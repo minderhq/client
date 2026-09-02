@@ -1,0 +1,188 @@
+@import "tailwindcss";
+
+/* Tailwind v4 defaults every `dark:` utility to `@media
+ * (prefers-color-scheme: dark)`, with no way to override the OS preference.
+ * Switching the variant to a `.dark` class match lets lib/theme.ts apply an
+ * explicit choice by toggling that class on <html> -- "system" (the
+ * default) still tracks the OS preference, just via JS instead of a bare
+ * media query, so nothing changes for anyone who never touches the toggle. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Self-hosted, no runtime CDN fetch: Minder ships offline-capable, and the
+ * client should not gain a network dependency Piper/gTTS et al. do not have.
+ * Only the weights headings actually use (400 fallback, 600 semibold, 700
+ * bold) to keep the bundle small. */
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+@import "@fontsource/ibm-plex-mono/700.css";
+
+/* ── Design tokens ──────────────────────────────────────────────────────────
+ * Minder is a mesh of independently-running services the user OWNS and
+ * operates. The visual language is an "instrument panel for infra you run
+ * yourself" — not a marketing SaaS. Two levers do most of the work app-wide:
+ *
+ *  1. The accent. Every `indigo-*` utility already sprinkled across ~25 pages
+ *     is remapped here to a teal/emerald ramp that reads as a network of
+ *     connected nodes rather than generic startup-blue. Recoloring the token
+ *     restyles every button, link, active nav item, and focus ring at once.
+ *     Ramp at hue ~168, contrast-checked: white on the 600 shade (the primary
+ *     button background) passes WCAG AA for normal text.
+ *
+ *  2. The neutrals. Tailwind's default `gray-*` is remapped to a cooler
+ *     "graphite" (slate) scale at the SAME lightness steps, so every existing
+ *     `text-gray-600 / dark:bg-gray-900` pairing keeps its contrast while the
+ *     whole app gains a more deliberate, cooler cast.
+ *
+ * Radii, shadows, and motion are set once here and consumed through the shared
+ * class tokens in lib/ui.ts, so a single edit here re-skins the app. */
+@theme {
+  /* Accent — teal/emerald "connected nodes" ramp (remaps every indigo-* util). */
+  --color-indigo-50: #ecfdf7;
+  --color-indigo-100: #d3f8ec;
+  --color-indigo-200: #a9efd9;
+  --color-indigo-300: #6fdfc2;
+  --color-indigo-400: #35c9a6;
+  --color-indigo-500: #14b192;
+  --color-indigo-600: #059478;
+  --color-indigo-700: #05745f;
+  --color-indigo-800: #075c4d;
+  --color-indigo-900: #084b40;
+  --color-indigo-950: #032b25;
+
+  /* Neutrals — cool graphite (slate) at Tailwind gray's lightness steps. */
+  --color-gray-50: #f7f8fa;
+  --color-gray-100: #eef1f5;
+  --color-gray-200: #e0e5ec;
+  --color-gray-300: #cbd3de;
+  --color-gray-400: #94a1b2;
+  --color-gray-500: #64748b;
+  --color-gray-600: #4a5768;
+  --color-gray-700: #364152;
+  --color-gray-800: #1f2733;
+  --color-gray-900: #141b25;
+  --color-gray-950: #0b0f16;
+
+  /* Softer default corner radius — modern, less boxy. */
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1.125rem;
+
+  /* Elevation — tinted, low-spread shadows that read as "lifted surface"
+   * rather than the default flat drop shadow. */
+  --shadow-sm: 0 1px 2px 0 rgb(11 15 22 / 0.06), 0 1px 3px -1px rgb(11 15 22 / 0.05);
+  --shadow-md: 0 2px 6px -1px rgb(11 15 22 / 0.08), 0 6px 16px -4px rgb(11 15 22 / 0.10);
+  --shadow-lg: 0 10px 30px -8px rgb(11 15 22 / 0.18), 0 4px 10px -4px rgb(11 15 22 / 0.10);
+
+  /* Snappy default transition. */
+  --default-transition-duration: 160ms;
+  --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Motion primitives (consumed via animate-* utilities below). */
+  --animate-fade-in: fade-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-rise: rise 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-pop: pop 0.16s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pop {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+:root {
+  color-scheme: light dark;
+}
+
+/* App canvas. The subtle radial washes evoke a lit control panel — faint in
+ * light mode, a touch more present in dark — without ever competing with
+ * content. `background-attachment: fixed` keeps them anchored to the viewport
+ * so long pages don't drag the glow with them. */
+body {
+  font-family:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  background-color: var(--color-gray-50);
+  background-image:
+    radial-gradient(60rem 60rem at 12% -8%, rgb(5 148 120 / 0.06), transparent 60%),
+    radial-gradient(48rem 48rem at 105% 0%, rgb(20 177 146 / 0.05), transparent 55%);
+  background-attachment: fixed;
+}
+
+.dark body {
+  background-color: var(--color-gray-950);
+  background-image:
+    radial-gradient(60rem 60rem at 10% -10%, rgb(5 148 120 / 0.14), transparent 60%),
+    radial-gradient(52rem 52rem at 108% -4%, rgb(20 177 146 / 0.10), transparent 55%);
+}
+
+/* Every page title and section heading gets the same technical, monospaced
+ * voice: a control panel for infra you run yourself, not a marketing page,
+ * while body copy stays in the system sans stack above for reading comfort.
+ * Tailwind utility classes on individual headings still apply on top; only
+ * the typeface + tracking is set here, once, for every h1 through h4. */
+h1,
+h2,
+h3,
+h4 {
+  font-family:
+    "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  letter-spacing: -0.02em;
+}
+
+h1 {
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+
+h2 {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+/* Brand-tinted text selection instead of the browser default blue. */
+::selection {
+  background-color: rgb(20 177 146 / 0.28);
+}
+
+/* Quieter, theme-aware scrollbars so long lists/graph panels don't get a
+ * heavy default gutter. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-gray-300) transparent;
+}
+.dark * {
+  scrollbar-color: var(--color-gray-700) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--color-gray-300);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.dark *::-webkit-scrollbar-thumb {
+  background-color: var(--color-gray-700);
+}
+
+/* Respect reduced-motion: drop the entrance animations entirely. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

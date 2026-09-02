@@ -1,0 +1,801 @@
+import { useEffect, useId, useRef, useState } from "react";
+
+import { Icon } from "../components/Icon";
+import { PageHeader } from "../components/PageHeader";
+import { StatusLine } from "../components/StatusLine";
+import { apiFetch, apiFetchBlob, friendlyErrorMessage, type Paginated } from "../lib/api";
+import { useAuth } from "../lib/auth";
+import { matchingSttLanguage } from "../lib/stt";
+import {
+  pickDefaultRewriteModel,
+  usableRewriteModels,
+  type RewriteModelInfo,
+} from "../lib/rewriteModel";
+import { badgeClass, cardClass, confidenceBadgeColor, fieldHintClass, inputClass, primaryButtonClass, secondaryButtonClass, surfaceMutedClass } from "../lib/ui";
+import { formatElapsed, useElapsedSeconds } from "../lib/useElapsedSeconds";
+
+interface LanguagesResponse {
+  languages: Record<string, string>;
+  default: string;
+  available: boolean;
+  auto_detect?: boolean;
+}
+
+interface TtsVoice {
+  id: string;
+  label: string;
+}
+
+interface VoicesResponse {
+  language: string;
+  voices: TtsVoice[];
+}
+
+interface SttResponse {
+  text: string;
+  language: string;
+  confidence: number;
+}
+
+/** Bumped on every "speak this back" click, even for identical text -- a
+ * plain string dependency wouldn't re-fire the effect that seeds the TTS
+ * card's textarea if the same transcript is sent back twice in a row. */
+interface Seed {
+  text: string;
+  nonce: number;
+}
+
+const TTS_EXAMPLES: { label: string; text: string }[] = [
+  { label: "Turkish greeting", text: "Merhaba, bugün nasılsın?" },
+  { label: "English pangram", text: "The quick brown fox jumps over the lazy dog." },
+  { label: "Numbers", text: "One, two, three, four, five." },
+];
+
+/** Regional Turkish speaking styles for the "character voice" rewrite (#596
+ * follow-up). Piper only ships ONE Turkish voice (tr_TR-dfki-medium, checked
+ * live against Piper's own catalog) -- there's no synthesis-level accent to
+ * pick, so a "region" here changes the WORDING via an LLM rewrite, not the
+ * audio itself. Kept to a small, well-known set rather than a long list: an
+ * LLM's grasp of a lesser-known dialect's real phrasing is inconsistent, and
+ * an honest small set beats a long one that reads the same for every entry. */
+interface RegionalStyle {
+  id: string;
+  label: string;
+}
+
+const REGIONAL_STYLES: RegionalStyle[] = [
+  { id: "karadeniz", label: "Karadeniz" },
+  { id: "ege", label: "Ege" },
+  { id: "trakya", label: "Trakya" },
+  { id: "guneydogu", label: "Güneydoğu" },
+];
+
+interface ChatCompletionResponse {
+  message?: { content?: string };
+}
+
+export function TextToSpeechCard({
+  token,
+  seed,
+}: {
+  token: string;
+  seed: Seed | null;
+}) {
+  const textId = useId();
+  const languageId = useId();
+  const voiceId = useId();
+  const regionalStyleId = useId();
+  const rewriteModelId = useId();
+  const [languages, setLanguages] = useState<Record<string, string>>({});
+  const [sttLanguages, setSttLanguages] = useState<Record<string, string>>({});
+  const [text, setText] = useState("");
+  const [language, setLanguage] = useState("tr");
+  const [voices, setVoices] = useState<TtsVoice[]>([]);
+  const [voice, setVoice] = useState("");
+  const [slow, setSlow] = useState(false);
+  const [status, setStatus] = useState("");
+  const [isError, setIsError] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [meta, setMeta] = useState<{ language: string; duration: string } | null>(null);
+  const [verifyResult, setVerifyResult] = useState<SttResponse | null>(null);
+  const [verifyBusy, setVerifyBusy] = useState(false);
+  const [regionalStyle, setRegionalStyle] = useState("");
+  const [rewriteModels, setRewriteModels] = useState<RewriteModelInfo[]>([]);
+  const [rewriteModel, setRewriteModel] = useState("");
+  const [rewriting, setRewriting] = useState(false);
+  const [preRewriteText, setPreRewriteText] = useState<string | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
+  const lastBlobRef = useRef<Blob | null>(null);
+
+  useEffect(() => {
+    apiFetch<LanguagesResponse>("/v1/tts/languages")
+      .then((res) => {
+        setLanguages(res.languages);
+        setLanguage(res.default);
+      })
+      .catch(() => {
+        setStatus("Could not load supported languages.");
+        setIsError(true);
+      });
+    // Only used to pick a matching locale for "verify by transcribing" --
+    // never shown as a selector, so a load failure here is silent (the
+    // verify button just stays disabled via matchingSttLanguage's null).
+    apiFetch<LanguagesResponse>("/v1/stt/languages")
+      .then((res) => setSttLanguages(res.languages))
+      .catch(() => {});
+    // For the regional-style rewrite's model picker below -- fetched once
+    // (not per-click) and reused, since the pulled-model list rarely
+    // changes mid-session and re-fetching on every click was wasteful.
+    apiFetch<Paginated<RewriteModelInfo>>("/v1/models?limit=500")
+      .then((res) => {
+        setRewriteModels(res.items);
+        setRewriteModel(pickDefaultRewriteModel(res.items));
+      })
+      .catch(() => {});
+  }, []);
+
+  // Voice choices are per-language (a gTTS-only language has none at all) --
+  // refetch whenever the selected language changes, and reset the current
+  // pick so a voice id from the PREVIOUS language never gets sent silently
+  // alongside a new one.
+  //
+  // Stale-response guard: rapidly switching languages before an earlier
+  // request resolves could otherwise let an out-of-order response overwrite
+  // `voices` with the wrong language's list, letting the user pick a voice ID
+  // that gets sent alongside a mismatched `language` in the POST /v1/tts body.
+  const voicesRequestRef = useRef(0);
+  useEffect(() => {
+    if (!language) return;
+    setVoice("");
+    const requestId = ++voicesRequestRef.current;
+    apiFetch<VoicesResponse>(`/v1/tts/voices?language=${encodeURIComponent(language)}`)
+      .then((res) => {
+        if (voicesRequestRef.current === requestId) setVoices(res.voices);
+      })
+      .catch(() => {
+        if (voicesRequestRef.current === requestId) setVoices([]);
+      });
+  }, [language]);
+
+  useEffect(() => {
+    // Revoke the previous object URL whenever it's replaced/unmounted --
+    // otherwise every synthesis leaks a blob URL for the session's lifetime.
+    return () => {
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (seed) {
+      setText(seed.text);
+      setPreRewriteText(null);
+    }
+  }, [seed]);
+
+  async function handleSpeak() {
+    if (!text.trim()) {
+      setStatus("Text is required.");
+      setIsError(true);
+      return;
+    }
+    setBusy(true);
+    setStatus("Synthesizing…");
+    setIsError(false);
+    setAudioUrl(null);
+    setVerifyResult(null);
+    try {
+      const { blob, headers } = await apiFetchBlob("/v1/tts", {
+        method: "POST",
+        body: { text, language, slow, voice: voice || undefined },
+        token,
+      });
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+      const url = URL.createObjectURL(blob);
+      objectUrlRef.current = url;
+      lastBlobRef.current = blob;
+      setAudioUrl(url);
+      setMeta({
+        language: headers.get("X-Language") ?? language,
+        duration: headers.get("X-Duration") ?? "",
+      });
+      setStatus("");
+    } catch (e) {
+      setStatus(friendlyErrorMessage(e));
+      setIsError(true);
+    }
+    setBusy(false);
+  }
+
+  const verifyLanguage = matchingSttLanguage(language, sttLanguages);
+
+  async function handleVerify() {
+    if (!lastBlobRef.current || !verifyLanguage) return;
+    setVerifyBusy(true);
+    setVerifyResult(null);
+    try {
+      const form = new FormData();
+      form.append("file", new File([lastBlobRef.current], "verify-clip"));
+      form.append("language", verifyLanguage);
+      const res = await apiFetch<SttResponse>("/v1/stt", {
+        method: "POST",
+        body: form,
+        token,
+      });
+      setVerifyResult(res);
+    } catch (e) {
+      setStatus(friendlyErrorMessage(e));
+      setIsError(true);
+    }
+    setVerifyBusy(false);
+  }
+
+  /** Rewrites the text's WORDING in a regional style via Ollama chat (#596
+   * follow-up: "creating a character and hearing that character's voice").
+   * This does NOT change the synthesized voice/accent -- Piper only ships
+   * one Turkish voice -- it changes the phrasing an LLM produces, which the
+   * standard voice then reads aloud. Explicitly a stylized approximation,
+   * not a linguistically accurate dialect transcription; the result lands
+   * back in the editable Text box (with Undo) rather than being spoken
+   * automatically, so a bad rewrite is never a surprise. */
+  async function handleRewrite() {
+    const style = REGIONAL_STYLES.find((s) => s.id === regionalStyle);
+    if (!text.trim() || !style) return;
+    if (!rewriteModel) {
+      setStatus(
+        "No ready model available to rewrite text — pull one on Model Management first.",
+      );
+      setIsError(true);
+      return;
+    }
+    setRewriting(true);
+    setStatus("");
+    setIsError(false);
+    // #597 bugfix: every early-return path used to skip setRewriting(false),
+    // leaving the button stuck on "Rewriting…" forever on either failure
+    // path below -- finally now guarantees it always clears.
+    try {
+      const res = await apiFetch<ChatCompletionResponse>("/v1/ai/chat/completions", {
+        method: "POST",
+        body: {
+          model: rewriteModel,
+          messages: [
+            {
+              role: "system",
+              content:
+                `Sen bir metin yeniden yazma asistanısın. Kullanıcının verdiği Türkçe ` +
+                `cümleyi, seslendirme (TTS) amaçlı olarak ${style.label} bölgesinin ağzına/` +
+                `şivesine yakın, günlük konuşma diline uygun şekilde yeniden yaz. Anlamı ` +
+                `değiştirme. SADECE yeniden yazılmış cümleyi yaz — bölge adı, tırnak ` +
+                `işareti, açıklama veya başka hiçbir şey ekleme.`,
+            },
+            { role: "user", content: text },
+          ],
+        },
+        token,
+      });
+      const rewritten = res.message?.content?.trim();
+      if (!rewritten) {
+        setStatus("The model returned an empty rewrite.");
+        setIsError(true);
+        return;
+      }
+      setPreRewriteText(text);
+      setText(rewritten);
+    } catch (e) {
+      setStatus(friendlyErrorMessage(e));
+      setIsError(true);
+    } finally {
+      setRewriting(false);
+    }
+  }
+
+  function handleUndoRewrite() {
+    if (preRewriteText === null) return;
+    setText(preRewriteText);
+    setPreRewriteText(null);
+  }
+
+  return (
+    <section className={`mb-6 ${cardClass}`}>
+      <h2 className="mb-1 flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
+        <Icon name="speaker" size={18} className="text-indigo-600 dark:text-indigo-400" />
+        Text to Speech
+      </h2>
+      <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+        Piper (offline) synthesizes bundled languages as WAV; anything else
+        falls back to gTTS (online) as MP3. A Voice picker appears when the
+        selected language has more than one bundled option (English currently
+        offers Male/Female; Turkish has one voice for now).
+      </p>
+      <fieldset disabled={!token} className="flex flex-col gap-3">
+        <div className="flex flex-wrap gap-1.5">
+          {TTS_EXAMPLES.map((ex) => (
+            <button
+              key={ex.label}
+              type="button"
+              onClick={() => {
+                setText(ex.text);
+                setPreRewriteText(null);
+              }}
+              className="rounded-full border border-gray-300 px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
+            >
+              {ex.label}
+            </button>
+          ))}
+        </div>
+        <div>
+          <label
+            htmlFor={textId}
+            className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+          >
+            Text
+          </label>
+          <textarea
+            id={textId}
+            className={inputClass}
+            rows={3}
+            value={text}
+            onChange={(e) => {
+              setText(e.target.value);
+              setPreRewriteText(null);
+            }}
+            placeholder="Type something to hear it spoken, or pick an example above…"
+          />
+        </div>
+        {/* Synthesis controls. A grid (not an items-end flex row) keeps the
+          Language/Voice selects top-aligned regardless of whether the optional
+          Voice picker is present, and gives the "Speak slowly" toggle its own
+          full-width row so it never wedges between two selects at a mismatched
+          baseline. */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label
+              htmlFor={languageId}
+              className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              Language
+            </label>
+            <select
+              id={languageId}
+              className={inputClass}
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+            >
+              {Object.entries(languages).map(([code, name]) => (
+                <option key={code} value={code}>
+                  {name} ({code})
+                </option>
+              ))}
+            </select>
+          </div>
+          {voices.length > 1 && (
+            <div>
+              <label
+                htmlFor={voiceId}
+                className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                Voice
+              </label>
+              <select
+                id={voiceId}
+                className={inputClass}
+                value={voice}
+                onChange={(e) => setVoice(e.target.value)}
+              >
+                {voices.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+        <label className="flex w-fit items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+          <input
+            className="h-4 w-4 rounded border-gray-300 disabled:cursor-not-allowed disabled:opacity-60"
+            type="checkbox"
+            checked={slow}
+            onChange={(e) => setSlow(e.target.checked)}
+          />
+          Speak slowly
+        </label>
+        {language === "tr" && (
+          <div className={`${surfaceMutedClass} p-4`}>
+            <div className="mb-1 flex items-center gap-2">
+              <Icon name="wand" size={15} className="text-indigo-500 dark:text-indigo-400" />
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                Regional style rewrite
+              </h3>
+              <span className={badgeClass}>experimental</span>
+            </div>
+            <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+              Rewrites the wording above using AI to sound like a region's
+              everyday speech, then reads it in the same standard Turkish voice —
+              Piper doesn't synthesize a different accent, only the phrasing
+              changes. A stylized approximation for fun, not a linguistically
+              accurate dialect.
+            </p>
+            {/* items-start so the "Rewrite model" hint below its select can grow
+              downward without pushing the two selects out of alignment — the
+              exact misalignment the old items-end flex row produced. */}
+            <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
+              <div>
+                <label
+                  htmlFor={regionalStyleId}
+                  className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  Regional style
+                </label>
+                <select
+                  id={regionalStyleId}
+                  className={inputClass}
+                  value={regionalStyle}
+                  onChange={(e) => setRegionalStyle(e.target.value)}
+                >
+                  <option value="">None (standard)</option>
+                  {REGIONAL_STYLES.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {usableRewriteModels(rewriteModels).length > 0 && (
+                <div>
+                  <label
+                    htmlFor={rewriteModelId}
+                    className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    Rewrite model
+                  </label>
+                  <select
+                    id={rewriteModelId}
+                    className={inputClass}
+                    value={rewriteModel}
+                    onChange={(e) => setRewriteModel(e.target.value)}
+                  >
+                    {usableRewriteModels(rewriteModels).map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.id}
+                      </option>
+                    ))}
+                  </select>
+                  <p className={fieldHintClass}>
+                    Some models ignore the Turkish instructions entirely — switch
+                    models here if a rewrite comes back wrong or in English.
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleRewrite}
+                disabled={rewriting || !regionalStyle || !text.trim() || !rewriteModel}
+                className={secondaryButtonClass}
+              >
+                <Icon name={rewriting ? "reset" : "wand"} size={15} className={rewriting ? "animate-spin" : undefined} />
+                {rewriting ? "Rewriting…" : "Rewrite text in this style"}
+              </button>
+              {preRewriteText !== null && (
+                <button type="button" onClick={handleUndoRewrite} className={secondaryButtonClass}>
+                  <Icon name="undo" size={15} />
+                  Undo rewrite
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={handleSpeak} disabled={busy} className={primaryButtonClass}>
+            <Icon name={busy ? "reset" : "play"} size={16} className={busy ? "animate-spin" : undefined} />
+            {busy ? "Synthesizing…" : "Speak"}
+          </button>
+          {!token && (
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              Log in to synthesize speech.
+            </span>
+          )}
+          <StatusLine isError={isError}>{status}</StatusLine>
+        </div>
+      </fieldset>
+      {audioUrl && (
+        <div className="mt-3 flex flex-col gap-2 rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={badgeClass}>{meta?.language ?? language}</span>
+            {meta?.duration && (
+              <span className={badgeClass}>~{Math.round(parseFloat(meta.duration))}s</span>
+            )}
+            <a
+              href={audioUrl}
+              download="speech"
+              className="flex items-center gap-1 text-sm text-indigo-600 hover:underline dark:text-indigo-400"
+            >
+              <Icon name="download" size={14} /> Download
+            </a>
+            <button
+              type="button"
+              onClick={handleVerify}
+              disabled={verifyBusy || !verifyLanguage}
+              title={
+                verifyLanguage
+                  ? "Feed this clip straight back into Speech-to-Text to confirm the round trip works"
+                  : "No matching Speech-to-Text locale for this language"
+              }
+              className={`${secondaryButtonClass} ml-auto`}
+            >
+              <Icon name={verifyBusy ? "reset" : "mic"} size={15} className={verifyBusy ? "animate-spin" : undefined} />
+              {verifyBusy ? "Transcribing…" : "Verify by transcribing"}
+            </button>
+          </div>
+          <audio controls src={audioUrl} className="w-full" />
+          {verifyResult && (
+            <p className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-gray-600 dark:text-gray-400">Transcribed back as:</span>
+              <span className="italic text-gray-900 dark:text-gray-100">
+                “{verifyResult.text || "(no speech detected)"}”
+              </span>
+              <span className={`${badgeClass} ${confidenceBadgeColor(verifyResult.confidence)}`}>
+                {Math.round(verifyResult.confidence * 100)}% confidence
+              </span>
+            </p>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function SpeechToTextCard({
+  token,
+  onSpeakBack,
+}: {
+  token: string;
+  onSpeakBack: (text: string) => void;
+}) {
+  const languageId = useId();
+  const [languages, setLanguages] = useState<Record<string, string>>({});
+  const [language, setLanguage] = useState("tr-TR");
+  const [status, setStatus] = useState("");
+  const [isError, setIsError] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<SttResponse | null>(null);
+  const [recording, setRecording] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const previewUrlRef = useRef<string | null>(null);
+  const elapsed = useElapsedSeconds(recording);
+
+  useEffect(() => {
+    apiFetch<LanguagesResponse>("/v1/stt/languages")
+      .then((res) => {
+        setLanguages(res.languages);
+        setLanguage(res.default);
+      })
+      .catch(() => {
+        setStatus("Could not load supported languages.");
+        setIsError(true);
+      });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    };
+  }, []);
+
+  // Release the microphone if the user navigates away mid-recording. Without
+  // this, getUserMedia's stream keeps the mic live (privacy + resource leak).
+  // Detach the handlers first so stopping doesn't fire onstop -> transcribe ->
+  // setState on an unmounted component (and doesn't upload an abandoned clip).
+  useEffect(() => {
+    return () => {
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        recorder.ondataavailable = null;
+        recorder.onstop = null;
+        try {
+          recorder.stop();
+        } catch {
+          /* already stopped */
+        }
+      }
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    };
+  }, []);
+
+  async function transcribe(file: File) {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    const url = URL.createObjectURL(file);
+    previewUrlRef.current = url;
+    setPreviewUrl(url);
+
+    setBusy(true);
+    setStatus("Transcribing…");
+    setIsError(false);
+    setResult(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("language", language);
+      const res = await apiFetch<SttResponse>("/v1/stt", {
+        method: "POST",
+        body: form,
+        token,
+      });
+      setResult(res);
+      setStatus("");
+    } catch (e) {
+      setStatus(friendlyErrorMessage(e));
+      setIsError(true);
+    }
+    setBusy(false);
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) transcribe(file);
+  }
+
+  async function handleStartRecording() {
+    setStatus("");
+    setIsError(false);
+    setResult(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const recorder = new MediaRecorder(stream);
+      chunksRef.current = [];
+      recorder.ondataavailable = (e) => chunksRef.current.push(e.data);
+      recorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        transcribe(new File([blob], "recording.webm", { type: "audio/webm" }));
+      };
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setRecording(true);
+    } catch (e) {
+      setStatus(
+        e instanceof Error
+          ? `Microphone access failed: ${e.message}`
+          : "Microphone access failed.",
+      );
+      setIsError(true);
+    }
+  }
+
+  function handleStopRecording() {
+    mediaRecorderRef.current?.stop();
+    setRecording(false);
+  }
+
+  return (
+    <section className={`mb-6 ${cardClass}`}>
+      <h2 className="mb-1 flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
+        <Icon name="mic" size={18} className="text-indigo-600 dark:text-indigo-400" />
+        Speech to Text
+      </h2>
+      <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+        Record from your microphone or upload an audio file — transcribed via
+        Google's speech recognition backend.
+      </p>
+      <fieldset disabled={!token} className="flex flex-col gap-3">
+        <div className="max-w-xs">
+          <label
+            htmlFor={languageId}
+            className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+          >
+            Language
+          </label>
+          <select
+            id={languageId}
+            className={inputClass}
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+          >
+            {Object.entries(languages).map(([code, name]) => (
+              <option key={code} value={code}>
+                {name} ({code})
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {!recording ? (
+            <button
+              type="button"
+              onClick={handleStartRecording}
+              disabled={busy}
+              className={primaryButtonClass}
+            >
+              <Icon name="mic" size={16} />
+              Record
+            </button>
+          ) : (
+            <button type="button" onClick={handleStopRecording} className={primaryButtonClass}>
+              <span className="inline-flex items-center gap-2">
+                <span
+                  className="h-2 w-2 animate-pulse rounded-full bg-red-300"
+                  aria-hidden="true"
+                />
+                Stop &amp; transcribe · {formatElapsed(elapsed)}
+              </span>
+            </button>
+          )}
+          <label className={`${secondaryButtonClass} cursor-pointer`}>
+            <Icon name="upload" size={15} />
+            Upload audio file
+            <input
+              type="file"
+              accept="audio/*"
+              className="hidden"
+              onChange={handleFileSelect}
+              disabled={busy || recording}
+            />
+          </label>
+          {!token && (
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              Log in to transcribe audio.
+            </span>
+          )}
+        </div>
+      </fieldset>
+      <StatusLine isError={isError}>{status}</StatusLine>
+      {previewUrl && (
+        <div className="mt-1 flex flex-col gap-2 rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
+          <audio controls src={previewUrl} className="w-full" />
+          {result && (
+            <>
+              <p className="whitespace-pre-wrap text-sm">
+                {result.text || "(no speech detected)"}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`${badgeClass} ${confidenceBadgeColor(result.confidence)}`}>
+                  {Math.round(result.confidence * 100)}% confidence
+                </span>
+                {result.text && (
+                  <button
+                    type="button"
+                    onClick={() => onSpeakBack(result.text)}
+                    className={`${secondaryButtonClass} ml-auto`}
+                  >
+                    <Icon name="speaker" size={15} />
+                    Speak this back
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+export function VoicePage() {
+  const { token } = useAuth();
+  const [seed, setSeed] = useState<Seed | null>(null);
+
+  return (
+    <>
+      <PageHeader
+        icon="voice"
+        title="Voice"
+        subtitle="Try Minder's text-to-speech and speech-to-text engines directly — ~12 languages supported, Turkish by default. Browsing is open for everyone; log in to synthesize or transcribe."
+      />
+      <TextToSpeechCard token={token} seed={seed} />
+      <SpeechToTextCard
+        token={token}
+        onSpeakBack={(text) => setSeed({ text, nonce: Date.now() })}
+      />
+    </>
+  );
+}
