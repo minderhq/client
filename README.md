@@ -1,6 +1,6 @@
 # minder-console
 
-Minder's **management console** — the operator web UI (open source, MIT).
+Minder's **management console** — the operator web UI (open source, Apache-2.0).
 React 18 + Vite + React Router 7 + Tailwind 4, ~6.3k LOC. Served on `:8009`
 (loopback + Traefik `client.minder.local`, forward-auth gated).
 
