@@ -342,9 +342,13 @@ export function ModelManagementPage() {
         subtitle="Pull, delete, and test Ollama models on Minder's own model-management service. Browsing is open for everyone; log in to test a prompt. Pulling and deleting require an admin account."
       />
       <InfoCallout icon="models">
-        <a className="font-medium underline" href={openWebUiUrl}>
-          OpenWebUI
-        </a>
+        {openWebUiUrl ? (
+          <a className="font-medium underline" href={openWebUiUrl}>
+            OpenWebUI
+          </a>
+        ) : (
+          <span className="font-medium">OpenWebUI</span>
+        )}
         's own Admin Panel → Connections → Ollama → Manage offers the same
         pull/delete against this same Ollama instance too, with more
         per-model settings (system prompts, parameters) if you're already
