@@ -50,10 +50,20 @@ function claimToString(v: unknown): string {
   return "";
 }
 
+/** A JWT payload segment → parsed JSON. Decodes the bytes as **UTF-8** (so
+ * non-ASCII usernames/emails — İ, ş, ğ, ö, … — survive instead of turning into
+ * mojibake, which plain `atob`'s Latin-1 output does) and pads url-safe base64
+ * so `atob` doesn't throw on an unpadded segment. */
+function decodePayload(seg: string): Record<string, unknown> {
+  const b64 = seg.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+  const bytes = Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes)) as Record<string, unknown>;
+}
+
 export function decodeJwtClaims(jwt: string): JwtClaims {
   try {
-    const payload = jwt.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    const decoded = JSON.parse(atob(payload)) as Record<string, unknown>;
+    const decoded = decodePayload(jwt.split(".")[1]);
     return {
       username: typeof decoded.username === "string" ? decoded.username : "",
       email: typeof decoded.email === "string" ? decoded.email : "",

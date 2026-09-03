@@ -6,7 +6,10 @@ import { decodeJwtClaims, isExpired } from "./jwt";
  * base64url encoding of `claims`. Only the payload segment is ever read, so the
  * header/signature are inert placeholders. */
 function makeJwt(claims: Record<string, unknown>): string {
-  const b64 = btoa(JSON.stringify(claims))
+  // UTF-8 encode first (like a real JWT) so non-ASCII claims round-trip; plain
+  // btoa(str) can't encode code points > 255.
+  const bytes = new TextEncoder().encode(JSON.stringify(claims));
+  const b64 = btoa(String.fromCharCode(...bytes))
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");
@@ -53,6 +56,19 @@ describe("decodeJwtClaims", () => {
     // substitution in decode is actually exercised.
     const jwt = makeJwt({ username: "a>b?c", email: "", role: "", exp: 0 });
     expect(decodeJwtClaims(jwt).username).toBe("a>b?c");
+  });
+
+  it("decodes non-ASCII (Turkish) usernames/emails without mojibake", () => {
+    const jwt = makeJwt({
+      username: "İhsan Şşğ",
+      email: "öörnek@çay.com",
+      role: "üye",
+      exp: 0,
+    });
+    const claims = decodeJwtClaims(jwt);
+    expect(claims.username).toBe("İhsan Şşğ");
+    expect(claims.email).toBe("öörnek@çay.com");
+    expect(claims.role).toBe("üye");
   });
 
   it("fails open to empty claims on a malformed token", () => {
