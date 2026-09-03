@@ -173,9 +173,13 @@ function Callouts(): ReactNode {
   return (
     <div className="flex flex-col gap-3">
       <InfoCallout icon="models">
-        <a className="font-medium underline" href={openWebUiUrl}>
-          OpenWebUI
-        </a>
+        {openWebUiUrl ? (
+          <a className="font-medium underline" href={openWebUiUrl}>
+            OpenWebUI
+          </a>
+        ) : (
+          <span className="font-medium">OpenWebUI</span>
+        )}
         's own Admin Panel → Connections → Ollama → Manage offers the same
         pull/delete against this same Ollama instance too, with more
         per-model settings (system prompts, parameters) if you're already

@@ -41,6 +41,12 @@ ENV VITE_OIDC_LOGIN_URL=$VITE_OIDC_LOGIN_URL
 ARG VITE_AUTHELIA_PORTAL_URL=
 ENV VITE_AUTHELIA_PORTAL_URL=$VITE_AUTHELIA_PORTAL_URL
 
+# OpenWebUI link target -- same build-time, no-default rule: unset -> the UI
+# shows "OpenWebUI" as plain text instead of a dead/mixed-content link. A real
+# deployment sets it to OpenWebUI's routed URL (e.g. https://chat.<domain>).
+ARG VITE_OPENWEBUI_URL=
+ENV VITE_OPENWEBUI_URL=$VITE_OPENWEBUI_URL
+
 RUN npm run build
 
 # Same pinned nginx:alpine already used for ollama-router elsewhere in this
