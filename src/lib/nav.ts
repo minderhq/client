@@ -138,6 +138,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Organization",
     items: [
       { to: "/organization", label: "Overview", icon: "org", end: true, description: "Your org, its members & switching", keywords: "organization tenant workspace switch members" },
+      { to: "/billing", label: "Billing", icon: "billing", description: "Your plan, subscription & upgrades", keywords: "subscription plan upgrade payment tier pricing invoice" },
       { to: "/platform/teams", label: "Teams", icon: "teams", description: "Group people & share resources", keywords: "groups members sharing collaborate" },
       { to: "/organizations", label: "All Organizations", icon: "org", adminOnly: true, description: "Every org on the instance + provisioning (admin)", keywords: "organizations tenants provision create admin" },
       { to: "/platform/users", label: "All Users", icon: "users", adminOnly: true, description: "Instance-wide accounts & roles (admin) — distinct from this org's members above", keywords: "users accounts roles admin people members" },
