@@ -64,8 +64,18 @@ function fakeFile(name: string) {
 }
 
 afterEach(() => {
-  apiFetch.mockReset();
+  // Unmount BEFORE resetting the mock. cleanup() aborts any in-flight
+  // useAsyncResource fetch (e.g. DocumentsList's docs load, or the reload()
+  // that handleDelete kicks off) via its abort signal. If we reset first, a
+  // still-mounted component could re-invoke apiFetch in the window before
+  // unmount and get `undefined` back, so `apiFetch(...).then(...)` throws
+  // "Cannot read properties of undefined (reading 'then')" during commit — a
+  // flaky, cross-test CI failure that never reproduced in isolation.
   cleanup();
+  apiFetch.mockReset();
+  // Final safety net: any late/leaked call resolves to an empty page instead
+  // of undefined, so it can never crash a subsequent test's render.
+  apiFetch.mockResolvedValue({ items: [] });
 });
 
 // ChunkViewer is a pure presentational component (lazy-loads a document's
