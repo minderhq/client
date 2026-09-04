@@ -4,6 +4,7 @@ import {
   ArrowRight,
   Bot,
   Boxes,
+  CreditCard,
   Building2,
   Check,
   ChevronsUpDown,
@@ -85,6 +86,7 @@ import {
 export const ICONS = {
   home: LayoutDashboard,
   ask: Sparkles,
+  billing: CreditCard,
   // RAG
   "knowledge-bases": Library,
   pipelines: Workflow,

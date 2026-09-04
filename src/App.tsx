@@ -20,6 +20,7 @@ import { AllOrganizationsPage } from "./pages/AllOrganizationsPage";
 import { AuditLogPage } from "./pages/AuditLogPage";
 import { AvailableToolsPage } from "./pages/AvailableToolsPage";
 import { BackupsPage } from "./pages/BackupsPage";
+import { BillingPage } from "./pages/BillingPage";
 import { ConversationsPage } from "./pages/ConversationsPage";
 import { GraphExplorerPage } from "./pages/GraphExplorerPage";
 import { HomePage } from "./pages/HomePage";
@@ -139,6 +140,7 @@ export function App() {
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/auth/callback" element={<AuthCallbackPage />} />
                   <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/billing" element={<BillingPage />} />
                   <Route path="/invite/:token" element={<InviteRedeemPage />} />
 
                   <Route path="/rag" element={<KnowledgeBasesPage />} />
