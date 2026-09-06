@@ -48,8 +48,8 @@ function job(overrides: Partial<BackupJob> = {}): BackupJob {
 
 describe("RestoreControl", () => {
   afterEach(() => {
-    apiFetch.mockReset();
     cleanup();
+    apiFetch.mockReset();
   });
 
   it("keeps the confirm button disabled until the typed text exactly matches the filename", () => {
@@ -173,9 +173,9 @@ describe("JobRow", () => {
 
 describe("BackupsPage", () => {
   afterEach(() => {
+    cleanup();
     apiFetch.mockReset();
     mockAuth = { token: "", role: "" };
-    cleanup();
   });
 
   it("shows an admin-required hint and never fetches when logged out", () => {

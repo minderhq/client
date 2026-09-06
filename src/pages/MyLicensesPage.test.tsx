@@ -34,8 +34,8 @@ function license(overrides: Partial<License> = {}): License {
 
 describe("MyLicensesPage", () => {
   afterEach(() => {
-    apiFetch.mockReset();
     cleanup();
+    apiFetch.mockReset();
   });
 
   it("prompts a logged-out user to log in instead of fetching anything", () => {

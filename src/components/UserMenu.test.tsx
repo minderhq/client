@@ -20,8 +20,8 @@ function renderMenu() {
 
 describe("UserMenu", () => {
   afterEach(() => {
-    useAuth.mockReset();
     cleanup();
+    useAuth.mockReset();
   });
 
   it("shows a Log in link to /login when logged out", () => {

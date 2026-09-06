@@ -75,9 +75,9 @@ function routeApiFetch(opts: {
 
 describe("HomePage", () => {
   afterEach(() => {
+    cleanup();
     apiFetch.mockReset();
     mockAuth = { isAuthenticated: false, username: "", token: "" };
-    cleanup();
   });
 
   it("greets an anonymous visitor and still loads stats (browsing is open to everyone)", async () => {

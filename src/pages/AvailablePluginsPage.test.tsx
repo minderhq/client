@@ -110,8 +110,8 @@ function renderCard(overrides: {
 
 describe("PluginCard", () => {
   afterEach(() => {
-    apiFetch.mockReset();
     cleanup();
+    apiFetch.mockReset();
   });
 
   it("installs the plugin and shows the success banner", async () => {
@@ -240,9 +240,9 @@ function routeApiFetch(handlers: {
 
 describe("AvailablePluginsPage", () => {
   afterEach(() => {
+    cleanup();
     apiFetch.mockReset();
     mockAuth = { token: "", isAuthenticated: false };
-    cleanup();
   });
 
   it("renders the catalog and excludes plugins already shown in Featured", async () => {
