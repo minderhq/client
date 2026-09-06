@@ -38,8 +38,8 @@ function submission(overrides: Partial<Submission> = {}): Submission {
 
 describe("ReviewQueuePage", () => {
   afterEach(() => {
-    apiFetch.mockReset();
     cleanup();
+    apiFetch.mockReset();
   });
 
   it("tells a non-admin the page is admins-only and never fetches", () => {

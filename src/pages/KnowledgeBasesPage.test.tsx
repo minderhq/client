@@ -64,8 +64,8 @@ function fakeFile(name: string) {
 }
 
 afterEach(() => {
-  apiFetch.mockReset();
   cleanup();
+  apiFetch.mockReset();
 });
 
 // ChunkViewer is a pure presentational component (lazy-loads a document's

@@ -15,8 +15,8 @@ vi.mock("../lib/auth", () => ({
 
 describe("LogViewer", () => {
   afterEach(() => {
-    apiFetch.mockReset();
     cleanup();
+    apiFetch.mockReset();
   });
 
   it("fetches logs only once expanded, not on initial render", () => {
@@ -129,8 +129,8 @@ describe("LogViewer", () => {
 
 describe("StatusPage", () => {
   afterEach(() => {
-    apiFetch.mockReset();
     cleanup();
+    apiFetch.mockReset();
   });
 
   it("shows a loading state, then an empty state when no services are reported", async () => {

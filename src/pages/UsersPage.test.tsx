@@ -30,9 +30,9 @@ function user(overrides: Partial<ManagedUser> = {}): ManagedUser {
 
 describe("UsersPage", () => {
   afterEach(() => {
+    cleanup();
     apiFetch.mockReset();
     mockAuth = { token: "", role: "" };
-    cleanup();
   });
 
   it("shows an admin-required hint and never fetches when logged out", () => {
