@@ -33,8 +33,8 @@ function candidate(overrides: Partial<Record<string, unknown>> = {}) {
 
 describe("EntityMergeReviewPage", () => {
   afterEach(() => {
-    apiFetch.mockReset();
     cleanup();
+    apiFetch.mockReset();
   });
 
   it("tells a logged-out visitor to log in and never fetches", () => {

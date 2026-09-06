@@ -37,9 +37,9 @@ function user(overrides: Partial<DirectoryUser> = {}): DirectoryUser {
 
 describe("AllOrganizationsPage", () => {
   afterEach(() => {
+    cleanup();
     apiFetch.mockReset();
     mockAuth = { isAuthenticated: false, token: "", role: "" };
-    cleanup();
   });
 
   it("gates the page behind admin and never fetches otherwise", () => {

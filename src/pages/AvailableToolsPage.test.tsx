@@ -48,8 +48,8 @@ function renderPage() {
 
 describe("AvailableToolsPage", () => {
   afterEach(() => {
-    apiFetch.mockReset();
     cleanup();
+    apiFetch.mockReset();
   });
 
   it("shows an empty state when the catalog has no tools", async () => {

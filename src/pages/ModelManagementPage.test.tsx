@@ -51,8 +51,8 @@ function baseApiFetchMock() {
 
 describe("ModelCard delete", () => {
   afterEach(() => {
-    apiFetch.mockReset();
     cleanup();
+    apiFetch.mockReset();
   });
 
   it("does not delete when the confirmation is declined", async () => {
@@ -121,8 +121,8 @@ describe("ModelCard delete", () => {
 
 describe("PullModelForm", () => {
   afterEach(() => {
-    apiFetch.mockReset();
     cleanup();
+    apiFetch.mockReset();
   });
 
   it("rejects an empty model id without calling the API", () => {
@@ -232,9 +232,9 @@ function routeApiFetch(items: ModelInfo[]) {
 
 describe("ModelManagementPage", () => {
   afterEach(() => {
+    cleanup();
     apiFetch.mockReset();
     mockAuth = { token: "", role: "" };
-    cleanup();
   });
 
   it("shows an empty state when no models are pulled", async () => {

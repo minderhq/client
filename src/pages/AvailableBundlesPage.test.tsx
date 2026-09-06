@@ -26,8 +26,8 @@ function bundle(overrides: Partial<Bundle> = {}): Bundle {
 }
 
 afterEach(() => {
-  apiFetch.mockReset();
   cleanup();
+  apiFetch.mockReset();
 });
 
 describe("AvailableBundlesPage", () => {

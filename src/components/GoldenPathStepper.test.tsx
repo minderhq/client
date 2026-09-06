@@ -27,9 +27,9 @@ function renderStepper() {
 }
 
 afterEach(() => {
+  cleanup();
   useAuthMock.mockReset();
   useJourneyMock.mockReset();
-  cleanup();
 });
 
 describe("GoldenPathStepper", () => {

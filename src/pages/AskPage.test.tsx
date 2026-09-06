@@ -117,10 +117,10 @@ function routeApiFetch(opts: {
 
 describe("AskPage", () => {
   afterEach(() => {
+    cleanup();
     apiFetch.mockReset();
     mockAuth = { token: "", isAuthenticated: false };
     searchParams = new URLSearchParams();
-    cleanup();
   });
 
   it("shows an empty state pointing at Pipelines when there are none yet", async () => {

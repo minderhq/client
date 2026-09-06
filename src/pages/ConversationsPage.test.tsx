@@ -34,9 +34,9 @@ function conversation(overrides: Partial<{
 
 describe("ConversationsPage", () => {
   afterEach(() => {
+    cleanup();
     apiFetch.mockReset();
     navigate.mockReset();
-    cleanup();
   });
 
   it("prompts to log in and never fetches when there's no token", () => {
