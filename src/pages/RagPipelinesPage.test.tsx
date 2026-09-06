@@ -48,8 +48,8 @@ vi.mock("../components/ConfirmDialog", () => ({
 }));
 
 afterEach(() => {
-  apiFetch.mockReset();
   cleanup();
+  apiFetch.mockReset();
 });
 
 // AutoRouterStatsCard is a pure presentational component (GET /v1/rag/decision-stats

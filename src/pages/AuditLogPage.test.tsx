@@ -53,9 +53,9 @@ function page(entries: Entry[], total = entries.length) {
 
 describe("AuditLogPage", () => {
   afterEach(() => {
+    cleanup();
     apiFetch.mockReset();
     mockAuth = { isAuthenticated: false, token: "", role: "" };
-    cleanup();
   });
 
   it("gates the page behind admin and never fetches otherwise", () => {

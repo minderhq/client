@@ -37,8 +37,8 @@ function submission(overrides: Partial<Submission> = {}): Submission {
 
 describe("SubmissionsPage", () => {
   afterEach(() => {
-    apiFetch.mockReset();
     cleanup();
+    apiFetch.mockReset();
   });
 
   it("prompts a logged-out user to log in instead of showing the form", () => {

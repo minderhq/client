@@ -24,9 +24,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  cleanup();
   vi.unstubAllGlobals();
   document.documentElement.classList.remove("dark");
-  cleanup();
 });
 
 describe("ThemeToggle", () => {

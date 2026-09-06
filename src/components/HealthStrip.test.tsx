@@ -26,8 +26,8 @@ vi.mock("react-router-dom", () => ({
 }));
 
 afterEach(() => {
-  apiFetch.mockReset();
   cleanup();
+  apiFetch.mockReset();
 });
 
 describe("HealthStrip", () => {
