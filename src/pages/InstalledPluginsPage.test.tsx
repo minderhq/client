@@ -52,10 +52,10 @@ function installation(overrides: Partial<Installation> = {}): Installation {
 }
 
 afterEach(() => {
+  cleanup();
   apiFetch.mockReset();
   mockConfirm.mockReset();
   mockAuth = { token: "tok", isAuthenticated: true };
-  cleanup();
 });
 
 describe("InstalledPluginsPage", () => {

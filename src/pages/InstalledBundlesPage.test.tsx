@@ -43,9 +43,9 @@ async function importFile(content: unknown) {
 
 describe("InstalledBundlesPage", () => {
   afterEach(() => {
+    cleanup();
     apiFetch.mockReset();
     mockAuth = { token: "tok", role: "admin" };
-    cleanup();
   });
 
   it("shows only the enabled bundles", async () => {
@@ -149,9 +149,9 @@ describe("InstalledBundlesPage", () => {
 
 describe("ExportImportPanel import logic", () => {
   afterEach(() => {
+    cleanup();
     apiFetch.mockReset();
     onChanged.mockReset();
-    cleanup();
   });
 
   it("skips an unknown bundle name without calling the API", async () => {

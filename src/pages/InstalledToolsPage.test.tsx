@@ -52,8 +52,8 @@ async function openAndRun(paramsText?: string) {
 
 describe("TryItPanel", () => {
   afterEach(() => {
-    apiFetch.mockReset();
     cleanup();
+    apiFetch.mockReset();
   });
 
   it("pre-fills a schema-derived example the user can edit", () => {
@@ -142,8 +142,8 @@ describe("TryItPanel", () => {
 
 describe("InstalledToolsPage", () => {
   afterEach(() => {
-    apiFetch.mockReset();
     cleanup();
+    apiFetch.mockReset();
   });
 
   it("shows an empty state when no plugin exposes a live tool", async () => {

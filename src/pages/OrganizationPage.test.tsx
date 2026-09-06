@@ -114,12 +114,12 @@ function routeApiFetch(opts: {
 
 describe("OrganizationPage", () => {
   afterEach(() => {
+    cleanup();
     apiFetch.mockReset();
     copyText.mockReset();
     confirmMock.mockReset();
     confirmMock.mockResolvedValue(true);
     mockAuth = { isAuthenticated: false, token: "", role: "", activeTenantId: "", orgRole: "" };
-    cleanup();
   });
 
   it("shows a login prompt and never fetches when logged out", () => {

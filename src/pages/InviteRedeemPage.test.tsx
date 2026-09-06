@@ -53,11 +53,11 @@ function inviteInfo(overrides: Partial<Record<string, unknown>> = {}) {
 
 describe("InviteRedeemPage", () => {
   afterEach(() => {
+    cleanup();
     apiFetch.mockReset();
     navigate.mockReset();
     loginWithToken.mockReset();
     mockAuth = { token: "", isAuthenticated: false, loginWithToken };
-    cleanup();
   });
 
   it("shows a login prompt when not authenticated", async () => {

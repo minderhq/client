@@ -73,9 +73,9 @@ async function selectRegionalStyle() {
 
 describe("TextToSpeechCard rewrite", () => {
   afterEach(() => {
+    cleanup();
     apiFetch.mockReset();
     apiFetchBlob.mockReset();
-    cleanup();
   });
 
   it("rewrites the text and shows Undo, using the correct model/messages", async () => {
@@ -201,9 +201,9 @@ describe("TextToSpeechCard rewrite", () => {
 
 describe("TextToSpeechCard speak/verify", () => {
   afterEach(() => {
+    cleanup();
     apiFetch.mockReset();
     apiFetchBlob.mockReset();
-    cleanup();
   });
 
   function mockBlobResponse(overrides: Record<string, string> = {}) {
@@ -392,8 +392,8 @@ describe("TextToSpeechCard speak/verify", () => {
 
 describe("SpeechToTextCard", () => {
   afterEach(() => {
-    apiFetch.mockReset();
     cleanup();
+    apiFetch.mockReset();
     vi.unstubAllGlobals();
   });
 
@@ -579,8 +579,8 @@ describe("SpeechToTextCard", () => {
 
 describe("VoicePage", () => {
   afterEach(() => {
-    apiFetch.mockReset();
     cleanup();
+    apiFetch.mockReset();
   });
 
   it("renders both the Text to Speech and Speech to Text cards", async () => {

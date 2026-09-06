@@ -57,10 +57,10 @@ function detail(overrides: Partial<TeamDetail> = {}): TeamDetail {
 
 describe("TeamsPage", () => {
   afterEach(() => {
+    cleanup();
     apiFetch.mockReset();
     loginWithToken.mockReset();
     mockAuth = { token: "", username: "", role: "", loginWithToken };
-    cleanup();
   });
 
   it("shows a login hint and never fetches when logged out", () => {
