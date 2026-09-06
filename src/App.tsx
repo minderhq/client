@@ -21,6 +21,7 @@ import { AuditLogPage } from "./pages/AuditLogPage";
 import { AvailableToolsPage } from "./pages/AvailableToolsPage";
 import { BackupsPage } from "./pages/BackupsPage";
 import { BillingPage } from "./pages/BillingPage";
+import { CloudProvidersPage } from "./pages/CloudProvidersPage";
 import { ConversationsPage } from "./pages/ConversationsPage";
 import { GraphExplorerPage } from "./pages/GraphExplorerPage";
 import { HomePage } from "./pages/HomePage";
@@ -202,6 +203,7 @@ export function App() {
                   />
 
                   <Route path="/platform" element={<ModelManagementPage />} />
+                  <Route path="/platform/providers" element={<CloudProvidersPage />} />
                   <Route path="/platform/status" element={<StatusPage />} />
                   <Route path="/platform/voice" element={<VoicePage />} />
                   <Route path="/platform/backups" element={<BackupsPage />} />

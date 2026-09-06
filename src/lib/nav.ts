@@ -117,6 +117,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Platform",
     items: [
       { to: "/platform", label: "Models", icon: "models", end: true, description: "Local LLMs (Ollama): pull, test, remove", keywords: "ollama llm pull download" },
+      { to: "/platform/providers", label: "Cloud Providers", icon: "globe", adminOnly: true, description: "Connect OpenAI-compatible or Anthropic providers (admin)", keywords: "openai anthropic cloud remote provider api key credential" },
       { to: "/platform/voice", label: "Voice", icon: "voice", description: "Text-to-speech & speech-to-text", keywords: "tts stt speech piper transcribe" },
       {
         to: "/bundles/available",
