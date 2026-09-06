@@ -55,6 +55,22 @@ interface PluginRequires {
   bundles: string[];
 }
 
+interface JsonSchemaProperty {
+  type?: string;
+  enum?: unknown[];
+  description?: string;
+}
+
+interface JsonSchema {
+  properties?: Record<string, JsonSchemaProperty>;
+  required?: string[];
+}
+
+type UiSchema = Record<
+  string,
+  { "ui:widget"?: string; "ui:placeholder"?: string; "ui:rows"?: number }
+>;
+
 interface PluginConfigResponse {
   configurable: boolean;
   schema: ConfigField[];
@@ -64,6 +80,51 @@ interface PluginConfigResponse {
   display?: PluginDisplay | null;
   requires?: PluginRequires | null;
   capabilities?: string[];
+  // RFC 0001 (#1263) Increment 2: the scalable form for plugins with no flat
+  // `schema` (nested/enum/conditional shapes that don't fit ConfigField).
+  json_schema?: JsonSchema | null;
+  ui_schema?: UiSchema | null;
+}
+
+/** Maps json_schema/ui_schema onto the existing ConfigField shape so the flat
+ * schema's rendering/submission logic (FieldInput, handleSubmit's int/float
+ * coercion) covers advanced plugins for free -- only used when the flat
+ * `schema` list is empty (RFC 0001's back-compat: a flat CONFIG_SCHEMA always
+ * compiles to json_schema too, so the flat list stays authoritative when
+ * present). Nested objects/arrays have no ConfigField equivalent and are
+ * skipped -- graceful degradation per the RFC, not a crash. */
+function jsonSchemaToConfigFields(
+  jsonSchema: JsonSchema | null | undefined,
+  uiSchema: UiSchema | null | undefined,
+): ConfigField[] {
+  const properties = jsonSchema?.properties;
+  if (!properties) return [];
+  const required = new Set(jsonSchema?.required ?? []);
+  const fields: ConfigField[] = [];
+  for (const [key, prop] of Object.entries(properties)) {
+    const hint = uiSchema?.[key];
+    const type: ConfigField["type"] =
+      prop.type === "integer"
+        ? "int"
+        : prop.type === "number"
+          ? "float"
+          : prop.type === "boolean"
+            ? "bool"
+            : undefined;
+    fields.push({
+      key,
+      type,
+      secret: hint?.["ui:widget"] === "secret",
+      description: required.has(key)
+        ? [prop.description, "(required)"].filter(Boolean).join(" ")
+        : prop.description,
+      widget: hint?.["ui:widget"] ?? (prop.enum ? "select" : undefined),
+      options: prop.enum?.map((v) => ({ value: v, label: String(v) })),
+      rows: hint?.["ui:rows"],
+      placeholder: hint?.["ui:placeholder"],
+    });
+  }
+  return fields;
 }
 
 function hasRequires(r: PluginRequires | null | undefined): boolean {
@@ -215,7 +276,11 @@ export function ConfigurePanel({ name, token }: { name: string; token: string })
         { token },
       );
       setConfigurable(cfg.configurable);
-      setSchema(cfg.schema);
+      setSchema(
+        cfg.schema.length > 0
+          ? cfg.schema
+          : jsonSchemaToConfigFields(cfg.json_schema, cfg.ui_schema),
+      );
       setDisplay(cfg.display ?? null);
       setRequires(cfg.requires ?? null);
       setValues(cfg.values);
