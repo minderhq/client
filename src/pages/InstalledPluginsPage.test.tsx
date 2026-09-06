@@ -324,6 +324,50 @@ describe("ConfigurePanel", () => {
     expect((screen.getByLabelText("mode") as HTMLElement).tagName).toBe("SELECT");
   });
 
+  it("renders a form from json_schema/ui_schema when the flat schema is empty (#1263)", async () => {
+    apiFetch.mockResolvedValueOnce({
+      configurable: true,
+      schema: [],
+      json_schema: {
+        properties: {
+          api_key: { type: "string" },
+          max_results: { type: "integer" },
+          mode: { type: "string", enum: ["fast", "thorough"] },
+        },
+        required: ["api_key"],
+      },
+      ui_schema: { api_key: { "ui:widget": "secret" } },
+      values: { max_results: 5, mode: "fast" },
+    });
+    render(<ConfigurePanel name="advanced-plugin" token="tok" />);
+
+    fireEvent.click(screen.getByText("Configure"));
+
+    expect(await screen.findByText("(required)")).toBeTruthy();
+    expect((screen.getByLabelText("api_key") as HTMLInputElement).type).toBe(
+      "password",
+    );
+    expect((screen.getByLabelText("max_results") as HTMLInputElement).type).toBe(
+      "number",
+    );
+    expect((screen.getByLabelText("mode") as HTMLElement).tagName).toBe("SELECT");
+  });
+
+  it("prefers the flat schema over json_schema when both are present (back-compat)", async () => {
+    apiFetch.mockResolvedValueOnce({
+      configurable: true,
+      schema: [{ key: "flat_field", type: "string" }],
+      json_schema: { properties: { flat_field: { type: "string" } } },
+      ui_schema: {},
+      values: { flat_field: "x" },
+    });
+    render(<ConfigurePanel name="my-plugin" token="tok" />);
+
+    fireEvent.click(screen.getByText("Configure"));
+
+    expect(await screen.findByLabelText("flat_field")).toBeTruthy();
+  });
+
   it("skips an emptied/invalid number field instead of saving null (#field-nan-guard)", async () => {
     apiFetch.mockResolvedValueOnce({
       configurable: true,
