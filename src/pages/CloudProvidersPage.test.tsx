@@ -133,6 +133,39 @@ describe("CloudProvidersPage", () => {
     );
   });
 
+  it("shows the test result via the status line", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    apiFetch.mockResolvedValueOnce([provider()]);
+    render(<CloudProvidersPage />);
+    await screen.findByText("OpenAI (production)");
+
+    apiFetch.mockResolvedValueOnce({ ok: true, detail: "connection verified" });
+    fireEvent.click(screen.getByText("Test"));
+
+    expect(await screen.findByText("connection verified")).toBeTruthy();
+    expect(apiFetch).toHaveBeenLastCalledWith("/v1/model-providers/p1/test", {
+      method: "POST",
+      token: "tok",
+    });
+  });
+
+  it("shows a bad-key test result as an error, without a thrown exception", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    apiFetch.mockResolvedValueOnce([provider()]);
+    render(<CloudProvidersPage />);
+    await screen.findByText("OpenAI (production)");
+
+    apiFetch.mockResolvedValueOnce({
+      ok: false,
+      detail: "authentication failed — check the API key",
+    });
+    fireEvent.click(screen.getByText("Test"));
+
+    expect(
+      await screen.findByText("authentication failed — check the API key"),
+    ).toBeTruthy();
+  });
+
   it("deletes a provider only after confirmation", async () => {
     mockAuth = { token: "tok", role: "admin" };
     apiFetch.mockResolvedValueOnce([provider()]);
