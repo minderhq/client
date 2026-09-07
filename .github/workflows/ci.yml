@@ -56,5 +56,24 @@ jobs:
     runs-on: ${{ github.event_name == 'push' && fromJSON('["self-hosted","Linux","X64","org-shared"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
       - name: Build image
-        run: docker build -t minder-console:ci .
+        # A plain `docker build` here had no layer caching at all -- on
+        # pull_request (always a fresh ubuntu-latest VM, no persistent Docker
+        # daemon the way a self-hosted runner has), every single PR reran the
+        # Dockerfile's own `npm ci` from scratch inside the image build, on
+        # top of the separate `npm ci` the build job above already does at
+        # the workflow level (setup-node's npm cache only covers that job,
+        # never a sibling job's Docker-internal build). GitHub Actions' own
+        # cache backend (type=gha) gives buildx a persistent layer cache
+        # across runs regardless of runner type -- validation-only build
+        # (push: false), nothing is published from here.
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          tags: minder-console:ci
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
