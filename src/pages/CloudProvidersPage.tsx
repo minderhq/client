@@ -74,6 +74,25 @@ function ProviderRow({
     setBusy(false);
   }
 
+  async function handleTest() {
+    if (busy) return; // already in flight -- ignore a double-click/tap
+    setBusy(true);
+    setIsError(false);
+    setStatus("Testing…");
+    try {
+      const result = await apiFetch<{ ok: boolean; detail: string }>(
+        `/v1/model-providers/${encodeURIComponent(provider.id)}/test`,
+        { method: "POST", token },
+      );
+      setStatus(result.detail);
+      setIsError(!result.ok);
+    } catch (e) {
+      setStatus(friendlyErrorMessage(e));
+      setIsError(true);
+    }
+    setBusy(false);
+  }
+
   async function handleDelete() {
     if (
       !(await confirm({
@@ -123,6 +142,9 @@ function ProviderRow({
           {provider.api_key_masked}
         </span>
         <div className="ml-auto flex items-center gap-2">
+          <button onClick={handleTest} disabled={busy} className={secondaryButtonClass}>
+            Test
+          </button>
           <button onClick={handleToggle} disabled={busy} className={ghostButtonClass}>
             {provider.enabled ? "Disable" : "Enable"}
           </button>
