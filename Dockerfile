@@ -50,7 +50,7 @@ ENV VITE_OPENWEBUI_URL=$VITE_OPENWEBUI_URL
 RUN npm run build
 
 # Same pinned nginx:alpine already used for ollama-router elsewhere in this
-# repo (docker/services/ollama-router), for a single vetted base image
+# repo (src/third-party/ollama-router), for a single vetted base image
 # rather than introducing a second nginx variant.
 FROM nginx:1.31.3-alpine
 
