@@ -311,12 +311,31 @@ export function PluginCard({
   );
 }
 
+// Pricing model is a fixed, known enum (models/plugin.py's `PricingModel`) --
+// safe to hard-code here, unlike category (see `categories` prop below).
+const PRICING_MODEL_OPTIONS = [
+  { value: "", label: "All pricing" },
+  { value: "free", label: "Free" },
+  { value: "freemium", label: "Freemium" },
+  { value: "paid", label: "Paid" },
+];
+
 function SearchAndFilters({
   query,
   onQueryChange,
+  pricingModel,
+  onPricingModelChange,
+  category,
+  onCategoryChange,
+  categories,
 }: {
   query: string;
   onQueryChange: (q: string) => void;
+  pricingModel: string;
+  onPricingModelChange: (v: string) => void;
+  category: string;
+  onCategoryChange: (v: string) => void;
+  categories: string[];
 }) {
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -328,6 +347,33 @@ function SearchAndFilters({
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
       />
+      <select
+        className={`${inputClass} w-auto`}
+        aria-label="Filter by pricing"
+        value={pricingModel}
+        onChange={(e) => onPricingModelChange(e.target.value)}
+      >
+        {PRICING_MODEL_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+      {categories.length > 0 && (
+        <select
+          className={`${inputClass} w-auto`}
+          aria-label="Filter by category"
+          value={category}
+          onChange={(e) => onCategoryChange(e.target.value)}
+        >
+          <option value="">All categories</option>
+          {categories.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+      )}
     </div>
   );
 }
@@ -339,6 +385,8 @@ export function AvailablePluginsPage() {
   const [searchParams] = useSearchParams();
   const [queryInput, setQueryInput] = useState(() => searchParams.get("q") ?? "");
   const query = useDebouncedValue(queryInput, 300);
+  const [pricingModel, setPricingModel] = useState("");
+  const [category, setCategory] = useState("");
   const [myInstallations, setMyInstallations] = useState<Installation[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [featured, setFeatured] = useState<Plugin[]>([]);
@@ -359,13 +407,22 @@ export function AvailablePluginsPage() {
 
   const fetchPluginsPage = useCallback(
     async (nextOffset: number) => {
-      const path = query.trim()
-        ? `/v1/marketplace/plugins/search?q=${encodeURIComponent(query.trim())}&limit=20&offset=${nextOffset}`
-        : `/v1/marketplace/plugins?limit=20&offset=${nextOffset}`;
+      let path: string;
+      if (query.trim()) {
+        // /plugins/search has no category/pricing_model params of its own
+        // (search-by-text only) -- the client-side filter on `visiblePlugins`
+        // below covers this path; only the plain browse endpoint gets these
+        // as real server-side query params.
+        path = `/v1/marketplace/plugins/search?q=${encodeURIComponent(query.trim())}&limit=20&offset=${nextOffset}`;
+      } else {
+        path = `/v1/marketplace/plugins?limit=20&offset=${nextOffset}`;
+        if (category) path += `&category=${encodeURIComponent(category)}`;
+        if (pricingModel) path += `&pricing_model=${encodeURIComponent(pricingModel)}`;
+      }
       const res = await apiFetch<PluginListResponse>(path);
       return { items: res.plugins, total: res.total };
     },
-    [query],
+    [query, category, pricingModel],
   );
   const {
     items: plugins,
@@ -421,14 +478,37 @@ export function AvailablePluginsPage() {
   }, [loadMyInstallations]);
 
   const featuredIds = useMemo(() => new Set(featured.map((p) => p.id)), [featured]);
+  // No categories-by-name endpoint exists yet (#1519) -- categories are only
+  // ever seen as a raw category_id UUID (same rough edge PluginCard's own
+  // badge already has, `{plugin.category_id}` below). Derive the filter's
+  // option list from whatever category_ids are present on the currently
+  // loaded page, rather than blocking this filter entirely on a backend
+  // change that's out of this fix's scope.
+  const availableCategories = useMemo(
+    () =>
+      Array.from(
+        new Set(plugins.map((p) => p.category_id).filter((c): c is string => !!c)),
+      ).sort(),
+    [plugins],
+  );
   // Featured is curated separately from the paginated catalog below, so the
   // same plugin can appear in both -- drop it from the catalog list once
   // it's already shown above. Search results skip this: a query is asking
   // "does this plugin match," not "browse the catalog," so hiding a
   // matching plugin because it happens to be Featured would look broken.
-  const visiblePlugins = query.trim()
+  const visiblePlugins = (query.trim()
     ? plugins
-    : plugins.filter((plugin) => !featuredIds.has(plugin.id));
+    : plugins.filter((plugin) => !featuredIds.has(plugin.id))
+  ).filter(
+    (plugin) =>
+      // Redundant-but-harmless for the plain-browse path (the server already
+      // filtered by these params there) -- the ONLY path that actually needs
+      // this is search (/plugins/search has no category/pricing_model params
+      // of its own), so this filter has to apply uniformly to both rather
+      // than just the search branch.
+      (!pricingModel || plugin.pricing_model === pricingModel) &&
+      (!category || plugin.category_id === category),
+  );
 
   function installationFor(pluginId: string) {
     return myInstallations.find((i) => i.plugin_id === pluginId);
@@ -493,18 +573,30 @@ export function AvailablePluginsPage() {
         </p>
       )}
 
-      <SearchAndFilters query={queryInput} onQueryChange={setQueryInput} />
+      <SearchAndFilters
+        query={queryInput}
+        onQueryChange={setQueryInput}
+        pricingModel={pricingModel}
+        onPricingModelChange={setPricingModel}
+        category={category}
+        onCategoryChange={setCategory}
+        categories={availableCategories}
+      />
 
       {plugins.length === 0 && (
         <EmptyState>
           {query
             ? "No plugins match your search."
-            : "No plugins in the catalog yet."}
+            : category || pricingModel
+              ? "No plugins match the selected filters."
+              : "No plugins in the catalog yet."}
         </EmptyState>
       )}
       {plugins.length > 0 && visiblePlugins.length === 0 && (
         <EmptyState>
-          Every plugin on this page is already shown above in Featured.
+          {category || pricingModel
+            ? "No plugins on this page match the selected filters."
+            : "Every plugin on this page is already shown above in Featured."}
         </EmptyState>
       )}
       {visiblePlugins.map((plugin) => (
