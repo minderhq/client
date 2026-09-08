@@ -390,4 +390,87 @@ describe("AvailablePluginsPage", () => {
     await screen.findByText(/You have 1 plugin installed/);
     expect(screen.queryByText(/Recommended based on/)).toBeNull();
   });
+
+  it("re-fetches with a pricing_model query param when the pricing filter changes (#1519)", async () => {
+    routeApiFetch({ catalog: () => ({ items: [plugin()], total: 1 }) });
+    render(<AvailablePluginsPage />);
+    await screen.findByText("Weather");
+
+    fireEvent.change(screen.getByLabelText("Filter by pricing"), {
+      target: { value: "paid" },
+    });
+
+    await vi.waitFor(() =>
+      expect(apiFetch).toHaveBeenLastCalledWith(
+        "/v1/marketplace/plugins?limit=20&offset=0&pricing_model=paid",
+      ),
+    );
+  });
+
+  it("does not add category/pricing_model params when no filter is set (unchanged default request)", async () => {
+    routeApiFetch({ catalog: () => ({ items: [plugin()], total: 1 }) });
+    render(<AvailablePluginsPage />);
+    await screen.findByText("Weather");
+
+    expect(apiFetch).toHaveBeenCalledWith("/v1/marketplace/plugins?limit=20&offset=0");
+  });
+
+  it("shows a category filter option derived from the loaded plugins, and filters client-side by it", async () => {
+    routeApiFetch({
+      catalog: () => ({
+        items: [
+          plugin({ id: "p1", display_name: "Weather", category_id: "cat-a" }),
+          plugin({ id: "p2", display_name: "Translate", name: "translate", category_id: "cat-b" }),
+        ],
+        total: 2,
+      }),
+    });
+    render(<AvailablePluginsPage />);
+    await screen.findByText("Weather");
+    expect(screen.getByText("Translate")).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("Filter by category"), {
+      target: { value: "cat-a" },
+    });
+
+    expect(screen.getByText("Weather")).toBeTruthy();
+    expect(screen.queryByText("Translate")).toBeNull();
+  });
+
+  it("hides the category filter entirely when no plugin on the page has a category_id", async () => {
+    routeApiFetch({ catalog: () => ({ items: [plugin({ category_id: null })], total: 1 }) });
+    render(<AvailablePluginsPage />);
+    await screen.findByText("Weather");
+
+    expect(screen.queryByLabelText("Filter by category")).toBeNull();
+  });
+
+  it("filters search results client-side by pricing_model (the search endpoint has no such param)", async () => {
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path.startsWith("/v1/marketplace/plugins/search")) {
+        return {
+          plugins: [
+            plugin({ id: "p1", display_name: "Weather", pricing_model: "free" }),
+            plugin({ id: "p2", display_name: "Translate", name: "translate", pricing_model: "paid" }),
+          ],
+          count: 2,
+          total: 2,
+          limit: 20,
+          offset: 0,
+        };
+      }
+      return { plugins: [], count: 0, total: 0, limit: 20, offset: 0 };
+    });
+    render(<AvailablePluginsPage />);
+
+    fireEvent.change(screen.getByLabelText("Search plugins"), {
+      target: { value: "weather" },
+    });
+    fireEvent.change(screen.getByLabelText("Filter by pricing"), {
+      target: { value: "paid" },
+    });
+
+    await vi.waitFor(() => expect(screen.getByText("Translate")).toBeTruthy());
+    expect(screen.queryByText("Weather")).toBeNull();
+  });
 });
