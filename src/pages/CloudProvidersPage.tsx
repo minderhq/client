@@ -23,6 +23,12 @@ import { useAsyncResource } from "../lib/useAsyncResource";
 // credentials (openai_compatible / anthropic) -- create, enable/disable,
 // delete. Renaming or rotating an existing provider's key is a smaller
 // follow-up, not attempted here (delete + re-create covers that need today).
+//
+// #1467: a provider row can also be `is_local` -- self-hosted compute (e.g.
+// vLLM) reached through the SAME openai_compatible adapter/base_url
+// mechanism as a real external vendor, just flagged as free/uncapped instead
+// of getting a second "local provider" concept -- see the PR description for
+// the full reasoning.
 
 export interface Provider {
   id: string;
@@ -31,6 +37,7 @@ export interface Provider {
   base_url: string | null;
   api_key_masked: string;
   enabled: boolean;
+  is_local: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -38,6 +45,60 @@ export interface Provider {
 const ADAPTER_LABEL: Record<Provider["adapter"], string> = {
   openai_compatible: "OpenAI-compatible",
   anthropic: "Anthropic",
+};
+
+// A preset is a client-side convenience over the two real backend adapters
+// (schema.sql's own "vendor convenience is a client-side preset dropdown,
+// not a backend provider type") -- vLLM is just an openai_compatible row
+// with `is_local` pre-set, same as z.ai/OpenRouter/Together are
+// openai_compatible rows differing only by base_url.
+type Preset = "openai_compatible" | "vllm" | "anthropic";
+
+const PRESET_OPTIONS: { value: Preset; label: string }[] = [
+  {
+    value: "openai_compatible",
+    label: "OpenAI-compatible (OpenAI, z.ai, OpenRouter, Together, Azure OpenAI, …)",
+  },
+  { value: "vllm", label: "vLLM (self-hosted)" },
+  { value: "anthropic", label: "Anthropic" },
+];
+
+const PRESET_CONFIG: Record<
+  Preset,
+  {
+    adapter: Provider["adapter"];
+    isLocal: boolean;
+    baseUrlPlaceholder: string;
+    baseUrlHelp: string;
+    apiKeyPlaceholder: string;
+    apiKeyHelp: string;
+  }
+> = {
+  openai_compatible: {
+    adapter: "openai_compatible",
+    isLocal: false,
+    baseUrlPlaceholder: "https://api.z.ai/api/paas/v4",
+    baseUrlHelp: "optional — defaults to the adapter's own API",
+    apiKeyPlaceholder: "",
+    apiKeyHelp: "",
+  },
+  vllm: {
+    adapter: "openai_compatible",
+    isLocal: true,
+    baseUrlPlaceholder: "http://<your-vllm-host>:8000/v1",
+    baseUrlHelp: "your vLLM server's OpenAI-compatible endpoint",
+    apiKeyPlaceholder: "not-required",
+    apiKeyHelp:
+      "vLLM doesn't require a key by default — any non-empty value works unless you started it with --api-key",
+  },
+  anthropic: {
+    adapter: "anthropic",
+    isLocal: false,
+    baseUrlPlaceholder: "",
+    baseUrlHelp: "optional — defaults to the adapter's own API",
+    apiKeyPlaceholder: "",
+    apiKeyHelp: "",
+  },
 };
 
 function ProviderRow({
@@ -128,6 +189,7 @@ function ProviderRow({
           {provider.name}
         </span>
         <span className={badgeClass}>{ADAPTER_LABEL[provider.adapter]}</span>
+        {provider.is_local && <span className={badgeClass}>self-hosted</span>}
         <span
           className={`${badgeClass} ${provider.enabled ? badgeTone.success : badgeTone.warn}`}
         >
@@ -170,7 +232,7 @@ function AddProviderForm({
   onCreated: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [adapter, setAdapter] = useState<Provider["adapter"]>("openai_compatible");
+  const [preset, setPreset] = useState<Preset>("openai_compatible");
   const [name, setName] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -178,8 +240,10 @@ function AddProviderForm({
   const [status, setStatus] = useState("");
   const [isError, setIsError] = useState(false);
 
+  const config = PRESET_CONFIG[preset];
+
   function reset() {
-    setAdapter("openai_compatible");
+    setPreset("openai_compatible");
     setName("");
     setBaseUrl("");
     setApiKey("");
@@ -196,10 +260,11 @@ function AddProviderForm({
         method: "POST",
         token,
         body: {
-          adapter,
+          adapter: config.adapter,
           name,
           base_url: baseUrl || undefined,
           api_key: apiKey,
+          is_local: config.isLocal,
         },
       });
       reset();
@@ -228,17 +293,18 @@ function AddProviderForm({
     >
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Adapter
+          Provider type
         </label>
         <select
           className={inputClass}
-          value={adapter}
-          onChange={(e) => setAdapter(e.target.value as Provider["adapter"])}
+          value={preset}
+          onChange={(e) => setPreset(e.target.value as Preset)}
         >
-          <option value="openai_compatible">
-            OpenAI-compatible (OpenAI, z.ai, OpenRouter, Together, Azure OpenAI, …)
-          </option>
-          <option value="anthropic">Anthropic</option>
+          {PRESET_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
       </div>
       <div>
@@ -249,33 +315,37 @@ function AddProviderForm({
           className={inputClass}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. OpenAI (production)"
+          placeholder={
+            preset === "vllm" ? "e.g. vLLM (local)" : "e.g. OpenAI (production)"
+          }
           required
         />
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Base URL{" "}
-          <span className="font-normal text-gray-400">
-            (optional — defaults to the adapter's own API)
-          </span>
+          Base URL <span className="font-normal text-gray-400">({config.baseUrlHelp})</span>
         </label>
         <input
           className={inputClass}
           value={baseUrl}
           onChange={(e) => setBaseUrl(e.target.value)}
-          placeholder="https://api.z.ai/api/paas/v4"
+          placeholder={config.baseUrlPlaceholder}
+          required={preset === "vllm"}
         />
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
           API key
+          {config.apiKeyHelp && (
+            <span className="ml-1 font-normal text-gray-400">({config.apiKeyHelp})</span>
+          )}
         </label>
         <input
           type="password"
           className={inputClass}
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
+          placeholder={config.apiKeyPlaceholder}
           required
         />
       </div>
@@ -321,7 +391,7 @@ export function CloudProvidersPage() {
       <PageHeader
         icon="globe"
         title="Cloud Providers"
-        subtitle="Connect an external OpenAI-compatible or Anthropic provider so models from it appear alongside your local Ollama models. Opt-in and per-organization — nothing here is on by default. Admin-only: this manages the org's own API credentials."
+        subtitle="Connect an external OpenAI-compatible/Anthropic provider or a self-hosted instance (e.g. vLLM) so models from it appear alongside your local Ollama models. Opt-in and per-organization — nothing here is on by default. Admin-only: this manages the org's own API credentials."
       />
 
       {!isAdmin && (

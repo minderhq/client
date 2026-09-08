@@ -27,6 +27,7 @@ function provider(overrides: Partial<Provider> = {}): Provider {
     base_url: null,
     api_key_masked: "sk-...ab12",
     enabled: true,
+    is_local: false,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
     ...overrides,
@@ -109,9 +110,60 @@ describe("CloudProvidersPage", () => {
           name: "My Provider",
           base_url: "https://api.example.com",
           api_key: "secret-key",
+          is_local: false,
         },
       }),
     );
+  });
+
+  it("creates a vLLM preset provider with is_local set automatically", async () => {
+    // #1467: picking the vLLM preset must send adapter=openai_compatible
+    // (the only backend concept vLLM maps to) plus is_local=true, without
+    // the user ever seeing or setting either field directly.
+    mockAuth = { token: "tok", role: "admin" };
+    apiFetch.mockResolvedValueOnce([]); // initial list
+    render(<CloudProvidersPage />);
+    await screen.findByText("No cloud providers configured yet.");
+
+    fireEvent.click(screen.getByText("Add Provider"));
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: "vllm" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("e.g. vLLM (local)"), {
+      target: { value: "My vLLM box" },
+    });
+    fireEvent.change(
+      screen.getByPlaceholderText("http://<your-vllm-host>:8000/v1"),
+      { target: { value: "http://10.0.0.5:8000/v1" } },
+    );
+    const apiKeyInput = document.querySelector('input[type="password"]') as HTMLInputElement;
+    fireEvent.change(apiKeyInput, { target: { value: "not-required" } });
+
+    apiFetch.mockResolvedValueOnce(provider({ name: "My vLLM box", is_local: true }));
+    apiFetch.mockResolvedValueOnce([provider({ name: "My vLLM box", is_local: true })]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith("/v1/model-providers", {
+        method: "POST",
+        token: "tok",
+        body: {
+          adapter: "openai_compatible",
+          name: "My vLLM box",
+          base_url: "http://10.0.0.5:8000/v1",
+          api_key: "not-required",
+          is_local: true,
+        },
+      }),
+    );
+  });
+
+  it("shows a self-hosted badge for an is_local provider", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    apiFetch.mockResolvedValueOnce([provider({ is_local: true })]);
+    render(<CloudProvidersPage />);
+    expect(await screen.findByText("self-hosted")).toBeTruthy();
   });
 
   it("toggles a provider's enabled state", async () => {
