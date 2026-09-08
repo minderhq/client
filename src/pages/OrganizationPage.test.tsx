@@ -95,6 +95,8 @@ function routeApiFetch(opts: {
     const method = init?.method ?? "GET";
     if (path === "/v1/organizations/mine")
       return Promise.resolve({ organizations: orgs, active_organization_id: orgs[0]?.id ?? null });
+    if (/\/v1\/organizations\/\d+$/.test(path) && method === "PATCH")
+      return Promise.resolve({ id: orgs[0]?.id ?? 1, ...(init?.body as object) });
     if (/\/v1\/organizations\/\d+\/members$/.test(path) && method === "GET")
       return Promise.resolve({ members, total: members.length });
     if (/\/v1\/organizations\/\d+\/members$/.test(path) && method === "POST")
@@ -319,5 +321,63 @@ describe("OrganizationPage", () => {
     await screen.findByText("Acme Corporation");
 
     expect(screen.queryByText("Invite by email")).toBeNull();
+  });
+
+  it("hides the organization-details edit form for a plain member", async () => {
+    mockAuth = { isAuthenticated: true, token: "tok", role: "user", activeTenantId: "1", orgRole: "member" };
+    routeApiFetch({});
+    render(<OrganizationPage />);
+    await screen.findByText("Acme Corporation");
+
+    expect(screen.queryByText("Organization details")).toBeNull();
+  });
+
+  it("#1503: an org owner can edit the organization's name and description", async () => {
+    mockAuth = { isAuthenticated: true, token: "tok", role: "user", activeTenantId: "1", orgRole: "owner" };
+    routeApiFetch({});
+    render(<OrganizationPage />);
+    await screen.findByText("Organization details");
+
+    const nameInput = screen.getByLabelText("Name") as HTMLInputElement;
+    expect(nameInput.value).toBe("Acme Corporation"); // pre-filled from the active org
+
+    fireEvent.change(nameInput, { target: { value: "Acme Holdings" } });
+    fireEvent.change(screen.getByLabelText("Description"), {
+      target: { value: "Widgets and gadgets." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await vi.waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        "/v1/organizations/1",
+        {
+          method: "PATCH",
+          body: { name: "Acme Holdings", description: "Widgets and gadgets." },
+          token: "tok",
+        },
+      ),
+    );
+    await screen.findByText("Organization updated.");
+  });
+
+  it("surfaces a friendly error if the organization update fails", async () => {
+    mockAuth = { isAuthenticated: true, token: "tok", role: "user", activeTenantId: "1", orgRole: "owner" };
+    apiFetch.mockImplementation((path: string, init?: { method?: string }) => {
+      const method = init?.method ?? "GET";
+      if (path === "/v1/organizations/mine")
+        return Promise.resolve({ organizations: [org()], active_organization_id: 1 });
+      if (/\/v1\/organizations\/\d+$/.test(path) && method === "PATCH")
+        return Promise.reject(new Error("boom"));
+      if (/\/v1\/organizations\/\d+\/members$/.test(path))
+        return Promise.resolve({ members: [member()], total: 1 });
+      if (/\/v1\/organizations\/\d+\/invites$/.test(path))
+        return Promise.resolve({ invites: [], total: 0 });
+      return Promise.reject(new Error(`unexpected ${method} ${path}`));
+    });
+    render(<OrganizationPage />);
+    await screen.findByText("Organization details");
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByText("boom");
   });
 });
