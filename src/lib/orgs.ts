@@ -5,6 +5,7 @@ export interface MyOrg {
   id: number;
   name: string;
   slug: string;
+  description?: string | null;
   /** The caller's role WITHIN this org: owner / admin / member. */
   org_role: string;
   /** Their primary (home) org — the tenant their data is created under by default. */
@@ -37,6 +38,36 @@ export function fetchOrgMembers(orgId: number, token: string, signal?: AbortSign
   return apiFetch<OrgMembersResponse>(`/v1/organizations/${orgId}/members`, {
     token,
     signal,
+  });
+}
+
+/** PATCH body for updateOrganization — every field optional, only what's
+ * supplied is changed (the backend rejects an entirely-empty body). */
+export interface UpdateOrgBody {
+  name?: string;
+  description?: string;
+}
+
+/** An updated org's own details (PATCH /v1/organizations/{id} response). */
+export interface OrgDetail {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string | null;
+  created_at?: string | null;
+}
+
+/** Edit an org's own name/description. Owner/admin of the org (or an
+ * instance/platform admin) only — same authority as managing its members. */
+export function updateOrganization(
+  orgId: number,
+  body: UpdateOrgBody,
+  token: string,
+) {
+  return apiFetch<OrgDetail>(`/v1/organizations/${orgId}`, {
+    method: "PATCH",
+    body,
+    token,
   });
 }
 
