@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useConfirm } from "../components/ConfirmDialog";
@@ -24,6 +24,7 @@ import {
   removeOrgMember,
   revokeOrgInvite,
   setOrgMember,
+  updateOrganization,
 } from "../lib/orgs";
 import {
   badgeClass,
@@ -61,6 +62,17 @@ export function OrganizationPage() {
   const [inviteRole, setInviteRole] = useState("member");
   const inviteEmailId = useId();
   const inviteRoleId = useId();
+
+  // #1503: edit the active org's own name/description. A separate status/busy
+  // pair from the members section above -- two independent forms sharing one
+  // status line would let one's "Working…" clobber the other's result.
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
+  const [editStatus, setEditStatus] = useState("");
+  const [editIsError, setEditIsError] = useState(false);
+  const editNameId = useId();
+  const editDescriptionId = useId();
 
   const orgsRes = useAsyncResource<MyOrg[]>(
     (signal) => fetchMyOrgs(token, signal).then((r) => r.organizations),
@@ -182,6 +194,38 @@ export function OrganizationPage() {
     );
   }
 
+  // Sync the edit form's fields whenever the active org changes (initial load,
+  // org switch, or a reload after a successful save) -- but only from the
+  // server's own values, never overwriting mid-edit input the user is
+  // actively typing into a DIFFERENT org's form (keyed on active?.id so a
+  // reload of the SAME org after save re-syncs to the just-saved values).
+  useEffect(() => {
+    setEditName(active?.name ?? "");
+    setEditDescription(active?.description ?? "");
+  }, [active?.id, active?.name, active?.description]);
+
+  async function handleUpdateOrg(e: React.FormEvent) {
+    e.preventDefault();
+    if (!active || !editName.trim()) return;
+    setEditBusy(true);
+    setEditStatus("Saving…");
+    setEditIsError(false);
+    try {
+      await updateOrganization(
+        active.id,
+        { name: editName.trim(), description: editDescription.trim() },
+        token,
+      );
+      await orgsRes.reload();
+      setEditStatus("Organization updated.");
+    } catch (err) {
+      setEditStatus(friendlyErrorMessage(err));
+      setEditIsError(true);
+    } finally {
+      setEditBusy(false);
+    }
+  }
+
   async function handleRemove(userId: number, username: string) {
     if (!active) return;
     const ok = await confirm({
@@ -261,6 +305,58 @@ export function OrganizationPage() {
               </p>
             )}
           </section>
+
+          {/* #1503: edit the active org's own name/description. Owner/admin
+            only -- same `canManage` gate as the member-management section
+            below (mirrors the backend's `_require_org_manage` authority). */}
+          {canManage && (
+            <section className={`mb-4 ${cardClass}`}>
+              <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
+                <Icon name="edit" size={17} className="text-indigo-500 dark:text-indigo-400" />
+                Organization details
+              </h2>
+              <form onSubmit={handleUpdateOrg} className="flex flex-col gap-3">
+                <div>
+                  <label htmlFor={editNameId} className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
+                    Name
+                  </label>
+                  <input
+                    id={editNameId}
+                    type="text"
+                    className={inputClass}
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    disabled={editBusy}
+                    maxLength={200}
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor={editDescriptionId} className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
+                    Description
+                  </label>
+                  <textarea
+                    id={editDescriptionId}
+                    className={`${inputClass} min-h-20`}
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    disabled={editBusy}
+                    placeholder="What this organization is for…"
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="submit"
+                    disabled={editBusy || !editName.trim()}
+                    className={primaryButtonClass}
+                  >
+                    Save
+                  </button>
+                  <StatusLine isError={editIsError}>{editStatus}</StatusLine>
+                </div>
+              </form>
+            </section>
+          )}
 
           {/* Members of the active org (+ admin management). */}
           <section className={cardClass}>
