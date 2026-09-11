@@ -34,6 +34,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { ModelManagementPage } from "./pages/ModelManagementPage";
 import { MyLicensesPage } from "./pages/MyLicensesPage";
 import { OrganizationPage } from "./pages/OrganizationPage";
+import { PublicChatConversationsPage } from "./pages/PublicChatConversationsPage";
 import { PublicChatEndpointsPage } from "./pages/PublicChatEndpointsPage";
 import { RagPipelinesPage } from "./pages/RagPipelinesPage";
 import { ReviewQueuePage } from "./pages/ReviewQueuePage";
@@ -160,6 +161,14 @@ export function App() {
                   <Route
                     path="/rag/public-chat"
                     element={<PublicChatEndpointsPage />}
+                  />
+                  <Route
+                    path="/rag/public-chat/:endpointId/conversations"
+                    element={<PublicChatConversationsPage />}
+                  />
+                  <Route
+                    path="/rag/public-chat/:endpointId/conversations/:sessionId"
+                    element={<PublicChatConversationsPage />}
                   />
 
                   <Route
