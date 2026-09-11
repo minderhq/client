@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { EmptyState } from "../components/EmptyState";
 import { Icon } from "../components/Icon";
@@ -521,6 +522,14 @@ function EndpointRow({
               <span className={badgeClass}>{methodOf(endpoint.rag_config)}</span>
             )}
             <div className="ml-auto flex items-center gap-2">
+              {/* Read-only creator dashboard: the anonymous conversations that
+                  flowed through this endpoint (#1582). */}
+              <Link
+                to={`/rag/public-chat/${endpoint.id}/conversations`}
+                className={secondaryButtonClass}
+              >
+                <Icon name="conversations" size={14} /> Conversations
+              </Link>
               <button
                 onClick={startEdit}
                 disabled={busy}
