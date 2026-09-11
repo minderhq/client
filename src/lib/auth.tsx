@@ -16,6 +16,9 @@ const TOKEN_KEY = "minder_jwt";
 
 interface AuthContextValue {
   token: string;
+  /** The caller's own user id (JWT `sub`) — used to recognise the caller's own
+   * row in a server list keyed by user id (e.g. their plugin review, #1591). */
+  userId: string;
   username: string;
   email: string;
   role: string;
@@ -114,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         token,
+        userId: claims.userId,
         username: claims.username,
         email: claims.email,
         role: claims.role,
