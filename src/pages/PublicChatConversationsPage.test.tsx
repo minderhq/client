@@ -320,6 +320,126 @@ describe("PublicChatConversationsPage", () => {
     expect(screen.queryByRole("button", { name: /thumb/i })).toBeNull();
   });
 
+  // ── #1584: per-turn tool/RAG-method attribution ────────────────────────────
+  it("surfaces a turn's RAG method, model, and source count as chips (#1584)", async () => {
+    mockAuth = ADMIN;
+    installApi({
+      detail: {
+        session: session({ session_id: "sess-attr00000000", turn_count: 1 }),
+        turns: [
+          {
+            question: "How do refunds work?",
+            answer: "Within 30 days of purchase.",
+            timestamp: "2026-02-01T10:00:00Z",
+            metadata: {
+              method: "raptor",
+              pipeline_id: "pipe-1",
+              model_used: "llama3:8b",
+              sources_count: 4,
+            },
+            feedback: { rating: -1, comment: "Wrong policy", feedback_at: null },
+          },
+        ],
+      },
+    });
+    renderAt(DETAIL_PATH("sess-attr00000000"));
+
+    // The flagged answer's attribution: which method/model produced it + how many
+    // sources it drew on, each read-only.
+    expect(await screen.findByText("Method: raptor")).toBeTruthy();
+    expect(screen.getByText("Model: llama3:8b")).toBeTruthy();
+    expect(screen.getByText("4 sources")).toBeTruthy();
+    // Still read-only — attribution introduces no control.
+    expect(screen.queryByRole("textbox")).toBeNull();
+  });
+
+  it("singularises a one-source count (#1584)", async () => {
+    mockAuth = ADMIN;
+    installApi({
+      detail: {
+        session: session({ session_id: "sess-attr1s0000000", turn_count: 1 }),
+        turns: [
+          {
+            question: "Hours?",
+            answer: "9 to 5.",
+            timestamp: "2026-02-01T10:00:00Z",
+            metadata: { method: "standard", model_used: "llama3:8b", sources_count: 1 },
+          },
+        ],
+      },
+    });
+    renderAt(DETAIL_PATH("sess-attr1s0000000"));
+
+    expect(await screen.findByText("1 source")).toBeTruthy();
+    expect(screen.queryByText("1 sources")).toBeNull();
+  });
+
+  it("renders only the present attribution fields and omits the rest (#1584)", async () => {
+    mockAuth = ADMIN;
+    installApi({
+      detail: {
+        session: session({ session_id: "sess-attrpart00000", turn_count: 1 }),
+        turns: [
+          {
+            question: "Where are you?",
+            answer: "Remote.",
+            timestamp: "2026-02-01T10:00:00Z",
+            // Only method present — a partial/older turn's metadata.
+            metadata: { method: "hyde" },
+          },
+        ],
+      },
+    });
+    renderAt(DETAIL_PATH("sess-attrpart00000"));
+
+    expect(await screen.findByText("Method: hyde")).toBeTruthy();
+    expect(screen.queryByText(/^Model:/)).toBeNull();
+    expect(screen.queryByText(/source/)).toBeNull();
+  });
+
+  it("shows no attribution block when metadata is empty (#1584)", async () => {
+    mockAuth = ADMIN;
+    installApi({
+      detail: {
+        session: session({ session_id: "sess-attrempty0000", turn_count: 1 }),
+        turns: [
+          {
+            question: "What are your hours?",
+            answer: "9 to 5, Mon-Fri.",
+            timestamp: "2026-02-01T10:00:00Z",
+            metadata: {},
+          },
+        ],
+      },
+    });
+    renderAt(DETAIL_PATH("sess-attrempty0000"));
+
+    expect(await screen.findByText("What are your hours?")).toBeTruthy();
+    expect(screen.queryByText("Attribution")).toBeNull();
+    expect(screen.queryByLabelText("Response attribution")).toBeNull();
+  });
+
+  it("does not crash when a turn omits metadata entirely (#1584)", async () => {
+    mockAuth = ADMIN;
+    installApi({
+      detail: {
+        session: session({ session_id: "sess-attrnone00000", turn_count: 1 }),
+        // No `metadata` key at all on the turn.
+        turns: [
+          {
+            question: "Ping?",
+            answer: "Pong.",
+            timestamp: "2026-02-01T10:00:00Z",
+          },
+        ],
+      },
+    });
+    renderAt(DETAIL_PATH("sess-attrnone00000"));
+
+    expect(await screen.findByText("Pong.")).toBeTruthy();
+    expect(screen.queryByText("Attribution")).toBeNull();
+  });
+
   it("shows no feedback verdict on an unrated turn (#1583)", async () => {
     mockAuth = ADMIN;
     installApi({
