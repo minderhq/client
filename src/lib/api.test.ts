@@ -144,6 +144,40 @@ describe("apiFetch", () => {
     });
   });
 
+  it("surfaces the `error` field of a structured detail object (install-from-git)", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        detail: { error: "Repository URL is not allowed" },
+      }),
+    } as Response);
+
+    await expect(apiFetch("/v1/plugins/install-from-git")).rejects.toMatchObject({
+      message: "Repository URL is not allowed",
+      status: 400,
+    });
+  });
+
+  it("appends a structured detail's sub-errors to its error message", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      status: 422,
+      json: async () => ({
+        detail: {
+          error: "Invalid manifest",
+          errors: ["metadata.name is required", "spec.trigger missing"],
+        },
+      }),
+    } as Response);
+
+    await expect(apiFetch("/v1/plugins/install-from-git")).rejects.toMatchObject({
+      message:
+        "Invalid manifest: metadata.name is required; spec.trigger missing",
+      status: 422,
+    });
+  });
+
   it("falls back to a generic status message when there's no detail at all", async () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: false,
