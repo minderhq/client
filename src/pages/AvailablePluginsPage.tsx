@@ -181,11 +181,136 @@ function DependencyPanel({ pluginId }: { pluginId: string }) {
   );
 }
 
+/** Admin-only affordance turning a plugin's `repository_url` from a display-only
+ * link into a real "install from this repo" action (#1579, epic #1514). It POSTs
+ * to plugin-registry's `/v1/plugins/install-from-git` (reached through the
+ * api-gateway proxy), which shallow-clones the repo, strictly validates ONLY the
+ * plugin manifest, and registers it as a manifest/webhook plugin.
+ *
+ * TRUST MODEL (#1577): third-party plugins are manifest/webhook ONLY -- the
+ * backend runs them OUT-OF-PROCESS over a webhook and NEVER imports or executes
+ * fetched repo code in-process. The copy here is deliberate about that so the
+ * button doesn't imply arbitrary code execution.
+ *
+ * Gated to admins because the endpoint is admin-only (`require_role("admin")`);
+ * a non-admin call 403s, so we hide the affordance for non-admins (matching
+ * nav.ts's admin-only convention) and, if one is somehow attempted, surface the
+ * 403 via the shared error line rather than crashing. Optional ref/subpath and a
+ * private-repo token are collected but never required -- repo_url alone is
+ * enough. The token is a password field, cleared on success, and only ever sent
+ * for the single fetch (the backend never logs or persists it). */
+function InstallFromRepoPanel({
+  repositoryUrl,
+  token,
+}: {
+  repositoryUrl: string;
+  token: string;
+}) {
+  const [ref, setRef] = useState("");
+  const [subpath, setSubpath] = useState("");
+  const [pat, setPat] = useState("");
+  const [status, setStatus] = useState("");
+  const [isError, setIsError] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setStatus("Installing from repo…");
+    setIsError(false);
+    try {
+      const body: Record<string, string> = { repo_url: repositoryUrl };
+      if (ref.trim()) body.ref = ref.trim();
+      if (subpath.trim()) body.subpath = subpath.trim();
+      if (pat.trim()) body.token = pat.trim();
+      const res = await apiFetch<{
+        message: string;
+        plugin: string;
+        webhook_path: string | null;
+      }>("/v1/plugins/install-from-git", { method: "POST", body, token });
+      setPat(""); // never keep a private-repo token around after the one fetch
+      setStatus(
+        res.webhook_path
+          ? `${res.message} (webhook: ${res.webhook_path})`
+          : res.message,
+      );
+      setIsError(false);
+    } catch (e) {
+      // Surfaces the backend's own reason: SSRF-rejected URL, invalid manifest,
+      // 409 already installed, or a 403 for a non-admin caller.
+      setStatus(friendlyErrorMessage(e));
+      setIsError(true);
+    }
+    setBusy(false);
+  }
+
+  return (
+    <details className="mt-2">
+      <summary className="cursor-pointer text-xs font-medium text-indigo-600 dark:text-indigo-400">
+        Install from this repo
+      </summary>
+      <form
+        onSubmit={handleSubmit}
+        className="mt-2 space-y-2 text-xs text-gray-600 dark:text-gray-400"
+      >
+        <p>
+          Fetches and validates the plugin manifest from{" "}
+          <span className="break-all font-mono">{repositoryUrl}</span> and
+          registers it as a <strong>manifest/webhook</strong> plugin that runs
+          out-of-process. No repository code is executed in-process.
+        </p>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <label className="flex flex-col gap-1">
+            <span>Ref (optional)</span>
+            <input
+              className={inputClass}
+              value={ref}
+              onChange={(e) => setRef(e.target.value)}
+              placeholder="main"
+              aria-label="Git ref"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span>Subpath (optional)</span>
+            <input
+              className={inputClass}
+              value={subpath}
+              onChange={(e) => setSubpath(e.target.value)}
+              placeholder="plugins/x"
+              aria-label="Manifest subpath"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span>Token (private repos)</span>
+            <input
+              className={inputClass}
+              type="password"
+              value={pat}
+              onChange={(e) => setPat(e.target.value)}
+              autoComplete="off"
+              aria-label="Access token"
+            />
+          </label>
+        </div>
+        <button type="submit" disabled={busy} className={primaryButtonClass}>
+          Install from this repo
+        </button>
+        {status && (
+          <StatusLine isError={isError} className="mt-1">
+            {status}
+          </StatusLine>
+        )}
+      </form>
+    </details>
+  );
+}
+
 export function PluginCard({
   plugin,
   installation,
   token,
   isAuthenticated,
+  isAdmin = false,
   onInstalled,
   onUninstalled,
   onToggleEnabled,
@@ -195,6 +320,9 @@ export function PluginCard({
   installation: Installation | undefined;
   token: string;
   isAuthenticated: boolean;
+  /** Whether the caller is a platform admin. The install-from-git endpoint is
+   * admin-only, so the affordance is hidden for everyone else (default). */
+  isAdmin?: boolean;
   onInstalled: () => void;
   onUninstalled: (pluginId: string) => void;
   onToggleEnabled: (pluginId: string, enabled: boolean) => void;
@@ -256,6 +384,12 @@ export function PluginCard({
             )}
           </div>
           <PluginMetaRow plugin={plugin} />
+          {plugin.repository_url && isAdmin && (
+            <InstallFromRepoPanel
+              repositoryUrl={plugin.repository_url}
+              token={token}
+            />
+          )}
           <DependencyPanel pluginId={plugin.id} />
           <PluginRatings
             pluginId={plugin.id}
@@ -386,7 +520,10 @@ function SearchAndFilters({
 }
 
 export function AvailablePluginsPage() {
-  const { token, isAuthenticated } = useAuth();
+  const { token, isAuthenticated, role } = useAuth();
+  // The install-from-git endpoint is admin-only; gate the affordance to admins
+  // the same way nav.ts hides admin-only destinations (the backend 403s others).
+  const isAdmin = role === "admin";
   const { confirm, dialog } = useConfirm();
   // Seed from ?q= so the ⌘K palette can deep-link to a specific plugin (#1210).
   const [searchParams] = useSearchParams();
@@ -554,6 +691,7 @@ export function AvailablePluginsPage() {
               installation={installationFor(plugin.id)}
               token={token}
               isAuthenticated={isAuthenticated}
+              isAdmin={isAdmin}
               onInstalled={loadMyInstallations}
               onUninstalled={handleUninstalled}
               onToggleEnabled={handleToggleEnabled}
@@ -613,6 +751,7 @@ export function AvailablePluginsPage() {
           installation={installationFor(plugin.id)}
           token={token}
           isAuthenticated={isAuthenticated}
+          isAdmin={isAdmin}
           onInstalled={loadMyInstallations}
           onUninstalled={handleUninstalled}
           onToggleEnabled={handleToggleEnabled}
