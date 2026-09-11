@@ -5,6 +5,7 @@ import { Icon } from "../components/Icon";
 import { useConfirm } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 import { PageHeader } from "../components/PageHeader";
+import { PluginRatings } from "../components/PluginRatings";
 import { StatusLine } from "../components/StatusLine";
 import { apiFetch, friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -256,6 +257,12 @@ export function PluginCard({
           </div>
           <PluginMetaRow plugin={plugin} />
           <DependencyPanel pluginId={plugin.id} />
+          <PluginRatings
+            pluginId={plugin.id}
+            token={token}
+            isAuthenticated={isAuthenticated}
+            isInstalled={!!installation}
+          />
         </div>
         <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
           {!installation ? (
