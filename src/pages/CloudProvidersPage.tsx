@@ -47,59 +47,23 @@ const ADAPTER_LABEL: Record<Provider["adapter"], string> = {
   anthropic: "Anthropic",
 };
 
-// A preset is a client-side convenience over the two real backend adapters
-// (schema.sql's own "vendor convenience is a client-side preset dropdown,
-// not a backend provider type") -- vLLM is just an openai_compatible row
-// with `is_local` pre-set, same as z.ai/OpenRouter/Together are
-// openai_compatible rows differing only by base_url.
-type Preset = "openai_compatible" | "vllm" | "anthropic";
-
-const PRESET_OPTIONS: { value: Preset; label: string }[] = [
-  {
-    value: "openai_compatible",
-    label: "OpenAI-compatible (OpenAI, z.ai, OpenRouter, Together, Azure OpenAI, …)",
-  },
-  { value: "vllm", label: "vLLM (self-hosted)" },
-  { value: "anthropic", label: "Anthropic" },
-];
-
-const PRESET_CONFIG: Record<
-  Preset,
-  {
-    adapter: Provider["adapter"];
-    isLocal: boolean;
-    baseUrlPlaceholder: string;
-    baseUrlHelp: string;
-    apiKeyPlaceholder: string;
-    apiKeyHelp: string;
-  }
-> = {
-  openai_compatible: {
-    adapter: "openai_compatible",
-    isLocal: false,
-    baseUrlPlaceholder: "https://api.z.ai/api/paas/v4",
-    baseUrlHelp: "optional — defaults to the adapter's own API",
-    apiKeyPlaceholder: "",
-    apiKeyHelp: "",
-  },
-  vllm: {
-    adapter: "openai_compatible",
-    isLocal: true,
-    baseUrlPlaceholder: "http://<your-vllm-host>:8000/v1",
-    baseUrlHelp: "your vLLM server's OpenAI-compatible endpoint",
-    apiKeyPlaceholder: "not-required",
-    apiKeyHelp:
-      "vLLM doesn't require a key by default — any non-empty value works unless you started it with --api-key",
-  },
-  anthropic: {
-    adapter: "anthropic",
-    isLocal: false,
-    baseUrlPlaceholder: "",
-    baseUrlHelp: "optional — defaults to the adapter's own API",
-    apiKeyPlaceholder: "",
-    apiKeyHelp: "",
-  },
-};
+// A suggested "add provider" configuration, served read-only by the backend at
+// GET /v1/model-providers/presets (#1585 / ProviderPresetOut) and rendered as
+// the add-provider dropdown. The backend is the single source of truth for the
+// list (#1467) -- notably the first-class "vLLM (self-hosted)" entry, which is
+// just an `openai_compatible` row with `is_local` pre-set, so a self-hosted
+// vLLM box is a labeled option rather than something the user must know to
+// hand-build as a generic openai_compatible row. Static, credential-free
+// metadata -- see the backend's core.provider_catalog for the field semantics.
+export interface ProviderPreset {
+  id: string;
+  label: string;
+  adapter: Provider["adapter"];
+  is_local: boolean;
+  base_url_placeholder: string | null;
+  requires_api_key: boolean;
+  description: string;
+}
 
 function ProviderRow({
   provider,
@@ -227,12 +191,22 @@ function ProviderRow({
 function AddProviderForm({
   token,
   onCreated,
+  presets,
+  presetsLoading,
+  presetsError,
 }: {
   token: string;
   onCreated: () => void;
+  presets: ProviderPreset[] | null;
+  presetsLoading: boolean;
+  presetsError: string | null;
 }) {
   const [open, setOpen] = useState(false);
-  const [preset, setPreset] = useState<Preset>("openai_compatible");
+  // The chosen preset's `id`, or null to fall back to the first preset (so the
+  // dropdown shows a sensible default the moment the backend list loads, with
+  // no effect needed to seed state). A stale id (preset list changed under us)
+  // also falls back to the first entry rather than leaving nothing selected.
+  const [presetId, setPresetId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -240,10 +214,11 @@ function AddProviderForm({
   const [status, setStatus] = useState("");
   const [isError, setIsError] = useState(false);
 
-  const config = PRESET_CONFIG[preset];
+  const selected =
+    presets?.find((p) => p.id === presetId) ?? presets?.[0] ?? null;
 
   function reset() {
-    setPreset("openai_compatible");
+    setPresetId(null);
     setName("");
     setBaseUrl("");
     setApiKey("");
@@ -251,7 +226,7 @@ function AddProviderForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (busy) return;
+    if (busy || !selected) return;
     setBusy(true);
     setIsError(false);
     setStatus("Adding…");
@@ -260,11 +235,11 @@ function AddProviderForm({
         method: "POST",
         token,
         body: {
-          adapter: config.adapter,
+          adapter: selected.adapter,
           name,
           base_url: baseUrl || undefined,
           api_key: apiKey,
-          is_local: config.isLocal,
+          is_local: selected.is_local,
         },
       });
       reset();
@@ -286,71 +261,99 @@ function AddProviderForm({
     );
   }
 
+  // A self-hosted preset (vLLM) has no vendor default base_url, so it's genuinely
+  // required; hosted presets can leave it blank to use the adapter's own API.
+  const baseUrlHelp = selected?.is_local
+    ? "your server's OpenAI-compatible endpoint"
+    : selected?.base_url_placeholder
+      ? "optional — a custom OpenAI-compatible endpoint"
+      : "optional — defaults to the provider's own API";
+  // The create endpoint still requires a non-empty api_key even when the preset
+  // doesn't need a real one (a self-hosted vLLM run without --api-key accepts any
+  // bearer token), so the field stays required -- `requires_api_key` only drives
+  // the hint that any placeholder value will do.
+  const apiKeyHelp = selected && !selected.requires_api_key
+    ? "not required by default — any non-empty value works unless the server was started with an API key"
+    : "";
+
   return (
     <form
       onSubmit={handleSubmit}
       className="mb-4 flex flex-col gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700"
     >
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Provider type
-        </label>
-        <select
-          className={inputClass}
-          value={preset}
-          onChange={(e) => setPreset(e.target.value as Preset)}
-        >
-          {PRESET_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Name
-        </label>
-        <input
-          className={inputClass}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder={
-            preset === "vllm" ? "e.g. vLLM (local)" : "e.g. OpenAI (production)"
-          }
-          required
-        />
-      </div>
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Base URL <span className="font-normal text-gray-400">({config.baseUrlHelp})</span>
-        </label>
-        <input
-          className={inputClass}
-          value={baseUrl}
-          onChange={(e) => setBaseUrl(e.target.value)}
-          placeholder={config.baseUrlPlaceholder}
-          required={preset === "vllm"}
-        />
-      </div>
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-          API key
-          {config.apiKeyHelp && (
-            <span className="ml-1 font-normal text-gray-400">({config.apiKeyHelp})</span>
-          )}
-        </label>
-        <input
-          type="password"
-          className={inputClass}
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder={config.apiKeyPlaceholder}
-          required
-        />
-      </div>
+      {selected ? (
+        <>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Provider type
+            </label>
+            <select
+              className={inputClass}
+              value={selected.id}
+              onChange={(e) => setPresetId(e.target.value)}
+            >
+              {presets?.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {selected.description && (
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                {selected.description}
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Name
+            </label>
+            <input
+              className={inputClass}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={`e.g. ${selected.label}`}
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Base URL <span className="font-normal text-gray-400">({baseUrlHelp})</span>
+            </label>
+            <input
+              className={inputClass}
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder={selected.base_url_placeholder ?? ""}
+              required={selected.is_local}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              API key
+              {apiKeyHelp && (
+                <span className="ml-1 font-normal text-gray-400">({apiKeyHelp})</span>
+              )}
+            </label>
+            <input
+              type="password"
+              className={inputClass}
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder={selected.requires_api_key ? "" : "not-required"}
+              required
+            />
+          </div>
+        </>
+      ) : presetsLoading ? (
+        <StatusLine className="mb-0">Loading provider presets…</StatusLine>
+      ) : (
+        <StatusLine isError className="mb-0">
+          {presetsError ?? "No provider presets are available."}
+        </StatusLine>
+      )}
       <div className="flex items-center gap-2">
-        <button type="submit" disabled={busy} className={primaryButtonClass}>
+        <button type="submit" disabled={busy || !selected} className={primaryButtonClass}>
           {busy ? "Adding…" : "Add"}
         </button>
         <button
@@ -385,6 +388,16 @@ export function CloudProvidersPage() {
     { enabled: isAdmin },
   );
 
+  // The add-provider dropdown is backend-driven (#1467/#1585): the preset list
+  // -- including the first-class "vLLM (self-hosted)" entry -- comes from
+  // GET /v1/model-providers/presets rather than being hardcoded here, so a new
+  // preset ships without a client change. Admin-only, like the endpoint itself.
+  const presetsRes = useAsyncResource(
+    (signal) =>
+      apiFetch<ProviderPreset[]>("/v1/model-providers/presets", { token, signal }),
+    { enabled: isAdmin },
+  );
+
   return (
     <>
       {dialog}
@@ -405,7 +418,13 @@ export function CloudProvidersPage() {
       {isAdmin && (
         <>
           <div className="mb-4">
-            <AddProviderForm token={token} onCreated={providersRes.reload} />
+            <AddProviderForm
+              token={token}
+              onCreated={providersRes.reload}
+              presets={presetsRes.data}
+              presetsLoading={presetsRes.loading}
+              presetsError={presetsRes.error}
+            />
           </div>
 
           <StatusLine isError={!!providersRes.error}>
