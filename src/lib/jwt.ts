@@ -4,6 +4,10 @@
  * exports components alone). #502 */
 
 export interface JwtClaims {
+  /** The token subject (`sub`) — the user's own id, stringified. Empty when the
+   * token carries no `sub`. Used to recognise "my" row in a list the server keys
+   * by user id (e.g. which plugin review is the caller's own, #1591). */
+  userId: string;
   username: string;
   email: string;
   role: string;
@@ -32,6 +36,7 @@ export function isExpired(exp: number): boolean {
  * fresh keeps exactly one source of truth for "who is this" regardless of which
  * path (local login, SSO callback, reload from sessionStorage) produced it. */
 const EMPTY_CLAIMS: JwtClaims = {
+  userId: "",
   username: "",
   email: "",
   role: "",
@@ -65,6 +70,9 @@ export function decodeJwtClaims(jwt: string): JwtClaims {
   try {
     const decoded = decodePayload(jwt.split(".")[1]);
     return {
+      // `sub` is minted as the stringified user id (str(user["id"])); coerce a
+      // stray number defensively, same as the tenant ids below.
+      userId: claimToString(decoded.sub),
       username: typeof decoded.username === "string" ? decoded.username : "",
       email: typeof decoded.email === "string" ? decoded.email : "",
       role: typeof decoded.role === "string" ? decoded.role : "",
