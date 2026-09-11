@@ -11,6 +11,7 @@ import type { Paginated } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import {
   badgeClass,
+  badgeTone,
   mutedTextClass,
   secondaryButtonClass,
   surfaceMutedClass,
@@ -27,8 +28,16 @@ import type { PublicChatEndpoint } from "./PublicChatEndpointsPage";
 // Admin-gated exactly like PublicChatEndpointsPage (mirrors the backend's
 // _require_endpoint_admin). Ownership is server-enforced: a cross-tenant /
 // other-owner endpoint id 404s at the gateway, so this view never surfaces
-// another org's conversations. Per-message feedback (#1583) and tool/RAG
-// attribution (#1584) are deliberate follow-ups and NOT shown here.
+// another org's conversations.
+//
+// #1583 (client half): CREATOR-side feedback DISPLAY. The backend (minder PR
+// #1606) folds each turn's anonymous end-user rating (thumbs up/down + optional
+// comment) into the conversation-detail read, and adds a per-endpoint feedback
+// summary. Here we surface both, read-only: the per-turn rating on each turn
+// card, and the endpoint's up/down/total/with-comments summary above the list.
+// The EXTERNAL end-user thumbs-SUBMISSION control is deliberately OUT of scope —
+// it belongs to the public embeddable widget (a separate future issue; that UI
+// doesn't exist yet). Tool/RAG attribution (#1584) stays a follow-up too.
 
 /** One anonymous session row from
  * GET /v1/public-chat/endpoints/{id}/conversations (the gateway proxies
@@ -42,13 +51,37 @@ export interface EndpointConversation {
   turn_count: number;
 }
 
+/** The anonymous end user's rating of one turn's answer (#1583), as folded into
+ * the conversation-detail read by the gateway. `rating` is +1 (thumbs up) / -1
+ * (thumbs down); the optional `comment` is their free-text note. Absent on a
+ * turn nobody rated (the turn's `feedback` is then null). */
+export interface TurnFeedback {
+  rating: number;
+  comment: string | null;
+  feedback_at: string | null;
+}
+
 /** One question/answer exchange within a session. `metadata` is carried but not
- * surfaced yet — tool/RAG attribution off it is #1584. */
+ * surfaced yet — tool/RAG attribution off it is #1584. `feedback` is the
+ * end user's rating of THIS answer, or null/absent when unrated (#1583). */
 export interface ConversationTurn {
   question: string;
   answer: string;
   timestamp: string | null;
   metadata?: Record<string, unknown>;
+  feedback?: TurnFeedback | null;
+}
+
+/** GET /v1/public-chat/endpoints/{id}/feedback — the at-a-glance rating tally for
+ * an endpoint's answers (#1583). `with_comments` counts ratings that also left a
+ * free-text note. Tenant-scoped server-side, so it only ever covers this
+ * endpoint's own feedback. */
+export interface EndpointFeedbackSummary {
+  endpoint_id?: number | string;
+  up: number;
+  down: number;
+  total: number;
+  with_comments: number;
 }
 
 /** GET /v1/public-chat/endpoints/{id}/conversations/{session_id} — the session's
@@ -156,6 +189,45 @@ function ConversationList({
   );
 }
 
+/** Read-only display of the end user's rating on one turn (#1583). Thumbs up →
+ * a green "Helpful" pill, thumbs down → a red "Not helpful" one, plus the
+ * free-text comment when they left one. Rendered only when the turn was rated. */
+function TurnFeedbackBadge({ feedback }: { feedback: TurnFeedback }) {
+  const up = feedback.rating > 0;
+  return (
+    <div className="mt-3">
+      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        Feedback
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+            up ? badgeTone.success : badgeTone.danger
+          }`}
+        >
+          <Icon
+            name={up ? "thumbs-up" : "thumbs-down"}
+            size={12}
+            aria-hidden={false}
+            aria-label={up ? "Rated helpful" : "Rated not helpful"}
+          />
+          {up ? "Helpful" : "Not helpful"}
+        </span>
+        {feedback.feedback_at && (
+          <span className="text-xs text-gray-400 dark:text-gray-500">
+            rated {formatTimestamp(feedback.feedback_at)}
+          </span>
+        )}
+      </div>
+      {feedback.comment && (
+        <p className="mt-2 whitespace-pre-wrap rounded-md bg-white px-2.5 py-1.5 text-xs text-gray-700 ring-1 ring-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:ring-gray-700">
+          “{feedback.comment}”
+        </p>
+      )}
+    </div>
+  );
+}
+
 function ConversationTurnCard({ turn }: { turn: ConversationTurn }) {
   return (
     <div className={`mb-3 ${surfaceMutedClass} p-3 text-sm`}>
@@ -175,11 +247,66 @@ function ConversationTurnCard({ turn }: { turn: ConversationTurn }) {
           {turn.answer}
         </p>
       </div>
+      {turn.feedback && <TurnFeedbackBadge feedback={turn.feedback} />}
       {turn.timestamp && (
         <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
           {formatTimestamp(turn.timestamp)}
         </p>
       )}
+    </div>
+  );
+}
+
+/** The endpoint's at-a-glance feedback tally (#1583), shown above the
+ * conversations/detail. Supplementary chrome: while it's loading or if the
+ * summary fetch fails, we render nothing rather than block the page the creator
+ * actually came for. A zero-total endpoint gets a plain "no feedback yet" note. */
+function FeedbackSummaryBar({
+  endpointId,
+  token,
+}: {
+  endpointId: string;
+  token: string;
+}) {
+  const summaryRes = useAsyncResource(
+    (signal) =>
+      apiFetch<EndpointFeedbackSummary>(
+        `/v1/public-chat/endpoints/${endpointId}/feedback`,
+        { token, signal },
+      ),
+    { deps: [endpointId] },
+  );
+
+  const s = summaryRes.data;
+  if (!s) return null;
+
+  if (!s.total) {
+    return (
+      <p className={`mb-4 ${mutedTextClass}`}>
+        No feedback yet — end users haven't rated any answers on this endpoint.
+      </p>
+    );
+  }
+
+  return (
+    <div
+      className="mb-4 flex flex-wrap items-center gap-2"
+      aria-label="Endpoint feedback summary"
+    >
+      <span
+        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${badgeTone.success}`}
+      >
+        <Icon name="thumbs-up" size={12} /> {s.up} up
+      </span>
+      <span
+        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${badgeTone.danger}`}
+      >
+        <Icon name="thumbs-down" size={12} /> {s.down} down
+      </span>
+      <span className={badgeClass}>{s.total} rated</span>
+      <span className={badgeClass}>
+        {s.with_comments} with comment{s.with_comments === 1 ? "" : "s"}
+      </span>
     </div>
   );
 }
@@ -315,17 +442,23 @@ export function PublicChatConversationsPage() {
             <InfoCallout icon="warning">{endpointRes.error}</InfoCallout>
           )}
 
-          {!endpointRes.loading &&
-            !endpointRes.error &&
-            (sessionId ? (
-              <ConversationDetail
-                endpointId={endpointId}
-                sessionId={sessionId}
-                token={token}
-              />
-            ) : (
-              <ConversationList endpointId={endpointId} token={token} />
-            ))}
+          {!endpointRes.loading && !endpointRes.error && (
+            <>
+              {/* Endpoint-level feedback tally (#1583) — relevant on both the
+                  list overview and a single conversation's drill-in. */}
+              <FeedbackSummaryBar endpointId={endpointId} token={token} />
+
+              {sessionId ? (
+                <ConversationDetail
+                  endpointId={endpointId}
+                  sessionId={sessionId}
+                  token={token}
+                />
+              ) : (
+                <ConversationList endpointId={endpointId} token={token} />
+              )}
+            </>
+          )}
         </>
       )}
     </>
