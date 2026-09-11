@@ -17,14 +17,16 @@ function makeJwt(claims: Record<string, unknown>): string {
 }
 
 describe("decodeJwtClaims", () => {
-  it("pulls username/email/role/exp from a well-formed token", () => {
+  it("pulls sub/username/email/role/exp from a well-formed token", () => {
     const jwt = makeJwt({
+      sub: "42",
       username: "ada",
       email: "ada@example.com",
       role: "admin",
       exp: 1893456000,
     });
     expect(decodeJwtClaims(jwt)).toEqual({
+      userId: "42",
       username: "ada",
       email: "ada@example.com",
       role: "admin",
@@ -34,6 +36,12 @@ describe("decodeJwtClaims", () => {
       orgRole: "",
       isPlatformAdmin: false,
     });
+  });
+
+  it("coerces a numeric `sub` to a string user id", () => {
+    // Real tokens mint `sub` as str(user["id"]), but coerce a stray number so a
+    // review-ownership check (review.user_id === userId) still matches.
+    expect(decodeJwtClaims(makeJwt({ sub: 7 })).userId).toBe("7");
   });
 
   it("decodes multi-tenant org claims when present", () => {
@@ -73,6 +81,7 @@ describe("decodeJwtClaims", () => {
 
   it("fails open to empty claims on a malformed token", () => {
     expect(decodeJwtClaims("not-a-jwt")).toEqual({
+      userId: "",
       username: "",
       email: "",
       role: "",
@@ -85,8 +94,9 @@ describe("decodeJwtClaims", () => {
   });
 
   it("coerces wrong-typed claims to safe defaults", () => {
-    const jwt = makeJwt({ username: 42, role: null, exp: "soon" });
+    const jwt = makeJwt({ sub: null, username: 42, role: null, exp: "soon" });
     expect(decodeJwtClaims(jwt)).toEqual({
+      userId: "",
       username: "",
       email: "",
       role: "",
