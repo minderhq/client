@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -6,6 +7,16 @@ import {
   type PipelineOption,
   type PublicChatEndpoint,
 } from "./PublicChatEndpointsPage";
+
+// The endpoint rows now link into the conversation dashboard (#1582), so the
+// page needs a Router context to render.
+function renderPage() {
+  return render(
+    <MemoryRouter>
+      <PublicChatEndpointsPage />
+    </MemoryRouter>,
+  );
+}
 
 const apiFetch = vi.fn();
 vi.mock("../lib/api", () => ({
@@ -122,7 +133,7 @@ describe("PublicChatEndpointsPage", () => {
 
   it("shows an admin-required message and never fetches for a non-admin", () => {
     mockAuth = { token: "tok", role: "member", orgRole: "member", isPlatformAdmin: false };
-    render(<PublicChatEndpointsPage />);
+    renderPage();
     expect(
       screen.getByText("Admin role required to manage public chat endpoints."),
     ).toBeTruthy();
@@ -131,7 +142,7 @@ describe("PublicChatEndpointsPage", () => {
 
   it("prompts to log in when unauthenticated", () => {
     mockAuth = { token: "", role: "", orgRole: "", isPlatformAdmin: false };
-    render(<PublicChatEndpointsPage />);
+    renderPage();
     expect(
       screen.getByText("Log in as an admin to manage public chat endpoints."),
     ).toBeTruthy();
@@ -145,7 +156,7 @@ describe("PublicChatEndpointsPage", () => {
         endpoint({ id: 2, name: "Sales Bot", slug: "sales", enabled: false }),
       ],
     });
-    render(<PublicChatEndpointsPage />);
+    renderPage();
 
     expect(await screen.findByText("Support Bot")).toBeTruthy();
     expect(screen.getByText("Sales Bot")).toBeTruthy();
@@ -161,7 +172,7 @@ describe("PublicChatEndpointsPage", () => {
   it("shows an empty state when there are no endpoints", async () => {
     mockAuth = ADMIN;
     installApi({ endpoints: [] });
-    render(<PublicChatEndpointsPage />);
+    renderPage();
     expect(
       await screen.findByText("No public chat endpoints yet."),
     ).toBeTruthy();
@@ -170,7 +181,7 @@ describe("PublicChatEndpointsPage", () => {
   it("prompts to create a pipeline first when none exist", async () => {
     mockAuth = ADMIN;
     installApi({ endpoints: [], pipelines: [] });
-    render(<PublicChatEndpointsPage />);
+    renderPage();
     expect(
       await screen.findByText(
         "Create a RAG pipeline first — a public chat endpoint needs one to answer from.",
@@ -181,7 +192,7 @@ describe("PublicChatEndpointsPage", () => {
   it("creates an endpoint from the form", async () => {
     mockAuth = ADMIN;
     installApi({ endpoints: [] });
-    render(<PublicChatEndpointsPage />);
+    renderPage();
     await screen.findByText("No public chat endpoints yet.");
 
     fireEvent.click(screen.getByText("New Endpoint"));
@@ -217,7 +228,7 @@ describe("PublicChatEndpointsPage", () => {
   it("stores the chosen RAG method in rag_config on create", async () => {
     mockAuth = ADMIN;
     installApi({ endpoints: [] });
-    render(<PublicChatEndpointsPage />);
+    renderPage();
     await screen.findByText("No public chat endpoints yet.");
 
     fireEvent.click(screen.getByText("New Endpoint"));
@@ -252,7 +263,7 @@ describe("PublicChatEndpointsPage", () => {
   it("edits an endpoint's name via PATCH", async () => {
     mockAuth = ADMIN;
     installApi({ endpoints: [endpoint()] });
-    render(<PublicChatEndpointsPage />);
+    renderPage();
     await screen.findByText("Support Bot");
 
     fireEvent.click(screen.getByText("Edit"));
@@ -278,7 +289,7 @@ describe("PublicChatEndpointsPage", () => {
   it("toggles an endpoint's enabled state", async () => {
     mockAuth = ADMIN;
     installApi({ endpoints: [endpoint({ enabled: true })] });
-    render(<PublicChatEndpointsPage />);
+    renderPage();
     await screen.findByText("Support Bot");
 
     fireEvent.click(screen.getByText("Disable"));
@@ -295,7 +306,7 @@ describe("PublicChatEndpointsPage", () => {
   it("deletes an endpoint only after confirmation", async () => {
     mockAuth = ADMIN;
     installApi({ endpoints: [endpoint()] });
-    render(<PublicChatEndpointsPage />);
+    renderPage();
     await screen.findByText("Support Bot");
 
     mockConfirm.mockResolvedValueOnce(false);
@@ -320,7 +331,7 @@ describe("PublicChatEndpointsPage", () => {
   it("surfaces a fetch error via the status line", async () => {
     mockAuth = ADMIN;
     installApi({ endpointsError: new Error("gateway unreachable") });
-    render(<PublicChatEndpointsPage />);
+    renderPage();
     expect(await screen.findByText("gateway unreachable")).toBeTruthy();
   });
 });
