@@ -53,8 +53,11 @@ function session(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** Route apiFetch by path so the endpoint-metadata GET, the sessions list, and
- * the single-conversation GET each resolve independently of call order. */
+const NO_FEEDBACK = { endpoint_id: 7, up: 0, down: 0, total: 0, with_comments: 0 };
+
+/** Route apiFetch by path so the endpoint-metadata GET, the sessions list, the
+ * feedback summary, and the single-conversation GET each resolve independently
+ * of call order. */
 function installApi(opts: {
   endpoint?: unknown;
   endpointError?: Error;
@@ -63,6 +66,8 @@ function installApi(opts: {
   sessionsError?: Error;
   detail?: unknown;
   detailError?: Error;
+  summary?: unknown;
+  summaryError?: Error;
 } = {}) {
   const {
     endpoint = ENDPOINT,
@@ -72,8 +77,16 @@ function installApi(opts: {
     sessionsError,
     detail,
     detailError,
+    summary = NO_FEEDBACK,
+    summaryError,
   } = opts;
   apiFetch.mockImplementation((path: string) => {
+    // Feedback summary: /v1/public-chat/endpoints/{id}/feedback
+    if (/\/feedback$/.test(path)) {
+      return summaryError
+        ? Promise.reject(summaryError)
+        : Promise.resolve(summary);
+    }
     // Single conversation: .../conversations/{session_id}
     if (/\/conversations\/[^/]+$/.test(path)) {
       return detailError
@@ -261,5 +274,119 @@ describe("PublicChatConversationsPage", () => {
       await screen.findByText("Conversation not found"),
     ).toBeTruthy();
     expect(screen.getByText("Back to conversations")).toBeTruthy();
+  });
+
+  // ── #1583: per-turn feedback display ───────────────────────────────────────
+  it("shows a rated turn's thumbs verdict and comment (#1583)", async () => {
+    mockAuth = ADMIN;
+    installApi({
+      detail: {
+        session: session({ session_id: "sess-fb0000000000", turn_count: 2 }),
+        turns: [
+          {
+            question: "Do you offer refunds?",
+            answer: "Yes, within 30 days.",
+            timestamp: "2026-02-01T10:00:00Z",
+            metadata: {},
+            feedback: {
+              rating: 1,
+              comment: "Exactly what I needed, thanks!",
+              feedback_at: "2026-02-01T10:01:00Z",
+            },
+          },
+          {
+            question: "Ship to Antarctica?",
+            answer: "We do not ship there.",
+            timestamp: "2026-02-01T10:05:00Z",
+            metadata: {},
+            feedback: { rating: -1, comment: null, feedback_at: null },
+          },
+        ],
+      },
+    });
+    renderAt(DETAIL_PATH("sess-fb0000000000"));
+
+    // Thumbs-up turn: "Helpful" verdict + the free-text comment, read-only.
+    expect(await screen.findByText("Helpful")).toBeTruthy();
+    expect(
+      screen.getByText(/Exactly what I needed, thanks!/),
+    ).toBeTruthy();
+    expect(screen.getByLabelText("Rated helpful")).toBeTruthy();
+    // Thumbs-down turn with no comment: "Not helpful", no phantom comment.
+    expect(screen.getByText("Not helpful")).toBeTruthy();
+    expect(screen.getByLabelText("Rated not helpful")).toBeTruthy();
+    // Still fully read-only — no compose/submit affordance was introduced.
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByRole("button", { name: /thumb/i })).toBeNull();
+  });
+
+  it("shows no feedback verdict on an unrated turn (#1583)", async () => {
+    mockAuth = ADMIN;
+    installApi({
+      detail: {
+        session: session({ session_id: "sess-none00000000", turn_count: 1 }),
+        turns: [
+          {
+            question: "What are your hours?",
+            answer: "9 to 5, Mon-Fri.",
+            timestamp: "2026-02-01T10:00:00Z",
+            metadata: {},
+            feedback: null,
+          },
+        ],
+      },
+    });
+    renderAt(DETAIL_PATH("sess-none00000000"));
+
+    expect(await screen.findByText("What are your hours?")).toBeTruthy();
+    expect(screen.queryByText("Helpful")).toBeNull();
+    expect(screen.queryByText("Not helpful")).toBeNull();
+    expect(screen.queryByText("Feedback")).toBeNull();
+  });
+
+  // ── #1583: endpoint feedback summary display ───────────────────────────────
+  it("shows the endpoint feedback summary above the list (#1583)", async () => {
+    mockAuth = ADMIN;
+    installApi({
+      sessions: [session({ session_id: "sess-sum000000000", turn_count: 1 })],
+      total: 1,
+      summary: { endpoint_id: 7, up: 8, down: 2, total: 10, with_comments: 3 },
+    });
+    renderAt(LIST_PATH);
+
+    expect(await screen.findByText("8 up")).toBeTruthy();
+    expect(screen.getByText("2 down")).toBeTruthy();
+    expect(screen.getByText("10 rated")).toBeTruthy();
+    expect(screen.getByText("3 with comments")).toBeTruthy();
+  });
+
+  it("notes when the endpoint has no feedback yet (#1583)", async () => {
+    mockAuth = ADMIN;
+    installApi({
+      sessions: [session({ session_id: "sess-zero00000000", turn_count: 1 })],
+      total: 1,
+      summary: { endpoint_id: 7, up: 0, down: 0, total: 0, with_comments: 0 },
+    });
+    renderAt(LIST_PATH);
+
+    expect(
+      await screen.findByText(/No feedback yet/),
+    ).toBeTruthy();
+  });
+
+  it("degrades gracefully when the summary fetch errors, still listing conversations (#1583)", async () => {
+    mockAuth = ADMIN;
+    installApi({
+      sessions: [session({ session_id: "sess-err000000000", turn_count: 4 })],
+      total: 1,
+      summaryError: new Error("summary unavailable"),
+    });
+    renderAt(LIST_PATH);
+
+    // The list still renders; the failed summary is silently omitted, not fatal.
+    expect(await screen.findByText("sess-err0000…")).toBeTruthy();
+    expect(screen.getByText("4 turns")).toBeTruthy();
+    expect(screen.queryByText("summary unavailable")).toBeNull();
+    expect(screen.queryByLabelText("Endpoint feedback summary")).toBeNull();
   });
 });
