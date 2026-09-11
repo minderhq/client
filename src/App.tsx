@@ -34,6 +34,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { ModelManagementPage } from "./pages/ModelManagementPage";
 import { MyLicensesPage } from "./pages/MyLicensesPage";
 import { OrganizationPage } from "./pages/OrganizationPage";
+import { PublicChatEndpointsPage } from "./pages/PublicChatEndpointsPage";
 import { RagPipelinesPage } from "./pages/RagPipelinesPage";
 import { ReviewQueuePage } from "./pages/ReviewQueuePage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -156,6 +157,10 @@ export function App() {
                     element={<EntityMergeReviewPage />}
                   />
                   <Route path="/rag/conversations" element={<ConversationsPage />} />
+                  <Route
+                    path="/rag/public-chat"
+                    element={<PublicChatEndpointsPage />}
+                  />
 
                   <Route
                     path="/plugins"
