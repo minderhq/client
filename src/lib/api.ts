@@ -51,6 +51,23 @@ async function parseErrorDetail(res: Response): Promise<string> {
   const data = await res.json().catch(() => ({}) as { detail?: unknown });
   const detail = (data as { detail?: unknown }).detail;
   if (typeof detail === "string") return detail;
+  // Some endpoints return a structured detail `{error: string, errors?: []}`
+  // rather than a bare string -- e.g. plugin-registry's install-from-git route
+  // (#1578), whose GitInstallError surfaces an SSRF/clone/manifest-validation
+  // reason plus optional sub-errors. Show the human-readable message instead of
+  // dumping the raw JSON object at the user. (FastAPI's own validation errors
+  // are an ARRAY, which is excluded here and still falls through to stringify.)
+  if (
+    detail &&
+    typeof detail === "object" &&
+    !Array.isArray(detail) &&
+    typeof (detail as { error?: unknown }).error === "string"
+  ) {
+    const d = detail as { error: string; errors?: unknown };
+    return Array.isArray(d.errors) && d.errors.length > 0
+      ? `${d.error}: ${d.errors.join("; ")}`
+      : d.error;
+  }
   if (detail !== undefined) return JSON.stringify(detail);
   return `Request failed (${res.status})`;
 }

@@ -82,8 +82,10 @@ function installation(overrides: Partial<Installation> = {}): Installation {
 }
 
 function renderCard(overrides: {
+  plugin?: Plugin;
   installation?: Installation;
   isAuthenticated?: boolean;
+  isAdmin?: boolean;
   confirm?: ReturnType<typeof vi.fn>;
   onInstalled?: ReturnType<typeof vi.fn>;
   onUninstalled?: ReturnType<typeof vi.fn>;
@@ -95,10 +97,11 @@ function renderCard(overrides: {
   const onToggleEnabled = overrides.onToggleEnabled ?? vi.fn();
   render(
     <PluginCard
-      plugin={plugin()}
+      plugin={overrides.plugin ?? plugin()}
       installation={overrides.installation}
       token="tok"
       isAuthenticated={overrides.isAuthenticated ?? true}
+      isAdmin={overrides.isAdmin ?? false}
       onInstalled={onInstalled}
       onUninstalled={onUninstalled}
       onToggleEnabled={onToggleEnabled}
@@ -209,6 +212,100 @@ describe("PluginCard", () => {
       screen.getByRole("button", { name: "Install" }).hasAttribute("disabled"),
     ).toBe(true);
     expect(screen.getByText("Log in to install")).toBeTruthy();
+  });
+
+  it("hides the 'Install from this repo' affordance for non-admins", () => {
+    renderCard({
+      plugin: plugin({ repository_url: "https://github.com/acme/weather" }),
+      isAdmin: false,
+    });
+
+    expect(screen.queryByText("Install from this repo")).toBeNull();
+  });
+
+  it("hides the 'Install from this repo' affordance when there is no repository_url", () => {
+    renderCard({ plugin: plugin({ repository_url: null }), isAdmin: true });
+
+    expect(screen.queryByText("Install from this repo")).toBeNull();
+  });
+
+  it("installs from the repo for an admin, posting repo_url + optional ref/subpath", async () => {
+    apiFetch.mockResolvedValue({
+      message: "Plugin weather installed successfully",
+      plugin: "weather",
+      webhook_path: "/webhook/weather",
+    });
+    renderCard({
+      plugin: plugin({ repository_url: "https://github.com/acme/weather" }),
+      isAdmin: true,
+    });
+
+    fireEvent.click(
+      screen.getByText("Install from this repo", { selector: "summary" }),
+    );
+    fireEvent.change(screen.getByLabelText("Git ref"), {
+      target: { value: "v1.2.0" },
+    });
+    fireEvent.change(screen.getByLabelText("Manifest subpath"), {
+      target: { value: "plugins/weather" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Install from this repo" }),
+    );
+
+    await screen.findByText(/installed successfully/);
+    expect(apiFetch).toHaveBeenCalledWith("/v1/plugins/install-from-git", {
+      method: "POST",
+      token: "tok",
+      body: {
+        repo_url: "https://github.com/acme/weather",
+        ref: "v1.2.0",
+        subpath: "plugins/weather",
+      },
+    });
+  });
+
+  it("sends only repo_url when no ref/subpath/token are provided", async () => {
+    apiFetch.mockResolvedValue({
+      message: "Plugin weather installed successfully",
+      plugin: "weather",
+      webhook_path: null,
+    });
+    renderCard({
+      plugin: plugin({ repository_url: "https://github.com/acme/weather" }),
+      isAdmin: true,
+    });
+
+    fireEvent.click(
+      screen.getByText("Install from this repo", { selector: "summary" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Install from this repo" }),
+    );
+
+    await screen.findByText(/installed successfully/);
+    expect(apiFetch).toHaveBeenCalledWith("/v1/plugins/install-from-git", {
+      method: "POST",
+      token: "tok",
+      body: { repo_url: "https://github.com/acme/weather" },
+    });
+  });
+
+  it("surfaces the backend error (e.g. SSRF-rejected URL) without crashing", async () => {
+    apiFetch.mockRejectedValue(new Error("Repository URL is not allowed"));
+    renderCard({
+      plugin: plugin({ repository_url: "https://github.com/acme/weather" }),
+      isAdmin: true,
+    });
+
+    fireEvent.click(
+      screen.getByText("Install from this repo", { selector: "summary" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Install from this repo" }),
+    );
+
+    await screen.findByText("Repository URL is not allowed");
   });
 });
 
