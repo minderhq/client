@@ -42,6 +42,7 @@ describe("nav — Knowledge Graph grouping (#1230)", () => {
       "/rag",
       "/rag/pipelines",
       "/rag/conversations",
+      "/rag/public-chat",
       "/rag/graph",
     ]);
     // …Taxonomy Review / Entity Merge Review are reachable only as tabs.
