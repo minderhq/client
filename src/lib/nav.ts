@@ -61,6 +61,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { to: "/rag", label: "Knowledge Bases", icon: "knowledge-bases", end: true, description: "Upload & manage your documents", keywords: "documents kb corpus upload files" },
       { to: "/rag/pipelines", label: "Pipelines", icon: "pipelines", description: "Set up question-answering over your documents", keywords: "retrieval query hyde self-rag q&a" },
       { to: "/rag/conversations", label: "Conversations", icon: "conversations", description: "Revisit your past chats", keywords: "history threads chat" },
+      { to: "/rag/public-chat", label: "Public Chat", icon: "ask", adminOnly: true, description: "Publish a public chatbot over a pipeline (admin)", keywords: "public chatbot widget endpoint slug anonymous embed share rate limit" },
       // Graph / Taxonomy Review / Entity Merge Review are advanced surfaces a
       // first-timer has no data for — nested under one "Knowledge Graph" entry
       // as in-page tabs (#1230) so top-level Knowledge is just the golden path
