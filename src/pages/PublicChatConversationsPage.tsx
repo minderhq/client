@@ -37,7 +37,12 @@ import type { PublicChatEndpoint } from "./PublicChatEndpointsPage";
 // card, and the endpoint's up/down/total/with-comments summary above the list.
 // The EXTERNAL end-user thumbs-SUBMISSION control is deliberately OUT of scope —
 // it belongs to the public embeddable widget (a separate future issue; that UI
-// doesn't exist yet). Tool/RAG attribution (#1584) stays a follow-up too.
+// doesn't exist yet).
+//
+// #1584 (client half): TOOL/RAG-METHOD ATTRIBUTION. Each turn's `metadata` (the
+// RAG method, generation model, and retrieved-source count the rag-pipeline stamps
+// on every answer) is surfaced per turn as read-only chips, so a creator inspecting
+// a flagged (👎) response can see WHICH method/model produced that specific answer.
 
 /** One anonymous session row from
  * GET /v1/public-chat/endpoints/{id}/conversations (the gateway proxies
@@ -61,14 +66,31 @@ export interface TurnFeedback {
   feedback_at: string | null;
 }
 
-/** One question/answer exchange within a session. `metadata` is carried but not
- * surfaced yet — tool/RAG attribution off it is #1584. `feedback` is the
- * end user's rating of THIS answer, or null/absent when unrated (#1583). */
+/** Per-response attribution the rag-pipeline stamps on every stored turn and the
+ * gateway folds into the creator's conversation-detail read (#1584). `method` is
+ * the RAG method that produced this answer (standard/hyde/self_rag/raptor/
+ * corrective/auto/…); `model_used` the generation model; `sources_count` how many
+ * retrieved sources fed it; `pipeline_id` the endpoint's pipeline. Older turns can
+ * carry `metadata: {}` or omit individual fields, so EVERY field is optional — a
+ * consumer renders only what's present and never assumes a value. */
+export interface TurnMetadata {
+  method?: string;
+  pipeline_id?: string;
+  model_used?: string;
+  sources_count?: number;
+  /** DB-set stamp; the turn's own `timestamp` is the surfaced one, this is unused UI-side. */
+  timestamp?: string | null;
+}
+
+/** One question/answer exchange within a session. `metadata` carries this answer's
+ * tool/RAG attribution, surfaced per turn so a creator inspecting a flagged (👎)
+ * response sees WHICH method/model produced it (#1584). `feedback` is the end
+ * user's rating of THIS answer, or null/absent when unrated (#1583). */
 export interface ConversationTurn {
   question: string;
   answer: string;
   timestamp: string | null;
-  metadata?: Record<string, unknown>;
+  metadata?: TurnMetadata;
   feedback?: TurnFeedback | null;
 }
 
@@ -228,6 +250,45 @@ function TurnFeedbackBadge({ feedback }: { feedback: TurnFeedback }) {
   );
 }
 
+/** Read-only tool/RAG attribution for one answer (#1584). Surfaces which RAG
+ * method, generation model, and how many retrieved sources produced THIS response
+ * so a creator inspecting a flagged (👎) turn can tie the bad answer to its
+ * pipeline settings. Each fact is its own chip and only renders when present, so
+ * a turn with `metadata: {}` or missing fields degrades to fewer chips (or none)
+ * instead of crashing or showing empty "Method:" labels. Shown on every turn —
+ * flagged ones are the point, but it's harmless (and simpler) on all of them. */
+function TurnAttribution({ metadata }: { metadata: TurnMetadata }) {
+  const { method, model_used, sources_count } = metadata;
+  const hasSources = typeof sources_count === "number";
+  if (!method && !model_used && !hasSources) return null;
+
+  return (
+    <div className="mt-3" aria-label="Response attribution">
+      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        Attribution
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {method && (
+          <span className={badgeClass}>
+            <Icon name="layers" size={12} /> Method: {method}
+          </span>
+        )}
+        {model_used && (
+          <span className={badgeClass}>
+            <Icon name="models" size={12} /> Model: {model_used}
+          </span>
+        )}
+        {hasSources && (
+          <span className={badgeClass}>
+            <Icon name="file" size={12} /> {sources_count} source
+            {sources_count === 1 ? "" : "s"}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ConversationTurnCard({ turn }: { turn: ConversationTurn }) {
   return (
     <div className={`mb-3 ${surfaceMutedClass} p-3 text-sm`}>
@@ -247,6 +308,7 @@ function ConversationTurnCard({ turn }: { turn: ConversationTurn }) {
           {turn.answer}
         </p>
       </div>
+      {turn.metadata && <TurnAttribution metadata={turn.metadata} />}
       {turn.feedback && <TurnFeedbackBadge feedback={turn.feedback} />}
       {turn.timestamp && (
         <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
