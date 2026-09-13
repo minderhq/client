@@ -170,8 +170,13 @@ describe("PublicChatConversationsPage", () => {
     expect(
       await screen.findByText(/"Support Bot" public chat endpoint/),
     ).toBeTruthy();
-    // Short session id + turn count badges render for each row.
-    expect(screen.getByText("sess-one0000…")).toBeTruthy();
+    // Short session id + turn count badges render for each row. The list is
+    // fetched by a separate async chain (ConversationList's own
+    // usePaginatedList reload effect, kicked off once it mounts after the
+    // endpoint metadata resolves) — so, like the header assertion above, this
+    // must be awaited rather than asserted synchronously. A synchronous
+    // getByText here raced that effect and was flaky (#1615).
+    expect(await screen.findByText("sess-one0000…")).toBeTruthy();
     expect(screen.getByText("sess-two0000…")).toBeTruthy();
     expect(screen.getByText("2 turns")).toBeTruthy();
     expect(screen.getByText("5 turns")).toBeTruthy();
