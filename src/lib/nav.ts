@@ -108,8 +108,8 @@ export const NAV_SECTIONS: NavSection[] = [
         description: "Function-calling tools the assistant can use",
         keywords: "function calling ollama actions",
         tabs: [
-          { to: "/ai-tools/available", label: "Browse", icon: "ai-tools", end: true, description: "The tool catalog" },
-          { to: "/ai-tools/installed", label: "Installed", icon: "installed", description: "Tools callable right now" },
+          { to: "/ai-tools/available", label: "Catalog", icon: "ai-tools", end: true, description: "The durable catalog of AI Tools plugins offer" },
+          { to: "/ai-tools/installed", label: "Live", icon: "installed", description: "AI Tools callable right now" },
         ],
       },
     ],
