@@ -52,6 +52,16 @@ describe("AvailableToolsPage", () => {
     apiFetch.mockReset();
   });
 
+  it("renders the catalog heading and points to Live Tools", async () => {
+    apiFetch.mockResolvedValue({ tools: [], count: 0, total: 0, limit: 20, offset: 0 });
+    renderPage();
+
+    expect(screen.getByRole("heading", { name: "AI Tool Catalog" })).toBeTruthy();
+    expect(
+      screen.getAllByText("Live Tools")[0].closest("a")?.getAttribute("href"),
+    ).toBe("/ai-tools/installed");
+  });
+
   it("shows an empty state when the catalog has no tools", async () => {
     apiFetch.mockResolvedValue({ tools: [], count: 0, total: 0, limit: 20, offset: 0 });
     renderPage();

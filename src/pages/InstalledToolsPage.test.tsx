@@ -1,8 +1,17 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../lib/api";
 import { InstalledToolsPage, TryItPanel, type LiveTool } from "./InstalledToolsPage";
+
+function renderPage() {
+  return render(
+    <MemoryRouter>
+      <InstalledToolsPage />
+    </MemoryRouter>,
+  );
+}
 
 const apiFetch = vi.fn();
 
@@ -146,9 +155,19 @@ describe("InstalledToolsPage", () => {
     apiFetch.mockReset();
   });
 
+  it("renders the Live Tools heading and points to the AI Tool Catalog", async () => {
+    apiFetch.mockResolvedValue({ tools: [] });
+    renderPage();
+
+    expect(screen.getByRole("heading", { name: "Live Tools" })).toBeTruthy();
+    expect(
+      screen.getAllByText("AI Tool Catalog")[0].closest("a")?.getAttribute("href"),
+    ).toBe("/ai-tools/available");
+  });
+
   it("shows an empty state when no plugin exposes a live tool", async () => {
     apiFetch.mockResolvedValue({ tools: [] });
-    render(<InstalledToolsPage />);
+    renderPage();
 
     await screen.findByText("No plugin is currently exposing an AI tool.");
     expect(apiFetch).toHaveBeenCalledWith(
@@ -159,7 +178,7 @@ describe("InstalledToolsPage", () => {
 
   it("renders a LiveToolCard per live tool, including its Try It panel", async () => {
     apiFetch.mockResolvedValue({ tools: [tool({ plugin: "weather" }), tool({ plugin: "news" })] });
-    render(<InstalledToolsPage />);
+    renderPage();
 
     const cards = await screen.findAllByText("get_weather");
     expect(cards).toHaveLength(2);
@@ -177,21 +196,21 @@ describe("InstalledToolsPage", () => {
         },
       ],
     });
-    render(<InstalledToolsPage />);
+    renderPage();
 
     await screen.findByText("No description provided.");
   });
 
   it("shows a friendly error message when the live-tools fetch fails", async () => {
     apiFetch.mockRejectedValue(new Error("plugin-registry unreachable"));
-    render(<InstalledToolsPage />);
+    renderPage();
 
     await screen.findByText("plugin-registry unreachable");
   });
 
   it("renders (does not crash) when the response omits `tools` entirely", async () => {
     apiFetch.mockResolvedValue({});
-    render(<InstalledToolsPage />);
+    renderPage();
 
     await screen.findByText("No plugin is currently exposing an AI tool.");
   });
