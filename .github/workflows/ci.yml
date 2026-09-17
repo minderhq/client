@@ -21,10 +21,13 @@ permissions:
 jobs:
   build:
     name: Lint, Typecheck, Test & Build
-    # push (trusted, post-merge) runs on the org's self-hosted pool; pull_request
-    # (including from forks -- this repo is public) stays on GitHub-hosted so an
-    # external contributor's PR never executes on our infrastructure.
-    runs-on: ${{ github.event_name == 'push' && fromJSON('["self-hosted","Linux","X64","org-shared"]') || 'ubuntu-latest' }}
+    # Always GitHub-hosted. This repo is public, so self-hosted push CI queues
+    # forever behind the org runner group's allows_public_repositories=false gate
+    # (confirmed live: main runs sat queued for hours, then were cancelled).
+    # Hosted minutes are free for a public repo, and fork PRs already ran hosted,
+    # so nothing external newly executes on our infra. (The docker job's type=gha
+    # cache is runner-independent, so self-hosted gave it nothing here anyway.)
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
@@ -50,10 +53,13 @@ jobs:
 
   docker:
     name: Docker image builds
-    # push (trusted, post-merge) runs on the org's self-hosted pool; pull_request
-    # (including from forks -- this repo is public) stays on GitHub-hosted so an
-    # external contributor's PR never executes on our infrastructure.
-    runs-on: ${{ github.event_name == 'push' && fromJSON('["self-hosted","Linux","X64","org-shared"]') || 'ubuntu-latest' }}
+    # Always GitHub-hosted. This repo is public, so self-hosted push CI queues
+    # forever behind the org runner group's allows_public_repositories=false gate
+    # (confirmed live: main runs sat queued for hours, then were cancelled).
+    # Hosted minutes are free for a public repo, and fork PRs already ran hosted,
+    # so nothing external newly executes on our infra. (The docker job's type=gha
+    # cache is runner-independent, so self-hosted gave it nothing here anyway.)
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
