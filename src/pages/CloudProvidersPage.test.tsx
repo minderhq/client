@@ -471,6 +471,96 @@ describe("CloudProvidersPage", () => {
     );
   });
 
+  it("renames a provider via PATCH name", async () => {
+    // #1718: rename is a first-class inline edit reusing the existing PATCH
+    // endpoint's `name` field -- no delete-and-recreate.
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({ providers: [provider({ name: "OpenAI (production)" })] });
+    render(<CloudProvidersPage />);
+    await screen.findByText("OpenAI (production)");
+
+    fireEvent.click(screen.getByText("Rename"));
+    const nameInput = await screen.findByLabelText("New provider name");
+    fireEvent.change(nameInput, { target: { value: "OpenAI (staging)" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith("/v1/model-providers/p1", {
+        method: "PATCH",
+        token: "tok",
+        body: { name: "OpenAI (staging)" },
+      }),
+    );
+  });
+
+  it("does not send a rename request when the name is unchanged", async () => {
+    // A blank/unchanged rename just closes the form -- no pointless PATCH.
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({ providers: [provider({ name: "OpenAI (production)" })] });
+    render(<CloudProvidersPage />);
+    await screen.findByText("OpenAI (production)");
+
+    fireEvent.click(screen.getByText("Rename"));
+    await screen.findByLabelText("New provider name");
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(screen.queryByLabelText("New provider name")).toBeNull(),
+    );
+    expect(apiFetch).not.toHaveBeenCalledWith(
+      "/v1/model-providers/p1",
+      expect.objectContaining({ method: "PATCH" }),
+    );
+  });
+
+  it("rotates a provider's API key via PATCH api_key", async () => {
+    // #1718: rotating replaces the stored key on the SAME provider row (keeps
+    // its id, so routed models keep working) -- the old delete-and-recreate is
+    // gone. The new key is write-only, sent via the existing PATCH `api_key`.
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({ providers: [provider()] });
+    render(<CloudProvidersPage />);
+    await screen.findByText("OpenAI (production)");
+
+    fireEvent.click(screen.getByText("Rotate key"));
+    const keyInput = await screen.findByLabelText("New API key");
+    // The current key is never pre-filled -- the rotate form starts empty so it
+    // can only ever SET a new key, never reveal the stored one.
+    expect((keyInput as HTMLInputElement).value).toBe("");
+    fireEvent.change(keyInput, { target: { value: "sk-new-secret-key" } });
+    fireEvent.click(screen.getByRole("button", { name: "Rotate" }));
+
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith("/v1/model-providers/p1", {
+        method: "PATCH",
+        token: "tok",
+        body: { api_key: "sk-new-secret-key" },
+      }),
+    );
+  });
+
+  it("keeps the rotate submit disabled until a new key is entered", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({ providers: [provider()] });
+    render(<CloudProvidersPage />);
+    await screen.findByText("OpenAI (production)");
+
+    fireEvent.click(screen.getByText("Rotate key"));
+    await screen.findByLabelText("New API key");
+    expect(screen.getByRole("button", { name: "Rotate" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+
+    fireEvent.change(screen.getByLabelText("New API key"), {
+      target: { value: "sk-new" },
+    });
+    expect(screen.getByRole("button", { name: "Rotate" })).toHaveProperty(
+      "disabled",
+      false,
+    );
+  });
+
   it("surfaces a fetch error via the status line", async () => {
     mockAuth = { token: "tok", role: "admin" };
     installApi({ providersError: new Error("model-management unreachable") });
