@@ -70,9 +70,9 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "Available Bundles" })).toBeTruthy();
   });
 
-  it("redirects the section-index /ai-tools path to Available Tools", () => {
+  it("redirects the section-index /ai-tools path to the AI Tool Catalog", () => {
     renderAt("/ai-tools");
-    expect(screen.getByRole("heading", { name: "Available Tools" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "AI Tool Catalog" })).toBeTruthy();
   });
 
   it("redirects the old /knowledge-bases path to the RAG section", () => {

@@ -475,10 +475,10 @@ export function PluginCard({
         <p className="mt-2 rounded-lg bg-green-50 p-2 text-xs text-green-900 dark:bg-green-950 dark:text-green-100">
           ✅ Installed. If this plugin exposes an AI tool,{" "}
           <Link
-            to="/ai-tools/available"
+            to="/ai-tools/installed"
             className="underline hover:text-green-700 dark:hover:text-green-300"
           >
-            check AI Tools
+            check Live Tools
           </Link>{" "}
           to confirm it's live.
         </p>

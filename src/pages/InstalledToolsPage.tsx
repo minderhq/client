@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { Icon } from "../components/Icon";
 import { EmptyState } from "../components/EmptyState";
@@ -159,11 +160,11 @@ function LiveToolCard({ tool, token }: { tool: LiveTool; token: string }) {
   );
 }
 
-/** Tools actually callable right now, computed fresh from the plugins
+/** AI Tools actually callable right now, computed fresh from the plugins
  * currently running on Plugin Registry -- exactly what the AI chat's own
  * function-calling feeds on. Each one carries its full JSON-Schema
- * parameter list (unlike the durable catalog on Available Tools), which is
- * what makes a runnable example possible only here. */
+ * parameter list (unlike the durable AI Tool Catalog), which is what makes a
+ * runnable example possible only here. */
 export function InstalledToolsPage() {
   const { token } = useAuth();
   const liveTools = useAsyncResource(
@@ -182,14 +183,24 @@ export function InstalledToolsPage() {
     <>
       <PageHeader
         icon="ai-tools"
-        title="Installed Tools"
-        subtitle="Every function-calling tool actually callable right now, from plugins currently running on Plugin Registry. Browsing needs no login — running a tool that changes data does, same as anywhere else in Minder."
+        title="Live Tools"
+        subtitle={
+          <>
+            Every AI Tool actually callable right now, from plugins currently
+            running on Plugin Registry — exactly what the assistant's
+            function-calling can reach. Browsing needs no login; running a tool
+            that changes data does, same as anywhere else in Minder.
+          </>
+        }
       />
       <InfoCallout icon="info">
-        Computed fresh on every request. If a plugin isn't running, its
-        tools won't appear here even if they're in the catalog on Available
-        Tools — installing (and enabling) that plugin is what makes it show
-        up.
+        This is what's live this moment, computed fresh on every request. If a
+        plugin isn't running, its tools won't appear here even when they're in
+        the{" "}
+        <Link to="/ai-tools/available" className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+          AI Tool Catalog
+        </Link>{" "}
+        — installing and enabling that plugin is what makes them live.
       </InfoCallout>
       <StatusLine isError={!!liveTools.error}>
         {liveTools.error ?? (liveTools.loading ? "Loading…" : "")}
