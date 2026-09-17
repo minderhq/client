@@ -21,8 +21,16 @@ import { useAsyncResource } from "../lib/useAsyncResource";
 
 // #1207 Increment 4: admin-only management of cloud/remote model provider
 // credentials (openai_compatible / anthropic) -- create, enable/disable,
-// delete. Renaming or rotating an existing provider's key is a smaller
-// follow-up, not attempted here (delete + re-create covers that need today).
+// delete.
+//
+// #1718: renaming a provider and rotating (replacing) its stored API key are
+// now first-class inline actions rather than the delete-and-recreate dance the
+// original increment left them as. Both reuse the existing
+// PATCH /v1/model-providers/{id} endpoint (its `name` / `api_key` fields) -- no
+// new backend surface -- so a routed model keeps its provider id (and stays
+// working) across a key rotation instead of being torn down and rebuilt. The
+// current key is never fetched or shown; the rotate form only ever accepts a
+// NEW key (write-only -- masked-on-read stays the only way any key is surfaced).
 //
 // #1467: a provider row can also be `is_local` -- self-hosted compute (e.g.
 // vLLM) reached through the SAME openai_compatible adapter/base_url
@@ -83,6 +91,11 @@ export interface ProviderPreset {
   description: string;
 }
 
+// #1718: which inline edit form (if any) a row currently has open. Only one at
+// a time -- opening one closes the other -- so the compact row never sprouts two
+// stacked forms.
+type RowEditMode = null | "rename" | "rotate";
+
 function ProviderRow({
   provider,
   token,
@@ -97,6 +110,26 @@ function ProviderRow({
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [isError, setIsError] = useState(false);
+  // #1718: the currently-open inline edit form, plus its drafts. `nameDraft`
+  // seeds from the current name (a rename is an edit of the existing value);
+  // `keyDraft` always starts empty -- the stored key is write-only, never
+  // pre-filled, so a rotation can only ever SET a new key, never reveal the old.
+  const [editMode, setEditMode] = useState<RowEditMode>(null);
+  const [nameDraft, setNameDraft] = useState(provider.name);
+  const [keyDraft, setKeyDraft] = useState("");
+
+  function openEdit(mode: Exclude<RowEditMode, null>) {
+    setStatus("");
+    setIsError(false);
+    if (mode === "rename") setNameDraft(provider.name);
+    if (mode === "rotate") setKeyDraft("");
+    setEditMode(mode);
+  }
+
+  function closeEdit() {
+    setEditMode(null);
+    setKeyDraft(""); // never leave an entered key sitting in component state
+  }
 
   async function handleToggle() {
     if (busy) return; // already in flight -- ignore a double-click/tap
@@ -182,6 +215,65 @@ function ProviderRow({
     setBusy(false);
   }
 
+  // #1718: rename via the existing PATCH endpoint's `name` field. A no-op
+  // (blank or unchanged) just closes the form -- no pointless request, no
+  // 422 from a blank name. Add/enable/disable/delete behaviour is untouched.
+  async function handleRename(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    const nextName = nameDraft.trim();
+    if (!nextName || nextName === provider.name) {
+      closeEdit();
+      return;
+    }
+    setBusy(true);
+    setIsError(false);
+    setStatus("");
+    try {
+      await apiFetch(`/v1/model-providers/${encodeURIComponent(provider.id)}`, {
+        method: "PATCH",
+        token,
+        body: { name: nextName },
+      });
+      closeEdit();
+      onChanged();
+    } catch (e) {
+      setStatus(friendlyErrorMessage(e));
+      setIsError(true);
+    }
+    setBusy(false);
+  }
+
+  // #1718: rotate (replace) the stored API key via the existing PATCH
+  // endpoint's `api_key` field -- first-class, so the provider keeps its id and
+  // any model routed through it keeps working, instead of the old
+  // delete-and-recreate that broke routing. The new key is write-only: sent
+  // once, never read back (the list only ever shows the masked form). Whitespace
+  // is trimmed since a pasted key routinely carries a trailing newline; an empty
+  // result is rejected (the backend requires min_length=1 anyway).
+  async function handleRotate(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    const nextKey = keyDraft.trim();
+    if (!nextKey) return;
+    setBusy(true);
+    setIsError(false);
+    setStatus("");
+    try {
+      await apiFetch(`/v1/model-providers/${encodeURIComponent(provider.id)}`, {
+        method: "PATCH",
+        token,
+        body: { api_key: nextKey },
+      });
+      closeEdit();
+      onChanged();
+    } catch (e) {
+      setStatus(friendlyErrorMessage(e));
+      setIsError(true);
+    }
+    setBusy(false);
+  }
+
   return (
     <div className="mb-2 rounded-lg border border-gray-200 p-3 text-sm dark:border-gray-700">
       <div className="flex flex-wrap items-center gap-2">
@@ -207,6 +299,20 @@ function ProviderRow({
           <button onClick={handleTest} disabled={busy} className={secondaryButtonClass}>
             Test
           </button>
+          <button
+            onClick={() => (editMode === "rename" ? closeEdit() : openEdit("rename"))}
+            disabled={busy}
+            className={ghostButtonClass}
+          >
+            <Icon name="edit" size={14} /> Rename
+          </button>
+          <button
+            onClick={() => (editMode === "rotate" ? closeEdit() : openEdit("rotate"))}
+            disabled={busy}
+            className={ghostButtonClass}
+          >
+            <Icon name="reset" size={14} /> Rotate key
+          </button>
           <button onClick={handleToggle} disabled={busy} className={ghostButtonClass}>
             {provider.enabled ? "Disable" : "Enable"}
           </button>
@@ -215,6 +321,71 @@ function ProviderRow({
           </button>
         </div>
       </div>
+      {editMode === "rename" && (
+        <form onSubmit={handleRename} className="mt-3 flex flex-wrap items-end gap-2">
+          <div className="min-w-48 flex-1">
+            <label className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
+              New name
+            </label>
+            <input
+              className={inputClass}
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              aria-label="New provider name"
+              autoFocus
+              required
+            />
+          </div>
+          <button type="submit" disabled={busy} className={primaryButtonClass}>
+            {busy ? "Saving…" : "Save"}
+          </button>
+          <button
+            type="button"
+            onClick={closeEdit}
+            disabled={busy}
+            className={secondaryButtonClass}
+          >
+            Cancel
+          </button>
+        </form>
+      )}
+      {editMode === "rotate" && (
+        <form onSubmit={handleRotate} className="mt-3 flex flex-wrap items-end gap-2">
+          <div className="min-w-48 flex-1">
+            <label className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
+              New API key{" "}
+              <span className="font-normal text-gray-400">
+                (replaces the current key — the existing key is never shown)
+              </span>
+            </label>
+            <input
+              type="password"
+              className={inputClass}
+              value={keyDraft}
+              onChange={(e) => setKeyDraft(e.target.value)}
+              aria-label="New API key"
+              autoComplete="off"
+              autoFocus
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={busy || !keyDraft.trim()}
+            className={primaryButtonClass}
+          >
+            {busy ? "Rotating…" : "Rotate"}
+          </button>
+          <button
+            type="button"
+            onClick={closeEdit}
+            disabled={busy}
+            className={secondaryButtonClass}
+          >
+            Cancel
+          </button>
+        </form>
+      )}
       {status && (
         <StatusLine isError={isError} className="mb-0 mt-2">
           {status}
