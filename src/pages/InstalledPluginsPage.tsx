@@ -541,8 +541,8 @@ export function InstalledPluginsPage() {
       {isAuthenticated && installations !== null && installations.length > 0 && (
         <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
           Some of these expose AI tools the assistant can call —{" "}
-          <Link to="/ai-tools/available" className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
-            check AI Tools
+          <Link to="/ai-tools/installed" className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+            check Live Tools
           </Link>{" "}
           to see which are live right now.
         </p>

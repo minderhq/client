@@ -76,12 +76,12 @@ describe("InstalledPluginsPage", () => {
     expect(await screen.findByText("browse Available Plugins")).toBeTruthy();
   });
 
-  it("renders installed plugin cards and the AI Tools cross-link when non-empty", async () => {
+  it("renders installed plugin cards and the Live Tools cross-link when non-empty", async () => {
     apiFetch.mockResolvedValue({ installations: [installation()], count: 1 });
     render(<InstalledPluginsPage />);
 
     expect(await screen.findByText("My Plugin")).toBeTruthy();
-    expect(screen.getByText("check AI Tools")).toBeTruthy();
+    expect(screen.getByText("check Live Tools")).toBeTruthy();
   });
 
   it("shows a friendly error when the installations fetch fails", async () => {
