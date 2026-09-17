@@ -38,6 +38,10 @@ export interface Provider {
   api_key_masked: string;
   enabled: boolean;
   is_local: boolean;
+  // #1511: whether the org admin has acknowledged the privacy tradeoff of a
+  // non-local (cloud/BYOK) provider (see CLOUD_PRIVACY_DISCLOSURE). Always
+  // present; only meaningful for `is_local === false` rows.
+  privacy_acknowledged: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -46,6 +50,20 @@ const ADAPTER_LABEL: Record<Provider["adapter"], string> = {
   openai_compatible: "OpenAI-compatible",
   anthropic: "Anthropic",
 };
+
+// #1511: a non-local (cloud/BYOK) provider trades away this platform's
+// local-first privacy guarantee -- data sent through it leaves the
+// local/self-hosted boundary to a third-party vendor governed by that vendor's
+// own data handling, not this platform's. That's a legitimate, org-owned
+// choice, but it must be an INFORMED one, not a silent one. This plain
+// disclosure (plus a required acknowledgment, persisted as
+// `privacy_acknowledged`) is surfaced at the two activation points: adding a
+// cloud provider, and enabling a previously-disabled one. `is_local` rows
+// (managed Ollama / a self-hosted vLLM that never leaves the box) are exempt.
+const CLOUD_PRIVACY_DISCLOSURE =
+  "Data sent through a cloud (non-local) provider leaves your local/self-hosted " +
+  "boundary and is subject to that provider's own data handling, not this " +
+  "platform's. Enabling it is your organization's own choice and responsibility.";
 
 // A suggested "add provider" configuration, served read-only by the backend at
 // GET /v1/model-providers/presets (#1585 / ProviderPresetOut) and rendered as
@@ -82,6 +100,22 @@ function ProviderRow({
 
   async function handleToggle() {
     if (busy) return; // already in flight -- ignore a double-click/tap
+    const enabling = !provider.enabled;
+    // #1511: enabling a not-yet-acknowledged cloud provider is an activation
+    // point for the privacy tradeoff -- disclose it and capture a one-time
+    // acknowledgment (persisted via privacy_acknowledged) before turning it on.
+    // The backend enforces the same gate, so this both informs the admin and
+    // avoids a confusing 422; disabling and `is_local` rows are never gated.
+    const needsAck =
+      enabling && !provider.is_local && !provider.privacy_acknowledged;
+    if (needsAck) {
+      const ok = await confirm({
+        title: "Enable cloud provider?",
+        message: CLOUD_PRIVACY_DISCLOSURE,
+        confirmLabel: "I understand — enable",
+      });
+      if (!ok) return;
+    }
     setBusy(true);
     setIsError(false);
     setStatus("");
@@ -89,7 +123,9 @@ function ProviderRow({
       await apiFetch(`/v1/model-providers/${encodeURIComponent(provider.id)}`, {
         method: "PATCH",
         token,
-        body: { enabled: !provider.enabled },
+        body: needsAck
+          ? { enabled: true, privacy_acknowledged: true }
+          : { enabled: enabling },
       });
       onChanged();
     } catch (e) {
@@ -210,23 +246,31 @@ function AddProviderForm({
   const [name, setName] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
+  // #1511: the privacy-tradeoff acknowledgment for a cloud provider. Reset on
+  // preset change so the admin re-affirms it per provider rather than a stale
+  // check carrying over from a previous selection.
+  const [acknowledged, setAcknowledged] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [isError, setIsError] = useState(false);
 
   const selected =
     presets?.find((p) => p.id === presetId) ?? presets?.[0] ?? null;
+  // A non-local (cloud/BYOK) provider sends data outside the box, so it needs
+  // the privacy acknowledgment before it can be added; `is_local` rows don't.
+  const requiresAck = !!selected && !selected.is_local;
 
   function reset() {
     setPresetId(null);
     setName("");
     setBaseUrl("");
     setApiKey("");
+    setAcknowledged(false);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (busy || !selected) return;
+    if (busy || !selected || (requiresAck && !acknowledged)) return;
     setBusy(true);
     setIsError(false);
     setStatus("Adding…");
@@ -240,6 +284,7 @@ function AddProviderForm({
           base_url: baseUrl || undefined,
           api_key: apiKey,
           is_local: selected.is_local,
+          privacy_acknowledged: selected.is_local ? false : acknowledged,
         },
       });
       reset();
@@ -290,7 +335,10 @@ function AddProviderForm({
             <select
               className={inputClass}
               value={selected.id}
-              onChange={(e) => setPresetId(e.target.value)}
+              onChange={(e) => {
+                setPresetId(e.target.value);
+                setAcknowledged(false);
+              }}
             >
               {presets?.map((option) => (
                 <option key={option.id} value={option.id}>
@@ -344,6 +392,24 @@ function AddProviderForm({
               required
             />
           </div>
+          {requiresAck && (
+            <div>
+              <InfoCallout icon="warning">{CLOUD_PRIVACY_DISCLOSURE}</InfoCallout>
+              <label className="mt-2 flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={acknowledged}
+                  onChange={(e) => setAcknowledged(e.target.checked)}
+                />
+                <span>
+                  I understand this provider is outside this platform's
+                  local/self-hosted boundary and my organization accepts that
+                  privacy tradeoff.
+                </span>
+              </label>
+            </div>
+          )}
         </>
       ) : presetsLoading ? (
         <StatusLine className="mb-0">Loading provider presets…</StatusLine>
@@ -353,7 +419,11 @@ function AddProviderForm({
         </StatusLine>
       )}
       <div className="flex items-center gap-2">
-        <button type="submit" disabled={busy || !selected} className={primaryButtonClass}>
+        <button
+          type="submit"
+          disabled={busy || !selected || (requiresAck && !acknowledged)}
+          className={primaryButtonClass}
+        >
           {busy ? "Adding…" : "Add"}
         </button>
         <button
