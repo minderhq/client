@@ -46,6 +46,10 @@ export interface Plugin {
   developer_id: string | null;
   category_id: string | null;
   requires_services: string[];
+  /** Screenshot/media image URLs shown as a gallery on the listing (#1521).
+   * Additive: legacy listings and any plugin whose author hasn't attached media
+   * return an empty array. */
+  screenshots: string[];
 }
 
 interface PluginListResponse {
@@ -119,6 +123,36 @@ function PluginMetaRow({ plugin }: { plugin: Plugin }) {
         <span>Needs: {plugin.requires_services.join(", ")}</span>
       )}
     </p>
+  );
+}
+
+/** Screenshot/media gallery (#1521): a simple horizontal strip of thumbnails a
+ * plugin author has attached to the listing. Each thumbnail links to the full
+ * image in a new tab. Renders nothing when the listing carries no screenshots,
+ * so the card is unchanged for every existing plugin. `screenshots` may be
+ * absent on responses served by a pre-#1521 backend, hence the `?? []` guard. */
+function PluginScreenshotGallery({ plugin }: { plugin: Plugin }) {
+  const screenshots = plugin.screenshots ?? [];
+  if (screenshots.length === 0) return null;
+  return (
+    <div className="mt-2 flex gap-2 overflow-x-auto pb-1" aria-label="Screenshots">
+      {screenshots.map((url, i) => (
+        <a
+          key={url}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0"
+        >
+          <img
+            src={url}
+            alt={`${plugin.display_name} screenshot ${i + 1}`}
+            loading="lazy"
+            className="h-24 w-auto rounded border border-gray-200 object-cover dark:border-gray-700"
+          />
+        </a>
+      ))}
+    </div>
   );
 }
 
@@ -384,6 +418,7 @@ export function PluginCard({
             )}
           </div>
           <PluginMetaRow plugin={plugin} />
+          <PluginScreenshotGallery plugin={plugin} />
           {plugin.repository_url && isAdmin && (
             <InstallFromRepoPanel
               repositoryUrl={plugin.repository_url}
