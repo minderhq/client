@@ -32,6 +32,7 @@ function provider(overrides: Partial<Provider> = {}): Provider {
     api_key_masked: "sk-...ab12",
     enabled: true,
     is_local: false,
+    privacy_acknowledged: true,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
     ...overrides,
@@ -214,6 +215,8 @@ describe("CloudProvidersPage", () => {
     const apiKeyInput = document.querySelector('input[type="password"]') as HTMLInputElement;
     fireEvent.change(apiKeyInput, { target: { value: "secret-key" } });
 
+    // #1511: a cloud provider requires acknowledging the privacy tradeoff first.
+    fireEvent.click(screen.getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     await waitFor(() =>
@@ -226,6 +229,7 @@ describe("CloudProvidersPage", () => {
           base_url: undefined,
           api_key: "secret-key",
           is_local: false,
+          privacy_acknowledged: true,
         },
       }),
     );
@@ -266,9 +270,99 @@ describe("CloudProvidersPage", () => {
           base_url: "http://10.0.0.5:8000/v1",
           api_key: "not-required",
           is_local: true,
+          // #1511: a self-hosted (is_local) provider never leaves the box, so no
+          // acknowledgment is required or sent as acknowledged.
+          privacy_acknowledged: false,
         },
       }),
     );
+  });
+
+  it("requires acknowledging the privacy tradeoff before a cloud provider can be added", async () => {
+    // #1511: with a cloud preset selected the disclosure + acknowledgment
+    // checkbox appear, and Add stays disabled until it's checked.
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({ providers: [] });
+    render(<CloudProvidersPage />);
+    await screen.findByText("No cloud providers configured yet.");
+
+    fireEvent.click(screen.getByText("Add Provider"));
+    // Default (first) preset is OpenAI -- a cloud provider.
+    await screen.findByPlaceholderText("e.g. OpenAI");
+    expect(
+      screen.getByText(
+        /leaves your local\/self-hosted boundary and is subject to that provider's own data handling/,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(screen.getByRole("button", { name: "Add" })).toHaveProperty(
+      "disabled",
+      false,
+    );
+  });
+
+  it("shows no acknowledgment checkbox for a self-hosted (local) provider", async () => {
+    // #1511: an is_local preset never leaves the box, so the privacy
+    // disclosure/checkbox must not appear and Add is immediately available.
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({ providers: [] });
+    render(<CloudProvidersPage />);
+    await screen.findByText("No cloud providers configured yet.");
+
+    fireEvent.click(screen.getByText("Add Provider"));
+    fireEvent.change(await screen.findByRole("combobox"), {
+      target: { value: "vllm" },
+    });
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
+  it("prompts for acknowledgment when enabling a disabled, unacknowledged cloud provider", async () => {
+    // #1511: enabling is the other activation point -- a disabled cloud row that
+    // was never acknowledged must surface the disclosure via a confirm and send
+    // privacy_acknowledged=true alongside enabled=true.
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({
+      providers: [provider({ enabled: false, privacy_acknowledged: false })],
+    });
+    render(<CloudProvidersPage />);
+    await screen.findByText("OpenAI (production)");
+
+    mockConfirm.mockResolvedValueOnce(true);
+    fireEvent.click(screen.getByText("Enable"));
+
+    await waitFor(() => expect(mockConfirm).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith("/v1/model-providers/p1", {
+        method: "PATCH",
+        token: "tok",
+        body: { enabled: true, privacy_acknowledged: true },
+      }),
+    );
+  });
+
+  it("does not re-prompt when enabling an already-acknowledged cloud provider", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({
+      providers: [provider({ enabled: false, privacy_acknowledged: true })],
+    });
+    render(<CloudProvidersPage />);
+    await screen.findByText("OpenAI (production)");
+
+    fireEvent.click(screen.getByText("Enable"));
+
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith("/v1/model-providers/p1", {
+        method: "PATCH",
+        token: "tok",
+        body: { enabled: true },
+      }),
+    );
+    expect(mockConfirm).not.toHaveBeenCalled();
   });
 
   it("shows an error in the add form when the presets fail to load", async () => {
