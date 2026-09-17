@@ -55,6 +55,7 @@ function plugin(overrides: Partial<Plugin> = {}): Plugin {
     developer_id: null,
     category_id: null,
     requires_services: [],
+    screenshots: [],
     ...overrides,
   };
 }
@@ -203,6 +204,29 @@ describe("PluginCard", () => {
       ),
     );
     expect(onToggleEnabled).toHaveBeenCalledWith("p1", true);
+  });
+
+  it("renders a screenshot gallery when the listing carries media (#1521)", () => {
+    renderCard({
+      plugin: plugin({
+        screenshots: [
+          "https://cdn.example.com/one.png",
+          "https://cdn.example.com/two.png",
+        ],
+      }),
+    });
+
+    const imgs = screen.getAllByRole("img", { name: /Weather screenshot/ });
+    expect(imgs).toHaveLength(2);
+    expect(imgs[0].getAttribute("src")).toBe("https://cdn.example.com/one.png");
+  });
+
+  it("renders no gallery when the listing has no screenshots (#1521)", () => {
+    renderCard({ plugin: plugin({ screenshots: [] }) });
+
+    expect(
+      screen.queryByRole("img", { name: /Weather screenshot/ }),
+    ).toBeNull();
   });
 
   it("disables the Install button and shows a login hint when logged out", () => {
