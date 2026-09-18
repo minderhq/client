@@ -1,20 +1,90 @@
+import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 
 import { autheliaPortalUrl } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { badgeClass, cardClass, secondaryButtonClass } from "../lib/ui";
+import { fetchMyProfile, updateMyProfile } from "../lib/profile";
+import { getTheme, setTheme, type Theme } from "../lib/theme";
+import {
+  badgeClass,
+  cardClass,
+  fieldHintClass,
+  inputClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+  statusClass,
+} from "../lib/ui";
+import { useAsyncResource } from "../lib/useAsyncResource";
+
+const THEME_OPTIONS: { value: Theme; label: string }[] = [
+  { value: "system", label: "Match system" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+];
 
 /** A real settings page was one of the concrete gaps in "this needs to feel
  * like a platform" -- account identity had nowhere to live before this.
- * Everything shown comes straight from the current JWT's own claims (no
- * new endpoint needed for a first version): editing account details is a
- * job for Authelia's own portal (the actual identity source for SSO
- * logins), not something Minder should grow a duplicate UI for. */
+ * Identity (username/email/role) still comes straight from the JWT claims and
+ * is edited in Authelia's own portal, NOT duplicated here (#1504). What this
+ * page DOES let you edit is Minder's own per-user state that had no edit
+ * surface before: a Minder-side display name and app preferences (theme),
+ * persisted server-side so they follow your account across devices. */
 export function SettingsPage() {
-  const { isAuthenticated, username, email, role, logout } = useAuth();
+  const { isAuthenticated, username, email, role, token, logout } = useAuth();
+
+  const profile = useAsyncResource((signal) => fetchMyProfile(token, signal), {
+    enabled: isAuthenticated && !!token,
+  });
+
+  const [displayName, setDisplayName] = useState("");
+  // Theme defaults to whatever this browser currently applies until the server
+  // profile loads; the effect below adopts the persisted value once available.
+  const [theme, setThemeState] = useState<Theme>(getTheme);
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState<{ text: string; error: boolean } | null>(
+    null,
+  );
+
+  // Hydrate the form from the loaded profile exactly once per load.
+  useEffect(() => {
+    if (!profile.data) return;
+    setDisplayName(profile.data.display_name ?? "");
+    const savedTheme = profile.data.preferences?.theme;
+    if (savedTheme === "light" || savedTheme === "dark" || savedTheme === "system") {
+      setThemeState(savedTheme);
+    }
+  }, [profile.data]);
 
   if (!isAuthenticated) {
     return <Navigate to="/" replace />;
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setStatus(null);
+    try {
+      const trimmed = displayName.trim();
+      await updateMyProfile(
+        {
+          display_name: trimmed === "" ? null : trimmed,
+          preferences: { ...(profile.data?.preferences ?? {}), theme },
+        },
+        token,
+      );
+      // Apply the theme locally too, so the choice takes effect immediately
+      // (and index.html's anti-flash script picks it up on the next load).
+      setTheme(theme);
+      setStatus({ text: "Profile saved.", error: false });
+      profile.reload();
+    } catch (err) {
+      setStatus({
+        text: err instanceof Error ? err.message : String(err),
+        error: true,
+      });
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -49,8 +119,8 @@ export function SettingsPage() {
           </div>
         </dl>
         <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-          Signed in via Authelia SSO or a local Minder account. To change
-          your password, display name, or group membership, use{" "}
+          Signed in via Authelia SSO or a local Minder account. To change your
+          password or group membership, use{" "}
           {autheliaPortalUrl ? (
             <a
               href={autheliaPortalUrl}
@@ -63,6 +133,84 @@ export function SettingsPage() {
           )}{" "}
           — that's the actual identity source for SSO logins, not this page.
         </p>
+      </section>
+
+      <section className={`mb-6 ${cardClass}`}>
+        <h2 className="mb-1 text-base font-semibold text-gray-900 dark:text-gray-100">
+          Minder profile
+        </h2>
+        <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+          Minder's own per-user preferences — separate from your Authelia
+          identity above. These are saved to your account, so they follow you
+          across devices.
+        </p>
+
+        <form onSubmit={handleSave} className="flex flex-col gap-4">
+          <div>
+            <label
+              htmlFor="display-name"
+              className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              Display name
+            </label>
+            <input
+              id="display-name"
+              type="text"
+              maxLength={100}
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder={username}
+              disabled={saving || profile.loading}
+              className={inputClass}
+            />
+            <p className={fieldHintClass}>
+              How Minder addresses you in its own UI. Leave blank to use your
+              username ({username}). This does not change your Authelia identity.
+            </p>
+          </div>
+
+          <div>
+            <label
+              htmlFor="theme-pref"
+              className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              Theme
+            </label>
+            <select
+              id="theme-pref"
+              value={theme}
+              onChange={(e) => setThemeState(e.target.value as Theme)}
+              disabled={saving || profile.loading}
+              className={inputClass}
+            >
+              {THEME_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <p className={fieldHintClass}>
+              Applied immediately and remembered on your account.
+            </p>
+          </div>
+
+          {status && (
+            <p className={statusClass(status.error)}>{status.text}</p>
+          )}
+          {profile.error && !status && (
+            <p className={statusClass(true)}>{profile.error}</p>
+          )}
+
+          <div>
+            <button
+              type="submit"
+              disabled={saving || profile.loading}
+              className={primaryButtonClass}
+            >
+              {saving ? "Saving…" : "Save profile"}
+            </button>
+          </div>
+        </form>
       </section>
 
       <button type="button" onClick={logout} className={secondaryButtonClass}>
