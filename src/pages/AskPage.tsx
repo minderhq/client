@@ -23,11 +23,25 @@ import {
 } from "../lib/ui";
 import { type ModelInfo } from "./ModelManagementPage";
 import {
+  type AppliedParameter,
   type Capabilities,
   type QueryResponse,
   QueryResultCard,
   type RagPipeline,
 } from "./RagPipelinesPage";
+
+// Semantic Intent Router (backend #1733): the Method/Top K/Rerank/Hybrid/Compress/
+// Parent context controls below double as "manual overrides" once touched -- these
+// are exactly the field names the backend's QueryRequest.manual_overrides accepts.
+// Auto-Pilot (the backend's decision engine) resolves any of them the caller hasn't
+// explicitly dirtied since page load / the last "Reset to Auto-Pilot".
+type OverridableField =
+  | "method"
+  | "top_k"
+  | "rerank"
+  | "hybrid"
+  | "compress"
+  | "parent_context";
 
 type Method = "standard" | "hyde" | "self_rag" | "auto" | "corrective" | "raptor";
 
@@ -39,6 +53,30 @@ const METHODS: { value: Method; hint: string }[] = [
   { value: "corrective", hint: "Grades chunks for relevance before answering." },
   { value: "raptor", hint: "Also searches document summaries — good for broad questions." },
 ];
+
+/** Small per-control indicator of who actually decided this field's value on the
+ * last query -- "Auto" (Auto-Pilot's decision engine) or "Manual" (this request's
+ * own literal value, because the field was in manual_overrides). Renders nothing
+ * until there's a response to report on. */
+function AutoManualBadge({ source }: { source: AppliedParameter["source"] | null }) {
+  if (!source) return null;
+  return (
+    <span
+      title={
+        source === "manual"
+          ? "You set this value directly for the last question."
+          : "Auto-Pilot chose this value for the last question."
+      }
+      className={
+        source === "manual"
+          ? "rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+          : "rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+      }
+    >
+      {source === "manual" ? "Manual" : "Auto"}
+    </span>
+  );
+}
 
 const SUGGESTIONS = [
   "Summarize the key points across these documents.",
@@ -100,6 +138,19 @@ export function AskPage() {
   const [compress, setCompress] = useState(false);
   const [hybrid, setHybrid] = useState(false);
   const [parentContext, setParentContext] = useState(false);
+  // Semantic Intent Router (#1733): which of the controls above the user has
+  // touched since page load / the last "Reset to Auto-Pilot" -- sent to the
+  // backend as manual_overrides so Auto-Pilot resolves every other field instead.
+  const [manualOverrides, setManualOverrides] = useState<Set<OverridableField>>(
+    () => new Set(),
+  );
+  // What the backend actually applied for each Auto-Pilot field on the most
+  // recent query -- drives the per-control Auto/Manual badges below. null until
+  // the first response comes back (or after a reset/pipeline switch clears it).
+  const [appliedParameters, setAppliedParameters] = useState<Record<
+    string,
+    AppliedParameter
+  > | null>(null);
   const [sourceFilter, setSourceFilter] = useState("");
   const [llmModels, setLlmModels] = useState<string[]>([]);
   const [llmModel, setLlmModel] = useState("");
@@ -109,6 +160,24 @@ export function AskPage() {
   const questionId = useId();
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Marks a control "dirty" the first time its value changes -- membership, not
+  // the value itself, is what tells the backend to honor it literally instead of
+  // letting Auto-Pilot resolve it (#1733).
+  const markManual = useCallback((field: OverridableField) => {
+    setManualOverrides((prev) => (prev.has(field) ? prev : new Set(prev).add(field)));
+  }, []);
+
+  function resetToAutoPilot() {
+    setManualOverrides(new Set());
+    setAppliedParameters(null);
+  }
+
+  // What the backend actually used for `field` on the last query, if any --
+  // renders as a small "Auto"/"Manual" badge next to that control.
+  function appliedSource(field: OverridableField): AppliedParameter["source"] | null {
+    return appliedParameters?.[field]?.source ?? null;
+  }
 
   const methodAvailable = (m: Method) => capabilities?.methods[m] !== false;
   const rerankAvailable = capabilities?.enhancers.rerank.available ?? false;
@@ -189,6 +258,10 @@ export function AskPage() {
     setTurns([]);
     setConversationId(null);
     setInput("");
+    // The badges below belonged to the thread that just ended -- manualOverrides
+    // itself persists (same convention as method/rerank/etc. persisting across
+    // "New chat"), only the "what did the router actually do" snapshot resets.
+    setAppliedParameters(null);
     textareaRef.current?.focus();
   }
 
@@ -200,6 +273,9 @@ export function AskPage() {
     setConversationId(null);
     // The old document scope belonged to the previous pipeline's KBs.
     setDocumentId("");
+    // Same reasoning as newChat() above -- the router's last decision was for
+    // the previous pipeline's knowledge bases.
+    setAppliedParameters(null);
   }
 
   const selectedPipeline = pipelines.find((p) => p.id === pipelineId);
@@ -233,6 +309,11 @@ export function AskPage() {
       compress,
       hybrid: parentContext ? false : hybrid,
       parent_context: parentContext,
+      // Semantic Intent Router (#1733): only the fields the user has actually
+      // touched are sent as overrides -- every other field is Auto-Pilot's to
+      // resolve, regardless of the literal value this request happens to carry
+      // for it (e.g. the "standard"/false schema defaults above).
+      manual_overrides: Array.from(manualOverrides),
     };
     if (conversationalAvailable && convId) body.conversation_id = convId;
     const metadataFilter: Record<string, string> = {};
@@ -251,6 +332,7 @@ export function AskPage() {
           t.id === pendingId ? { id: pendingId, role: "assistant", response: res } : t,
         ),
       );
+      setAppliedParameters(res.applied_parameters ?? null);
     } catch (e) {
       const msg =
         e instanceof ApiError && e.status === 404
@@ -479,7 +561,10 @@ export function AskPage() {
                 <select
                   className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 outline-none focus:border-indigo-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
                   value={method}
-                  onChange={(e) => setMethod(e.target.value as Method)}
+                  onChange={(e) => {
+                    setMethod(e.target.value as Method);
+                    markManual("method");
+                  }}
                 >
                   {METHODS.map((m) => (
                     <option key={m.value} value={m.value} disabled={!methodAvailable(m.value)}>
@@ -488,6 +573,7 @@ export function AskPage() {
                     </option>
                   ))}
                 </select>
+                <AutoManualBadge source={appliedSource("method")} />
               </label>
               <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-gray-400">
                 Top K
@@ -496,10 +582,25 @@ export function AskPage() {
                   min={1}
                   max={100}
                   value={topK}
-                  onChange={(e) => setTopK(e.target.value)}
+                  onChange={(e) => {
+                    setTopK(e.target.value);
+                    markManual("top_k");
+                  }}
                   className="w-16 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 outline-none focus:border-indigo-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
                 />
+                <AutoManualBadge source={appliedSource("top_k")} />
               </label>
+              {manualOverrides.size > 0 && (
+                <button
+                  type="button"
+                  onClick={resetToAutoPilot}
+                  className="flex items-center gap-1 text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                  title="Clear your manual choices above so Auto-Pilot decides every field again."
+                >
+                  <Icon name="reset" size={13} />
+                  Reset to Auto-Pilot
+                </button>
+              )}
               <details className="group">
                 <summary className="flex cursor-pointer list-none items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100">
                   <Icon name="chevron-right" size={13} className="transition group-open:rotate-90" />
@@ -510,20 +611,59 @@ export function AskPage() {
                 </summary>
                 <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                    <input type="checkbox" checked={rerank} disabled={!rerankAvailable} onChange={(e) => setRerank(e.target.checked)} className="h-3.5 w-3.5 rounded border-gray-300" />
+                    <input
+                      type="checkbox"
+                      checked={rerank}
+                      disabled={!rerankAvailable}
+                      onChange={(e) => {
+                        setRerank(e.target.checked);
+                        markManual("rerank");
+                      }}
+                      className="h-3.5 w-3.5 rounded border-gray-300"
+                    />
                     Rerank{!rerankAvailable && " (unavailable)"}
+                    <AutoManualBadge source={appliedSource("rerank")} />
                   </label>
                   <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                    <input type="checkbox" checked={compress} disabled={!compressAvailable} onChange={(e) => setCompress(e.target.checked)} className="h-3.5 w-3.5 rounded border-gray-300" />
+                    <input
+                      type="checkbox"
+                      checked={compress}
+                      disabled={!compressAvailable}
+                      onChange={(e) => {
+                        setCompress(e.target.checked);
+                        markManual("compress");
+                      }}
+                      className="h-3.5 w-3.5 rounded border-gray-300"
+                    />
                     Compress{!compressAvailable && " (unavailable)"}
+                    <AutoManualBadge source={appliedSource("compress")} />
                   </label>
                   <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                    <input type="checkbox" checked={hybrid} disabled={!hybridAvailable || parentContext} onChange={(e) => setHybrid(e.target.checked)} className="h-3.5 w-3.5 rounded border-gray-300" />
+                    <input
+                      type="checkbox"
+                      checked={hybrid}
+                      disabled={!hybridAvailable || parentContext}
+                      onChange={(e) => {
+                        setHybrid(e.target.checked);
+                        markManual("hybrid");
+                      }}
+                      className="h-3.5 w-3.5 rounded border-gray-300"
+                    />
                     Hybrid retrieval{!hybridAvailable && " (unavailable)"}
+                    <AutoManualBadge source={appliedSource("hybrid")} />
                   </label>
                   <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                    <input type="checkbox" checked={parentContext} onChange={(e) => setParentContext(e.target.checked)} className="h-3.5 w-3.5 rounded border-gray-300" />
+                    <input
+                      type="checkbox"
+                      checked={parentContext}
+                      onChange={(e) => {
+                        setParentContext(e.target.checked);
+                        markManual("parent_context");
+                      }}
+                      className="h-3.5 w-3.5 rounded border-gray-300"
+                    />
                     Parent context
+                    <AutoManualBadge source={appliedSource("parent_context")} />
                   </label>
                   {llmModels.length > 0 && (
                     <label className="col-span-full flex flex-col gap-1 text-xs text-gray-700 dark:text-gray-300">

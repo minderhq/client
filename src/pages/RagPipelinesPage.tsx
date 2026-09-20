@@ -165,6 +165,14 @@ export interface Source {
   score: number;
 }
 
+/** One entry per Semantic Intent Router (backend #1733) Auto-Pilot field --
+ * "router" if the pipeline's decision engine picked the value, "manual" if the
+ * caller's own literal value (from `manual_overrides`) was honored instead. */
+export interface AppliedParameter {
+  value: unknown;
+  source: "router" | "manual";
+}
+
 export interface QueryResponse {
   answer: string;
   sources: Source[];
@@ -177,6 +185,7 @@ export interface QueryResponse {
     degraded?: string[];
     metadata_filter?: { source?: string; document_id?: string };
   } | null;
+  applied_parameters?: Record<string, AppliedParameter> | null;
 }
 
 export interface Turn {

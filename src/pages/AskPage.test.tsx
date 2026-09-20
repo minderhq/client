@@ -206,6 +206,95 @@ describe("AskPage", () => {
     );
   });
 
+  it("sends manual_overrides only for controls the user has touched (#1733)", async () => {
+    mockAuth = { token: "tok", isAuthenticated: true };
+    routeApiFetch({});
+    render(<AskPage />);
+    await screen.findByText("Ask anything about your documents");
+
+    // Untouched: manual_overrides should be empty (fully Auto-Pilot).
+    fireEvent.change(screen.getByLabelText("Your question"), { target: { value: "hi" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    await screen.findByText("The refund window is 30 days.");
+    expect(apiFetch).toHaveBeenLastCalledWith(
+      "/v1/rag/pipeline/p-1/query",
+      expect.objectContaining({
+        body: expect.objectContaining({ manual_overrides: [] }),
+      }),
+    );
+
+    // Touch Top K only -- it alone should be reported as a manual override.
+    fireEvent.change(screen.getByLabelText(/top k/i), { target: { value: "12" } });
+    fireEvent.change(screen.getByLabelText("Your question"), {
+      target: { value: "follow-up" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    await vi.waitFor(() =>
+      expect(apiFetch).toHaveBeenLastCalledWith(
+        "/v1/rag/pipeline/p-1/query",
+        expect.objectContaining({
+          body: expect.objectContaining({ top_k: 12, manual_overrides: ["top_k"] }),
+        }),
+      ),
+    );
+  });
+
+  it("renders Auto/Manual badges from the response's applied_parameters (#1733)", async () => {
+    mockAuth = { token: "tok", isAuthenticated: true };
+    routeApiFetch({
+      queryResult: queryResponse({
+        applied_parameters: {
+          method: { value: "standard", source: "router" },
+          top_k: { value: 12, source: "manual" },
+          rerank: { value: true, source: "router" },
+          compress: { value: false, source: "router" },
+          hybrid: { value: false, source: "router" },
+          parent_context: { value: false, source: "router" },
+        },
+      }),
+    });
+    render(<AskPage />);
+    await screen.findByText("Ask anything about your documents");
+
+    fireEvent.change(screen.getByLabelText(/top k/i), { target: { value: "12" } });
+    fireEvent.change(screen.getByLabelText("Your question"), { target: { value: "hi" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    await screen.findByText("The refund window is 30 days.");
+
+    expect(screen.getByLabelText(/^method/i).closest("label")?.textContent).toContain(
+      "Auto",
+    );
+    expect(screen.getByLabelText(/top k/i).closest("label")?.textContent).toContain(
+      "Manual",
+    );
+  });
+
+  it("Reset to Auto-Pilot clears manual overrides", async () => {
+    mockAuth = { token: "tok", isAuthenticated: true };
+    routeApiFetch({});
+    render(<AskPage />);
+    await screen.findByText("Ask anything about your documents");
+
+    expect(screen.queryByRole("button", { name: "Reset to Auto-Pilot" })).toBeNull();
+
+    fireEvent.change(screen.getByLabelText(/top k/i), { target: { value: "20" } });
+    const resetButton = await screen.findByRole("button", { name: "Reset to Auto-Pilot" });
+
+    fireEvent.click(resetButton);
+    expect(screen.queryByRole("button", { name: "Reset to Auto-Pilot" })).toBeNull();
+
+    fireEvent.change(screen.getByLabelText("Your question"), { target: { value: "hi" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    await vi.waitFor(() =>
+      expect(apiFetch).toHaveBeenLastCalledWith(
+        "/v1/rag/pipeline/p-1/query",
+        expect.objectContaining({
+          body: expect.objectContaining({ manual_overrides: [] }),
+        }),
+      ),
+    );
+  });
+
   it("sends on Enter but inserts a newline on Shift+Enter", async () => {
     mockAuth = { token: "tok", isAuthenticated: true };
     routeApiFetch({});
