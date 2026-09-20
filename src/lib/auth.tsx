@@ -3,16 +3,13 @@ import {
   type ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
 
-import { apiBaseUrl } from "./api";
+import { apiBaseUrl, SESSION_EXPIRED_EVENT, TOKEN_KEY } from "./api";
 import { decodeJwtClaims, isExpired } from "./jwt";
-
-// Same sessionStorage key the old plugin_config.html/model_management.html
-// pages used, kept for continuity across the migration (#422 -> this client).
-const TOKEN_KEY = "minder_jwt";
 
 interface AuthContextValue {
   token: string;
@@ -112,6 +109,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken("");
     sessionStorage.removeItem(TOKEN_KEY);
   }, []);
+
+  // Global 401 reaction (#46): apiFetch/apiFetchBlob (src/lib/api.ts) already
+  // clear the sessionStorage token and dispatch this event the moment any
+  // request comes back unauthorized. Mirror that into React state here so
+  // `isAuthenticated` flips to false immediately -- the same state `logout()`
+  // produces -- instead of only the next full read of sessionStorage noticing.
+  // This is what stops every already-gated page/poll (`enabled: isAuthenticated`
+  // or `enabled: !!token`) from continuing to re-fire against a dead token.
+  useEffect(() => {
+    window.addEventListener(SESSION_EXPIRED_EVENT, logout);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, logout);
+  }, [logout]);
 
   return (
     <AuthContext.Provider

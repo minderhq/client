@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { SESSION_EXPIRED_EVENT } from "./api";
 import { AuthProvider, useAuth } from "./auth";
 
 const TOKEN_KEY = "minder_jwt";
@@ -207,5 +208,54 @@ describe("AuthProvider / useAuth", () => {
     expect(result.current.token).toBe("");
     expect(result.current.isAuthenticated).toBe(false);
     expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
+  });
+
+  describe(`${SESSION_EXPIRED_EVENT} window event (#46)`, () => {
+    it("logs the user out when apiFetch/apiFetchBlob dispatch it after a 401", () => {
+      const jwt = makeJwt({
+        username: "ada",
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      });
+      sessionStorage.setItem(TOKEN_KEY, jwt);
+      const { result } = renderAuth();
+      expect(result.current.isAuthenticated).toBe(true);
+
+      act(() => {
+        window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+      });
+
+      expect(result.current.token).toBe("");
+      expect(result.current.isAuthenticated).toBe(false);
+      expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
+    });
+
+    it("is a no-op when there was never a session", () => {
+      const { result } = renderAuth();
+      expect(result.current.isAuthenticated).toBe(false);
+
+      act(() => {
+        window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+      });
+
+      expect(result.current.token).toBe("");
+      expect(result.current.isAuthenticated).toBe(false);
+    });
+
+    it("stops reacting once the AuthProvider unmounts (listener cleanup)", () => {
+      const jwt = makeJwt({
+        username: "ada",
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      });
+      sessionStorage.setItem(TOKEN_KEY, jwt);
+      const { unmount } = renderAuth();
+
+      unmount();
+
+      // Would throw "Uncaught [Error: ...]" style noise or leak a stale
+      // listener across tests/instances if the effect's cleanup didn't run.
+      expect(() => {
+        window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+      }).not.toThrow();
+    });
   });
 });
