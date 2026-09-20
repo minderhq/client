@@ -25,6 +25,43 @@ export const oidcLoginUrl: string =
 export const autheliaPortalUrl: string =
   import.meta.env.VITE_AUTHELIA_PORTAL_URL || "";
 
+// Same sessionStorage key the old plugin_config.html/model_management.html
+// pages used, kept for continuity across the migration (#422 -> this client).
+// Defined here (rather than in auth.tsx, which imports apiBaseUrl from this
+// module) so apiFetch/apiFetchBlob can clear it directly on a 401 without a
+// circular import.
+export const TOKEN_KEY = "minder_jwt";
+
+// Dispatched on `window` whenever any apiFetch/apiFetchBlob call gets a 401 --
+// AuthProvider (src/lib/auth.tsx) listens for this on mount and reacts by
+// clearing its in-memory token, which flips `isAuthenticated` to false
+// everywhere in the app (#46). Without this, an expired/invalid token just
+// sits in sessionStorage and every in-flight or polling data-fetch call keeps
+// firing and 401ing -- each page only ever showed its own dead-end
+// `friendlyErrorMessage()` text, with nothing stopping the retries or getting
+// the user back to a logged-out state.
+export const SESSION_EXPIRED_EVENT = "minder:session-expired";
+
+/** Clears the stale token and tells the rest of the app (AuthProvider) that
+ * the session is gone. Called once per 401 response, from both apiFetch and
+ * apiFetchBlob. Idempotent -- safe to call repeatedly. */
+function handleUnauthorized(): void {
+  sessionStorage.removeItem(TOKEN_KEY);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+  }
+}
+
+/** Parses the error body and throws the resulting ApiError -- shared by
+ * apiFetch and apiFetchBlob so the 401 handling above only lives in one
+ * place. Always throws; the `Promise<never>` return type lets callers
+ * `return throwApiError(res)` regardless of their own return type. */
+async function throwApiError(res: Response): Promise<never> {
+  const detail = await parseErrorDetail(res);
+  if (res.status === 401) handleUnauthorized();
+  throw new ApiError(detail, res.status);
+}
+
 export class ApiError extends Error {
   status: number;
 
@@ -118,7 +155,7 @@ export async function apiFetch<T>(
     signal,
   });
 
-  if (!res.ok) throw new ApiError(await parseErrorDetail(res), res.status);
+  if (!res.ok) return throwApiError(res);
 
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -148,7 +185,7 @@ export async function apiFetchBlob(
     signal,
   });
 
-  if (!res.ok) throw new ApiError(await parseErrorDetail(res), res.status);
+  if (!res.ok) return throwApiError(res);
 
   return { blob: await res.blob(), headers: res.headers };
 }
