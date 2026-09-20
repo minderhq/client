@@ -19,6 +19,7 @@ import {
   ExternalLink,
   FileText,
   Filter,
+  FolderGit2,
   GitMerge,
   Globe,
   Info,
@@ -103,6 +104,7 @@ export const ICONS = {
   submit: Upload,
   review: ClipboardCheck,
   licenses: KeyRound,
+  sources: FolderGit2,
   // AI tools
   "ai-tools": Zap,
   // Bundles

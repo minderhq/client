@@ -34,6 +34,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { ModelManagementPage } from "./pages/ModelManagementPage";
 import { MyLicensesPage } from "./pages/MyLicensesPage";
 import { OrganizationPage } from "./pages/OrganizationPage";
+import { PluginSourceRepositoriesPage } from "./pages/PluginSourceRepositoriesPage";
 import { PublicChatConversationsPage } from "./pages/PublicChatConversationsPage";
 import { PublicChatEndpointsPage } from "./pages/PublicChatEndpointsPage";
 import { RagPipelinesPage } from "./pages/RagPipelinesPage";
@@ -178,6 +179,14 @@ export function App() {
                   <Route
                     path="/plugins/available"
                     element={<AvailablePluginsPage />}
+                  />
+                  <Route
+                    path="/plugins/sources"
+                    element={<PluginSourceRepositoriesPage />}
+                  />
+                  <Route
+                    path="/plugins/sources/:repositoryId"
+                    element={<PluginSourceRepositoriesPage />}
                   />
                   <Route
                     path="/plugins/installed"
