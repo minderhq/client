@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { apiFetch, apiFetchBlob, ApiError, friendlyErrorMessage } from "./api";
+import {
+  apiFetch,
+  apiFetchBlob,
+  ApiError,
+  friendlyErrorMessage,
+  SESSION_EXPIRED_EVENT,
+  TOKEN_KEY,
+} from "./api";
 
 describe("ApiError", () => {
   it("is an Error that carries the HTTP status", () => {
@@ -34,6 +41,7 @@ describe("friendlyErrorMessage", () => {
 describe("apiFetch", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
+    sessionStorage.clear();
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -205,11 +213,60 @@ describe("apiFetch", () => {
       status: 502,
     });
   });
+
+  describe("global 401 handling (#46)", () => {
+    it("clears the stored token and dispatches the session-expired event on a 401", async () => {
+      sessionStorage.setItem(TOKEN_KEY, "stale-token");
+      const onSessionExpired = vi.fn();
+      window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+      vi.mocked(fetch).mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({ detail: "Not authenticated" }),
+      } as Response);
+
+      try {
+        await expect(apiFetch("/v1/things")).rejects.toMatchObject({
+          message: "Not authenticated",
+          status: 401,
+        });
+
+        expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
+        expect(onSessionExpired).toHaveBeenCalledTimes(1);
+      } finally {
+        window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+      }
+    });
+
+    it.each([403, 500])(
+      "does NOT clear the token or dispatch the event for a %d",
+      async (status) => {
+        sessionStorage.setItem(TOKEN_KEY, "still-valid-token");
+        const onSessionExpired = vi.fn();
+        window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+        vi.mocked(fetch).mockResolvedValue({
+          ok: false,
+          status,
+          json: async () => ({ detail: "nope" }),
+        } as Response);
+
+        try {
+          await expect(apiFetch("/v1/things")).rejects.toMatchObject({ status });
+
+          expect(sessionStorage.getItem(TOKEN_KEY)).toBe("still-valid-token");
+          expect(onSessionExpired).not.toHaveBeenCalled();
+        } finally {
+          window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+        }
+      },
+    );
+  });
 });
 
 describe("apiFetchBlob", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
+    sessionStorage.clear();
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -289,5 +346,50 @@ describe("apiFetchBlob", () => {
     const init = call[1] as RequestInit;
     expect(init.headers).toEqual({});
     expect(init.body).toBe(form);
+  });
+
+  describe("global 401 handling (#46)", () => {
+    it("clears the stored token and dispatches the session-expired event on a 401", async () => {
+      sessionStorage.setItem(TOKEN_KEY, "stale-token");
+      const onSessionExpired = vi.fn();
+      window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+      vi.mocked(fetch).mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({ detail: "Not authenticated" }),
+      } as Response);
+
+      try {
+        await expect(apiFetchBlob("/v1/tts")).rejects.toMatchObject({
+          message: "Not authenticated",
+          status: 401,
+        });
+
+        expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
+        expect(onSessionExpired).toHaveBeenCalledTimes(1);
+      } finally {
+        window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+      }
+    });
+
+    it("does NOT clear the token or dispatch the event for a non-401 error", async () => {
+      sessionStorage.setItem(TOKEN_KEY, "still-valid-token");
+      const onSessionExpired = vi.fn();
+      window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+      vi.mocked(fetch).mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: async () => ({ detail: "boom" }),
+      } as Response);
+
+      try {
+        await expect(apiFetchBlob("/v1/tts")).rejects.toMatchObject({ status: 500 });
+
+        expect(sessionStorage.getItem(TOKEN_KEY)).toBe("still-valid-token");
+        expect(onSessionExpired).not.toHaveBeenCalled();
+      } finally {
+        window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+      }
+    });
   });
 });
