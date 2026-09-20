@@ -28,6 +28,7 @@ import {
   secondaryButtonClass,
 } from "../lib/ui";
 import { EmptyState } from "../components/EmptyState";
+import { isEmbeddingModelName } from "../lib/modelClassification";
 
 export interface ModelInfo {
   id: string;
@@ -695,8 +696,8 @@ export function CreateKbForm({
       .catch(() => {});
   }, []);
 
-  const embeddingModels = models.filter((m) => /embed/i.test(m.name));
-  const llmModels = models.filter((m) => !/embed/i.test(m.name));
+  const embeddingModels = models.filter((m) => isEmbeddingModelName(m.name));
+  const llmModels = models.filter((m) => !isEmbeddingModelName(m.name));
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -799,7 +800,8 @@ export function CreateKbForm({
             </select>
             <p className={fieldHintClass}>
               Turns each chunk of text into a vector for similarity search —
-              pick a model whose name contains "embed".
+              pick a model built for embeddings (e.g. "embed", BGE, E5, GTE,
+              Instructor, MiniLM, sentence-T5).
             </p>
           </div>
           <div>

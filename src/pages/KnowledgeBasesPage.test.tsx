@@ -675,6 +675,9 @@ describe("CreateKbForm", () => {
           items: [
             { id: "m1", name: "nomic-embed-text" },
             { id: "m2", name: "llama3" },
+            // #1756: bge-m3 is a real, popular embedding-only model whose tag
+            // doesn't contain "embed" -- must classify as embedding, not LLM.
+            { id: "m3", name: "bge-m3" },
           ],
         });
       }
@@ -692,6 +695,12 @@ describe("CreateKbForm", () => {
       Array.from(llmSelect.options).some((o) => o.value === "nomic-embed-text"),
     ).toBe(false);
     expect(Array.from(llmSelect.options).some((o) => o.value === "llama3")).toBe(true);
+    expect(
+      Array.from(embeddingSelect.options).some((o) => o.value === "bge-m3"),
+    ).toBe(true);
+    expect(Array.from(llmSelect.options).some((o) => o.value === "bge-m3")).toBe(
+      false,
+    );
   });
 
   it("degrades gracefully to just the default option when the model list fails to load", async () => {
