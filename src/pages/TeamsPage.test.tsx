@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TeamsPage, type Team, type TeamDetail } from "./TeamsPage";
@@ -281,12 +281,40 @@ describe("TeamsPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
 
+    // #1765-adjacent: removing a member now confirms first (a real modal,
+    // not a mocked stub -- ConfirmDialog isn't mocked in this file).
+    const dialog = await screen.findByRole("alertdialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
+
     await vi.waitFor(() =>
       expect(apiFetch).toHaveBeenCalledWith("/v1/teams/1/members/2", {
         method: "DELETE",
         token: "tok",
       }),
     );
+  });
+
+  it("cancelling the confirm dialog does not remove the member", async () => {
+    mockAuth = { token: "tok", username: "alice", role: "user", loginWithToken };
+    apiFetch.mockImplementation((path: string, opts?: { method?: string }) => {
+      if (opts?.method === "DELETE") return Promise.resolve({});
+      if (path === "/v1/teams/1") return Promise.resolve(detail());
+      if (path.startsWith("/v1/invites"))
+        return Promise.resolve({ invites: [], total: 0, limit: 50, offset: 0 });
+      return Promise.resolve({ teams: [team()], total: 1, limit: 50, offset: 0 });
+    });
+    render(<TeamsPage />);
+    await screen.findByText("Engineering");
+    fireEvent.click(screen.getByText("Engineering"));
+    await screen.findByText("bob");
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    const dialog = await screen.findByRole("alertdialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    expect(
+      apiFetch.mock.calls.some(([, opts]) => opts?.method === "DELETE"),
+    ).toBe(false);
   });
 
   it("a team_admin can send an invite and see the resulting link", async () => {
