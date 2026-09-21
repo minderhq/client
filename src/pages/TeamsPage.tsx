@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { useConfirm } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
@@ -276,6 +277,7 @@ function TeamDetailPanel({
   const [status, setStatus] = useState("");
   const [isError, setIsError] = useState(false);
   const [busy, setBusy] = useState(false);
+  const { confirm, dialog } = useConfirm();
 
   async function run(action: () => Promise<unknown>, successMessage = "") {
     setBusy(true);
@@ -318,6 +320,25 @@ function TeamDetailPanel({
     setNewMemberEmail("");
   }
 
+  async function handleRemoveMember(member: TeamDetail["members"][number]) {
+    const isSelf = member.username === currentUsername;
+    const ok = await confirm({
+      title: isSelf ? "Leave this team?" : `Remove ${member.username}?`,
+      message: isSelf
+        ? "You'll lose access to this team's shared knowledge bases and pipelines. You can be re-invited later."
+        : `${member.username} will immediately lose access to this team's shared knowledge bases and pipelines.`,
+      confirmLabel: isSelf ? "Leave" : "Remove",
+      danger: true,
+    });
+    if (!ok) return;
+    await run(() =>
+      apiFetch(`/v1/teams/${detail.id}/members/${member.user_id}`, {
+        method: "DELETE",
+        token,
+      }),
+    );
+  }
+
   return (
     <div>
       {detail.members.map((m) => (
@@ -356,14 +377,7 @@ function TeamDetailPanel({
             )}
             {(canManage || m.username === currentUsername) && (
               <button
-                onClick={() =>
-                  run(() =>
-                    apiFetch(`/v1/teams/${detail.id}/members/${m.user_id}`, {
-                      method: "DELETE",
-                      token,
-                    }),
-                  )
-                }
+                onClick={() => handleRemoveMember(m)}
                 disabled={busy}
                 className={destructiveButtonClass}
               >
@@ -407,6 +421,7 @@ function TeamDetailPanel({
       </StatusLine>
 
       {canManage && <InvitesSection teamId={detail.id} token={token} />}
+      {dialog}
     </div>
   );
 }
