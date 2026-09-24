@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { useConfirm } from "../components/ConfirmDialog";
 import { Icon } from "../components/Icon";
 import { EmptyState } from "../components/EmptyState";
 import { InfoCallout } from "../components/InfoCallout";
@@ -95,13 +96,83 @@ function RoleControl({
   );
 }
 
-function UserRow({
+/** Deactivate / reactivate an account (minderhq/minder#1803): the gateway's
+ * soft, reversible kill-switch -- a deactivated account can't sign in
+ * (password or SSO) or refresh its token, but its data stays intact. Hidden on
+ * the caller's own row (the gateway refuses self-deactivation anyway); the
+ * last-admin guard's 409 surfaces as a status message. */
+function StatusControl({
   user,
   token,
+  isSelf,
   onChanged,
 }: {
   user: ManagedUser;
   token: string;
+  isSelf: boolean;
+  onChanged: () => void;
+}) {
+  const { confirm, dialog } = useConfirm();
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+
+  if (isSelf) return null;
+
+  async function handleToggle() {
+    const activate = !user.is_active;
+    if (!activate) {
+      const ok = await confirm({
+        title: `Deactivate ${user.username}?`,
+        message: `${user.username} will no longer be able to sign in or refresh their session. Their data is kept, and you can reactivate the account at any time.`,
+        confirmLabel: "Deactivate",
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    setBusy(true);
+    setStatus("");
+    try {
+      await apiFetch(`/v1/auth/users/${user.id}/status`, {
+        method: "PATCH",
+        token,
+        body: { is_active: activate },
+      });
+      onChanged();
+    } catch (e) {
+      setStatus(friendlyErrorMessage(e));
+    }
+    setBusy(false);
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      {dialog}
+      <button
+        type="button"
+        onClick={handleToggle}
+        disabled={busy}
+        className={secondaryButtonClass}
+      >
+        {user.is_active ? "Deactivate" : "Reactivate"}
+      </button>
+      {status && (
+        <StatusLine isError className="mb-0">
+          {status}
+        </StatusLine>
+      )}
+    </div>
+  );
+}
+
+function UserRow({
+  user,
+  token,
+  isSelf,
+  onChanged,
+}: {
+  user: ManagedUser;
+  token: string;
+  isSelf: boolean;
   onChanged: () => void;
 }) {
   return (
@@ -117,8 +188,14 @@ function UserRow({
       {!user.is_active && (
         <span className={`${badgeClass} ${badgeTone.danger}`}>disabled</span>
       )}
-      <div className="ml-auto">
+      <div className="ml-auto flex items-start gap-2">
         <RoleControl user={user} token={token} onChanged={onChanged} />
+        <StatusControl
+          user={user}
+          token={token}
+          isSelf={isSelf}
+          onChanged={onChanged}
+        />
       </div>
     </div>
   );
@@ -131,7 +208,7 @@ function UserRow({
  * editing it here would silently revert (see the ADR at
  * docs/architecture/organizations-teams-rbac.md). */
 export function UsersPage() {
-  const { token, role } = useAuth();
+  const { token, role, userId } = useAuth();
   const isAdmin = role === "admin";
 
   const usersRes = useAsyncResource(
@@ -144,7 +221,7 @@ export function UsersPage() {
       <PageHeader
         icon="users"
         title="Users"
-        subtitle="Change a user's role. Admin-only. Accounts linked to Authelia SSO show their role as read-only — it's re-derived from Authelia's group membership on every login, so change it there instead."
+        subtitle="Change a user's role, or deactivate/reactivate their account. Admin-only. Accounts linked to Authelia SSO show their role as read-only — it's re-derived from Authelia's group membership on every login, so change it there instead."
       />
 
       {!isAdmin && (
@@ -173,6 +250,7 @@ export function UsersPage() {
               key={u.id}
               user={u}
               token={token}
+              isSelf={String(u.id) === userId}
               onChanged={usersRes.reload}
             />
           ))}
