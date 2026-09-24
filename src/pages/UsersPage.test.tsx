@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { UsersPage, type ManagedUser } from "./UsersPage";
@@ -10,7 +16,10 @@ vi.mock("../lib/api", () => ({
   friendlyErrorMessage: (e: unknown) => (e instanceof Error ? e.message : "error"),
 }));
 
-let mockAuth = { token: "", role: "" };
+let mockAuth: { token: string; role: string; userId?: string } = {
+  token: "",
+  role: "",
+};
 vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
 }));
@@ -139,5 +148,117 @@ describe("UsersPage", () => {
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "admin" } });
 
     await screen.findByText("managed by Authelia");
+  });
+
+  describe("deactivate / reactivate (minderhq/minder#1803)", () => {
+    function listing(users: ManagedUser[]) {
+      apiFetch.mockImplementation(
+        (_path: string, opts?: { method?: string }) => {
+          if (opts?.method === "PATCH") return Promise.resolve(users[0]);
+          return Promise.resolve({
+            users,
+            total: users.length,
+            limit: 50,
+            offset: 0,
+          });
+        },
+      );
+    }
+
+    function patchCalls() {
+      return apiFetch.mock.calls.filter(
+        (c) => (c[1] as { method?: string } | undefined)?.method === "PATCH",
+      );
+    }
+
+    it("deactivates after confirming", async () => {
+      mockAuth = { token: "tok", role: "admin", userId: "99" };
+      listing([user()]);
+      render(<UsersPage />);
+      await screen.findByText("alice");
+
+      fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
+      const dialog = await screen.findByRole("alertdialog");
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: "Deactivate" }),
+      );
+
+      await vi.waitFor(() =>
+        expect(apiFetch).toHaveBeenCalledWith("/v1/auth/users/1/status", {
+          method: "PATCH",
+          token: "tok",
+          body: { is_active: false },
+        }),
+      );
+    });
+
+    it("cancelling the confirm dialog does not deactivate", async () => {
+      mockAuth = { token: "tok", role: "admin", userId: "99" };
+      listing([user()]);
+      render(<UsersPage />);
+      await screen.findByText("alice");
+
+      fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
+      const dialog = await screen.findByRole("alertdialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+      expect(patchCalls()).toHaveLength(0);
+    });
+
+    it("reactivates a disabled account without a confirm", async () => {
+      mockAuth = { token: "tok", role: "admin", userId: "99" };
+      listing([user({ is_active: false })]);
+      render(<UsersPage />);
+      await screen.findByText("alice");
+      expect(screen.getByText("disabled")).toBeTruthy();
+
+      fireEvent.click(screen.getByRole("button", { name: "Reactivate" }));
+
+      await vi.waitFor(() =>
+        expect(apiFetch).toHaveBeenCalledWith("/v1/auth/users/1/status", {
+          method: "PATCH",
+          token: "tok",
+          body: { is_active: true },
+        }),
+      );
+    });
+
+    it("hides the control on the admin's own row", async () => {
+      mockAuth = { token: "tok", role: "admin", userId: "1" };
+      listing([user()]);
+      render(<UsersPage />);
+      await screen.findByText("alice");
+      expect(screen.queryByRole("button", { name: "Deactivate" })).toBeNull();
+    });
+
+    it("surfaces the last-admin 409 as a status message", async () => {
+      mockAuth = { token: "tok", role: "admin", userId: "99" };
+      apiFetch.mockImplementation(
+        (_path: string, opts?: { method?: string }) => {
+          if (opts?.method === "PATCH")
+            return Promise.reject(
+              new Error("Cannot deactivate the last remaining admin"),
+            );
+          return Promise.resolve({
+            users: [user({ role: "admin" })],
+            total: 1,
+            limit: 50,
+            offset: 0,
+          });
+        },
+      );
+      render(<UsersPage />);
+      await screen.findByText("alice");
+
+      fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
+      const dialog = await screen.findByRole("alertdialog");
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: "Deactivate" }),
+      );
+
+      expect(
+        await screen.findByText("Cannot deactivate the last remaining admin"),
+      ).toBeTruthy();
+    });
   });
 });
