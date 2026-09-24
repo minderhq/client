@@ -17,6 +17,7 @@ let autheliaPortalUrl: string | null = "https://auth.minder.local/";
 const fetchMyProfile = vi.fn();
 const updateMyProfile = vi.fn();
 const setTheme = vi.fn();
+const changePassword = vi.fn();
 
 vi.mock("../lib/auth", () => ({
   useAuth: () => ({
@@ -45,6 +46,10 @@ vi.mock("../lib/profile", () => ({
   fetchMyProfile: (...args: unknown[]) => fetchMyProfile(...args),
   updateMyProfile: (...args: unknown[]) => updateMyProfile(...args),
 }));
+vi.mock("../lib/password", () => ({
+  MIN_PASSWORD_LENGTH: 8,
+  changePassword: (...args: unknown[]) => changePassword(...args),
+}));
 vi.mock("../lib/theme", () => ({
   getTheme: () => "system",
   setTheme: (...args: unknown[]) => setTheme(...args),
@@ -67,6 +72,8 @@ describe("SettingsPage", () => {
     fetchMyProfile.mockReset();
     updateMyProfile.mockReset();
     setTheme.mockReset();
+    changePassword.mockReset();
+    changePassword.mockResolvedValue(undefined);
     isAuthenticated = true;
     autheliaPortalUrl = "https://auth.minder.local/";
     fetchMyProfile.mockResolvedValue(profileFixture());
@@ -161,5 +168,72 @@ describe("SettingsPage", () => {
     await screen.findByLabelText("Display name");
     fireEvent.click(screen.getByRole("button", { name: "Save profile" }));
     expect(await screen.findByText("nope")).toBeTruthy();
+  });
+
+  describe("change password (minderhq/minder#1776)", () => {
+    function fill(current: string, next: string, confirm: string) {
+      fireEvent.change(screen.getByLabelText("Current password"), {
+        target: { value: current },
+      });
+      fireEvent.change(screen.getByLabelText("New password"), {
+        target: { value: next },
+      });
+      fireEvent.change(screen.getByLabelText("Confirm new password"), {
+        target: { value: confirm },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Change password" }));
+    }
+
+    it("changes the password and clears the form", async () => {
+      render(<SettingsPage />);
+      fill("old-password", "new-password-1", "new-password-1");
+      expect(await screen.findByText("Password changed.")).toBeTruthy();
+      expect(changePassword).toHaveBeenCalledWith(
+        "old-password",
+        "new-password-1",
+        "tok",
+      );
+      expect(
+        (screen.getByLabelText("Current password") as HTMLInputElement).value,
+      ).toBe("");
+    });
+
+    it("rejects mismatched confirmation without calling the API", async () => {
+      render(<SettingsPage />);
+      fill("old-password", "new-password-1", "new-password-2");
+      expect(await screen.findByText("New passwords don't match.")).toBeTruthy();
+      expect(changePassword).not.toHaveBeenCalled();
+    });
+
+    it("rejects a too-short new password without calling the API", async () => {
+      render(<SettingsPage />);
+      fill("old-password", "short", "short");
+      expect(
+        await screen.findByText("New password must be at least 8 characters."),
+      ).toBeTruthy();
+      expect(changePassword).not.toHaveBeenCalled();
+    });
+
+    it("rejects reusing the current password without calling the API", async () => {
+      render(<SettingsPage />);
+      fill("same-password", "same-password", "same-password");
+      expect(
+        await screen.findByText(
+          "New password must differ from the current password.",
+        ),
+      ).toBeTruthy();
+      expect(changePassword).not.toHaveBeenCalled();
+    });
+
+    it("surfaces the server's message (wrong current / SSO-managed)", async () => {
+      changePassword.mockRejectedValue(
+        new Error("Current password is incorrect"),
+      );
+      render(<SettingsPage />);
+      fill("wrong-password", "new-password-1", "new-password-1");
+      expect(
+        await screen.findByText("Current password is incorrect"),
+      ).toBeTruthy();
+    });
   });
 });
