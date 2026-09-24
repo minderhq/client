@@ -261,4 +261,151 @@ describe("UsersPage", () => {
       ).toBeTruthy();
     });
   });
+
+  describe("reset password (#1776)", () => {
+    function resetListing(
+      users: ManagedUser[],
+      reset: () => Promise<unknown> = () =>
+        Promise.resolve({
+          user_id: users[0].id,
+          mode: "generate",
+          must_change_password: true,
+          temporary_password: "Tmp-once-XYZ",
+        }),
+    ) {
+      apiFetch.mockImplementation(
+        (path: string, opts?: { method?: string }) => {
+          if (opts?.method === "POST" && path.endsWith("/reset-password"))
+            return reset();
+          return Promise.resolve({
+            users,
+            total: users.length,
+            limit: 50,
+            offset: 0,
+          });
+        },
+      );
+    }
+
+    function resetCalls() {
+      return apiFetch.mock.calls.filter(([path]) =>
+        String(path).endsWith("/reset-password"),
+      );
+    }
+
+    it("generates a temporary password and shows it once with a copy button", async () => {
+      mockAuth = { token: "tok", role: "admin", userId: "99" };
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText },
+        configurable: true,
+      });
+      resetListing([user()]);
+      render(<UsersPage />);
+      await screen.findByText("alice");
+
+      fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
+      const dialog = await screen.findByRole("dialog");
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: "Reset password" }),
+      );
+
+      const field = (await within(dialog).findByLabelText(
+        "Temporary password",
+      )) as HTMLInputElement;
+      expect(field.value).toBe("Tmp-once-XYZ");
+      expect(within(dialog).getByText(/Shown once/)).toBeTruthy();
+      expect(resetCalls()).toHaveLength(1);
+      expect(resetCalls()[0]).toEqual([
+        "/v1/auth/users/1/reset-password",
+        { method: "POST", token: "tok", body: { mode: "generate" } },
+      ]);
+
+      fireEvent.click(within(dialog).getByRole("button", { name: /Copy/ }));
+      expect(writeText).toHaveBeenCalledWith("Tmp-once-XYZ");
+      expect(await within(dialog).findByText("Copied")).toBeTruthy();
+
+      fireEvent.click(within(dialog).getByRole("button", { name: "Done" }));
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(screen.queryByDisplayValue("Tmp-once-XYZ")).toBeNull();
+    });
+
+    it("sets an admin-chosen password, enforcing the length policy", async () => {
+      mockAuth = { token: "tok", role: "admin", userId: "99" };
+      resetListing([user()], () =>
+        Promise.resolve({
+          user_id: 1,
+          mode: "set",
+          must_change_password: true,
+          temporary_password: null,
+        }),
+      );
+      render(<UsersPage />);
+      await screen.findByText("alice");
+
+      fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
+      const dialog = await screen.findByRole("dialog");
+      fireEvent.click(within(dialog).getByLabelText("Set a password"));
+      const input = within(dialog).getByLabelText("New password for alice");
+      const submit = within(dialog).getByRole("button", {
+        name: "Reset password",
+      });
+
+      fireEvent.change(input, { target: { value: "short" } });
+      fireEvent.click(submit);
+      expect(
+        await within(dialog).findByText(/at least 8 characters/),
+      ).toBeTruthy();
+      expect(resetCalls()).toHaveLength(0);
+
+      fireEvent.change(input, { target: { value: "admin-chosen-1" } });
+      fireEvent.click(submit);
+      expect(await within(dialog).findByText(/was reset/)).toBeTruthy();
+      expect(resetCalls()[0][1]).toEqual({
+        method: "POST",
+        token: "tok",
+        body: { mode: "set", new_password: "admin-chosen-1" },
+      });
+      expect(within(dialog).queryByLabelText("Temporary password")).toBeNull();
+    });
+
+    it("cancel closes the dialog without resetting", async () => {
+      mockAuth = { token: "tok", role: "admin", userId: "99" };
+      resetListing([user()]);
+      render(<UsersPage />);
+      await screen.findByText("alice");
+
+      fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
+      const dialog = await screen.findByRole("dialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(resetCalls()).toHaveLength(0);
+    });
+
+    it("surfaces a server refusal in the dialog", async () => {
+      mockAuth = { token: "tok", role: "admin", userId: "99" };
+      resetListing([user()], () =>
+        Promise.reject(new Error("reset its password in the Authelia portal")),
+      );
+      render(<UsersPage />);
+      await screen.findByText("alice");
+
+      fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
+      const dialog = await screen.findByRole("dialog");
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: "Reset password" }),
+      );
+      expect(
+        await within(dialog).findByText(/Authelia portal/),
+      ).toBeTruthy();
+    });
+
+    it("hides the action on the admin's own row and on SSO accounts", async () => {
+      mockAuth = { token: "tok", role: "admin", userId: "1" };
+      resetListing([user(), user({ id: 2, username: "bob", is_oidc_linked: true })]);
+      render(<UsersPage />);
+      await screen.findByText("bob");
+      expect(screen.queryByRole("button", { name: "Reset password" })).toBeNull();
+    });
+  });
 });

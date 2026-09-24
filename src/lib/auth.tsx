@@ -27,6 +27,12 @@ interface AuthContextValue {
   orgRole: string;
   isPlatformAdmin: boolean;
   isAuthenticated: boolean;
+  /** Set when the login response says an admin reset this account's password
+   * (minderhq/minder#1776): the app must force the change-password form
+   * before anything else. */
+  mustChangePassword: boolean;
+  /** Clear the forced-change state after a successful password change. */
+  clearMustChangePassword: () => void;
   login: (username: string, password: string) => Promise<void>;
   loginWithToken: (jwt: string) => void;
   /** Switch the active organization: re-mints the JWT server-side (new
@@ -43,6 +49,10 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/** sessionStorage key for the forced-password-change flag -- kept beside the
+ * token (same lifetime) so a page reload can't skip the forced change. */
+export const MUST_CHANGE_PASSWORD_KEY = "minder_must_change_password";
+
 async function parseError(res: Response): Promise<string> {
   const data = await res.json().catch(() => ({}) as { detail?: string });
   return data.detail || `Request failed (${res.status})`;
@@ -51,6 +61,9 @@ async function parseError(res: Response): Promise<string> {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState(
     () => sessionStorage.getItem(TOKEN_KEY) || "",
+  );
+  const [mustChangePassword, setMustChangePassword] = useState(
+    () => sessionStorage.getItem(MUST_CHANGE_PASSWORD_KEY) === "1",
   );
   const claims = useMemo(() => decodeJwtClaims(token), [token]);
   // An expired JWT left in sessionStorage must NOT read as logged-in — otherwise
@@ -65,9 +78,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({ username: user, password }),
     });
     if (!res.ok) throw new Error(await parseError(res));
-    const data = (await res.json()) as { access_token: string };
+    const data = (await res.json()) as {
+      access_token: string;
+      user?: { must_change_password?: boolean };
+    };
+    const mustChange = !!data.user?.must_change_password;
+    setMustChangePassword(mustChange);
+    if (mustChange) sessionStorage.setItem(MUST_CHANGE_PASSWORD_KEY, "1");
+    else sessionStorage.removeItem(MUST_CHANGE_PASSWORD_KEY);
     setToken(data.access_token);
     sessionStorage.setItem(TOKEN_KEY, data.access_token);
+  }, []);
+
+  const clearMustChangePassword = useCallback(() => {
+    setMustChangePassword(false);
+    sessionStorage.removeItem(MUST_CHANGE_PASSWORD_KEY);
   }, []);
 
   const register = useCallback(
@@ -108,6 +133,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     setToken("");
     sessionStorage.removeItem(TOKEN_KEY);
+    setMustChangePassword(false);
+    sessionStorage.removeItem(MUST_CHANGE_PASSWORD_KEY);
   }, []);
 
   // Global 401 reaction (#46): apiFetch/apiFetchBlob (src/lib/api.ts) already
@@ -135,6 +162,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         orgRole: claims.orgRole,
         isPlatformAdmin: claims.isPlatformAdmin,
         isAuthenticated: authenticated,
+        mustChangePassword: authenticated && mustChangePassword,
+        clearMustChangePassword,
         login,
         loginWithToken,
         switchOrg,
