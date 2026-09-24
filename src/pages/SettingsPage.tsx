@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 
 import { autheliaPortalUrl } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { changePassword, MIN_PASSWORD_LENGTH } from "../lib/password";
 import { fetchMyProfile, updateMyProfile } from "../lib/profile";
 import { getTheme, setTheme, type Theme } from "../lib/theme";
 import {
@@ -119,8 +120,9 @@ export function SettingsPage() {
           </div>
         </dl>
         <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-          Signed in via Authelia SSO or a local Minder account. To change your
-          password or group membership, use{" "}
+          Signed in via Authelia SSO or a local Minder account. A local account
+          can change its password below; for an SSO account, change your
+          password or group membership in{" "}
           {autheliaPortalUrl ? (
             <a
               href={autheliaPortalUrl}
@@ -213,9 +215,143 @@ export function SettingsPage() {
         </form>
       </section>
 
+      <ChangePasswordSection token={token} />
+
       <button type="button" onClick={logout} className={secondaryButtonClass}>
         Log out
       </button>
     </>
+  );
+}
+
+/** Change the caller's own LOCAL password (minderhq/minder#1776). SSO-linked
+ * accounts are refused by the gateway with a 409 whose message points at the
+ * Authelia portal — surfaced as-is, since the client can't tell the two
+ * account kinds apart from the JWT alone. */
+function ChangePasswordSection({ token }: { token: string }) {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<{ text: string; error: boolean } | null>(
+    null,
+  );
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setStatus(null);
+    if (next.length < MIN_PASSWORD_LENGTH) {
+      setStatus({
+        text: `New password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+        error: true,
+      });
+      return;
+    }
+    if (next !== confirm) {
+      setStatus({ text: "New passwords don't match.", error: true });
+      return;
+    }
+    if (next === current) {
+      setStatus({
+        text: "New password must differ from the current password.",
+        error: true,
+      });
+      return;
+    }
+    setBusy(true);
+    try {
+      await changePassword(current, next, token);
+      setCurrent("");
+      setNext("");
+      setConfirm("");
+      setStatus({ text: "Password changed.", error: false });
+    } catch (err) {
+      setStatus({
+        text: err instanceof Error ? err.message : String(err),
+        error: true,
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className={`mb-6 ${cardClass}`}>
+      <h2 className="mb-1 text-base font-semibold text-gray-900 dark:text-gray-100">
+        Change password
+      </h2>
+      <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+        For local Minder accounts. Accounts that sign in via Authelia SSO change
+        their password in the Authelia portal instead.
+      </p>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <div>
+          <label
+            htmlFor="current-password"
+            className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+          >
+            Current password
+          </label>
+          <input
+            id="current-password"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+            disabled={busy}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label
+            htmlFor="new-password"
+            className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+          >
+            New password
+          </label>
+          <input
+            id="new-password"
+            type="password"
+            autoComplete="new-password"
+            required
+            minLength={MIN_PASSWORD_LENGTH}
+            value={next}
+            onChange={(e) => setNext(e.target.value)}
+            disabled={busy}
+            className={inputClass}
+          />
+          <p className={fieldHintClass}>
+            At least {MIN_PASSWORD_LENGTH} characters.
+          </p>
+        </div>
+        <div>
+          <label
+            htmlFor="confirm-password"
+            className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+          >
+            Confirm new password
+          </label>
+          <input
+            id="confirm-password"
+            type="password"
+            autoComplete="new-password"
+            required
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            disabled={busy}
+            className={inputClass}
+          />
+        </div>
+
+        {status && <p className={statusClass(status.error)}>{status.text}</p>}
+
+        <div>
+          <button type="submit" disabled={busy} className={primaryButtonClass}>
+            {busy ? "Changing…" : "Change password"}
+          </button>
+        </div>
+      </form>
+    </section>
   );
 }
