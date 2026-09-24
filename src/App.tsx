@@ -23,6 +23,7 @@ import { BackupsPage } from "./pages/BackupsPage";
 import { BillingPage } from "./pages/BillingPage";
 import { CloudProvidersPage } from "./pages/CloudProvidersPage";
 import { ConversationsPage } from "./pages/ConversationsPage";
+import { ForcePasswordChangeGate } from "./pages/ForcePasswordChangePage";
 import { GraphExplorerPage } from "./pages/GraphExplorerPage";
 import { HomePage } from "./pages/HomePage";
 import { InstalledBundlesPage } from "./pages/InstalledBundlesPage";
@@ -137,162 +138,164 @@ export function App() {
           <main className="mx-auto w-full max-w-5xl flex-1 p-6">
             <ErrorBoundary key={location.pathname}>
               <div className={pageEnterClass}>
-                <PageTabs />
-                <Routes>
-                  <Route path="/" element={<HomePage />} />
-                  <Route path="/ask" element={<AskPage />} />
-                  <Route path="/login" element={<LoginPage />} />
-                  <Route path="/auth/callback" element={<AuthCallbackPage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="/billing" element={<BillingPage />} />
-                  <Route path="/invite/:token" element={<InviteRedeemPage />} />
+                <ForcePasswordChangeGate>
+                  <PageTabs />
+                  <Routes>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/ask" element={<AskPage />} />
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/auth/callback" element={<AuthCallbackPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/billing" element={<BillingPage />} />
+                    <Route path="/invite/:token" element={<InviteRedeemPage />} />
 
-                  <Route path="/rag" element={<KnowledgeBasesPage />} />
-                  <Route path="/rag/pipelines" element={<RagPipelinesPage />} />
-                  <Route path="/rag/graph" element={<GraphExplorerPage />} />
-                  <Route
-                    path="/rag/taxonomy-review"
-                    element={<TaxonomyReviewPage />}
-                  />
-                  <Route
-                    path="/rag/entity-merges"
-                    element={<EntityMergeReviewPage />}
-                  />
-                  <Route path="/rag/conversations" element={<ConversationsPage />} />
-                  <Route
-                    path="/rag/public-chat"
-                    element={<PublicChatEndpointsPage />}
-                  />
-                  <Route
-                    path="/rag/public-chat/:endpointId/conversations"
-                    element={<PublicChatConversationsPage />}
-                  />
-                  <Route
-                    path="/rag/public-chat/:endpointId/conversations/:sessionId"
-                    element={<PublicChatConversationsPage />}
-                  />
+                    <Route path="/rag" element={<KnowledgeBasesPage />} />
+                    <Route path="/rag/pipelines" element={<RagPipelinesPage />} />
+                    <Route path="/rag/graph" element={<GraphExplorerPage />} />
+                    <Route
+                      path="/rag/taxonomy-review"
+                      element={<TaxonomyReviewPage />}
+                    />
+                    <Route
+                      path="/rag/entity-merges"
+                      element={<EntityMergeReviewPage />}
+                    />
+                    <Route path="/rag/conversations" element={<ConversationsPage />} />
+                    <Route
+                      path="/rag/public-chat"
+                      element={<PublicChatEndpointsPage />}
+                    />
+                    <Route
+                      path="/rag/public-chat/:endpointId/conversations"
+                      element={<PublicChatConversationsPage />}
+                    />
+                    <Route
+                      path="/rag/public-chat/:endpointId/conversations/:sessionId"
+                      element={<PublicChatConversationsPage />}
+                    />
 
-                  <Route
-                    path="/plugins"
-                    element={<Navigate to="/plugins/available" replace />}
-                  />
-                  <Route
-                    path="/plugins/available"
-                    element={<AvailablePluginsPage />}
-                  />
-                  <Route
-                    path="/plugins/sources"
-                    element={<PluginSourceRepositoriesPage />}
-                  />
-                  <Route
-                    path="/plugins/sources/:repositoryId"
-                    element={<PluginSourceRepositoriesPage />}
-                  />
-                  <Route
-                    path="/plugins/installed"
-                    element={<InstalledPluginsPage />}
-                  />
-                  <Route
-                    path="/plugins/submissions"
-                    element={<SubmissionsPage />}
-                  />
-                  <Route path="/plugins/review" element={<ReviewQueuePage />} />
-                  <Route path="/plugins/licenses" element={<MyLicensesPage />} />
+                    <Route
+                      path="/plugins"
+                      element={<Navigate to="/plugins/available" replace />}
+                    />
+                    <Route
+                      path="/plugins/available"
+                      element={<AvailablePluginsPage />}
+                    />
+                    <Route
+                      path="/plugins/sources"
+                      element={<PluginSourceRepositoriesPage />}
+                    />
+                    <Route
+                      path="/plugins/sources/:repositoryId"
+                      element={<PluginSourceRepositoriesPage />}
+                    />
+                    <Route
+                      path="/plugins/installed"
+                      element={<InstalledPluginsPage />}
+                    />
+                    <Route
+                      path="/plugins/submissions"
+                      element={<SubmissionsPage />}
+                    />
+                    <Route path="/plugins/review" element={<ReviewQueuePage />} />
+                    <Route path="/plugins/licenses" element={<MyLicensesPage />} />
 
-                  <Route
-                    path="/ai-tools"
-                    element={<Navigate to="/ai-tools/available" replace />}
-                  />
-                  <Route
-                    path="/ai-tools/available"
-                    element={<AvailableToolsPage />}
-                  />
-                  <Route
-                    path="/ai-tools/installed"
-                    element={<InstalledToolsPage />}
-                  />
+                    <Route
+                      path="/ai-tools"
+                      element={<Navigate to="/ai-tools/available" replace />}
+                    />
+                    <Route
+                      path="/ai-tools/available"
+                      element={<AvailableToolsPage />}
+                    />
+                    <Route
+                      path="/ai-tools/installed"
+                      element={<InstalledToolsPage />}
+                    />
 
-                  <Route
-                    path="/bundles"
-                    element={<Navigate to="/bundles/available" replace />}
-                  />
-                  <Route
-                    path="/bundles/available"
-                    element={<AvailableBundlesPage />}
-                  />
-                  <Route
-                    path="/bundles/installed"
-                    element={<InstalledBundlesPage />}
-                  />
+                    <Route
+                      path="/bundles"
+                      element={<Navigate to="/bundles/available" replace />}
+                    />
+                    <Route
+                      path="/bundles/available"
+                      element={<AvailableBundlesPage />}
+                    />
+                    <Route
+                      path="/bundles/installed"
+                      element={<InstalledBundlesPage />}
+                    />
 
-                  <Route path="/platform" element={<ModelManagementPage />} />
-                  <Route path="/platform/providers" element={<CloudProvidersPage />} />
-                  <Route path="/platform/status" element={<StatusPage />} />
-                  <Route path="/platform/voice" element={<VoicePage />} />
-                  <Route path="/platform/backups" element={<BackupsPage />} />
-                  <Route path="/platform/users" element={<UsersPage />} />
-                  <Route path="/platform/teams" element={<TeamsPage />} />
-                  <Route path="/organization" element={<OrganizationPage />} />
-                  <Route path="/organizations" element={<AllOrganizationsPage />} />
-                  <Route path="/audit" element={<AuditLogPage />} />
+                    <Route path="/platform" element={<ModelManagementPage />} />
+                    <Route path="/platform/providers" element={<CloudProvidersPage />} />
+                    <Route path="/platform/status" element={<StatusPage />} />
+                    <Route path="/platform/voice" element={<VoicePage />} />
+                    <Route path="/platform/backups" element={<BackupsPage />} />
+                    <Route path="/platform/users" element={<UsersPage />} />
+                    <Route path="/platform/teams" element={<TeamsPage />} />
+                    <Route path="/organization" element={<OrganizationPage />} />
+                    <Route path="/organizations" element={<AllOrganizationsPage />} />
+                    <Route path="/audit" element={<AuditLogPage />} />
 
-                  {/* Old flat/pre-restructure routes, kept as redirects so existing
-                    bookmarks/links still land somewhere sensible instead of the
-                    catch-all. */}
-                  <Route
-                    path="/knowledge-bases"
-                    element={<Navigate to="/rag" replace />}
-                  />
-                  <Route
-                    path="/rag-pipelines"
-                    element={<Navigate to="/rag/pipelines" replace />}
-                  />
-                  <Route
-                    path="/plugin-config"
-                    element={<Navigate to="/plugins/installed" replace />}
-                  />
-                  <Route
-                    path="/marketplace"
-                    element={<Navigate to="/plugins/available" replace />}
-                  />
-                  <Route
-                    path="/marketplace/plugins"
-                    element={<Navigate to="/plugins/available" replace />}
-                  />
-                  <Route
-                    path="/marketplace/plugins/available"
-                    element={<Navigate to="/plugins/available" replace />}
-                  />
-                  <Route
-                    path="/marketplace/plugins/installed"
-                    element={<Navigate to="/plugins/installed" replace />}
-                  />
-                  <Route
-                    path="/marketplace/plugins/ai-tools"
-                    element={<Navigate to="/ai-tools/available" replace />}
-                  />
-                  <Route
-                    path="/marketplace/bundles"
-                    element={<Navigate to="/bundles/available" replace />}
-                  />
-                  <Route
-                    path="/platform/bundles"
-                    element={<Navigate to="/bundles/available" replace />}
-                  />
-                  <Route
-                    path="/plugins/ai-tools"
-                    element={<Navigate to="/ai-tools/available" replace />}
-                  />
-                  <Route
-                    path="/plugins/config"
-                    element={<Navigate to="/plugins/installed" replace />}
-                  />
+                    {/* Old flat/pre-restructure routes, kept as redirects so existing
+                      bookmarks/links still land somewhere sensible instead of the
+                      catch-all. */}
+                    <Route
+                      path="/knowledge-bases"
+                      element={<Navigate to="/rag" replace />}
+                    />
+                    <Route
+                      path="/rag-pipelines"
+                      element={<Navigate to="/rag/pipelines" replace />}
+                    />
+                    <Route
+                      path="/plugin-config"
+                      element={<Navigate to="/plugins/installed" replace />}
+                    />
+                    <Route
+                      path="/marketplace"
+                      element={<Navigate to="/plugins/available" replace />}
+                    />
+                    <Route
+                      path="/marketplace/plugins"
+                      element={<Navigate to="/plugins/available" replace />}
+                    />
+                    <Route
+                      path="/marketplace/plugins/available"
+                      element={<Navigate to="/plugins/available" replace />}
+                    />
+                    <Route
+                      path="/marketplace/plugins/installed"
+                      element={<Navigate to="/plugins/installed" replace />}
+                    />
+                    <Route
+                      path="/marketplace/plugins/ai-tools"
+                      element={<Navigate to="/ai-tools/available" replace />}
+                    />
+                    <Route
+                      path="/marketplace/bundles"
+                      element={<Navigate to="/bundles/available" replace />}
+                    />
+                    <Route
+                      path="/platform/bundles"
+                      element={<Navigate to="/bundles/available" replace />}
+                    />
+                    <Route
+                      path="/plugins/ai-tools"
+                      element={<Navigate to="/ai-tools/available" replace />}
+                    />
+                    <Route
+                      path="/plugins/config"
+                      element={<Navigate to="/plugins/installed" replace />}
+                    />
 
-                  {/* Unmatched paths (including the removed /model-management, still
-                    served 200 by nginx's SPA fallback since it can't tell client-side
-                    routes apart) redirect home instead of rendering a blank page. */}
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
+                    {/* Unmatched paths (including the removed /model-management, still
+                      served 200 by nginx's SPA fallback since it can't tell client-side
+                      routes apart) redirect home instead of rendering a blank page. */}
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </ForcePasswordChangeGate>
               </div>
             </ErrorBoundary>
           </main>
