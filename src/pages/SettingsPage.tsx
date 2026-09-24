@@ -228,7 +228,14 @@ export function SettingsPage() {
  * accounts are refused by the gateway with a 409 whose message points at the
  * Authelia portal — surfaced as-is, since the client can't tell the two
  * account kinds apart from the JWT alone. */
-function ChangePasswordSection({ token }: { token: string }) {
+export function ChangePasswordSection({
+  token,
+  onChanged,
+}: {
+  token: string;
+  /** Called after a successful change (the forced-change flow, #1776). */
+  onChanged?: () => void;
+}) {
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -265,6 +272,7 @@ function ChangePasswordSection({ token }: { token: string }) {
       setNext("");
       setConfirm("");
       setStatus({ text: "Password changed.", error: false });
+      onChanged?.();
     } catch (err) {
       setStatus({
         text: err instanceof Error ? err.message : String(err),

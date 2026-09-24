@@ -100,6 +100,51 @@ describe("AuthProvider / useAuth", () => {
       expect(sessionStorage.getItem(TOKEN_KEY)).toBe(jwt);
     });
 
+    it("records must_change_password from the login response (#1776)", async () => {
+      const jwt = makeJwt({
+        username: "ada",
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      });
+      vi.mocked(fetch).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          access_token: jwt,
+          user: { must_change_password: true },
+        }),
+      } as Response);
+
+      const { result } = renderAuth();
+      expect(result.current.mustChangePassword).toBe(false);
+      await act(async () => {
+        await result.current.login("ada", "temp-pass");
+      });
+      expect(result.current.mustChangePassword).toBe(true);
+      // survives a reload, like the token
+      expect(sessionStorage.getItem("minder_must_change_password")).toBe("1");
+
+      act(() => result.current.clearMustChangePassword());
+      expect(result.current.mustChangePassword).toBe(false);
+      expect(sessionStorage.getItem("minder_must_change_password")).toBeNull();
+    });
+
+    it("logout clears a pending forced password change (#1776)", async () => {
+      const jwt = makeJwt({ exp: Math.floor(Date.now() / 1000) + 3600 });
+      vi.mocked(fetch).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          access_token: jwt,
+          user: { must_change_password: true },
+        }),
+      } as Response);
+      const { result } = renderAuth();
+      await act(async () => {
+        await result.current.login("ada", "temp-pass");
+      });
+      act(() => result.current.logout());
+      expect(result.current.mustChangePassword).toBe(false);
+      expect(sessionStorage.getItem("minder_must_change_password")).toBeNull();
+    });
+
     it("throws the backend's detail message on failure and leaves state unchanged", async () => {
       vi.mocked(fetch).mockResolvedValue({
         ok: false,
