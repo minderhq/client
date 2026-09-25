@@ -88,15 +88,7 @@ export function handleUnauthorized(): void {
 // The one in-flight refresh, shared by every caller (#53): N requests that
 // 401 at once -- or a 401 racing the scheduled pre-expiry refresh -- all await
 // the same POST instead of stampeding the endpoint.
-interface RefreshResult {
-  /** The token to use from now on, or null when the refresh was rejected. */
-  token: string | null;
-  /** True only when `token` was minted by this refresh from `from` -- false
-   * when it is whatever the session had moved on to meanwhile. */
-  minted: boolean;
-  from: string;
-}
-let refreshInFlight: Promise<RefreshResult> | null = null;
+let refreshInFlight: Promise<string | null> | null = null;
 
 /** Exchanges `token` for a fresh one via `POST /v1/auth/refresh` (the API
  * re-validates the account and re-mints from the still-valid bearer token), then
@@ -109,12 +101,8 @@ let refreshInFlight: Promise<RefreshResult> | null = null;
  * share one request. Uses raw `fetch`, never apiFetch, so a failing refresh can
  * never trigger another refresh. Does NOT log out by itself -- callers do. */
 export function refreshAccessToken(token: string): Promise<string | null> {
-  return refreshOnce(token).then((r) => r.token);
-}
-
-function refreshOnce(token: string): Promise<RefreshResult> {
   if (!refreshInFlight) {
-    refreshInFlight = (async (): Promise<RefreshResult> => {
+    refreshInFlight = (async (): Promise<string | null> => {
       // Taken before the request, so the recorded receive time never runs
       // later than the server's `iat` (errs toward refreshing early).
       const sentAt = Date.now();
@@ -123,7 +111,7 @@ function refreshOnce(token: string): Promise<RefreshResult> {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.status === 401 || res.status === 403) {
-        return { token: null, minted: false, from: token };
+        return null;
       }
       if (!res.ok) throw new ApiError(await parseErrorDetail(res), res.status);
       const data = (await res.json()) as { access_token?: unknown };
@@ -134,14 +122,14 @@ function refreshOnce(token: string): Promise<RefreshResult> {
       // cleared) or a token swap (switchOrg / loginWithToken). Don't resurrect
       // the old session over it -- hand back whatever is current instead.
       const current = sessionStorage.getItem(TOKEN_KEY);
-      if (current !== token) return { token: current, minted: false, from: token };
+      if (current !== token) return current;
       storeToken(data.access_token, sentAt);
       if (typeof window !== "undefined") {
         window.dispatchEvent(
           new CustomEvent(TOKEN_REFRESHED_EVENT, { detail: data.access_token }),
         );
       }
-      return { token: data.access_token, minted: true, from: token };
+      return data.access_token;
     })().finally(() => {
       refreshInFlight = null;
     });
@@ -149,10 +137,11 @@ function refreshOnce(token: string): Promise<RefreshResult> {
   return refreshInFlight;
 }
 
-/** Whether two tokens belong to the same user AND the same active org. A token
- * this request did not itself mint by refreshing (#53 review) is only replayed
- * if it passes this -- so a request made as one user/org is never silently
- * re-sent as another after a switchOrg or a different login. */
+/** Whether two tokens belong to the same user AND the same active org. Every
+ * replay must pass this (#53 review) -- so a request made as one user/org is
+ * never silently re-sent as another after a switchOrg, a different login, or a
+ * refresh that re-derived the active org (the API falls back to the home org
+ * when the user was removed from / suspended in the org they switched into). */
 function sameSession(a: string, b: string): boolean {
   const ca = decodeJwtClaims(a);
   const cb = decodeJwtClaims(b);
@@ -249,8 +238,9 @@ export interface Paginated<T> {
  * throwApiError to turn into the usual logout.
  *
  * `staleSession` is true when the replay was refused because the session had
- * meanwhile moved to a different user or org: only this stale request failed,
- * the stored session is valid, so the caller must NOT log out. */
+ * meanwhile moved to a different user or org (including a refresh that
+ * re-derived another active org): only this stale request failed, the stored
+ * session is valid, so the caller must NOT log out. */
 async function sendWithRefresh(
   path: string,
   { method = "GET", body, token, signal }: ApiOptions,
@@ -285,19 +275,18 @@ async function sendWithRefresh(
   // newer token than the one this caller captured -- replay with that instead
   // of refreshing again. Otherwise refresh the caller's own token.
   let candidate: string | null = stored;
-  let ours = false;
   if (stored === token) {
     try {
-      const r = await refreshOnce(token);
-      candidate = r.token; // null: refresh rejected -> usual logout
-      ours = r.minted && r.from === token;
+      candidate = await refreshAccessToken(token); // null: rejected -> logout
     } catch {
       return done; // transient refresh failure: the original 401 stands
     }
   }
   if (!candidate) return done;
-  // Only replay as the same user and org (unless our own refresh minted it).
-  if (!ours && !sameSession(token, candidate)) {
+  // Only ever replay as the same user and org -- even with a token our own
+  // refresh minted. On a mismatch the new token is already adopted (stored +
+  // TOKEN_REFRESHED_EVENT); only this request fails, without a logout.
+  if (!sameSession(token, candidate)) {
     return { res, staleSession: true };
   }
   return { res: await send(candidate), staleSession: false };
