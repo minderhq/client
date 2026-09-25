@@ -43,6 +43,10 @@ interface AuthContextValue {
   /** Role within the ACTIVE org (owner/admin/member), distinct from `role`. */
   orgRole: string;
   isPlatformAdmin: boolean;
+  /** True while there is a token and its session hasn't been given up on. A
+   * token past its expiry still counts while its refresh is pending (#56):
+   * a tab reloaded or woken after expiry mustn't flash the logged-out state
+   * or route to login before that refresh settles. */
   isAuthenticated: boolean;
   /** Set when the login response says an admin reset this account's password
    * (minderhq/minder#1776): the app must force the change-password form
@@ -51,7 +55,10 @@ interface AuthContextValue {
   /** Clear the forced-change state after a successful password change. */
   clearMustChangePassword: () => void;
   login: (username: string, password: string) => Promise<void>;
-  loginWithToken: (jwt: string) => void;
+  /** Adopt a token obtained outside `login` (SSO callback, invite redeem,
+   * team create). `sentAt` is the local time just before the request that
+   * produced it, so the recorded receive time errs early, never late (#56). */
+  loginWithToken: (jwt: string, sentAt: number) => void;
   /** Switch the active organization: re-mints the JWT server-side (new
    * active_tenant_id + org_role) and adopts it, so every subsequent request
    * reads/writes in that org's tenant context. */
@@ -92,6 +99,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // session even when user and org are unchanged -- e.g. a re-mint after
   // joining an org must refetch the org list (#55).
   const [adoption, setAdoption] = useState(0);
+  // The expired token whose refresh settled without a verdict -- the one
+  // attempt made after expiry failed transiently (network error / 5xx), so
+  // nothing will renew it. Only this reads an expired token as logged out; a
+  // rejected refresh logs out outright instead (#56).
+  const [abandonedToken, setAbandonedToken] = useState("");
   const sessionKey = token
     ? [
         adoption,
@@ -105,10 +117,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Expiry on the LOCAL clock, measured from the token's own lifetime so a
   // skewed client clock can't expire it early or refresh it late (#53).
   const expiresAt = localExpiryMs(claims.exp, claims.iat, receivedAt);
-  // An expired JWT left in sessionStorage must NOT read as logged-in — otherwise
-  // the header shows a username while every write silently 401s. Treated as
-  // not-authenticated so the app routes back to login (#472-adjacent UX gap).
-  const authenticated = !!token && !(expiresAt > 0 && Date.now() >= expiresAt);
+  // An expired token is NOT decided at render time (#56). The refresh effect
+  // below tries one refresh for it (on reload, or when an overdue timer fires
+  // after a wake), and until that settles the session reads as still
+  // authenticated -- requests made meanwhile 401 into apiFetch's
+  // retry-on-401, which joins the same single-flight refresh. The refresh then
+  // either lands a new token, or is rejected (401/403) and logs out, or fails
+  // transiently and marks the token abandoned. Only an abandoned token reads as
+  // logged out without a logout, so a dead token can't show a username while
+  // every write silently 401s (#472-adjacent UX gap).
+  const authenticated = !!token && abandonedToken !== token;
 
   const login = useCallback(async (user: string, password: string) => {
     const sentAt = Date.now();
@@ -148,10 +166,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const loginWithToken = useCallback((jwt: string) => {
+  const loginWithToken = useCallback((jwt: string, sentAt: number) => {
     setToken(jwt);
     setAdoption((n) => n + 1);
-    storeToken(jwt);
+    storeToken(jwt, sentAt);
   }, []);
 
   const switchOrg = useCallback(
@@ -208,27 +226,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Silent refresh before expiry (#53): one timer per token, at 80% of its
   // lifetime as measured on the local clock from when it was received. Any
   // token change -- refresh, login, SSO, switchOrg, logout -- tears it down
-  // and (if there is still a token) schedules anew. A rejected refresh (401/403: revoked, deactivated, password reset) logs out
-  // exactly like any other 401; a transient failure retries while the token is
-  // still valid. An already-expired stored token schedules nothing: the API
-  // can't refresh it, so it stays logged out as before.
+  // and (if there is still a token) schedules anew. A rejected refresh
+  // (401/403: revoked, deactivated, password reset, or expired past what the
+  // API accepts) logs out exactly like any other 401; a transient failure
+  // retries while the token is still valid.
+  //
+  // Past expiry (#56) -- a token reloaded after it expired, or a timer that
+  // fired late after a wake -- exactly one refresh is still tried. Today's API
+  // rejects it (401/403), which logs out as it always did; once
+  // minderhq/minder#1933 adds a grace window on /refresh, it succeeds. The
+  // client doesn't guess that window's length: the server decides. If that
+  // one attempt fails transiently, the token is abandoned (reads as logged
+  // out) rather than retried forever.
   useEffect(() => {
     if (!token) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let cancelled = false;
     const run = () => {
+      const startedExpired = Date.now() >= expiresAt;
       refreshAccessToken(token).then(
         (fresh) => {
           if (!cancelled && fresh === null) handleUnauthorized();
         },
         () => {
           if (cancelled) return;
+          if (startedExpired) {
+            setAbandonedToken(token);
+            return;
+          }
           // Same local-clock basis as the schedule. Retry at most every
-          // REFRESH_RETRY_MS, at least 1s apart, and only while the retry
-          // still lands before expiry (the API can't refresh after it).
+          // REFRESH_RETRY_MS, at least 1s apart. A retry that lands after
+          // expiry is the one post-expiry attempt above.
           const remaining = expiresAt - Date.now();
-          const wait = Math.max(1_000, Math.min(REFRESH_RETRY_MS, remaining / 2));
-          if (wait < remaining) timer = setTimeout(run, wait);
+          const wait =
+            remaining <= 0
+              ? 0
+              : Math.max(1_000, Math.min(REFRESH_RETRY_MS, remaining / 2));
+          timer = setTimeout(run, wait);
         },
       );
     };

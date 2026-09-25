@@ -93,12 +93,13 @@ export function handleUnauthorized(): void {
 const refreshInFlight = new Map<string, Promise<string | null>>();
 
 /** Exchanges `token` for a fresh one via `POST /v1/auth/refresh` (the API
- * re-validates the account and re-mints from the still-valid bearer token), then
- * stores it and announces it via TOKEN_REFRESHED_EVENT (#53).
+ * re-validates the account and re-mints from the bearer token, which may
+ * already have expired -- whether it still accepts it is the API's call,
+ * #56), then stores it and announces it via TOKEN_REFRESHED_EVENT (#53).
  *
  * Resolves to the new token, or to `null` when the API rejects the refresh with
  * 401/403 -- the session is really over (revoked, deactivated, password reset,
- * or the token already expired). Rejects on a transient failure (network error,
+ * or expired past what the API accepts). Rejects on a transient failure (network error,
  * 5xx) so a caller can decide whether to retry. Single-flight per token:
  * concurrent calls for the same token share one request. Uses raw `fetch`,
  * never apiFetch, so a failing refresh can never trigger another refresh. Does NOT log out by itself -- callers do. */
