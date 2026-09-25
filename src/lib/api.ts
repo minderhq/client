@@ -1,3 +1,5 @@
+import { decodeJwtClaims } from "./jwt";
+
 // VITE_API_BASE_URL is baked in at BUILD time (Vite convention), not read at
 // container start like every Python service's env vars -- changing it means
 // rebuilding the image, not just restarting the container. See
@@ -32,6 +34,31 @@ export const autheliaPortalUrl: string =
 // circular import.
 export const TOKEN_KEY = "minder_jwt";
 
+// Local-clock time (ms) at which the stored token was received, kept beside it
+// so the silent refresh (#53) can measure the token's lifetime on the client's
+// own clock -- immune to client/server clock skew -- across a page reload.
+export const TOKEN_RECEIVED_AT_KEY = "minder_jwt_received_at";
+
+/** Stores a newly received token together with its local receive time. */
+export function storeToken(jwt: string, receivedAt: number = Date.now()): void {
+  sessionStorage.setItem(TOKEN_KEY, jwt);
+  sessionStorage.setItem(TOKEN_RECEIVED_AT_KEY, String(receivedAt));
+}
+
+/** Removes the stored token and its receive time. */
+export function clearStoredToken(): void {
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(TOKEN_RECEIVED_AT_KEY);
+}
+
+/** The local receive time recorded for `jwt`, or null when unknown (not the
+ * stored token, or stored without one). */
+export function tokenReceivedAt(jwt: string): number | null {
+  if (!jwt || sessionStorage.getItem(TOKEN_KEY) !== jwt) return null;
+  const at = Number(sessionStorage.getItem(TOKEN_RECEIVED_AT_KEY));
+  return Number.isFinite(at) && at > 0 ? at : null;
+}
+
 // Dispatched on `window` whenever any apiFetch/apiFetchBlob call gets a 401 --
 // AuthProvider (src/lib/auth.tsx) listens for this on mount and reacts by
 // clearing its in-memory token, which flips `isAuthenticated` to false
@@ -52,7 +79,7 @@ export const TOKEN_REFRESHED_EVENT = "minder:token-refreshed";
  * apiFetchBlob, and when a refresh is rejected. Idempotent -- safe to call
  * repeatedly. */
 export function handleUnauthorized(): void {
-  sessionStorage.removeItem(TOKEN_KEY);
+  clearStoredToken();
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
   }
@@ -61,7 +88,15 @@ export function handleUnauthorized(): void {
 // The one in-flight refresh, shared by every caller (#53): N requests that
 // 401 at once -- or a 401 racing the scheduled pre-expiry refresh -- all await
 // the same POST instead of stampeding the endpoint.
-let refreshInFlight: Promise<string | null> | null = null;
+interface RefreshResult {
+  /** The token to use from now on, or null when the refresh was rejected. */
+  token: string | null;
+  /** True only when `token` was minted by this refresh from `from` -- false
+   * when it is whatever the session had moved on to meanwhile. */
+  minted: boolean;
+  from: string;
+}
+let refreshInFlight: Promise<RefreshResult> | null = null;
 
 /** Exchanges `token` for a fresh one via `POST /v1/auth/refresh` (the API
  * re-validates the account and re-mints from the still-valid bearer token), then
@@ -74,13 +109,22 @@ let refreshInFlight: Promise<string | null> | null = null;
  * share one request. Uses raw `fetch`, never apiFetch, so a failing refresh can
  * never trigger another refresh. Does NOT log out by itself -- callers do. */
 export function refreshAccessToken(token: string): Promise<string | null> {
+  return refreshOnce(token).then((r) => r.token);
+}
+
+function refreshOnce(token: string): Promise<RefreshResult> {
   if (!refreshInFlight) {
-    refreshInFlight = (async () => {
+    refreshInFlight = (async (): Promise<RefreshResult> => {
+      // Taken before the request, so the recorded receive time never runs
+      // later than the server's `iat` (errs toward refreshing early).
+      const sentAt = Date.now();
       const res = await fetch(`${apiBaseUrl}/v1/auth/refresh`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.status === 401 || res.status === 403) return null;
+      if (res.status === 401 || res.status === 403) {
+        return { token: null, minted: false, from: token };
+      }
       if (!res.ok) throw new ApiError(await parseErrorDetail(res), res.status);
       const data = (await res.json()) as { access_token?: unknown };
       if (typeof data.access_token !== "string" || !data.access_token) {
@@ -90,19 +134,32 @@ export function refreshAccessToken(token: string): Promise<string | null> {
       // cleared) or a token swap (switchOrg / loginWithToken). Don't resurrect
       // the old session over it -- hand back whatever is current instead.
       const current = sessionStorage.getItem(TOKEN_KEY);
-      if (current !== token) return current;
-      sessionStorage.setItem(TOKEN_KEY, data.access_token);
+      if (current !== token) return { token: current, minted: false, from: token };
+      storeToken(data.access_token, sentAt);
       if (typeof window !== "undefined") {
         window.dispatchEvent(
           new CustomEvent(TOKEN_REFRESHED_EVENT, { detail: data.access_token }),
         );
       }
-      return data.access_token;
+      return { token: data.access_token, minted: true, from: token };
     })().finally(() => {
       refreshInFlight = null;
     });
   }
   return refreshInFlight;
+}
+
+/** Whether two tokens belong to the same user AND the same active org. A token
+ * this request did not itself mint by refreshing (#53 review) is only replayed
+ * if it passes this -- so a request made as one user/org is never silently
+ * re-sent as another after a switchOrg or a different login. */
+function sameSession(a: string, b: string): boolean {
+  const ca = decodeJwtClaims(a);
+  const cb = decodeJwtClaims(b);
+  return (
+    ca.userId === cb.userId &&
+    (ca.activeTenantId || ca.tenantId) === (cb.activeTenantId || cb.tenantId)
+  );
 }
 
 /** Parses the error body and throws the resulting ApiError -- shared by
@@ -220,11 +277,13 @@ async function sendWithRefresh(
   if (stored !== token) {
     // Another request (or the scheduled refresh) already swapped in a newer
     // token than the one this caller captured -- replay with that instead of
-    // refreshing again.
-    fresh = stored;
+    // refreshing again, but only if it is the same user and org.
+    fresh = sameSession(token, stored) ? stored : null;
   } else {
     try {
-      fresh = await refreshAccessToken(token);
+      const r = await refreshOnce(token);
+      const ours = r.minted && r.from === token;
+      fresh = r.token && (ours || sameSession(token, r.token)) ? r.token : null;
     } catch {
       fresh = null; // transient refresh failure: the original 401 stands
     }

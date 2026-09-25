@@ -447,6 +447,92 @@ describe("AuthProvider / useAuth", () => {
       expect(refreshCalls()).toHaveLength(1);
     });
 
+    describe("clock skew (#53 review)", () => {
+      // The server's "now"; tokens are minted with its iat/exp, 5-min lifetime.
+      const SERVER_NOW = Date.parse("2030-01-01T00:00:00Z");
+      const token5m = (claims: Record<string, unknown> = {}) =>
+        makeJwt({
+          username: "ada",
+          iat: SERVER_NOW / 1000,
+          exp: SERVER_NOW / 1000 + 300,
+          ...claims,
+        });
+
+      it.each([
+        ["behind", -600_000],
+        ["ahead of", 600_000],
+      ])(
+        "refreshes before real expiry with the client clock 10 min %s the server",
+        async (_label, skewMs) => {
+          vi.setSystemTime(SERVER_NOW + skewMs);
+          vi.mocked(fetch).mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({ access_token: token5m({ username: "ada2" }) }),
+          } as Response);
+          const { result } = renderAuth();
+
+          act(() => {
+            result.current.loginWithToken(token5m());
+          });
+          // Skew doesn't make a freshly received token read as expired.
+          expect(result.current.isAuthenticated).toBe(true);
+
+          await act(async () => {
+            await vi.advanceTimersByTimeAsync(239_000);
+          });
+          expect(refreshCalls()).toHaveLength(0);
+
+          await act(async () => {
+            await vi.advanceTimersByTimeAsync(2_000); // t = 241s < 300s real expiry
+          });
+          expect(refreshCalls()).toHaveLength(1);
+          expect(result.current.username).toBe("ada2");
+        },
+      );
+
+      it("keeps the local receive time across a reload", async () => {
+        // Received 200s ago (local clock), client clock 10 min behind.
+        vi.setSystemTime(SERVER_NOW - 600_000 + 200_000);
+        sessionStorage.setItem(TOKEN_KEY, token5m());
+        sessionStorage.setItem("minder_jwt_received_at", String(SERVER_NOW - 600_000));
+        renderAuth();
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(39_000);
+        });
+        expect(refreshCalls()).toHaveLength(0);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(2_000); // 240s after receipt
+        });
+        expect(refreshCalls()).toHaveLength(1);
+      });
+
+      it("uses the same local basis for the transient-failure retry window", async () => {
+        vi.setSystemTime(SERVER_NOW - 600_000); // client 10 min behind
+        vi.mocked(fetch).mockRejectedValue(new TypeError("offline"));
+        const { result } = renderAuth();
+        act(() => {
+          result.current.loginWithToken(token5m());
+        });
+
+        // First attempt at 240s, then retries every min(30s, remaining/2)
+        // (>= 1s apart): 270s, 285s, 292.5s, ... -- all before the real 300s
+        // expiry, none after it.
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(300_000);
+        });
+        const beforeExpiry = refreshCalls().length;
+        expect(beforeExpiry).toBeGreaterThanOrEqual(4);
+        expect(beforeExpiry).toBeLessThanOrEqual(10);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(600_000);
+        });
+        expect(refreshCalls()).toHaveLength(beforeExpiry);
+        expect(result.current.token).not.toBe("");
+      });
+    });
+
     it(`adopts a token announced via ${TOKEN_REFRESHED_EVENT} (401 retry path)`, () => {
       sessionStorage.setItem(TOKEN_KEY, makeJwt({ username: "ada", exp: nowSec() + 100 }));
       const { result } = renderAuth();
