@@ -19,11 +19,12 @@ export function AuthCallbackPage() {
     if (tokenMatch) {
       // The token was minted during the navigation that loaded this page (the
       // API's OIDC callback redirected here), so that navigation's start is a
-      // local time no later than the token's `iat` (#56).
-      loginWithToken(
-        decodeURIComponent(tokenMatch[1]),
-        Math.floor(performance.timeOrigin),
-      );
+      // local time no later than the token's `iat` (#56). Capped at now, and
+      // falling back to now, in case timeOrigin drifted from wall time.
+      const now = Date.now();
+      const origin = performance.timeOrigin;
+      const sentAt = Number.isFinite(origin) ? Math.min(origin, now) : now;
+      loginWithToken(decodeURIComponent(tokenMatch[1]), Math.floor(sentAt));
       navigate("/", { replace: true });
       return;
     }
