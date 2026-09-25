@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { decodeJwtClaims, isExpired } from "./jwt";
+import { decodeJwtClaims, isExpired, refreshDelayMs } from "./jwt";
 
 /** Build a JWT-shaped string (`header.payload.signature`) whose payload is the
  * base64url encoding of `claims`. Only the payload segment is ever read, so the
@@ -128,5 +128,23 @@ describe("isExpired", () => {
     vi.setSystemTime(new Date("2030-01-01T00:00:00Z"));
     const inAnHour = Math.floor(Date.parse("2030-01-01T01:00:00Z") / 1000);
     expect(isExpired(inAnHour)).toBe(false);
+  });
+});
+
+describe("refreshDelayMs (#53)", () => {
+  const now = 1_700_000_000_000;
+
+  it("is 80% of the remaining lifetime", () => {
+    expect(refreshDelayMs(now / 1000 + 900, now)).toBe(720_000);
+  });
+
+  it("is null for an expired or non-expiring token", () => {
+    expect(refreshDelayMs(now / 1000 - 1, now)).toBeNull();
+    expect(refreshDelayMs(now / 1000, now)).toBeNull();
+    expect(refreshDelayMs(0, now)).toBeNull();
+  });
+
+  it("clamps to setTimeout's 32-bit maximum", () => {
+    expect(refreshDelayMs(now / 1000 + 365 * 24 * 3600, now)).toBe(2 ** 31 - 1);
   });
 });

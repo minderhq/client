@@ -5,8 +5,10 @@ import {
   apiFetchBlob,
   ApiError,
   friendlyErrorMessage,
+  refreshAccessToken,
   SESSION_EXPIRED_EVENT,
   TOKEN_KEY,
+  TOKEN_REFRESHED_EVENT,
 } from "./api";
 
 describe("ApiError", () => {
@@ -260,6 +262,201 @@ describe("apiFetch", () => {
         }
       },
     );
+  });
+});
+
+describe("silent refresh on 401 (#53)", () => {
+  const REFRESH_URL = "http://localhost:8000/v1/auth/refresh";
+  const json = (status: number, data: unknown) =>
+    ({ ok: status >= 200 && status < 300, status, json: async () => data }) as Response;
+  const authOf = (init: RequestInit | undefined) =>
+    (init?.headers as Record<string, string> | undefined)?.Authorization;
+  const refreshCalls = () =>
+    vi.mocked(fetch).mock.calls.filter(([url]) => url === REFRESH_URL);
+
+  let onSessionExpired: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+    sessionStorage.clear();
+    sessionStorage.setItem(TOKEN_KEY, "old-token");
+    onSessionExpired = vi.fn();
+    window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+  });
+  afterEach(() => {
+    window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+    vi.unstubAllGlobals();
+  });
+
+  /** API that 401s the old token, accepts the new one, and answers the
+   * refresh endpoint with `refresh` (default: a new token). */
+  function mockApi(refresh: () => Promise<Response> = async () =>
+    json(200, { access_token: "new-token", expires_in: 900 })) {
+    vi.mocked(fetch).mockImplementation(async (url, init) => {
+      if (url === REFRESH_URL) return refresh();
+      return authOf(init) === "Bearer new-token"
+        ? json(200, { ok: true })
+        : json(401, { detail: "Token expired" });
+    });
+  }
+
+  it("refreshes once and replays the original request with the new token", async () => {
+    mockApi();
+    const onRefreshed = vi.fn();
+    window.addEventListener(TOKEN_REFRESHED_EVENT, onRefreshed);
+    try {
+      const result = await apiFetch("/v1/things", {
+        method: "POST",
+        body: { a: 1 },
+        token: "old-token",
+      });
+
+      expect(result).toEqual({ ok: true });
+      const calls = vi.mocked(fetch).mock.calls;
+      expect(calls.map(([url]) => url)).toEqual([
+        "http://localhost:8000/v1/things",
+        REFRESH_URL,
+        "http://localhost:8000/v1/things",
+      ]);
+      expect(authOf(calls[1][1])).toBe("Bearer old-token");
+      expect(calls[2][1]).toMatchObject({ method: "POST", body: JSON.stringify({ a: 1 }) });
+      expect(sessionStorage.getItem(TOKEN_KEY)).toBe("new-token");
+      expect((onRefreshed.mock.calls[0][0] as CustomEvent).detail).toBe("new-token");
+      expect(onSessionExpired).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener(TOKEN_REFRESHED_EVENT, onRefreshed);
+    }
+  });
+
+  it("also refreshes and replays for apiFetchBlob", async () => {
+    const blob = new Blob(["x"]);
+    vi.mocked(fetch).mockImplementation(async (url, init) => {
+      if (url === REFRESH_URL) return json(200, { access_token: "new-token" });
+      if (authOf(init) === "Bearer new-token") {
+        return { ok: true, status: 200, blob: async () => blob, headers: new Headers() } as Response;
+      }
+      return json(401, { detail: "Token expired" });
+    });
+
+    const result = await apiFetchBlob("/v1/tts", { token: "old-token" });
+
+    expect(result.blob).toBe(blob);
+    expect(refreshCalls()).toHaveLength(1);
+  });
+
+  it.each([401, 403])("logs out when the refresh itself is rejected with %d", async (status) => {
+    mockApi(async () => json(status, { detail: "Account is disabled" }));
+
+    await expect(apiFetch("/v1/things", { token: "old-token" })).rejects.toMatchObject({
+      status: 401,
+    });
+
+    expect(refreshCalls()).toHaveLength(1);
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
+    expect(onSessionExpired).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs out when the refresh fails with a network error", async () => {
+    mockApi(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+
+    await expect(apiFetch("/v1/things", { token: "old-token" })).rejects.toMatchObject({
+      status: 401,
+    });
+
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
+    expect(onSessionExpired).toHaveBeenCalledTimes(1);
+  });
+
+  it("replays only once: a 401 on the replay logs out without another refresh", async () => {
+    vi.mocked(fetch).mockImplementation(async (url) =>
+      url === REFRESH_URL
+        ? json(200, { access_token: "new-token" })
+        : json(401, { detail: "nope" }),
+    );
+
+    await expect(apiFetch("/v1/things", { token: "old-token" })).rejects.toMatchObject({
+      status: 401,
+    });
+
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(3);
+    expect(refreshCalls()).toHaveLength(1);
+    expect(onSessionExpired).toHaveBeenCalledTimes(1);
+  });
+
+  it("shares one refresh between concurrent 401s", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    mockApi(async () => {
+      await gate;
+      return json(200, { access_token: "new-token" });
+    });
+
+    const requests = Array.from({ length: 5 }, (_, i) =>
+      apiFetch(`/v1/things/${i}`, { token: "old-token" }),
+    );
+    await vi.waitFor(() => expect(refreshCalls()).toHaveLength(1));
+    release();
+
+    await expect(Promise.all(requests)).resolves.toHaveLength(5);
+    expect(refreshCalls()).toHaveLength(1);
+    expect(onSessionExpired).not.toHaveBeenCalled();
+  });
+
+  it("replays with an already-refreshed stored token instead of refreshing again", async () => {
+    sessionStorage.setItem(TOKEN_KEY, "new-token");
+    mockApi();
+
+    await expect(apiFetch("/v1/things", { token: "old-token" })).resolves.toEqual({ ok: true });
+
+    expect(refreshCalls()).toHaveLength(0);
+  });
+
+  it("does not refresh an unauthenticated request", async () => {
+    mockApi();
+
+    await expect(apiFetch("/v1/things")).rejects.toMatchObject({ status: 401 });
+
+    expect(refreshCalls()).toHaveLength(0);
+    expect(onSessionExpired).toHaveBeenCalledTimes(1);
+  });
+
+  it("never recurses: a 401 from the refresh endpoint makes exactly one refresh call", async () => {
+    vi.mocked(fetch).mockResolvedValue(json(401, { detail: "Token expired" }));
+
+    await expect(refreshAccessToken("old-token")).resolves.toBeNull();
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith(
+      REFRESH_URL,
+      expect.objectContaining({ method: "POST", headers: { Authorization: "Bearer old-token" } }),
+    );
+    // Rejection is reported to the caller, not acted on here.
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBe("old-token");
+    expect(onSessionExpired).not.toHaveBeenCalled();
+  });
+
+  it("rejects (rather than resolving null) on a transient 5xx", async () => {
+    vi.mocked(fetch).mockResolvedValue(json(503, { detail: "unavailable" }));
+
+    await expect(refreshAccessToken("old-token")).rejects.toMatchObject({ status: 503 });
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBe("old-token");
+  });
+
+  it("does not resurrect a session that was logged out while the refresh was in flight", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    vi.mocked(fetch).mockImplementation(async () => {
+      await gate;
+      return json(200, { access_token: "new-token" });
+    });
+
+    const pending = refreshAccessToken("old-token");
+    sessionStorage.removeItem(TOKEN_KEY); // logout
+    release();
+
+    await expect(pending).resolves.toBeNull();
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
   });
 });
 
