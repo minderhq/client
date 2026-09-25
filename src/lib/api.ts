@@ -85,10 +85,12 @@ export function handleUnauthorized(): void {
   }
 }
 
-// The one in-flight refresh, shared by every caller (#53): N requests that
-// 401 at once -- or a 401 racing the scheduled pre-expiry refresh -- all await
-// the same POST instead of stampeding the endpoint.
-let refreshInFlight: Promise<string | null> | null = null;
+// The in-flight refresh per starting token, shared by every caller holding
+// that token (#53): N requests that 401 at once -- or a 401 racing the
+// scheduled pre-expiry refresh -- all await the same POST instead of
+// stampeding the endpoint. Keyed by token so a caller holding a different one
+// (e.g. right after switchOrg) never receives another token's refresh result.
+const refreshInFlight = new Map<string, Promise<string | null>>();
 
 /** Exchanges `token` for a fresh one via `POST /v1/auth/refresh` (the API
  * re-validates the account and re-mints from the still-valid bearer token), then
@@ -97,12 +99,13 @@ let refreshInFlight: Promise<string | null> | null = null;
  * Resolves to the new token, or to `null` when the API rejects the refresh with
  * 401/403 -- the session is really over (revoked, deactivated, password reset,
  * or the token already expired). Rejects on a transient failure (network error,
- * 5xx) so a caller can decide whether to retry. Single-flight: concurrent calls
- * share one request. Uses raw `fetch`, never apiFetch, so a failing refresh can
- * never trigger another refresh. Does NOT log out by itself -- callers do. */
+ * 5xx) so a caller can decide whether to retry. Single-flight per token:
+ * concurrent calls for the same token share one request. Uses raw `fetch`,
+ * never apiFetch, so a failing refresh can never trigger another refresh. Does NOT log out by itself -- callers do. */
 export function refreshAccessToken(token: string): Promise<string | null> {
-  if (!refreshInFlight) {
-    refreshInFlight = (async (): Promise<string | null> => {
+  let inFlight = refreshInFlight.get(token);
+  if (!inFlight) {
+    inFlight = (async (): Promise<string | null> => {
       // Taken before the request, so the recorded receive time never runs
       // later than the server's `iat` (errs toward refreshing early).
       const sentAt = Date.now();
@@ -131,10 +134,11 @@ export function refreshAccessToken(token: string): Promise<string | null> {
       }
       return data.access_token;
     })().finally(() => {
-      refreshInFlight = null;
+      refreshInFlight.delete(token);
     });
+    refreshInFlight.set(token, inFlight);
   }
-  return refreshInFlight;
+  return inFlight;
 }
 
 /** Whether two tokens belong to the same user AND the same active org. Every
