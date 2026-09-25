@@ -74,8 +74,9 @@ src/
   `Paginated<T>` list envelope (`{items,total,limit,offset}`, matches the backend
   `shared.models.PaginatedList` — #501).
 - **`auth.tsx`** — `AuthProvider` / `useAuth` (JWT in sessionStorage; SSO callback
-  + local login). Pure claim helpers live in **`jwt.ts`** (`decodeJwtClaims`,
-  `isExpired`) so they're testable without rendering the provider.
+  + local login; silent token refresh). Pure claim helpers live in **`jwt.ts`**
+  (`decodeJwtClaims`, `localExpiryMs`, `refreshDelayMs`) so they're testable
+  without rendering the provider.
 - **`useAsyncResource.ts`** — declarative data-fetch hook: AbortController
   cancellation + **stale-response race guard** + opt-in `timeoutMs`. Replaces the
   hand-rolled `data/status/isError/loadX/useEffect` boilerplate. Adopt it when a

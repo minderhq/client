@@ -439,16 +439,37 @@ describe("silent refresh on 401 (#53)", () => {
     it.each([
       ["another org (switchOrg)", { sub: "1", active_tenant_id: "20", exp: 2e9 }],
       ["another user", { sub: "2", active_tenant_id: "10", exp: 2e9 }],
-    ])("does not replay with a stored token for %s", async (_label, claims) => {
-      const other = jwt(claims);
+    ])(
+      "does not replay with a stored token for %s, and keeps that session",
+      async (_label, claims) => {
+        const other = jwt(claims);
+        sessionStorage.setItem(TOKEN_KEY, other);
+        sessionStorage.setItem(TOKEN_RECEIVED_AT_KEY, "1234567");
+        mockServer(other);
+
+        // The stale caller still gets its 401 ...
+        const err = await apiFetch("/v1/things", { token: mine }).catch((e) => e);
+        expect(err).toBeInstanceOf(ApiError);
+        expect(err).toMatchObject({ status: 401 });
+        // ... with no replay as someone else ...
+        expect(vi.mocked(fetch).mock.calls).toHaveLength(1);
+        // ... and the current, valid session is left alone.
+        expect(sessionStorage.getItem(TOKEN_KEY)).toBe(other);
+        expect(sessionStorage.getItem(TOKEN_RECEIVED_AT_KEY)).toBe("1234567");
+        expect(onSessionExpired).not.toHaveBeenCalled();
+      },
+    );
+
+    it("keeps the session for a stale apiFetchBlob request too", async () => {
+      const other = jwt({ sub: "1", active_tenant_id: "20", exp: 2e9 });
       sessionStorage.setItem(TOKEN_KEY, other);
       mockServer(other);
 
-      await expect(apiFetch("/v1/things", { token: mine })).rejects.toMatchObject({
+      await expect(apiFetchBlob("/v1/tts", { token: mine })).rejects.toMatchObject({
         status: 401,
       });
-      // Only the original request went out: no replay as someone else.
-      expect(vi.mocked(fetch).mock.calls).toHaveLength(1);
+      expect(sessionStorage.getItem(TOKEN_KEY)).toBe(other);
+      expect(onSessionExpired).not.toHaveBeenCalled();
     });
 
     it("does not replay with a token swapped in for another org mid-refresh", async () => {
@@ -463,6 +484,34 @@ describe("silent refresh on 401 (#53)", () => {
         status: 401,
       });
       expect(vi.mocked(fetch).mock.calls).toHaveLength(2); // original + refresh
+      expect(sessionStorage.getItem(TOKEN_KEY)).toBe(other);
+      expect(onSessionExpired).not.toHaveBeenCalled();
+    });
+
+    it("still logs out when the caller's own token is rejected on refresh", async () => {
+      sessionStorage.setItem(TOKEN_KEY, mine);
+      sessionStorage.setItem(TOKEN_RECEIVED_AT_KEY, "1234567");
+      mockServer("nobody", async () => json(401, { detail: "Account is disabled" }));
+
+      await expect(apiFetch("/v1/things", { token: mine })).rejects.toMatchObject({
+        status: 401,
+      });
+      expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
+      expect(sessionStorage.getItem(TOKEN_RECEIVED_AT_KEY)).toBeNull();
+      expect(onSessionExpired).toHaveBeenCalledTimes(1);
+    });
+
+    it("still logs out when the replay with a same-session token 401s", async () => {
+      const newer = jwt({ sub: "1", active_tenant_id: "10", exp: 2e9 + 1 });
+      sessionStorage.setItem(TOKEN_KEY, newer);
+      mockServer("nobody");
+
+      await expect(apiFetch("/v1/things", { token: mine })).rejects.toMatchObject({
+        status: 401,
+      });
+      expect(vi.mocked(fetch).mock.calls).toHaveLength(2); // original + replay
+      expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
+      expect(onSessionExpired).toHaveBeenCalledTimes(1);
     });
 
     it("replays with the token its own refresh minted, even if the org changed", async () => {

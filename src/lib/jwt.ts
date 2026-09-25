@@ -24,12 +24,6 @@ export interface JwtClaims {
   isPlatformAdmin: boolean;
 }
 
-/** True once the token's `exp` has passed. Tokens without an `exp` (exp === 0)
- * are treated as non-expiring so this never regresses such tokens to logged-out. */
-export function isExpired(exp: number): boolean {
-  return exp > 0 && Date.now() >= exp * 1000;
-}
-
 /** Refresh once this fraction of the token's lifetime has elapsed (#53),
  * leaving the last 20% as headroom for a slow or retried refresh. */
 const REFRESH_AT_FRACTION = 0.8;
