@@ -13,6 +13,7 @@ import type { Installation } from "../lib/types";
 import { useAsyncResource } from "../lib/useAsyncResource";
 import { usePaginatedList } from "../lib/usePaginatedList";
 import { badgeClass, cardClass, cardHoverClass, mutedTextClass, secondaryButtonClass } from "../lib/ui";
+import { useTokenRef } from "../lib/useTokenRef";
 import { PluginCard, type Plugin } from "./AvailablePluginsPage";
 
 // #1516 (client half, groundwork already merged in minder#1725): a "plugin
@@ -150,7 +151,8 @@ function RepositoryList() {
 }
 
 function RepositoryPluginList({ repositoryId }: { repositoryId: string }) {
-  const { token, isAuthenticated, role } = useAuth();
+  const { token, sessionKey, isAuthenticated, role } = useAuth();
+  const tokenRef = useTokenRef();
   const isAdmin = role === "admin";
   const { confirm, dialog } = useConfirm();
   const [myInstallations, setMyInstallations] = useState<Installation[]>([]);
@@ -163,17 +165,17 @@ function RepositoryPluginList({ repositoryId }: { repositoryId: string }) {
     try {
       const res = await apiFetch<MyInstallationsResponse>(
         "/v1/marketplace/installations/me",
-        { token },
+        { token: tokenRef.current },
       );
       setMyInstallations(res.installations);
     } catch {
       // best-effort -- an install action below will surface its own error
     }
-  }, [isAuthenticated, token]);
+  }, [isAuthenticated, tokenRef]);
 
   useEffect(() => {
     loadMyInstallations();
-  }, [loadMyInstallations]);
+  }, [loadMyInstallations, sessionKey]);
 
   const fetchPage = useCallback(
     async (offset: number) => {

@@ -11,7 +11,10 @@ vi.mock("../lib/api", () => ({
 }));
 
 // Mutable per test, same convention as SubmissionsPage.test.tsx.
-let mockAuth = { token: "", isAuthenticated: false };
+let mockAuth: { token: string; isAuthenticated: boolean; sessionKey?: string } = {
+  token: "",
+  isAuthenticated: false,
+};
 vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
 }));
@@ -107,5 +110,28 @@ describe("licenseStatus", () => {
 
   it("is Active when valid_until is null (no expiry)", () => {
     expect(licenseStatus(license({ valid_until: null })).label).toBe("Active");
+  });
+
+  it("keys the fetch on the session, not the token string (#55)", async () => {
+    mockAuth = { token: "tok", isAuthenticated: true, sessionKey: "1:7:1" };
+    apiFetch.mockResolvedValue({ licenses: [license()], count: 1 });
+    const { rerender } = render(<MyLicensesPage />);
+    await screen.findByText("Weather");
+    expect(apiFetch).toHaveBeenCalledTimes(1);
+
+    // Silent refresh: same user and org, new token -> no refetch.
+    mockAuth = { token: "tok-refreshed", isAuthenticated: true, sessionKey: "1:7:1" };
+    rerender(<MyLicensesPage />);
+    expect(apiFetch).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Weather")).toBeTruthy();
+
+    // Org switch -> refetch with the new org's token.
+    mockAuth = { token: "tok-org2", isAuthenticated: true, sessionKey: "2:7:2" };
+    rerender(<MyLicensesPage />);
+    expect(apiFetch).toHaveBeenCalledTimes(2);
+    expect(apiFetch).toHaveBeenLastCalledWith(
+      "/v1/marketplace/licenses",
+      expect.objectContaining({ token: "tok-org2" }),
+    );
   });
 });

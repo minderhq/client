@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../lib/auth";
 import { fetchMyOrgs, type MyOrg, orgRoleTone } from "../lib/orgs";
 import { badgeClass } from "../lib/ui";
+import { useTokenRef } from "../lib/useTokenRef";
 import { Icon } from "./Icon";
 
 /** Topbar organization context + switcher. Answers three things at once:
@@ -15,7 +16,8 @@ import { Icon } from "./Icon";
  * Hidden entirely for logged-out users and for tokens with no org membership
  * (pre-tenancy / orgless), so it never shows an empty control. */
 export function OrgSwitcher() {
-  const { isAuthenticated, token, activeTenantId, switchOrg } = useAuth();
+  const { isAuthenticated, sessionKey, activeTenantId, switchOrg } = useAuth();
+  const tokenRef = useTokenRef();
   const [orgs, setOrgs] = useState<MyOrg[]>([]);
   const [open, setOpen] = useState(false);
   const [switching, setSwitching] = useState<number | null>(null);
@@ -23,6 +25,7 @@ export function OrgSwitcher() {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const token = tokenRef.current;
     if (!isAuthenticated || !token) {
       setOrgs([]);
       return;
@@ -32,7 +35,7 @@ export function OrgSwitcher() {
       .then((r) => setOrgs(r.organizations))
       .catch(() => setOrgs([]));
     return () => ctrl.abort();
-  }, [isAuthenticated, token]);
+  }, [isAuthenticated, sessionKey, tokenRef]);
 
   // Close the menu on an outside click.
   useEffect(() => {

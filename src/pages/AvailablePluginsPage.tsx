@@ -22,6 +22,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from "../lib/ui";
+import { useTokenRef } from "../lib/useTokenRef";
 
 export interface Plugin {
   id: string;
@@ -555,7 +556,8 @@ function SearchAndFilters({
 }
 
 export function AvailablePluginsPage() {
-  const { token, isAuthenticated, role } = useAuth();
+  const { token, sessionKey, isAuthenticated, role } = useAuth();
+  const tokenRef = useTokenRef();
   // The install-from-git endpoint is admin-only; gate the affordance to admins
   // the same way nav.ts hides admin-only destinations (the backend 403s others).
   const isAdmin = role === "admin";
@@ -620,7 +622,7 @@ export function AvailablePluginsPage() {
     try {
       const res = await apiFetch<MyInstallationsResponse>(
         "/v1/marketplace/installations/me",
-        { token },
+        { token: tokenRef.current },
       );
       setMyInstallations(res.installations);
       if (res.installations.length > 0) {
@@ -628,7 +630,7 @@ export function AvailablePluginsPage() {
         try {
           const rec = await apiFetch<{ recommendations: Recommendation[] }>(
             "/v1/graph/recommendations?limit=5",
-            { method: "POST", body: ids, token },
+            { method: "POST", body: ids, token: tokenRef.current },
           );
           // `?? []`: a response missing `recommendations` would otherwise set
           // state to `undefined`, past this try/catch (no throw happens) and
@@ -644,7 +646,7 @@ export function AvailablePluginsPage() {
     } catch {
       // best-effort -- an install action will surface its own error
     }
-  }, [isAuthenticated, token]);
+  }, [isAuthenticated, tokenRef]);
 
   useEffect(() => {
     // query changes trigger a fresh search from offset 0 (reloadPlugins'
@@ -654,7 +656,7 @@ export function AvailablePluginsPage() {
 
   useEffect(() => {
     loadMyInstallations();
-  }, [loadMyInstallations]);
+  }, [loadMyInstallations, sessionKey]);
 
   const featuredIds = useMemo(() => new Set(featured.map((p) => p.id)), [featured]);
   // No categories-by-name endpoint exists yet (#1519) -- categories are only

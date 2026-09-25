@@ -112,7 +112,9 @@ export function PluginRatings({
   isAuthenticated: boolean;
   isInstalled: boolean;
 }) {
-  const myUserId = useMemo(() => decodeJwtClaims(token).userId, [token]);
+  // Decoded per render rather than memoised on the token, which changes on
+  // every silent refresh (#55); the decode is cheap.
+  const myUserId = decodeJwtClaims(token).userId;
 
   const [loaded, setLoaded] = useState(false);
   const [ratings, setRatings] = useState<PluginRating[]>([]);

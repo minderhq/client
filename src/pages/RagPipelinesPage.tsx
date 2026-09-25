@@ -23,6 +23,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from "../lib/ui";
+import { useTokenRef } from "../lib/useTokenRef";
 import { EmptyState } from "../components/EmptyState";
 
 // document_count/vector_count come along so the picker below can flag empty
@@ -758,7 +759,8 @@ export function AutoRouterStatsCard({ stats }: { stats: DecisionStats | null }) 
 }
 
 export function RagPipelinesPage() {
-  const { token } = useAuth();
+  const { token, sessionKey } = useAuth();
+  const tokenRef = useTokenRef();
   const { confirm, dialog } = useConfirm();
   const [searchParams] = useSearchParams();
   const [kbs, setKbs] = useState<KnowledgeBase[]>([]);
@@ -789,11 +791,13 @@ export function RagPipelinesPage() {
     try {
       const [kbList, pipelineList, stats] = await Promise.all([
         apiFetch<Paginated<KnowledgeBase>>("/v1/rag/knowledge-bases?limit=100", {
-          token,
+          token: tokenRef.current,
         }),
         // JWT-gated (owner-scoped under tenancy): 401s without the token, which
         // failed the whole page load with a misleading "session expired".
-        apiFetch<Paginated<RagPipeline>>("/v1/rag/pipeline?limit=100", { token }),
+        apiFetch<Paginated<RagPipeline>>("/v1/rag/pipeline?limit=100", {
+          token: tokenRef.current,
+        }),
         // Newer endpoint (auto-router analytics) — degrade gracefully rather than
         // failing the whole page load against a backend that predates it.
         apiFetch<DecisionStats>("/v1/rag/decision-stats").catch(() => null),
@@ -805,13 +809,14 @@ export function RagPipelinesPage() {
     } catch (e) {
       setStatusMsg(friendlyErrorMessage(e), true);
     }
-  }, [setStatusMsg, token]);
+  }, [setStatusMsg, tokenRef]);
 
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, sessionKey]);
 
   useEffect(() => {
+    const token = tokenRef.current;
     if (!token) {
       setMyTeams([]);
       return;
@@ -823,7 +828,7 @@ export function RagPipelinesPage() {
     apiFetch<{ teams: TeamOption[] }>("/v1/teams?limit=500", { token })
       .then((res) => setMyTeams(res.teams))
       .catch(() => setMyTeams([]));
-  }, [token]);
+  }, [sessionKey, tokenRef]);
 
   function handlePipelineDeleted(id: string) {
     setPipelines((prev) => prev.filter((p) => p.id !== id));

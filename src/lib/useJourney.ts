@@ -13,7 +13,7 @@ import { type AsyncResource, useAsyncResource } from "./useAsyncResource";
  * counts are as of mount, which is enough for the cross-page hand-off this
  * feature is really about. */
 export function useJourney(refreshKey?: unknown): AsyncResource<JourneyCounts> {
-  const { token } = useAuth();
+  const { token, sessionKey } = useAuth();
   return useAsyncResource<JourneyCounts>(
     (signal) =>
       Promise.all([
@@ -28,6 +28,6 @@ export function useJourney(refreshKey?: unknown): AsyncResource<JourneyCounts> {
         readyKbCount: kbs.items.filter(kbReady).length,
         pipelineCount: pipelines.total,
       })),
-    { deps: [token, refreshKey], enabled: Boolean(token) },
+    { deps: [sessionKey, refreshKey], enabled: Boolean(token) },
   );
 }

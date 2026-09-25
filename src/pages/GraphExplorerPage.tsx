@@ -18,6 +18,7 @@ import {
   secondaryButtonClass,
 } from "../lib/ui";
 import { type AsyncResource, useAsyncResource } from "../lib/useAsyncResource";
+import { useTokenRef } from "../lib/useTokenRef";
 
 interface Entity {
   text: string;
@@ -1425,7 +1426,8 @@ function CorrelationsCard({ token }: { token: string }) {
 }
 
 export function GraphExplorerPage() {
-  const { token } = useAuth();
+  const { token, sessionKey } = useAuth();
+  const tokenRef = useTokenRef();
   const { confirm, dialog } = useConfirm();
   const [myTeams, setMyTeams] = useState<TeamOption[]>([]);
 
@@ -1437,7 +1439,7 @@ export function GraphExplorerPage() {
   // otherwise a logged-in user's overview + documents silently 401.
   const stats = useAsyncResource<GraphStats>(
     (signal) => apiFetch<GraphStats>("/v1/graph-rag/graph/stats", { signal, token }),
-    { deps: [token] },
+    { deps: [sessionKey] },
   );
   const graphDocs = useAsyncResource<GraphDocumentsResponse>(
     (signal) =>
@@ -1445,7 +1447,7 @@ export function GraphExplorerPage() {
         signal,
         token,
       }),
-    { deps: [token] },
+    { deps: [sessionKey] },
   );
 
   function handleChanged() {
@@ -1454,6 +1456,7 @@ export function GraphExplorerPage() {
   }
 
   useEffect(() => {
+    const token = tokenRef.current;
     if (!token) {
       setMyTeams([]);
       return;
@@ -1464,7 +1467,7 @@ export function GraphExplorerPage() {
     apiFetch<{ teams: TeamOption[] }>("/v1/teams?limit=500", { token })
       .then((res) => setMyTeams(res.teams))
       .catch(() => setMyTeams([]));
-  }, [token]);
+  }, [sessionKey, tokenRef]);
 
   return (
     <>

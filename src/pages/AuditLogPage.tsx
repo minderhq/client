@@ -71,7 +71,7 @@ function StatePeek({ label, value }: { label: string; value: unknown }) {
  * add/remove, plugin review, …) and streams to SIEM — this makes it readable in
  * the app instead of only via the API. Admin-only. */
 export function AuditLogPage() {
-  const { isAuthenticated, token, role } = useAuth();
+  const { isAuthenticated, token, sessionKey, role } = useAuth();
   const isAdmin = role === "admin";
   const [action, setAction] = useState("");
   const [targetType, setTargetType] = useState("");
@@ -90,7 +90,7 @@ export function AuditLogPage() {
       if (dTarget.trim()) params.set("target_type", dTarget.trim());
       return apiFetch<AuditResponse>(`/v1/audit-logs?${params}`, { token, signal });
     },
-    { deps: [token, offset, dAction, dTarget], enabled: isAuthenticated && isAdmin },
+    { deps: [sessionKey, offset, dAction, dTarget], enabled: isAuthenticated && isAdmin },
   );
 
   if (!isAuthenticated || !isAdmin) {
