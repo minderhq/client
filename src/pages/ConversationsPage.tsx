@@ -9,6 +9,7 @@ import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { mutedTextClass, secondaryButtonClass } from "../lib/ui";
 import { usePaginatedList } from "../lib/usePaginatedList";
+import { useTokenRef } from "../lib/useTokenRef";
 
 export interface ConversationSummary {
   conversation_id: string;
@@ -63,18 +64,21 @@ function ConversationCard({
  * backend's `list_owned_conversations`); this is "conversations I began,"
  * not "conversations I can see." */
 export function ConversationsPage() {
-  const { token } = useAuth();
+  const { token, sessionKey } = useAuth();
+  const tokenRef = useTokenRef();
   const navigate = useNavigate();
 
   const fetchConversationsPage = useCallback(
     async (offset: number) => {
       const res = await apiFetch<ConversationsResponse>(
         `/v1/conversations/mine?limit=20&offset=${offset}`,
-        { token },
+        { token: tokenRef.current },
       );
       return { items: res.items, total: res.total };
     },
-    [token],
+    // Not the token (#55): it changes on every silent refresh, and a new
+    // fetchPage would re-run the effect below and drop the "load more" pages.
+    [tokenRef],
   );
   const {
     items: conversations,
@@ -86,8 +90,8 @@ export function ConversationsPage() {
   } = usePaginatedList(fetchConversationsPage);
 
   useEffect(() => {
-    if (token) reload();
-  }, [token, reload]);
+    if (sessionKey) reload();
+  }, [sessionKey, reload]);
 
   function handleContinue(conversationId: string) {
     // Ask is the canonical query surface now (#1229) — it already supports

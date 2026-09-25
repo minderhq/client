@@ -215,7 +215,7 @@ function ReviewCard({
 }
 
 export function ReviewQueuePage() {
-  const { token, role, isAuthenticated } = useAuth();
+  const { token, sessionKey, role, isAuthenticated } = useAuth();
   const isAdmin = role === "admin";
   const [statusFilter, setStatusFilter] = useState<Submission["status"]>("submitted");
   const {
@@ -229,7 +229,7 @@ export function ReviewQueuePage() {
         `/v1/marketplace/submissions?status=${statusFilter}`,
         { token, signal },
       ),
-    { deps: [statusFilter, token], enabled: isAdmin },
+    { deps: [statusFilter, sessionKey], enabled: isAdmin },
   );
   const submissions = data?.plugins ?? [];
 

@@ -21,6 +21,7 @@ import {
   secondaryButtonClass,
   surfaceMutedClass,
 } from "../lib/ui";
+import { useTokenRef } from "../lib/useTokenRef";
 import { type ModelInfo } from "./ModelManagementPage";
 import {
   type AppliedParameter,
@@ -109,7 +110,8 @@ type Turn = UserTurn | AssistantTurn;
  * QueryResultCard the Pipelines page uses, so answers look identical wherever
  * you ask from. */
 export function AskPage() {
-  const { token, isAuthenticated } = useAuth();
+  const { token, sessionKey, isAuthenticated } = useAuth();
+  const tokenRef = useTokenRef();
   // Deep-link entry points (#1229): "Ask this pipeline" from a pipeline card
   // (?pipeline=<id>) and "Continue →" from Conversations (?conversation_id=<id>).
   // Seeded once as initial state; load() keeps a preselected pipeline if it
@@ -203,7 +205,9 @@ export function AskPage() {
         // GET /v1/rag/pipeline is JWT-gated (owner-scoped under tenancy) — it
         // 401s without the token, so pass it or the whole load fails with a
         // misleading "session expired" even while logged in.
-        apiFetch<Paginated<RagPipeline>>("/v1/rag/pipeline?limit=100", { token }),
+        apiFetch<Paginated<RagPipeline>>("/v1/rag/pipeline?limit=100", {
+          token: tokenRef.current,
+        }),
       ]);
       setCapabilities(caps);
       setPipelines(pipelineList.items);
@@ -217,11 +221,11 @@ export function AskPage() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [tokenRef]);
 
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, sessionKey]);
 
   // Best-effort: offer the pulled generation models as a per-question override
   // of the pipeline's KB-configured llm_model. Kept out of `load`'s Promise.all
@@ -238,6 +242,7 @@ export function AskPage() {
   // re-uploads). Best-effort; re-fetched whenever the pipeline changes.
   useEffect(() => {
     const pipeline = pipelines.find((p) => p.id === pipelineId);
+    const token = tokenRef.current;
     if (!token || !pipeline) {
       setDocs([]);
       return;
@@ -247,7 +252,7 @@ export function AskPage() {
       .then(setDocs)
       .catch(() => {});
     return () => controller.abort();
-  }, [pipelineId, pipelines, token]);
+  }, [pipelineId, pipelines, sessionKey, tokenRef]);
 
   // Auto-scroll the transcript to the latest turn as it grows.
   useEffect(() => {

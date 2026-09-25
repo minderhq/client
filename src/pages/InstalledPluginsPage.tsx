@@ -21,6 +21,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from "../lib/ui";
+import { useTokenRef } from "../lib/useTokenRef";
 
 interface MyInstallationsResponse {
   installations: Installation[];
@@ -475,7 +476,8 @@ export function InstalledPluginCard({
 }
 
 export function InstalledPluginsPage() {
-  const { token, isAuthenticated } = useAuth();
+  const { token, sessionKey, isAuthenticated } = useAuth();
+  const tokenRef = useTokenRef();
   const { confirm, dialog } = useConfirm();
   const [installations, setInstallations] = useState<Installation[] | null>(null);
   const [status, setStatus] = useState("");
@@ -492,18 +494,18 @@ export function InstalledPluginsPage() {
     try {
       const res = await apiFetch<MyInstallationsResponse>(
         "/v1/marketplace/installations/me",
-        { token },
+        { token: tokenRef.current },
       );
       setInstallations(res.installations ?? []);
       setStatusMsg("");
     } catch (e) {
       setStatusMsg(friendlyErrorMessage(e), true);
     }
-  }, [isAuthenticated, token, setStatusMsg]);
+  }, [isAuthenticated, tokenRef, setStatusMsg]);
 
   useEffect(() => {
     loadInstallations();
-  }, [loadInstallations]);
+  }, [loadInstallations, sessionKey]);
 
   function handleUninstalled(pluginId: string) {
     setInstallations((prev) => (prev ?? []).filter((i) => i.plugin_id !== pluginId));

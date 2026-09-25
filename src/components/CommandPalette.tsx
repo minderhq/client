@@ -7,6 +7,7 @@ import { NAV_DESTINATIONS } from "../lib/nav";
 import { getTheme, setTheme, type Theme } from "../lib/theme";
 import { kbdClass } from "../lib/ui";
 import { useDebouncedValue } from "../lib/useDebouncedValue";
+import { useTokenRef } from "../lib/useTokenRef";
 import { Icon, type IconName } from "./Icon";
 
 interface Command {
@@ -32,7 +33,8 @@ export function CommandPalette({
   onClose: () => void;
 }) {
   const navigate = useNavigate();
-  const { role, token } = useAuth();
+  const { role, sessionKey } = useAuth();
+  const tokenRef = useTokenRef();
   const isAdmin = role === "admin";
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -87,6 +89,7 @@ export function CommandPalette({
       setResources([]);
       return;
     }
+    const token = tokenRef.current;
     const ctrl = new AbortController();
     const q = debouncedQuery.toLowerCase();
     const noToken = Promise.resolve({ items: [] as { id: string; name: string }[] });
@@ -157,7 +160,7 @@ export function CommandPalette({
       setResources(out);
     });
     return () => ctrl.abort();
-  }, [open, debouncedQuery, token]);
+  }, [open, debouncedQuery, sessionKey, tokenRef]);
 
   const results = useMemo(
     () => [...staticResults, ...resources],

@@ -18,6 +18,7 @@ import {
 } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
 import { usePaginatedList } from "../lib/usePaginatedList";
+import { useTokenRef } from "../lib/useTokenRef";
 import type { PublicChatEndpoint } from "./PublicChatEndpointsPage";
 
 // #1582 (client half): the creator conversation dashboard. An endpoint owner
@@ -127,22 +128,18 @@ function shortSessionId(id: string): string {
   return id.length > 12 ? `${id.slice(0, 12)}…` : id;
 }
 
-function ConversationList({
-  endpointId,
-  token,
-}: {
-  endpointId: string;
-  token: string;
-}) {
+function ConversationList({ endpointId }: { endpointId: string }) {
+  const { sessionKey } = useAuth();
+  const tokenRef = useTokenRef();
   const fetchPage = useCallback(
     async (offset: number) => {
       const res = await apiFetch<Paginated<EndpointConversation>>(
         `/v1/public-chat/endpoints/${endpointId}/conversations?limit=20&offset=${offset}`,
-        { token },
+        { token: tokenRef.current },
       );
       return { items: res.items, total: res.total };
     },
-    [endpointId, token],
+    [endpointId, tokenRef],
   );
 
   const {
@@ -157,7 +154,7 @@ function ConversationList({
 
   useEffect(() => {
     reload();
-  }, [reload]);
+  }, [reload, sessionKey]);
 
   return (
     <>
@@ -517,7 +514,7 @@ export function PublicChatConversationsPage() {
                   token={token}
                 />
               ) : (
-                <ConversationList endpointId={endpointId} token={token} />
+                <ConversationList endpointId={endpointId} />
               )}
             </>
           )}
