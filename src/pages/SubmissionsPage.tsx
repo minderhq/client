@@ -543,7 +543,7 @@ function SubmissionCard({
 }
 
 export function SubmissionsPage() {
-  const { token, isAuthenticated } = useAuth();
+  const { token, sessionKey, isAuthenticated } = useAuth();
   const {
     data,
     error,
@@ -555,7 +555,7 @@ export function SubmissionsPage() {
         token,
         signal,
       }),
-    { deps: [token], enabled: isAuthenticated },
+    { deps: [sessionKey], enabled: isAuthenticated },
   );
   const submissions = data?.plugins ?? [];
 

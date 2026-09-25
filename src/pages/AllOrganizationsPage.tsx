@@ -31,7 +31,7 @@ import { useAsyncResource } from "../lib/useAsyncResource";
  * is the current user's own org. Both org create and the all-orgs list are
  * admin-only endpoints, so the whole page is gated to instance admins. */
 export function AllOrganizationsPage() {
-  const { isAuthenticated, token, role } = useAuth();
+  const { isAuthenticated, token, sessionKey, role } = useAuth();
   const isAdmin = role === "admin";
   const nameId = useId();
   const slugId = useId();
@@ -48,11 +48,11 @@ export function AllOrganizationsPage() {
 
   const orgsRes = useAsyncResource<OrgListItem[]>(
     (signal) => fetchAllOrganizations(token, signal).then((r) => r.organizations),
-    { deps: [token], enabled: isAuthenticated && isAdmin },
+    { deps: [sessionKey], enabled: isAuthenticated && isAdmin },
   );
   const usersRes = useAsyncResource<DirectoryUser[]>(
     (signal) => fetchAllUsers(token, signal).then((r) => r.users),
-    { deps: [token], enabled: isAuthenticated && isAdmin },
+    { deps: [sessionKey], enabled: isAuthenticated && isAdmin },
   );
 
   function onNameChange(v: string) {

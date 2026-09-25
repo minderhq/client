@@ -545,4 +545,73 @@ describe("AuthProvider / useAuth", () => {
       expect(result.current.token).toBe(fresh);
     });
   });
+
+  describe("sessionKey (#55)", () => {
+    const exp = (s: number) => Math.floor(Date.now() / 1000) + s;
+    const jwt = (claims: Record<string, unknown>) =>
+      makeJwt({ sub: "7", username: "ada", active_tenant_id: "1", ...claims });
+    const refreshTo = (fresh: string) =>
+      act(() => {
+        window.dispatchEvent(new CustomEvent(TOKEN_REFRESHED_EVENT, { detail: fresh }));
+      });
+
+    it("is empty with no token", () => {
+      expect(renderAuth().result.current.sessionKey).toBe("");
+    });
+
+    it("stays the same across a silent refresh of the same user and org", () => {
+      sessionStorage.setItem(TOKEN_KEY, jwt({ exp: exp(100) }));
+      const { result } = renderAuth();
+      const before = result.current.sessionKey;
+      expect(before).not.toBe("");
+
+      const fresh = jwt({ exp: exp(900) });
+      refreshTo(fresh);
+
+      expect(result.current.token).toBe(fresh);
+      expect(result.current.sessionKey).toBe(before);
+    });
+
+    it("changes when a refresh lands in a different active org", () => {
+      sessionStorage.setItem(TOKEN_KEY, jwt({ exp: exp(100) }));
+      const { result } = renderAuth();
+      const before = result.current.sessionKey;
+
+      refreshTo(jwt({ exp: exp(900), active_tenant_id: "2" }));
+
+      expect(result.current.sessionKey).not.toBe(before);
+    });
+
+    it("changes on an org switch", async () => {
+      sessionStorage.setItem(TOKEN_KEY, jwt({ exp: exp(3600) }));
+      const { result } = renderAuth();
+      const before = result.current.sessionKey;
+      vi.mocked(fetch).mockResolvedValue({
+        ok: true,
+        json: async () => ({ access_token: jwt({ exp: exp(3600), active_tenant_id: "2" }) }),
+      } as Response);
+
+      await act(async () => {
+        await result.current.switchOrg(2);
+      });
+
+      expect(result.current.sessionKey).not.toBe(before);
+    });
+
+    it("changes on an explicit token adoption even for the same user and org", () => {
+      sessionStorage.setItem(TOKEN_KEY, jwt({ exp: exp(3600) }));
+      const { result } = renderAuth();
+      const before = result.current.sessionKey;
+
+      act(() => {
+        result.current.loginWithToken(jwt({ exp: exp(7200) }));
+      });
+      expect(result.current.sessionKey).not.toBe(before);
+
+      act(() => {
+        result.current.logout();
+      });
+      expect(result.current.sessionKey).toBe("");
+    });
+  });
 });

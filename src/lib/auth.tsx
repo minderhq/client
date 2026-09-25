@@ -22,7 +22,14 @@ import {
 import { decodeJwtClaims, localExpiryMs, refreshDelayMs } from "./jwt";
 
 interface AuthContextValue {
+  /** The current access token. Changes on every silent refresh (#53), so
+   * NEVER key a data-loading effect on it -- use `sessionKey` (#55). */
   token: string;
+  /** Stable identity of the session: changes on login, logout, org switch and
+   * any other explicit token adoption, but NOT on a silent refresh of the same
+   * user in the same org. Key data-loading effects / useAsyncResource deps on
+   * this instead of `token` (#55); empty while there is no token. */
+  sessionKey: string;
   /** The caller's own user id (JWT `sub`) — used to recognise the caller's own
    * row in a server list keyed by user id (e.g. their plugin review, #1591). */
   userId: string;
@@ -80,6 +87,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => sessionStorage.getItem(MUST_CHANGE_PASSWORD_KEY) === "1",
   );
   const claims = useMemo(() => decodeJwtClaims(token), [token]);
+  // Bumped by every explicit token adoption (login, SSO/invite loginWithToken,
+  // switchOrg, logout) but not by a silent refresh, so those still re-key the
+  // session even when user and org are unchanged -- e.g. a re-mint after
+  // joining an org must refetch the org list (#55).
+  const [adoption, setAdoption] = useState(0);
+  const sessionKey = token
+    ? [
+        adoption,
+        claims.userId || claims.username,
+        claims.activeTenantId || claims.tenantId,
+      ].join(":")
+    : "";
   // When this token was received, on the local clock (#53) -- read back from
   // sessionStorage, where every path that adopts a token records it.
   const receivedAt = useMemo(() => tokenReceivedAt(token), [token]);
@@ -108,6 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (mustChange) sessionStorage.setItem(MUST_CHANGE_PASSWORD_KEY, "1");
     else sessionStorage.removeItem(MUST_CHANGE_PASSWORD_KEY);
     setToken(data.access_token);
+    setAdoption((n) => n + 1);
     storeToken(data.access_token, sentAt);
   }, []);
 
@@ -130,6 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithToken = useCallback((jwt: string) => {
     setToken(jwt);
+    setAdoption((n) => n + 1);
     storeToken(jwt);
   }, []);
 
@@ -147,6 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!res.ok) throw new Error(await parseError(res));
       const data = (await res.json()) as { access_token: string };
       setToken(data.access_token);
+      setAdoption((n) => n + 1);
       storeToken(data.access_token, sentAt);
     },
     [token],
@@ -154,6 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     setToken("");
+    setAdoption((n) => n + 1);
     clearStoredToken();
     setMustChangePassword(false);
     sessionStorage.removeItem(MUST_CHANGE_PASSWORD_KEY);
@@ -221,6 +244,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         token,
+        sessionKey,
         userId: claims.userId,
         username: claims.username,
         email: claims.email,

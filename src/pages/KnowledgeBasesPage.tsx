@@ -29,6 +29,7 @@ import {
 } from "../lib/ui";
 import { EmptyState } from "../components/EmptyState";
 import { isEmbeddingModelName } from "../lib/modelClassification";
+import { useTokenRef } from "../lib/useTokenRef";
 
 export interface ModelInfo {
   id: string;
@@ -293,6 +294,7 @@ export function DocumentsList({
   onDeleted: () => void;
   confirm: ReturnType<typeof useConfirm>["confirm"];
 }) {
+  const { sessionKey } = useAuth();
   const [status, setStatus] = useState("");
 
   // Re-fetches whenever the selected KB (or an upload's refreshToken) changes.
@@ -307,7 +309,7 @@ export function DocumentsList({
         `/v1/rag/knowledge-bases/${kbId}/documents`,
         { signal, token },
       ).then((res) => res.items ?? []),
-    { deps: [kbId, refreshToken, token] },
+    { deps: [kbId, refreshToken, sessionKey] },
   );
 
   async function handleDelete(doc: KbDocument) {
@@ -888,7 +890,8 @@ export function CreateKbForm({
 }
 
 export function KnowledgeBasesPage() {
-  const { token } = useAuth();
+  const { token, sessionKey } = useAuth();
+  const tokenRef = useTokenRef();
   const { confirm, dialog } = useConfirm();
   const [kbs, setKbs] = useState<KnowledgeBase[] | null>(null);
   // Name of a KB just created this session -> a "now do the next thing" CTA, so
@@ -916,20 +919,21 @@ export function KnowledgeBasesPage() {
     try {
       const list = await apiFetch<Paginated<KnowledgeBase>>(
         "/v1/rag/knowledge-bases?limit=100",
-        { token },
+        { token: tokenRef.current },
       );
       setKbs(list.items);
       setStatusMsg("");
     } catch (e) {
       setStatusMsg(friendlyErrorMessage(e), true);
     }
-  }, [setStatusMsg, token]);
+  }, [setStatusMsg, tokenRef]);
 
   useEffect(() => {
     loadKbs();
-  }, [loadKbs]);
+  }, [loadKbs, sessionKey]);
 
   useEffect(() => {
+    const token = tokenRef.current;
     if (!token) {
       setMyTeams([]);
       return;
@@ -941,7 +945,7 @@ export function KnowledgeBasesPage() {
     apiFetch<{ teams: TeamOption[] }>("/v1/teams?limit=500", { token })
       .then((res) => setMyTeams(res.teams))
       .catch(() => setMyTeams([]));
-  }, [token]);
+  }, [sessionKey, tokenRef]);
 
   return (
     <>

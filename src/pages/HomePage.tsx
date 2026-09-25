@@ -201,7 +201,7 @@ function Callouts(): ReactNode {
  * navigation demoted to a compact "More to explore" strip since the sidebar
  * already covers that job. */
 export function HomePage() {
-  const { isAuthenticated, username, token } = useAuth();
+  const { isAuthenticated, username, token, sessionKey } = useAuth();
   const stats = useAsyncResource<HomeStats>(
     (signal) =>
       Promise.all([
@@ -225,7 +225,7 @@ export function HomePage() {
         bundlesTotal: bundles.count,
         modelCount: models.total,
       })),
-    { deps: [token] },
+    { deps: [sessionKey] },
   );
 
   return (

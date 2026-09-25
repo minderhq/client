@@ -43,7 +43,7 @@ import { useAsyncResource } from "../lib/useAsyncResource";
  * admin of another, and both appear here / in the switcher. Team-level
  * membership stays on the Teams page (linked). */
 export function OrganizationPage() {
-  const { isAuthenticated, token, role, activeTenantId, orgRole } = useAuth();
+  const { isAuthenticated, token, sessionKey, role, activeTenantId, orgRole } = useAuth();
   const isAdmin = role === "admin";
   // #1208: an org owner/admin manages their OWN org's members too — role change
   // + removal need no user directory. Adding a brand-new member still needs the
@@ -76,7 +76,7 @@ export function OrganizationPage() {
 
   const orgsRes = useAsyncResource<MyOrg[]>(
     (signal) => fetchMyOrgs(token, signal).then((r) => r.organizations),
-    { deps: [token], enabled: isAuthenticated },
+    { deps: [sessionKey], enabled: isAuthenticated },
   );
 
   const activeId = activeTenantId ? Number(activeTenantId) : null;
@@ -89,14 +89,14 @@ export function OrganizationPage() {
       active
         ? fetchOrgMembers(active.id, token, signal).then((r) => r.members)
         : Promise.resolve([]),
-    { deps: [token, active?.id], enabled: isAuthenticated && !!active },
+    { deps: [sessionKey, active?.id], enabled: isAuthenticated && !!active },
   );
 
   // Directory for the add-member picker — admin-only endpoint, so only fetch it
   // when the caller can actually add members.
   const usersRes = useAsyncResource<DirectoryUser[]>(
     (signal) => fetchAllUsers(token, signal).then((r) => r.users),
-    { deps: [token], enabled: isAuthenticated && isAdmin },
+    { deps: [sessionKey], enabled: isAuthenticated && isAdmin },
   );
 
   // Pending/spent org invites — owner/admin only (same gate as the endpoint).
@@ -105,7 +105,7 @@ export function OrganizationPage() {
       active
         ? fetchOrgInvites(active.id, token, signal).then((r) => r.invites)
         : Promise.resolve([]),
-    { deps: [token, active?.id], enabled: isAuthenticated && canManage && !!active },
+    { deps: [sessionKey, active?.id], enabled: isAuthenticated && canManage && !!active },
   );
 
   const memberIds = useMemo(
