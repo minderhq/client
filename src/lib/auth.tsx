@@ -10,13 +10,16 @@ import {
 
 import {
   apiBaseUrl,
+  clearStoredToken,
   handleUnauthorized,
   refreshAccessToken,
   SESSION_EXPIRED_EVENT,
+  storeToken,
   TOKEN_KEY,
   TOKEN_REFRESHED_EVENT,
+  tokenReceivedAt,
 } from "./api";
-import { decodeJwtClaims, isExpired, refreshDelayMs } from "./jwt";
+import { decodeJwtClaims, localExpiryMs, refreshDelayMs } from "./jwt";
 
 interface AuthContextValue {
   token: string;
@@ -77,12 +80,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => sessionStorage.getItem(MUST_CHANGE_PASSWORD_KEY) === "1",
   );
   const claims = useMemo(() => decodeJwtClaims(token), [token]);
+  // When this token was received, on the local clock (#53) -- read back from
+  // sessionStorage, where every path that adopts a token records it.
+  const receivedAt = useMemo(() => tokenReceivedAt(token), [token]);
+  // Expiry on the LOCAL clock, measured from the token's own lifetime so a
+  // skewed client clock can't expire it early or refresh it late (#53).
+  const expiresAt = localExpiryMs(claims.exp, claims.iat, receivedAt);
   // An expired JWT left in sessionStorage must NOT read as logged-in — otherwise
   // the header shows a username while every write silently 401s. Treated as
   // not-authenticated so the app routes back to login (#472-adjacent UX gap).
-  const authenticated = !!token && !isExpired(claims.exp);
+  const authenticated = !!token && !(expiresAt > 0 && Date.now() >= expiresAt);
 
   const login = useCallback(async (user: string, password: string) => {
+    const sentAt = Date.now();
     const res = await fetch(`${apiBaseUrl}/v1/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -98,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (mustChange) sessionStorage.setItem(MUST_CHANGE_PASSWORD_KEY, "1");
     else sessionStorage.removeItem(MUST_CHANGE_PASSWORD_KEY);
     setToken(data.access_token);
-    sessionStorage.setItem(TOKEN_KEY, data.access_token);
+    storeToken(data.access_token, sentAt);
   }, []);
 
   const clearMustChangePassword = useCallback(() => {
@@ -120,11 +130,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithToken = useCallback((jwt: string) => {
     setToken(jwt);
-    sessionStorage.setItem(TOKEN_KEY, jwt);
+    storeToken(jwt);
   }, []);
 
   const switchOrg = useCallback(
     async (organizationId: number) => {
+      const sentAt = Date.now();
       const res = await fetch(`${apiBaseUrl}/v1/organizations/switch`, {
         method: "POST",
         headers: {
@@ -136,14 +147,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!res.ok) throw new Error(await parseError(res));
       const data = (await res.json()) as { access_token: string };
       setToken(data.access_token);
-      sessionStorage.setItem(TOKEN_KEY, data.access_token);
+      storeToken(data.access_token, sentAt);
     },
     [token],
   );
 
   const logout = useCallback(() => {
     setToken("");
-    sessionStorage.removeItem(TOKEN_KEY);
+    clearStoredToken();
     setMustChangePassword(false);
     sessionStorage.removeItem(MUST_CHANGE_PASSWORD_KEY);
   }, []);
@@ -172,13 +183,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Silent refresh before expiry (#53): one timer per token, at 80% of its
-  // remaining lifetime. Any token change -- refresh, login, SSO, switchOrg,
-  // logout -- tears it down and (if there is still a token) schedules anew. A
-  // rejected refresh (401/403: revoked, deactivated, password reset) logs out
+  // lifetime as measured on the local clock from when it was received. Any
+  // token change -- refresh, login, SSO, switchOrg, logout -- tears it down
+  // and (if there is still a token) schedules anew. A rejected refresh (401/403: revoked, deactivated, password reset) logs out
   // exactly like any other 401; a transient failure retries while the token is
   // still valid. An already-expired stored token schedules nothing: the API
   // can't refresh it, so it stays logged out as before.
-  const exp = claims.exp;
   useEffect(() => {
     if (!token) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -190,20 +200,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
         () => {
           if (cancelled) return;
-          const remaining = exp * 1000 - Date.now();
-          if (remaining > 0) {
-            timer = setTimeout(run, Math.min(REFRESH_RETRY_MS, remaining / 2));
-          }
+          // Same local-clock basis as the schedule. Retry at most every
+          // REFRESH_RETRY_MS, at least 1s apart, and only while the retry
+          // still lands before expiry (the API can't refresh after it).
+          const remaining = expiresAt - Date.now();
+          const wait = Math.max(1_000, Math.min(REFRESH_RETRY_MS, remaining / 2));
+          if (wait < remaining) timer = setTimeout(run, wait);
         },
       );
     };
-    const delay = refreshDelayMs(exp);
+    const delay = refreshDelayMs(expiresAt, receivedAt ?? Date.now());
     if (delay !== null) timer = setTimeout(run, delay);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [token, exp]);
+  }, [token, expiresAt, receivedAt]);
 
   return (
     <AuthContext.Provider
