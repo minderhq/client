@@ -17,7 +17,13 @@ export function AuthCallbackPage() {
     const hash = window.location.hash;
     const tokenMatch = hash.match(/token=([^&]+)/);
     if (tokenMatch) {
-      loginWithToken(decodeURIComponent(tokenMatch[1]));
+      // The token was minted during the navigation that loaded this page (the
+      // API's OIDC callback redirected here), so that navigation's start is a
+      // local time no later than the token's `iat` (#56).
+      loginWithToken(
+        decodeURIComponent(tokenMatch[1]),
+        Math.floor(performance.timeOrigin),
+      );
       navigate("/", { replace: true });
       return;
     }

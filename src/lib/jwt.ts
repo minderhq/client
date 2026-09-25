@@ -55,15 +55,18 @@ export function localExpiryMs(
  * span from `startMs` (when the token was received, or `now` if unknown) to
  * `expiresAt` (from localExpiryMs) has elapsed, so a token adopted fresh
  * refreshes at 80% of its life and one picked up from sessionStorage late in
- * its life refreshes almost immediately. `null` when there is nothing to
- * schedule: no expiry, or already expired (the API only refreshes a
- * still-valid token). */
+ * its life refreshes almost immediately. An already-expired token is due at
+ * once (0): the client still tries one refresh (#56) -- the API may accept it
+ * inside its grace window (minderhq/minder#1933), and otherwise rejects it
+ * with 401/403, which logs out as before. `null` only when the token has no
+ * expiry, so there is nothing to schedule. */
 export function refreshDelayMs(
   expiresAt: number,
   startMs: number,
   now: number = Date.now(),
 ): number | null {
-  if (expiresAt <= 0 || now >= expiresAt) return null;
+  if (expiresAt <= 0) return null;
+  if (now >= expiresAt) return 0;
   const refreshAt = startMs + (expiresAt - startMs) * REFRESH_AT_FRACTION;
   return Math.min(Math.max(0, Math.floor(refreshAt - now)), MAX_TIMER_MS);
 }

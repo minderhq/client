@@ -91,7 +91,7 @@ describe("InviteRedeemPage", () => {
     // #1071: the redeemed-with token predates this exact membership change,
     // so the fresh one from the redeem response must replace it.
     await vi.waitFor(() =>
-      expect(loginWithToken).toHaveBeenCalledWith("fresh.jwt.token"),
+      expect(loginWithToken).toHaveBeenCalledWith("fresh.jwt.token", expect.any(Number)),
     );
     await vi.waitFor(() =>
       expect(navigate).toHaveBeenCalledWith("/platform/teams", { replace: true }),

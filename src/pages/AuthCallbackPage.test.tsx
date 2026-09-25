@@ -31,14 +31,16 @@ describe("AuthCallbackPage", () => {
   it("logs in and goes home when the redirect carries a token", () => {
     window.location.hash = "#token=abc.def.ghi";
     render(<AuthCallbackPage />);
-    expect(loginWithToken).toHaveBeenCalledWith("abc.def.ghi");
+    expect(loginWithToken).toHaveBeenCalledWith("abc.def.ghi", expect.any(Number));
+    // Send time = the navigation's start, never later than now (#56).
+    expect(loginWithToken.mock.calls[0][1]).toBeLessThanOrEqual(Date.now());
     expect(navigate).toHaveBeenCalledWith("/", { replace: true });
   });
 
   it("URL-decodes the token before handing it to loginWithToken", () => {
     window.location.hash = "#token=abc%2Bdef";
     render(<AuthCallbackPage />);
-    expect(loginWithToken).toHaveBeenCalledWith("abc+def");
+    expect(loginWithToken).toHaveBeenCalledWith("abc+def", expect.any(Number));
   });
 
   it("routes to /login with the failure reason when the redirect carries an OIDC error", () => {

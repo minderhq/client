@@ -59,17 +59,6 @@ describe("AuthProvider / useAuth", () => {
     expect(result.current.role).toBe("admin");
   });
 
-  it("treats an expired token in sessionStorage as not authenticated", () => {
-    const jwt = makeJwt({
-      username: "ada",
-      exp: Math.floor(Date.now() / 1000) - 10,
-    });
-    sessionStorage.setItem(TOKEN_KEY, jwt);
-
-    const { result } = renderAuth();
-
-    expect(result.current.isAuthenticated).toBe(false);
-  });
 
   describe("login", () => {
     it("stores the returned token and flips isAuthenticated on success", async () => {
@@ -226,15 +215,18 @@ describe("AuthProvider / useAuth", () => {
       exp: Math.floor(Date.now() / 1000) + 3600,
     });
     const { result } = renderAuth();
+    const sentAt = Date.now() - 5_000;
 
     act(() => {
-      result.current.loginWithToken(jwt);
+      result.current.loginWithToken(jwt, sentAt);
     });
 
     expect(fetch).not.toHaveBeenCalled();
     expect(result.current.token).toBe(jwt);
     expect(result.current.username).toBe("bob");
     expect(sessionStorage.getItem(TOKEN_KEY)).toBe(jwt);
+    // The caller's send time, not the (later) adoption time (#56).
+    expect(sessionStorage.getItem("minder_jwt_received_at")).toBe(String(sentAt));
   });
 
   it("logout clears the token from state and sessionStorage", () => {
@@ -400,10 +392,7 @@ describe("AuthProvider / useAuth", () => {
       expect(refreshCalls()).toHaveLength(1);
     });
 
-    it("schedules nothing for an already-expired or non-expiring token", async () => {
-      sessionStorage.setItem(TOKEN_KEY, makeJwt({ username: "ada", exp: nowSec() - 10 }));
-      const { unmount } = renderAuth();
-      unmount();
+    it("schedules nothing for a non-expiring token", async () => {
       sessionStorage.setItem(TOKEN_KEY, makeJwt({ username: "svc" }));
       renderAuth();
 
@@ -434,7 +423,10 @@ describe("AuthProvider / useAuth", () => {
       const { result } = renderAuth();
 
       act(() => {
-        result.current.loginWithToken(makeJwt({ username: "bob", exp: nowSec() + 1000 }));
+        result.current.loginWithToken(
+          makeJwt({ username: "bob", exp: nowSec() + 1000 }),
+          Date.now(),
+        );
       });
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100_000);
@@ -473,7 +465,7 @@ describe("AuthProvider / useAuth", () => {
           const { result } = renderAuth();
 
           act(() => {
-            result.current.loginWithToken(token5m());
+            result.current.loginWithToken(token5m(), Date.now());
           });
           // Skew doesn't make a freshly received token read as expired.
           expect(result.current.isAuthenticated).toBe(true);
@@ -513,23 +505,191 @@ describe("AuthProvider / useAuth", () => {
         vi.mocked(fetch).mockRejectedValue(new TypeError("offline"));
         const { result } = renderAuth();
         act(() => {
-          result.current.loginWithToken(token5m());
+          result.current.loginWithToken(token5m(), Date.now());
         });
 
         // First attempt at 240s, then retries every min(30s, remaining/2)
         // (>= 1s apart): 270s, 285s, 292.5s, ... -- all before the real 300s
-        // expiry, none after it.
+        // expiry -- then exactly one attempt after it (#56), then nothing.
         await act(async () => {
-          await vi.advanceTimersByTimeAsync(300_000);
+          await vi.advanceTimersByTimeAsync(299_999);
         });
         const beforeExpiry = refreshCalls().length;
         expect(beforeExpiry).toBeGreaterThanOrEqual(4);
         expect(beforeExpiry).toBeLessThanOrEqual(10);
+        expect(result.current.isAuthenticated).toBe(true);
         await act(async () => {
           await vi.advanceTimersByTimeAsync(600_000);
         });
-        expect(refreshCalls()).toHaveLength(beforeExpiry);
+        expect(refreshCalls()).toHaveLength(beforeExpiry + 1);
+        // The token stays stored (no verdict from the API), but reads as
+        // logged out once its one post-expiry attempt has failed.
         expect(result.current.token).not.toBe("");
+        expect(result.current.isAuthenticated).toBe(false);
+      });
+    });
+
+    describe("expired token: refresh instead of logging out (#56)", () => {
+      /** A fetch whose response the test settles by hand, to observe the
+       * state while the refresh is in flight. */
+      function deferredFetch() {
+        let settle: (r: Response) => void = () => {};
+        vi.mocked(fetch).mockImplementation(
+          () => new Promise<Response>((resolve) => (settle = resolve)),
+        );
+        return {
+          ok: (jwt: string) =>
+            settle({
+              ok: true,
+              status: 200,
+              json: async () => ({ access_token: jwt }),
+            } as Response),
+          reject: (status: number) =>
+            settle({
+              ok: false,
+              status,
+              json: async () => ({ detail: "Token expired" }),
+            } as Response),
+        };
+      }
+
+      it("reload with an expired token: stays logged in when the refresh succeeds", async () => {
+        const expired = makeJwt({ username: "ada", exp: nowSec() - 60 });
+        const fresh = makeJwt({ username: "ada", exp: nowSec() + 900 });
+        sessionStorage.setItem(TOKEN_KEY, expired);
+        const res = deferredFetch();
+        const { result } = renderAuth();
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(refreshCalls()).toHaveLength(1);
+        expect(refreshCalls()[0][1]).toMatchObject({
+          headers: { Authorization: `Bearer ${expired}` },
+        });
+
+        await act(async () => {
+          res.ok(fresh);
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(result.current.token).toBe(fresh);
+        expect(result.current.isAuthenticated).toBe(true);
+        expect(sessionStorage.getItem(TOKEN_KEY)).toBe(fresh);
+      });
+
+      it.each([401, 403])(
+        "reload with an expired token: logs out when the refresh is rejected (%i)",
+        async (status) => {
+          sessionStorage.setItem(TOKEN_KEY, makeJwt({ username: "ada", exp: nowSec() - 60 }));
+          const res = deferredFetch();
+          const { result } = renderAuth();
+          await act(async () => {
+            await vi.advanceTimersByTimeAsync(0);
+          });
+
+          await act(async () => {
+            res.reject(status);
+            await vi.advanceTimersByTimeAsync(0);
+          });
+          expect(refreshCalls()).toHaveLength(1);
+          expect(result.current.token).toBe("");
+          expect(result.current.isAuthenticated).toBe(false);
+          expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
+        },
+      );
+
+      it("shows no logged-out state while the refresh is pending", async () => {
+        sessionStorage.setItem(TOKEN_KEY, makeJwt({ username: "ada", exp: nowSec() - 60 }));
+        const res = deferredFetch();
+        const seen: boolean[] = [];
+        const { result } = renderHook(
+          () => {
+            const auth = useAuth();
+            seen.push(auth.isAuthenticated);
+            return auth;
+          },
+          { wrapper: AuthProvider },
+        );
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(60_000);
+        });
+        expect(refreshCalls()).toHaveLength(1);
+        expect(result.current.username).toBe("ada");
+        await act(async () => {
+          res.ok(makeJwt({ username: "ada", exp: nowSec() + 900 }));
+          await vi.advanceTimersByTimeAsync(0);
+        });
+
+        // Every render -- the first one included -- read as logged in.
+        expect(seen.length).toBeGreaterThan(1);
+        expect(seen.every(Boolean)).toBe(true);
+      });
+
+      it("reads as logged out (without retrying) once the one attempt fails transiently", async () => {
+        sessionStorage.setItem(TOKEN_KEY, makeJwt({ username: "ada", exp: nowSec() - 60 }));
+        vi.mocked(fetch).mockRejectedValue(new TypeError("Failed to fetch"));
+        const { result } = renderAuth();
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(10 * 60_000);
+        });
+        expect(refreshCalls()).toHaveLength(1);
+        expect(result.current.isAuthenticated).toBe(false);
+      });
+
+      describe("an overdue timer after a wake", () => {
+        // Scheduled for 80s; the machine sleeps and wakes 10 min later, past
+        // expiry, before the (overdue) timer has run.
+        const sleepPastExpiry = (rerender: () => void) => {
+          vi.setSystemTime(Date.now() + 10 * 60_000);
+          rerender();
+        };
+
+        it("stays logged in until the refresh settles, then adopts the new token", async () => {
+          sessionStorage.setItem(TOKEN_KEY, makeJwt({ username: "ada", exp: nowSec() + 100 }));
+          const res = deferredFetch();
+          const { result, rerender } = renderAuth();
+
+          sleepPastExpiry(rerender);
+          // Rendered past expiry, refresh not even started yet.
+          expect(refreshCalls()).toHaveLength(0);
+          expect(result.current.isAuthenticated).toBe(true);
+
+          await act(async () => {
+            await vi.advanceTimersByTimeAsync(80_000); // the overdue timer runs
+          });
+          expect(refreshCalls()).toHaveLength(1);
+          expect(result.current.isAuthenticated).toBe(true);
+
+          const fresh = makeJwt({ username: "ada", exp: nowSec() + 900 });
+          await act(async () => {
+            res.ok(fresh);
+            await vi.advanceTimersByTimeAsync(0);
+          });
+          expect(result.current.token).toBe(fresh);
+          expect(result.current.isAuthenticated).toBe(true);
+        });
+
+        it("logs out when that refresh is rejected", async () => {
+          sessionStorage.setItem(TOKEN_KEY, makeJwt({ username: "ada", exp: nowSec() + 100 }));
+          const res = deferredFetch();
+          const { result, rerender } = renderAuth();
+
+          sleepPastExpiry(rerender);
+          await act(async () => {
+            await vi.advanceTimersByTimeAsync(80_000);
+          });
+          expect(result.current.isAuthenticated).toBe(true);
+
+          await act(async () => {
+            res.reject(401);
+            await vi.advanceTimersByTimeAsync(0);
+          });
+          expect(refreshCalls()).toHaveLength(1);
+          expect(result.current.token).toBe("");
+          expect(result.current.isAuthenticated).toBe(false);
+        });
       });
     });
 
@@ -604,7 +764,7 @@ describe("AuthProvider / useAuth", () => {
       const before = result.current.sessionKey;
 
       act(() => {
-        result.current.loginWithToken(jwt({ exp: exp(7200) }));
+        result.current.loginWithToken(jwt({ exp: exp(7200) }), Date.now());
       });
       expect(result.current.sessionKey).not.toBe(before);
 

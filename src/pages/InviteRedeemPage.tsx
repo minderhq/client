@@ -57,11 +57,12 @@ export function InviteRedeemPage() {
       // /v1/auth/refresh never re-derives `teams`, so without swapping in
       // this new token the caller couldn't see the team's shared content
       // until an unrelated full logout/login.
+      const sentAt = Date.now();
       const result = await apiFetch<{ access_token: string }>(
         `/v1/invites/by-token/${inviteToken}/redeem`,
         { method: "POST", token },
       );
-      loginWithToken(result.access_token);
+      loginWithToken(result.access_token, sentAt);
       // Org invites land on the Organization page; team invites on Teams.
       navigate(infoRes.data?.organization_id ? "/organization" : "/platform/teams", {
         replace: true,

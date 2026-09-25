@@ -132,7 +132,7 @@ describe("TeamsPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create Team" }));
 
     await vi.waitFor(() =>
-      expect(loginWithToken).toHaveBeenCalledWith("fresh.jwt.token"),
+      expect(loginWithToken).toHaveBeenCalledWith("fresh.jwt.token", expect.any(Number)),
     );
   });
 
