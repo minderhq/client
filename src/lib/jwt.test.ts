@@ -148,9 +148,12 @@ describe("refreshDelayMs (#53)", () => {
     expect(refreshDelayMs(now + 900_000, now, now + 800_000)).toBe(0);
   });
 
-  it("is null for an expired or non-expiring token", () => {
-    expect(refreshDelayMs(now - 1, now - 1000, now)).toBeNull();
-    expect(refreshDelayMs(now, now - 1000, now)).toBeNull();
+  it("is 0 for an already-expired token -- one refresh is still tried (#56)", () => {
+    expect(refreshDelayMs(now - 1, now - 1000, now)).toBe(0);
+    expect(refreshDelayMs(now, now - 1000, now)).toBe(0);
+  });
+
+  it("is null for a non-expiring token", () => {
     expect(refreshDelayMs(0, now, now)).toBeNull();
   });
 

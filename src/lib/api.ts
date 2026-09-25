@@ -92,13 +92,21 @@ export function handleUnauthorized(): void {
 // (e.g. right after switchOrg) never receives another token's refresh result.
 const refreshInFlight = new Map<string, Promise<string | null>>();
 
+/** Upper bound on one `/v1/auth/refresh` call (#56). An expired token reads as
+ * authenticated only while its refresh is pending, so a hung request (e.g. a
+ * half-open keep-alive socket after a wake) must not keep it pending for
+ * minutes. The abort rejects like any transient failure: retried before
+ * expiry, abandoned after it. */
+export const REFRESH_TIMEOUT_MS = 15_000;
+
 /** Exchanges `token` for a fresh one via `POST /v1/auth/refresh` (the API
- * re-validates the account and re-mints from the still-valid bearer token), then
- * stores it and announces it via TOKEN_REFRESHED_EVENT (#53).
+ * re-validates the account and re-mints from the bearer token, which may
+ * already have expired -- whether it still accepts it is the API's call,
+ * #56), then stores it and announces it via TOKEN_REFRESHED_EVENT (#53).
  *
  * Resolves to the new token, or to `null` when the API rejects the refresh with
  * 401/403 -- the session is really over (revoked, deactivated, password reset,
- * or the token already expired). Rejects on a transient failure (network error,
+ * or expired past what the API accepts). Rejects on a transient failure (network error,
  * 5xx) so a caller can decide whether to retry. Single-flight per token:
  * concurrent calls for the same token share one request. Uses raw `fetch`,
  * never apiFetch, so a failing refresh can never trigger another refresh. Does NOT log out by itself -- callers do. */
@@ -112,6 +120,7 @@ export function refreshAccessToken(token: string): Promise<string | null> {
       const res = await fetch(`${apiBaseUrl}/v1/auth/refresh`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(REFRESH_TIMEOUT_MS),
       });
       if (res.status === 401 || res.status === 403) {
         return null;

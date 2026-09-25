@@ -90,6 +90,7 @@ export function TeamsPage() {
     setCreateIsError(false);
     setCreateStatus("");
     try {
+      const sentAt = Date.now();
       const result = await apiFetch<{ access_token: string }>("/v1/teams", {
         method: "POST",
         token,
@@ -100,7 +101,7 @@ export function TeamsPage() {
       // this browser's session couldn't share anything with the new team
       // until an unrelated full logout/login (same fix shape as #1071's
       // invite-redeem token refresh).
-      loginWithToken(result.access_token);
+      loginWithToken(result.access_token, sentAt);
       setName("");
       setDescription("");
       teamsRes.reload();
