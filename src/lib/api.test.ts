@@ -514,14 +514,40 @@ describe("silent refresh on 401 (#53)", () => {
       expect(onSessionExpired).toHaveBeenCalledTimes(1);
     });
 
-    it("replays with the token its own refresh minted, even if the org changed", async () => {
-      // The API may re-derive the active org on refresh; that token was minted
-      // from the caller's own, so it is still the caller's session.
+    it("does not replay in another org when its own refresh re-derived the org", async () => {
+      // The API falls back to the home org on refresh when the user was removed
+      // from / suspended in the org they had switched into: a request meant for
+      // org 10 must never be silently re-sent in org 99.
       const minted = jwt({ sub: "1", active_tenant_id: "99", exp: 2e9 });
+      sessionStorage.setItem(TOKEN_KEY, mine);
+      mockServer(minted, async () => json(200, { access_token: minted }));
+      const onRefreshed = vi.fn();
+      window.addEventListener(TOKEN_REFRESHED_EVENT, onRefreshed);
+      try {
+        await expect(
+          apiFetch("/v1/things", { method: "POST", body: { a: 1 }, token: mine }),
+        ).rejects.toMatchObject({ status: 401 });
+        // Original request + refresh only -- no replay as org 99.
+        expect(vi.mocked(fetch).mock.calls.map(([url]) => url)).toEqual([
+          "http://localhost:8000/v1/things",
+          REFRESH_URL,
+        ]);
+        // The new token is still adopted, and the session is kept.
+        expect(sessionStorage.getItem(TOKEN_KEY)).toBe(minted);
+        expect((onRefreshed.mock.calls[0][0] as CustomEvent).detail).toBe(minted);
+        expect(onSessionExpired).not.toHaveBeenCalled();
+      } finally {
+        window.removeEventListener(TOKEN_REFRESHED_EVENT, onRefreshed);
+      }
+    });
+
+    it("replays with the token its own refresh minted for the same user and org", async () => {
+      const minted = jwt({ sub: "1", active_tenant_id: "10", exp: 2e9 + 1 });
       sessionStorage.setItem(TOKEN_KEY, mine);
       mockServer(minted, async () => json(200, { access_token: minted }));
 
       await expect(apiFetch("/v1/things", { token: mine })).resolves.toEqual({ ok: true });
+      expect(onSessionExpired).not.toHaveBeenCalled();
     });
   });
 
