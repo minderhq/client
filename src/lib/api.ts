@@ -166,9 +166,12 @@ function sameSession(a: string, b: string): boolean {
  * apiFetch and apiFetchBlob so the 401 handling above only lives in one
  * place. Always throws; the `Promise<never>` return type lets callers
  * `return throwApiError(res)` regardless of their own return type. */
-async function throwApiError(res: Response): Promise<never> {
+async function throwApiError(
+  res: Response,
+  { logoutOn401 = true }: { logoutOn401?: boolean } = {},
+): Promise<never> {
   const detail = await parseErrorDetail(res);
-  if (res.status === 401) handleUnauthorized();
+  if (res.status === 401 && logoutOn401) handleUnauthorized();
   throw new ApiError(detail, res.status);
 }
 
@@ -243,11 +246,15 @@ export interface Paginated<T> {
  * for an authenticated request, gets a fresh token (one shared refresh, #53) and
  * replays the request exactly once with it. Returns the final Response; a 401
  * that survives (refresh rejected/failed, or the replay 401s too) is left for
- * throwApiError to turn into the usual logout. */
+ * throwApiError to turn into the usual logout.
+ *
+ * `staleSession` is true when the replay was refused because the session had
+ * meanwhile moved to a different user or org: only this stale request failed,
+ * the stored session is valid, so the caller must NOT log out. */
 async function sendWithRefresh(
   path: string,
   { method = "GET", body, token, signal }: ApiOptions,
-): Promise<Response> {
+): Promise<{ res: Response; staleSession: boolean }> {
   const isFormData = body instanceof FormData;
   const send = (bearer: string | undefined) => {
     const headers: Record<string, string> = {};
@@ -268,27 +275,32 @@ async function sendWithRefresh(
   };
 
   const res = await send(token);
-  if (res.status !== 401 || !token) return res;
+  const done = { res, staleSession: false };
+  if (res.status !== 401 || !token) return done;
 
   // No stored token at all means the session is already gone (logged out).
   const stored = sessionStorage.getItem(TOKEN_KEY);
-  if (!stored) return res;
-  let fresh: string | null = null;
-  if (stored !== token) {
-    // Another request (or the scheduled refresh) already swapped in a newer
-    // token than the one this caller captured -- replay with that instead of
-    // refreshing again, but only if it is the same user and org.
-    fresh = sameSession(token, stored) ? stored : null;
-  } else {
+  if (!stored) return done;
+  // Another request (or the scheduled refresh) may already have swapped in a
+  // newer token than the one this caller captured -- replay with that instead
+  // of refreshing again. Otherwise refresh the caller's own token.
+  let candidate: string | null = stored;
+  let ours = false;
+  if (stored === token) {
     try {
       const r = await refreshOnce(token);
-      const ours = r.minted && r.from === token;
-      fresh = r.token && (ours || sameSession(token, r.token)) ? r.token : null;
+      candidate = r.token; // null: refresh rejected -> usual logout
+      ours = r.minted && r.from === token;
     } catch {
-      fresh = null; // transient refresh failure: the original 401 stands
+      return done; // transient refresh failure: the original 401 stands
     }
   }
-  return fresh ? send(fresh) : res;
+  if (!candidate) return done;
+  // Only replay as the same user and org (unless our own refresh minted it).
+  if (!ours && !sameSession(token, candidate)) {
+    return { res, staleSession: true };
+  }
+  return { res: await send(candidate), staleSession: false };
 }
 
 /** Thin fetch wrapper: prefixes the gateway base URL, injects the bearer
@@ -299,9 +311,9 @@ export async function apiFetch<T>(
   path: string,
   options: ApiOptions = {},
 ): Promise<T> {
-  const res = await sendWithRefresh(path, options);
+  const { res, staleSession } = await sendWithRefresh(path, options);
 
-  if (!res.ok) return throwApiError(res);
+  if (!res.ok) return throwApiError(res, { logoutOn401: !staleSession });
 
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -316,9 +328,9 @@ export async function apiFetchBlob(
   path: string,
   options: ApiOptions = {},
 ): Promise<{ blob: Blob; headers: Headers }> {
-  const res = await sendWithRefresh(path, options);
+  const { res, staleSession } = await sendWithRefresh(path, options);
 
-  if (!res.ok) return throwApiError(res);
+  if (!res.ok) return throwApiError(res, { logoutOn401: !staleSession });
 
   return { blob: await res.blob(), headers: res.headers };
 }

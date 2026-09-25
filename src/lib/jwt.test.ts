@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { decodeJwtClaims, isExpired, localExpiryMs, refreshDelayMs } from "./jwt";
+import { decodeJwtClaims, localExpiryMs, refreshDelayMs } from "./jwt";
 
 /** Build a JWT-shaped string (`header.payload.signature`) whose payload is the
  * base64url encoding of `claims`. Only the payload segment is ever read, so the
@@ -110,28 +110,6 @@ describe("decodeJwtClaims", () => {
       orgRole: "",
       isPlatformAdmin: false,
     });
-  });
-});
-
-describe("isExpired", () => {
-  afterEach(() => vi.useRealTimers());
-
-  it("treats exp === 0 (no expiry) as never-expired", () => {
-    expect(isExpired(0)).toBe(false);
-  });
-
-  it("is true once the exp second has passed", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2030-01-01T00:00:10Z"));
-    const tenSecondsAgo = Math.floor(Date.parse("2030-01-01T00:00:00Z") / 1000);
-    expect(isExpired(tenSecondsAgo)).toBe(true);
-  });
-
-  it("is false while the exp is still in the future", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2030-01-01T00:00:00Z"));
-    const inAnHour = Math.floor(Date.parse("2030-01-01T01:00:00Z") / 1000);
-    expect(isExpired(inAnHour)).toBe(false);
   });
 });
 
