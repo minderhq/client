@@ -541,6 +541,45 @@ describe("silent refresh on 401 (#53)", () => {
       }
     });
 
+    it("does not hand a caller another token's in-flight refresh result", async () => {
+      // A refresh for org 10's token is still in flight when switchOrg swaps in
+      // org 20's token; a request made with the org-20 token then 401s. It must
+      // get its own refresh, not org 10's result.
+      const other = jwt({ sub: "1", active_tenant_id: "20", exp: 2e9 });
+      const otherRefreshed = jwt({ sub: "1", active_tenant_id: "20", exp: 2e9 + 1 });
+      let releaseMine!: () => void;
+      const mineGate = new Promise<void>((r) => (releaseMine = r));
+      sessionStorage.setItem(TOKEN_KEY, mine);
+      vi.mocked(fetch).mockImplementation(async (url, init) => {
+        if (url === REFRESH_URL) {
+          if (authOf(init) === `Bearer ${mine}`) {
+            await mineGate;
+            return json(200, { access_token: jwt({ sub: "1", active_tenant_id: "10" }) });
+          }
+          return json(200, { access_token: otherRefreshed });
+        }
+        return authOf(init) === `Bearer ${otherRefreshed}`
+          ? json(200, { ok: true })
+          : json(401, { detail: "Token expired" });
+      });
+
+      const pendingMine = refreshAccessToken(mine);
+      sessionStorage.setItem(TOKEN_KEY, other); // switchOrg lands meanwhile
+
+      await expect(apiFetch("/v1/things", { token: other })).resolves.toEqual({ ok: true });
+      expect(refreshCalls().map(([, init]) => authOf(init))).toEqual([
+        `Bearer ${mine}`,
+        `Bearer ${other}`,
+      ]);
+      expect(sessionStorage.getItem(TOKEN_KEY)).toBe(otherRefreshed);
+      expect(onSessionExpired).not.toHaveBeenCalled();
+
+      releaseMine();
+      // The superseded refresh doesn't resurrect org 10 over org 20.
+      await expect(pendingMine).resolves.toBe(otherRefreshed);
+      expect(sessionStorage.getItem(TOKEN_KEY)).toBe(otherRefreshed);
+    });
+
     it("replays with the token its own refresh minted for the same user and org", async () => {
       const minted = jwt({ sub: "1", active_tenant_id: "10", exp: 2e9 + 1 });
       sessionStorage.setItem(TOKEN_KEY, mine);
