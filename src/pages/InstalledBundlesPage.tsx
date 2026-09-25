@@ -54,61 +54,58 @@ export function ExportImportPanel({
     downloadJson(`minder-bundles-${ts}.json`, bundlesToStateExport(bundles));
   }
 
-  const handleImportFile = useCallback(
-    async (file: File) => {
-      setBusy(true);
-      setIsError(false);
-      setStatus("Reading file…");
-      try {
-        const text = await file.text();
-        const desired = parseBundleStateExport(JSON.parse(text));
-        const byName = new Map(bundles.map((b) => [b.name, b]));
-        const applied: string[] = [];
-        const skipped: string[] = [];
-        const errors: string[] = [];
-        for (const [name, { enabled }] of Object.entries(desired)) {
-          const current = byName.get(name);
-          if (!current) {
-            skipped.push(`${name} (unknown bundle)`);
-            continue;
-          }
-          if (current.enabled === enabled) {
-            continue; // already matches -- nothing to do
-          }
-          if (current.core && !enabled) {
-            skipped.push(`${name} (core can't be disabled)`);
-            continue;
-          }
-          setStatus(`Applying ${name} → ${enabled ? "enabled" : "disabled"}…`);
-          try {
-            await apiFetch(
-              `/v1/bundles/${encodeURIComponent(name)}/${enabled ? "enable" : "disable"}`,
-              { method: "POST", token },
-            );
-            applied.push(name);
-          } catch (e) {
-            errors.push(`${name}: ${friendlyErrorMessage(e)}`);
-          }
+  async function handleImportFile(file: File) {
+    setBusy(true);
+    setIsError(false);
+    setStatus("Reading file…");
+    try {
+      const text = await file.text();
+      const desired = parseBundleStateExport(JSON.parse(text));
+      const byName = new Map(bundles.map((b) => [b.name, b]));
+      const applied: string[] = [];
+      const skipped: string[] = [];
+      const errors: string[] = [];
+      for (const [name, { enabled }] of Object.entries(desired)) {
+        const current = byName.get(name);
+        if (!current) {
+          skipped.push(`${name} (unknown bundle)`);
+          continue;
         }
-        const parts = [
-          applied.length > 0 ? `applied: ${applied.join(", ")}` : "",
-          skipped.length > 0 ? `skipped: ${skipped.join(", ")}` : "",
-          errors.length > 0 ? `errors: ${errors.join("; ")}` : "",
-        ].filter(Boolean);
-        setStatus(parts.length > 0 ? parts.join(" — ") : "Nothing to change.");
-        setIsError(errors.length > 0);
-        onChanged();
-      } catch (e) {
-        setStatus(
-          e instanceof Error ? e.message : "Could not read that file as bundle state.",
-        );
-        setIsError(true);
+        if (current.enabled === enabled) {
+          continue; // already matches -- nothing to do
+        }
+        if (current.core && !enabled) {
+          skipped.push(`${name} (core can't be disabled)`);
+          continue;
+        }
+        setStatus(`Applying ${name} → ${enabled ? "enabled" : "disabled"}…`);
+        try {
+          await apiFetch(
+            `/v1/bundles/${encodeURIComponent(name)}/${enabled ? "enable" : "disable"}`,
+            { method: "POST", token },
+          );
+          applied.push(name);
+        } catch (e) {
+          errors.push(`${name}: ${friendlyErrorMessage(e)}`);
+        }
       }
-      setBusy(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    },
-    [bundles, token, onChanged],
-  );
+      const parts = [
+        applied.length > 0 ? `applied: ${applied.join(", ")}` : "",
+        skipped.length > 0 ? `skipped: ${skipped.join(", ")}` : "",
+        errors.length > 0 ? `errors: ${errors.join("; ")}` : "",
+      ].filter(Boolean);
+      setStatus(parts.length > 0 ? parts.join(" — ") : "Nothing to change.");
+      setIsError(errors.length > 0);
+      onChanged();
+    } catch (e) {
+      setStatus(
+        e instanceof Error ? e.message : "Could not read that file as bundle state.",
+      );
+      setIsError(true);
+    }
+    setBusy(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
 
   return (
     <section className="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">

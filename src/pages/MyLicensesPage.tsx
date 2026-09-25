@@ -74,11 +74,11 @@ function LicenseCard({ license }: { license: License }) {
 }
 
 export function MyLicensesPage() {
-  const { token, isAuthenticated } = useAuth();
+  const { token, sessionKey, isAuthenticated } = useAuth();
   const { data, error, loading } = useAsyncResource(
     (signal) =>
       apiFetch<LicenseListResponse>("/v1/marketplace/licenses", { token, signal }),
-    { deps: [token], enabled: isAuthenticated },
+    { deps: [sessionKey], enabled: isAuthenticated },
   );
   const licenses = data?.licenses ?? [];
 

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 
 import { EmptyState } from "../components/EmptyState";
 import { Icon } from "../components/Icon";
@@ -56,7 +56,7 @@ export function LogViewer({ name, token }: { name: string; token: string }) {
   const [lines, setLines] = useState<LogLine[]>([]);
   const [status, setStatus] = useState("");
 
-  const loadLogs = useCallback(async () => {
+  async function loadLogs() {
     setStatus("Loading…");
     try {
       const res = await apiFetch<LogsResponse>(
@@ -69,7 +69,7 @@ export function LogViewer({ name, token }: { name: string; token: string }) {
     } catch (e) {
       setStatus(friendlyErrorMessage(e));
     }
-  }, [name, token]);
+  }
 
   function handleToggle(e: React.SyntheticEvent<HTMLDetailsElement>) {
     // Only fires the fetch on first expand -- once `loaded`, logs sat frozen
