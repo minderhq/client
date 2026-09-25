@@ -12,6 +12,7 @@ export interface JwtClaims {
   email: string;
   role: string;
   exp: number; // seconds since epoch; 0 when the token carries no expiry
+  iat: number; // issued-at, seconds since epoch (server clock); 0 when absent
   // Multi-tenant (organization) claims — empty/false when the token predates the
   // tenancy spine or the user has no org yet. `tenantId` is the home org;
   // `activeTenantId` is the currently-switched-into org (they match until you
@@ -23,10 +24,48 @@ export interface JwtClaims {
   isPlatformAdmin: boolean;
 }
 
-/** True once the token's `exp` has passed. Tokens without an `exp` (exp === 0)
- * are treated as non-expiring so this never regresses such tokens to logged-out. */
-export function isExpired(exp: number): boolean {
-  return exp > 0 && Date.now() >= exp * 1000;
+/** Refresh once this fraction of the token's lifetime has elapsed (#53),
+ * leaving the last 20% as headroom for a slow or retried refresh. */
+const REFRESH_AT_FRACTION = 0.8;
+/** setTimeout's delay is a signed 32-bit int; anything larger fires at once. */
+const MAX_TIMER_MS = 2 ** 31 - 1;
+
+/** When a token expires, on the LOCAL clock (ms since epoch; 0 = never).
+ *
+ * `exp` is stamped by the server's clock, so comparing it with `Date.now()`
+ * is off by however far the client clock is skewed. With short token
+ * lifetimes a few minutes of skew would schedule the refresh after real
+ * expiry. Instead measure the token's own lifetime (`exp - iat`, both on the
+ * server clock, so skew cancels out) from the local time it was received.
+ * Falls back to the server-clock `exp` when `iat` or the receive time is
+ * unknown (e.g. a session stored before the receive time was recorded). */
+export function localExpiryMs(
+  exp: number,
+  iat: number,
+  receivedAt: number | null,
+): number {
+  if (exp <= 0) return 0;
+  if (iat > 0 && exp > iat && receivedAt !== null) {
+    return receivedAt + (exp - iat) * 1000;
+  }
+  return exp * 1000;
+}
+
+/** How long from `now` until the silent refresh should run: once 80% of the
+ * span from `startMs` (when the token was received, or `now` if unknown) to
+ * `expiresAt` (from localExpiryMs) has elapsed, so a token adopted fresh
+ * refreshes at 80% of its life and one picked up from sessionStorage late in
+ * its life refreshes almost immediately. `null` when there is nothing to
+ * schedule: no expiry, or already expired (the API only refreshes a
+ * still-valid token). */
+export function refreshDelayMs(
+  expiresAt: number,
+  startMs: number,
+  now: number = Date.now(),
+): number | null {
+  if (expiresAt <= 0 || now >= expiresAt) return null;
+  const refreshAt = startMs + (expiresAt - startMs) * REFRESH_AT_FRACTION;
+  return Math.min(Math.max(0, Math.floor(refreshAt - now)), MAX_TIMER_MS);
 }
 
 /** Decode the display claims (username/email/role/exp) straight from a JWT's
@@ -41,6 +80,7 @@ const EMPTY_CLAIMS: JwtClaims = {
   email: "",
   role: "",
   exp: 0,
+  iat: 0,
   tenantId: "",
   activeTenantId: "",
   orgRole: "",
@@ -77,6 +117,7 @@ export function decodeJwtClaims(jwt: string): JwtClaims {
       email: typeof decoded.email === "string" ? decoded.email : "",
       role: typeof decoded.role === "string" ? decoded.role : "",
       exp: typeof decoded.exp === "number" ? decoded.exp : 0,
+      iat: typeof decoded.iat === "number" ? decoded.iat : 0,
       // tenant ids are minted as strings; coerce a stray number defensively.
       tenantId: claimToString(decoded.tenant_id),
       activeTenantId: claimToString(decoded.active_tenant_id),

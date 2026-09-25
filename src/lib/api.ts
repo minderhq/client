@@ -1,3 +1,5 @@
+import { decodeJwtClaims } from "./jwt";
+
 // VITE_API_BASE_URL is baked in at BUILD time (Vite convention), not read at
 // container start like every Python service's env vars -- changing it means
 // rebuilding the image, not just restarting the container. See
@@ -32,6 +34,31 @@ export const autheliaPortalUrl: string =
 // circular import.
 export const TOKEN_KEY = "minder_jwt";
 
+// Local-clock time (ms) at which the stored token was received, kept beside it
+// so the silent refresh (#53) can measure the token's lifetime on the client's
+// own clock -- immune to client/server clock skew -- across a page reload.
+export const TOKEN_RECEIVED_AT_KEY = "minder_jwt_received_at";
+
+/** Stores a newly received token together with its local receive time. */
+export function storeToken(jwt: string, receivedAt: number = Date.now()): void {
+  sessionStorage.setItem(TOKEN_KEY, jwt);
+  sessionStorage.setItem(TOKEN_RECEIVED_AT_KEY, String(receivedAt));
+}
+
+/** Removes the stored token and its receive time. */
+export function clearStoredToken(): void {
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(TOKEN_RECEIVED_AT_KEY);
+}
+
+/** The local receive time recorded for `jwt`, or null when unknown (not the
+ * stored token, or stored without one). */
+export function tokenReceivedAt(jwt: string): number | null {
+  if (!jwt || sessionStorage.getItem(TOKEN_KEY) !== jwt) return null;
+  const at = Number(sessionStorage.getItem(TOKEN_RECEIVED_AT_KEY));
+  return Number.isFinite(at) && at > 0 ? at : null;
+}
+
 // Dispatched on `window` whenever any apiFetch/apiFetchBlob call gets a 401 --
 // AuthProvider (src/lib/auth.tsx) listens for this on mount and reacts by
 // clearing its in-memory token, which flips `isAuthenticated` to false
@@ -42,23 +69,102 @@ export const TOKEN_KEY = "minder_jwt";
 // the user back to a logged-out state.
 export const SESSION_EXPIRED_EVENT = "minder:session-expired";
 
+// Dispatched on `window` (as a CustomEvent whose `detail` is the new JWT)
+// whenever refreshAccessToken() swaps in a fresh token, so AuthProvider can
+// adopt it into React state -- the mirror image of SESSION_EXPIRED_EVENT (#53).
+export const TOKEN_REFRESHED_EVENT = "minder:token-refreshed";
+
 /** Clears the stale token and tells the rest of the app (AuthProvider) that
  * the session is gone. Called once per 401 response, from both apiFetch and
- * apiFetchBlob. Idempotent -- safe to call repeatedly. */
-function handleUnauthorized(): void {
-  sessionStorage.removeItem(TOKEN_KEY);
+ * apiFetchBlob, and when a refresh is rejected. Idempotent -- safe to call
+ * repeatedly. */
+export function handleUnauthorized(): void {
+  clearStoredToken();
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
   }
+}
+
+// The in-flight refresh per starting token, shared by every caller holding
+// that token (#53): N requests that 401 at once -- or a 401 racing the
+// scheduled pre-expiry refresh -- all await the same POST instead of
+// stampeding the endpoint. Keyed by token so a caller holding a different one
+// (e.g. right after switchOrg) never receives another token's refresh result.
+const refreshInFlight = new Map<string, Promise<string | null>>();
+
+/** Exchanges `token` for a fresh one via `POST /v1/auth/refresh` (the API
+ * re-validates the account and re-mints from the still-valid bearer token), then
+ * stores it and announces it via TOKEN_REFRESHED_EVENT (#53).
+ *
+ * Resolves to the new token, or to `null` when the API rejects the refresh with
+ * 401/403 -- the session is really over (revoked, deactivated, password reset,
+ * or the token already expired). Rejects on a transient failure (network error,
+ * 5xx) so a caller can decide whether to retry. Single-flight per token:
+ * concurrent calls for the same token share one request. Uses raw `fetch`,
+ * never apiFetch, so a failing refresh can never trigger another refresh. Does NOT log out by itself -- callers do. */
+export function refreshAccessToken(token: string): Promise<string | null> {
+  let inFlight = refreshInFlight.get(token);
+  if (!inFlight) {
+    inFlight = (async (): Promise<string | null> => {
+      // Taken before the request, so the recorded receive time never runs
+      // later than the server's `iat` (errs toward refreshing early).
+      const sentAt = Date.now();
+      const res = await fetch(`${apiBaseUrl}/v1/auth/refresh`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401 || res.status === 403) {
+        return null;
+      }
+      if (!res.ok) throw new ApiError(await parseErrorDetail(res), res.status);
+      const data = (await res.json()) as { access_token?: unknown };
+      if (typeof data.access_token !== "string" || !data.access_token) {
+        throw new ApiError("Refresh response carried no access token", res.status);
+      }
+      // The session moved on while the refresh was in flight: logout (storage
+      // cleared) or a token swap (switchOrg / loginWithToken). Don't resurrect
+      // the old session over it -- hand back whatever is current instead.
+      const current = sessionStorage.getItem(TOKEN_KEY);
+      if (current !== token) return current;
+      storeToken(data.access_token, sentAt);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent(TOKEN_REFRESHED_EVENT, { detail: data.access_token }),
+        );
+      }
+      return data.access_token;
+    })().finally(() => {
+      refreshInFlight.delete(token);
+    });
+    refreshInFlight.set(token, inFlight);
+  }
+  return inFlight;
+}
+
+/** Whether two tokens belong to the same user AND the same active org. Every
+ * replay must pass this (#53 review) -- so a request made as one user/org is
+ * never silently re-sent as another after a switchOrg, a different login, or a
+ * refresh that re-derived the active org (the API falls back to the home org
+ * when the user was removed from / suspended in the org they switched into). */
+function sameSession(a: string, b: string): boolean {
+  const ca = decodeJwtClaims(a);
+  const cb = decodeJwtClaims(b);
+  return (
+    ca.userId === cb.userId &&
+    (ca.activeTenantId || ca.tenantId) === (cb.activeTenantId || cb.tenantId)
+  );
 }
 
 /** Parses the error body and throws the resulting ApiError -- shared by
  * apiFetch and apiFetchBlob so the 401 handling above only lives in one
  * place. Always throws; the `Promise<never>` return type lets callers
  * `return throwApiError(res)` regardless of their own return type. */
-async function throwApiError(res: Response): Promise<never> {
+async function throwApiError(
+  res: Response,
+  { logoutOn401 = true }: { logoutOn401?: boolean } = {},
+): Promise<never> {
   const detail = await parseErrorDetail(res);
-  if (res.status === 401) handleUnauthorized();
+  if (res.status === 401 && logoutOn401) handleUnauthorized();
   throw new ApiError(detail, res.status);
 }
 
@@ -129,33 +235,78 @@ export interface Paginated<T> {
   offset: number;
 }
 
+/** Sends one request, attaching `token` as the bearer when present. On a 401
+ * for an authenticated request, gets a fresh token (one shared refresh, #53) and
+ * replays the request exactly once with it. Returns the final Response; a 401
+ * that survives (refresh rejected/failed, or the replay 401s too) is left for
+ * throwApiError to turn into the usual logout.
+ *
+ * `staleSession` is true when the replay was refused because the session had
+ * meanwhile moved to a different user or org (including a refresh that
+ * re-derived another active org): only this stale request failed, the stored
+ * session is valid, so the caller must NOT log out. */
+async function sendWithRefresh(
+  path: string,
+  { method = "GET", body, token, signal }: ApiOptions,
+): Promise<{ res: Response; staleSession: boolean }> {
+  const isFormData = body instanceof FormData;
+  const send = (bearer: string | undefined) => {
+    const headers: Record<string, string> = {};
+    // Never set Content-Type for FormData -- the browser fills in the
+    // multipart boundary itself; a manually-set header drops it and breaks
+    // parsing server-side.
+    if (body !== undefined && !isFormData) {
+      headers["Content-Type"] = "application/json";
+    }
+    if (bearer) headers["Authorization"] = `Bearer ${bearer}`;
+    return fetch(`${apiBaseUrl}${path}`, {
+      method,
+      headers,
+      body:
+        body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
+      signal,
+    });
+  };
+
+  const res = await send(token);
+  const done = { res, staleSession: false };
+  if (res.status !== 401 || !token) return done;
+
+  // No stored token at all means the session is already gone (logged out).
+  const stored = sessionStorage.getItem(TOKEN_KEY);
+  if (!stored) return done;
+  // Another request (or the scheduled refresh) may already have swapped in a
+  // newer token than the one this caller captured -- replay with that instead
+  // of refreshing again. Otherwise refresh the caller's own token.
+  let candidate: string | null = stored;
+  if (stored === token) {
+    try {
+      candidate = await refreshAccessToken(token); // null: rejected -> logout
+    } catch {
+      return done; // transient refresh failure: the original 401 stands
+    }
+  }
+  if (!candidate) return done;
+  // Only ever replay as the same user and org -- even with a token our own
+  // refresh minted. On a mismatch the new token is already adopted (stored +
+  // TOKEN_REFRESHED_EVENT); only this request fails, without a logout.
+  if (!sameSession(token, candidate)) {
+    return { res, staleSession: true };
+  }
+  return { res: await send(candidate), staleSession: false };
+}
+
 /** Thin fetch wrapper: prefixes the gateway base URL, injects the bearer
  * token when present, and centralizes JSON parsing + error handling --
  * replacing the copy-pasted try/catch blocks the old plugin_config.html and
  * model_management.html each carried independently. */
 export async function apiFetch<T>(
   path: string,
-  { method = "GET", body, token, signal }: ApiOptions = {},
+  options: ApiOptions = {},
 ): Promise<T> {
-  const headers: Record<string, string> = {};
-  const isFormData = body instanceof FormData;
-  // Never set Content-Type for FormData -- the browser fills in the
-  // multipart boundary itself; a manually-set header drops it and breaks
-  // parsing server-side.
-  if (body !== undefined && !isFormData) {
-    headers["Content-Type"] = "application/json";
-  }
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const { res, staleSession } = await sendWithRefresh(path, options);
 
-  const res = await fetch(`${apiBaseUrl}${path}`, {
-    method,
-    headers,
-    body:
-      body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
-    signal,
-  });
-
-  if (!res.ok) return throwApiError(res);
+  if (!res.ok) return throwApiError(res, { logoutOn401: !staleSession });
 
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -168,24 +319,11 @@ export async function apiFetch<T>(
  * header info. */
 export async function apiFetchBlob(
   path: string,
-  { method = "GET", body, token, signal }: ApiOptions = {},
+  options: ApiOptions = {},
 ): Promise<{ blob: Blob; headers: Headers }> {
-  const headers: Record<string, string> = {};
-  const isFormData = body instanceof FormData;
-  if (body !== undefined && !isFormData) {
-    headers["Content-Type"] = "application/json";
-  }
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const { res, staleSession } = await sendWithRefresh(path, options);
 
-  const res = await fetch(`${apiBaseUrl}${path}`, {
-    method,
-    headers,
-    body:
-      body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
-    signal,
-  });
-
-  if (!res.ok) return throwApiError(res);
+  if (!res.ok) return throwApiError(res, { logoutOn401: !staleSession });
 
   return { blob: await res.blob(), headers: res.headers };
 }
