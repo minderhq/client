@@ -1,7 +1,11 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SESSION_EXPIRED_EVENT, TOKEN_REFRESHED_EVENT } from "./api";
+import {
+  REFRESH_TIMEOUT_MS,
+  SESSION_EXPIRED_EVENT,
+  TOKEN_REFRESHED_EVENT,
+} from "./api";
 import { AuthProvider, useAuth } from "./auth";
 
 const TOKEN_KEY = "minder_jwt";
@@ -58,7 +62,6 @@ describe("AuthProvider / useAuth", () => {
     expect(result.current.email).toBe("ada@example.com");
     expect(result.current.role).toBe("admin");
   });
-
 
   describe("login", () => {
     it("stores the returned token and flips isAuthenticated on success", async () => {
@@ -559,6 +562,8 @@ describe("AuthProvider / useAuth", () => {
         sessionStorage.setItem(TOKEN_KEY, expired);
         const res = deferredFetch();
         const { result } = renderAuth();
+        const sessionKeyBefore = result.current.sessionKey;
+        expect(sessionKeyBefore).not.toBe("");
 
         await act(async () => {
           await vi.advanceTimersByTimeAsync(0);
@@ -575,6 +580,9 @@ describe("AuthProvider / useAuth", () => {
         expect(result.current.token).toBe(fresh);
         expect(result.current.isAuthenticated).toBe(true);
         expect(sessionStorage.getItem(TOKEN_KEY)).toBe(fresh);
+        // A silent refresh of the same session: loaders keyed on sessionKey
+        // (#55) don't refetch just because it landed after expiry.
+        expect(result.current.sessionKey).toBe(sessionKeyBefore);
       });
 
       it.each([401, 403])(
@@ -636,6 +644,84 @@ describe("AuthProvider / useAuth", () => {
         });
         expect(refreshCalls()).toHaveLength(1);
         expect(result.current.isAuthenticated).toBe(false);
+      });
+
+      it("a new login after abandonment reads as authenticated", async () => {
+        sessionStorage.setItem(TOKEN_KEY, makeJwt({ username: "ada", exp: nowSec() - 60 }));
+        vi.mocked(fetch).mockRejectedValue(new TypeError("Failed to fetch"));
+        const { result } = renderAuth();
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(result.current.isAuthenticated).toBe(false);
+
+        const fresh = makeJwt({ username: "ada", exp: nowSec() + 900 });
+        act(() => {
+          result.current.loginWithToken(fresh, Date.now());
+        });
+        expect(result.current.token).toBe(fresh);
+        expect(result.current.isAuthenticated).toBe(true);
+      });
+
+      describe("a refresh request that never settles", () => {
+        /** A fetch that only ever ends by aborting, like a hung socket. */
+        const hangingFetch = () =>
+          vi.mocked(fetch).mockImplementation(
+            (_url, init) =>
+              new Promise<Response>((_resolve, reject) => {
+                const signal = init?.signal;
+                signal?.addEventListener("abort", () => reject(signal.reason));
+              }),
+          );
+
+        it("times out and abandons an expired token", async () => {
+          sessionStorage.setItem(TOKEN_KEY, makeJwt({ username: "ada", exp: nowSec() - 60 }));
+          hangingFetch();
+          const { result } = renderAuth();
+
+          await act(async () => {
+            await vi.advanceTimersByTimeAsync(REFRESH_TIMEOUT_MS - 1);
+          });
+          expect(refreshCalls()).toHaveLength(1);
+          expect(refreshCalls()[0][1]?.signal).toBeInstanceOf(AbortSignal);
+          expect(result.current.isAuthenticated).toBe(true); // still pending
+
+          await act(async () => {
+            await vi.advanceTimersByTimeAsync(1);
+          });
+          expect(result.current.isAuthenticated).toBe(false);
+          await act(async () => {
+            await vi.advanceTimersByTimeAsync(10 * 60_000);
+          });
+          expect(refreshCalls()).toHaveLength(1); // abandoned, not retried
+        });
+
+        it("retries before expiry, then abandons after the post-expiry attempt times out", async () => {
+          // exp in 100s: first attempt at 80s, times out at 95s; retry at
+          // 97.5s (remaining/2) times out at 112.5s, past expiry; the one
+          // post-expiry attempt starts at once and times out at 127.5s.
+          sessionStorage.setItem(TOKEN_KEY, makeJwt({ username: "ada", exp: nowSec() + 100 }));
+          hangingFetch();
+          const { result } = renderAuth();
+
+          await act(async () => {
+            await vi.advanceTimersByTimeAsync(98_000);
+          });
+          expect(refreshCalls()).toHaveLength(2);
+          expect(result.current.isAuthenticated).toBe(true);
+
+          await act(async () => {
+            await vi.advanceTimersByTimeAsync(20_000); // t = 118s: expired, pending
+          });
+          expect(refreshCalls()).toHaveLength(3);
+          expect(result.current.isAuthenticated).toBe(true);
+
+          await act(async () => {
+            await vi.advanceTimersByTimeAsync(10_000); // t = 128s
+          });
+          expect(result.current.isAuthenticated).toBe(false);
+          expect(refreshCalls()).toHaveLength(3);
+        });
       });
 
       describe("an overdue timer after a wake", () => {
