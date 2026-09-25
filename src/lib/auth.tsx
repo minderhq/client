@@ -8,8 +8,15 @@ import {
   useState,
 } from "react";
 
-import { apiBaseUrl, SESSION_EXPIRED_EVENT, TOKEN_KEY } from "./api";
-import { decodeJwtClaims, isExpired } from "./jwt";
+import {
+  apiBaseUrl,
+  handleUnauthorized,
+  refreshAccessToken,
+  SESSION_EXPIRED_EVENT,
+  TOKEN_KEY,
+  TOKEN_REFRESHED_EVENT,
+} from "./api";
+import { decodeJwtClaims, isExpired, refreshDelayMs } from "./jwt";
 
 interface AuthContextValue {
   token: string;
@@ -48,6 +55,10 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+/** Upper bound on the wait before retrying a scheduled refresh that failed
+ * transiently (network error / 5xx) rather than being rejected (#53). */
+const REFRESH_RETRY_MS = 30_000;
 
 /** sessionStorage key for the forced-password-change flag -- kept beside the
  * token (same lifetime) so a page reload can't skip the forced change. */
@@ -148,6 +159,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.addEventListener(SESSION_EXPIRED_EVENT, logout);
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, logout);
   }, [logout]);
+
+  // Adopt a token refreshAccessToken() (src/lib/api.ts) swapped in -- whether
+  // from the scheduled refresh below or from apiFetch's retry-on-401 (#53).
+  useEffect(() => {
+    const onRefreshed = (e: Event) => {
+      const fresh = (e as CustomEvent<unknown>).detail;
+      if (typeof fresh === "string" && fresh) setToken(fresh);
+    };
+    window.addEventListener(TOKEN_REFRESHED_EVENT, onRefreshed);
+    return () => window.removeEventListener(TOKEN_REFRESHED_EVENT, onRefreshed);
+  }, []);
+
+  // Silent refresh before expiry (#53): one timer per token, at 80% of its
+  // remaining lifetime. Any token change -- refresh, login, SSO, switchOrg,
+  // logout -- tears it down and (if there is still a token) schedules anew. A
+  // rejected refresh (401/403: revoked, deactivated, password reset) logs out
+  // exactly like any other 401; a transient failure retries while the token is
+  // still valid. An already-expired stored token schedules nothing: the API
+  // can't refresh it, so it stays logged out as before.
+  const exp = claims.exp;
+  useEffect(() => {
+    if (!token) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
+    const run = () => {
+      refreshAccessToken(token).then(
+        (fresh) => {
+          if (!cancelled && fresh === null) handleUnauthorized();
+        },
+        () => {
+          if (cancelled) return;
+          const remaining = exp * 1000 - Date.now();
+          if (remaining > 0) {
+            timer = setTimeout(run, Math.min(REFRESH_RETRY_MS, remaining / 2));
+          }
+        },
+      );
+    };
+    const delay = refreshDelayMs(exp);
+    if (delay !== null) timer = setTimeout(run, delay);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [token, exp]);
 
   return (
     <AuthContext.Provider

@@ -42,14 +42,67 @@ export const TOKEN_KEY = "minder_jwt";
 // the user back to a logged-out state.
 export const SESSION_EXPIRED_EVENT = "minder:session-expired";
 
+// Dispatched on `window` (as a CustomEvent whose `detail` is the new JWT)
+// whenever refreshAccessToken() swaps in a fresh token, so AuthProvider can
+// adopt it into React state -- the mirror image of SESSION_EXPIRED_EVENT (#53).
+export const TOKEN_REFRESHED_EVENT = "minder:token-refreshed";
+
 /** Clears the stale token and tells the rest of the app (AuthProvider) that
  * the session is gone. Called once per 401 response, from both apiFetch and
- * apiFetchBlob. Idempotent -- safe to call repeatedly. */
-function handleUnauthorized(): void {
+ * apiFetchBlob, and when a refresh is rejected. Idempotent -- safe to call
+ * repeatedly. */
+export function handleUnauthorized(): void {
   sessionStorage.removeItem(TOKEN_KEY);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
   }
+}
+
+// The one in-flight refresh, shared by every caller (#53): N requests that
+// 401 at once -- or a 401 racing the scheduled pre-expiry refresh -- all await
+// the same POST instead of stampeding the endpoint.
+let refreshInFlight: Promise<string | null> | null = null;
+
+/** Exchanges `token` for a fresh one via `POST /v1/auth/refresh` (the API
+ * re-validates the account and re-mints from the still-valid bearer token), then
+ * stores it and announces it via TOKEN_REFRESHED_EVENT (#53).
+ *
+ * Resolves to the new token, or to `null` when the API rejects the refresh with
+ * 401/403 -- the session is really over (revoked, deactivated, password reset,
+ * or the token already expired). Rejects on a transient failure (network error,
+ * 5xx) so a caller can decide whether to retry. Single-flight: concurrent calls
+ * share one request. Uses raw `fetch`, never apiFetch, so a failing refresh can
+ * never trigger another refresh. Does NOT log out by itself -- callers do. */
+export function refreshAccessToken(token: string): Promise<string | null> {
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      const res = await fetch(`${apiBaseUrl}/v1/auth/refresh`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401 || res.status === 403) return null;
+      if (!res.ok) throw new ApiError(await parseErrorDetail(res), res.status);
+      const data = (await res.json()) as { access_token?: unknown };
+      if (typeof data.access_token !== "string" || !data.access_token) {
+        throw new ApiError("Refresh response carried no access token", res.status);
+      }
+      // The session moved on while the refresh was in flight: logout (storage
+      // cleared) or a token swap (switchOrg / loginWithToken). Don't resurrect
+      // the old session over it -- hand back whatever is current instead.
+      const current = sessionStorage.getItem(TOKEN_KEY);
+      if (current !== token) return current;
+      sessionStorage.setItem(TOKEN_KEY, data.access_token);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent(TOKEN_REFRESHED_EVENT, { detail: data.access_token }),
+        );
+      }
+      return data.access_token;
+    })().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
 }
 
 /** Parses the error body and throws the resulting ApiError -- shared by
@@ -129,31 +182,65 @@ export interface Paginated<T> {
   offset: number;
 }
 
+/** Sends one request, attaching `token` as the bearer when present. On a 401
+ * for an authenticated request, gets a fresh token (one shared refresh, #53) and
+ * replays the request exactly once with it. Returns the final Response; a 401
+ * that survives (refresh rejected/failed, or the replay 401s too) is left for
+ * throwApiError to turn into the usual logout. */
+async function sendWithRefresh(
+  path: string,
+  { method = "GET", body, token, signal }: ApiOptions,
+): Promise<Response> {
+  const isFormData = body instanceof FormData;
+  const send = (bearer: string | undefined) => {
+    const headers: Record<string, string> = {};
+    // Never set Content-Type for FormData -- the browser fills in the
+    // multipart boundary itself; a manually-set header drops it and breaks
+    // parsing server-side.
+    if (body !== undefined && !isFormData) {
+      headers["Content-Type"] = "application/json";
+    }
+    if (bearer) headers["Authorization"] = `Bearer ${bearer}`;
+    return fetch(`${apiBaseUrl}${path}`, {
+      method,
+      headers,
+      body:
+        body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
+      signal,
+    });
+  };
+
+  const res = await send(token);
+  if (res.status !== 401 || !token) return res;
+
+  // No stored token at all means the session is already gone (logged out).
+  const stored = sessionStorage.getItem(TOKEN_KEY);
+  if (!stored) return res;
+  let fresh: string | null = null;
+  if (stored !== token) {
+    // Another request (or the scheduled refresh) already swapped in a newer
+    // token than the one this caller captured -- replay with that instead of
+    // refreshing again.
+    fresh = stored;
+  } else {
+    try {
+      fresh = await refreshAccessToken(token);
+    } catch {
+      fresh = null; // transient refresh failure: the original 401 stands
+    }
+  }
+  return fresh ? send(fresh) : res;
+}
+
 /** Thin fetch wrapper: prefixes the gateway base URL, injects the bearer
  * token when present, and centralizes JSON parsing + error handling --
  * replacing the copy-pasted try/catch blocks the old plugin_config.html and
  * model_management.html each carried independently. */
 export async function apiFetch<T>(
   path: string,
-  { method = "GET", body, token, signal }: ApiOptions = {},
+  options: ApiOptions = {},
 ): Promise<T> {
-  const headers: Record<string, string> = {};
-  const isFormData = body instanceof FormData;
-  // Never set Content-Type for FormData -- the browser fills in the
-  // multipart boundary itself; a manually-set header drops it and breaks
-  // parsing server-side.
-  if (body !== undefined && !isFormData) {
-    headers["Content-Type"] = "application/json";
-  }
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-
-  const res = await fetch(`${apiBaseUrl}${path}`, {
-    method,
-    headers,
-    body:
-      body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
-    signal,
-  });
+  const res = await sendWithRefresh(path, options);
 
   if (!res.ok) return throwApiError(res);
 
@@ -168,22 +255,9 @@ export async function apiFetch<T>(
  * header info. */
 export async function apiFetchBlob(
   path: string,
-  { method = "GET", body, token, signal }: ApiOptions = {},
+  options: ApiOptions = {},
 ): Promise<{ blob: Blob; headers: Headers }> {
-  const headers: Record<string, string> = {};
-  const isFormData = body instanceof FormData;
-  if (body !== undefined && !isFormData) {
-    headers["Content-Type"] = "application/json";
-  }
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-
-  const res = await fetch(`${apiBaseUrl}${path}`, {
-    method,
-    headers,
-    body:
-      body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
-    signal,
-  });
+  const res = await sendWithRefresh(path, options);
 
   if (!res.ok) return throwApiError(res);
 

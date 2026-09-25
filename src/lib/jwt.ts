@@ -29,6 +29,24 @@ export function isExpired(exp: number): boolean {
   return exp > 0 && Date.now() >= exp * 1000;
 }
 
+/** Refresh once this fraction of the token's remaining lifetime has elapsed
+ * (#53), leaving the last 20% as headroom for a slow or retried refresh. */
+const REFRESH_AT_FRACTION = 0.8;
+/** setTimeout's delay is a signed 32-bit int; anything larger fires at once. */
+const MAX_TIMER_MS = 2 ** 31 - 1;
+
+/** How long from `now` until the silent refresh of a token expiring at `exp`
+ * (seconds since epoch) should run: 80% of the remaining lifetime, so a token
+ * adopted fresh refreshes at 80% of its life and one picked up from
+ * sessionStorage near expiry refreshes almost immediately. `null` when there is
+ * nothing to schedule -- no expiry (exp === 0) or already expired (the API
+ * only refreshes a still-valid token). */
+export function refreshDelayMs(exp: number, now: number = Date.now()): number | null {
+  const remaining = exp * 1000 - now;
+  if (exp <= 0 || remaining <= 0) return null;
+  return Math.min(Math.floor(remaining * REFRESH_AT_FRACTION), MAX_TIMER_MS);
+}
+
 /** Decode the display claims (username/email/role/exp) straight from a JWT's
  * payload segment. Malformed/absent input fails open into empty strings + exp 0
  * rather than throwing: a broken token should read as "not really logged in",

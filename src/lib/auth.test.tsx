@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SESSION_EXPIRED_EVENT } from "./api";
+import { SESSION_EXPIRED_EVENT, TOKEN_REFRESHED_EVENT } from "./api";
 import { AuthProvider, useAuth } from "./auth";
 
 const TOKEN_KEY = "minder_jwt";
@@ -301,6 +301,162 @@ describe("AuthProvider / useAuth", () => {
       expect(() => {
         window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
       }).not.toThrow();
+    });
+  });
+
+  describe("silent refresh before expiry (#53)", () => {
+    const REFRESH_URL = "http://localhost:8000/v1/auth/refresh";
+    const nowSec = () => Math.floor(Date.now() / 1000);
+    const refreshCalls = () =>
+      vi.mocked(fetch).mock.calls.filter(([url]) => url === REFRESH_URL);
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("refreshes at 80% of the remaining lifetime and adopts the new token", async () => {
+      const oldJwt = makeJwt({ username: "ada", exp: nowSec() + 100 });
+      const newJwt = makeJwt({ username: "ada2", exp: nowSec() + 1000 });
+      sessionStorage.setItem(TOKEN_KEY, oldJwt);
+      vi.mocked(fetch).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: newJwt, expires_in: 900 }),
+      } as Response);
+      const { result } = renderAuth();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(79_000);
+      });
+      expect(refreshCalls()).toHaveLength(0);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_000);
+      });
+      expect(refreshCalls()).toHaveLength(1);
+      expect(refreshCalls()[0][1]).toMatchObject({
+        method: "POST",
+        headers: { Authorization: `Bearer ${oldJwt}` },
+      });
+      expect(result.current.token).toBe(newJwt);
+      expect(result.current.username).toBe("ada2");
+      expect(result.current.isAuthenticated).toBe(true);
+      expect(sessionStorage.getItem(TOKEN_KEY)).toBe(newJwt);
+    });
+
+    it("logs out when the scheduled refresh is rejected (revoked session)", async () => {
+      sessionStorage.setItem(TOKEN_KEY, makeJwt({ username: "ada", exp: nowSec() + 100 }));
+      vi.mocked(fetch).mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({ detail: "Account is disabled or no longer exists" }),
+      } as Response);
+      const { result } = renderAuth();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(81_000);
+      });
+
+      expect(refreshCalls()).toHaveLength(1);
+      expect(result.current.token).toBe("");
+      expect(result.current.isAuthenticated).toBe(false);
+      expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
+    });
+
+    it("retries a transiently failed scheduled refresh instead of logging out", async () => {
+      sessionStorage.setItem(TOKEN_KEY, makeJwt({ username: "ada", exp: nowSec() + 1000 }));
+      vi.mocked(fetch).mockRejectedValue(new TypeError("Failed to fetch"));
+      const { result } = renderAuth();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(801_000);
+      });
+      expect(refreshCalls()).toHaveLength(1);
+      expect(result.current.isAuthenticated).toBe(true);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+      expect(refreshCalls()).toHaveLength(2);
+      expect(result.current.isAuthenticated).toBe(true);
+    });
+
+    it("refreshes almost immediately when a stored token is near expiry", async () => {
+      sessionStorage.setItem(TOKEN_KEY, makeJwt({ username: "ada", exp: nowSec() + 2 }));
+      vi.mocked(fetch).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: makeJwt({ exp: nowSec() + 900 }) }),
+      } as Response);
+      renderAuth();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_700);
+      });
+
+      expect(refreshCalls()).toHaveLength(1);
+    });
+
+    it("schedules nothing for an already-expired or non-expiring token", async () => {
+      sessionStorage.setItem(TOKEN_KEY, makeJwt({ username: "ada", exp: nowSec() - 10 }));
+      const { unmount } = renderAuth();
+      unmount();
+      sessionStorage.setItem(TOKEN_KEY, makeJwt({ username: "svc" }));
+      renderAuth();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10 * 24 * 3600 * 1000);
+      });
+
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it("logout clears the pending refresh timer", async () => {
+      sessionStorage.setItem(TOKEN_KEY, makeJwt({ username: "ada", exp: nowSec() + 100 }));
+      const { result } = renderAuth();
+
+      act(() => {
+        result.current.logout();
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200_000);
+      });
+
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it("a token swap (e.g. loginWithToken) reschedules against the new expiry", async () => {
+      sessionStorage.setItem(TOKEN_KEY, makeJwt({ username: "ada", exp: nowSec() + 100 }));
+      vi.mocked(fetch).mockRejectedValue(new TypeError("offline"));
+      const { result } = renderAuth();
+
+      act(() => {
+        result.current.loginWithToken(makeJwt({ username: "bob", exp: nowSec() + 1000 }));
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100_000);
+      });
+      expect(refreshCalls()).toHaveLength(0);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(701_000);
+      });
+      expect(refreshCalls()).toHaveLength(1);
+    });
+
+    it(`adopts a token announced via ${TOKEN_REFRESHED_EVENT} (401 retry path)`, () => {
+      sessionStorage.setItem(TOKEN_KEY, makeJwt({ username: "ada", exp: nowSec() + 100 }));
+      const { result } = renderAuth();
+      const fresh = makeJwt({ username: "ada", exp: nowSec() + 900 });
+
+      act(() => {
+        window.dispatchEvent(new CustomEvent(TOKEN_REFRESHED_EVENT, { detail: fresh }));
+      });
+
+      expect(result.current.token).toBe(fresh);
     });
   });
 });
