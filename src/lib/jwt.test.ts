@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { decodeJwtClaims, isExpired } from "./jwt";
+import { decodeJwtClaims, localExpiryMs, refreshDelayMs } from "./jwt";
 
 /** Build a JWT-shaped string (`header.payload.signature`) whose payload is the
  * base64url encoding of `claims`. Only the payload segment is ever read, so the
@@ -24,6 +24,7 @@ describe("decodeJwtClaims", () => {
       email: "ada@example.com",
       role: "admin",
       exp: 1893456000,
+      iat: 1893455100,
     });
     expect(decodeJwtClaims(jwt)).toEqual({
       userId: "42",
@@ -31,6 +32,7 @@ describe("decodeJwtClaims", () => {
       email: "ada@example.com",
       role: "admin",
       exp: 1893456000,
+      iat: 1893455100,
       tenantId: "",
       activeTenantId: "",
       orgRole: "",
@@ -86,6 +88,7 @@ describe("decodeJwtClaims", () => {
       email: "",
       role: "",
       exp: 0,
+      iat: 0,
       tenantId: "",
       activeTenantId: "",
       orgRole: "",
@@ -94,13 +97,14 @@ describe("decodeJwtClaims", () => {
   });
 
   it("coerces wrong-typed claims to safe defaults", () => {
-    const jwt = makeJwt({ sub: null, username: 42, role: null, exp: "soon" });
+    const jwt = makeJwt({ sub: null, username: 42, role: null, exp: "soon", iat: "now" });
     expect(decodeJwtClaims(jwt)).toEqual({
       userId: "",
       username: "",
       email: "",
       role: "",
       exp: 0,
+      iat: 0,
       tenantId: "",
       activeTenantId: "",
       orgRole: "",
@@ -109,24 +113,48 @@ describe("decodeJwtClaims", () => {
   });
 });
 
-describe("isExpired", () => {
-  afterEach(() => vi.useRealTimers());
+describe("localExpiryMs (#53 review: clock skew)", () => {
+  const iat = 1_700_000_000; // server clock, seconds
+  const exp = iat + 300;
 
-  it("treats exp === 0 (no expiry) as never-expired", () => {
-    expect(isExpired(0)).toBe(false);
+  it("measures the lifetime (exp - iat) from the local receive time", () => {
+    // Client clock 10 minutes behind the server: server-clock exp would be
+    // 15 minutes away locally; the local expiry is 5 minutes after receipt.
+    const receivedAt = (iat - 600) * 1000;
+    expect(localExpiryMs(exp, iat, receivedAt)).toBe(receivedAt + 300_000);
   });
 
-  it("is true once the exp second has passed", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2030-01-01T00:00:10Z"));
-    const tenSecondsAgo = Math.floor(Date.parse("2030-01-01T00:00:00Z") / 1000);
-    expect(isExpired(tenSecondsAgo)).toBe(true);
+  it("falls back to the server-clock exp without iat or a receive time", () => {
+    expect(localExpiryMs(exp, 0, 123)).toBe(exp * 1000);
+    expect(localExpiryMs(exp, iat, null)).toBe(exp * 1000);
+    expect(localExpiryMs(exp, exp, 123)).toBe(exp * 1000); // nonsense iat
   });
 
-  it("is false while the exp is still in the future", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2030-01-01T00:00:00Z"));
-    const inAnHour = Math.floor(Date.parse("2030-01-01T01:00:00Z") / 1000);
-    expect(isExpired(inAnHour)).toBe(false);
+  it("is 0 (never) for a token without exp", () => {
+    expect(localExpiryMs(0, iat, 123)).toBe(0);
+  });
+});
+
+describe("refreshDelayMs (#53)", () => {
+  const now = 1_700_000_000_000;
+
+  it("is 80% of the span from receipt to expiry", () => {
+    expect(refreshDelayMs(now + 900_000, now, now)).toBe(720_000);
+    // Picked up again (e.g. after a reload) 100s after receipt.
+    expect(refreshDelayMs(now + 900_000, now, now + 100_000)).toBe(620_000);
+  });
+
+  it("is 0 once the 80% point has passed but the token is still valid", () => {
+    expect(refreshDelayMs(now + 900_000, now, now + 800_000)).toBe(0);
+  });
+
+  it("is null for an expired or non-expiring token", () => {
+    expect(refreshDelayMs(now - 1, now - 1000, now)).toBeNull();
+    expect(refreshDelayMs(now, now - 1000, now)).toBeNull();
+    expect(refreshDelayMs(0, now, now)).toBeNull();
+  });
+
+  it("clamps to setTimeout's 32-bit maximum", () => {
+    expect(refreshDelayMs(now + 365 * 24 * 3600 * 1000, now, now)).toBe(2 ** 31 - 1);
   });
 });

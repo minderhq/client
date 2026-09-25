@@ -5,8 +5,11 @@ import {
   apiFetchBlob,
   ApiError,
   friendlyErrorMessage,
+  refreshAccessToken,
   SESSION_EXPIRED_EVENT,
   TOKEN_KEY,
+  TOKEN_RECEIVED_AT_KEY,
+  TOKEN_REFRESHED_EVENT,
 } from "./api";
 
 describe("ApiError", () => {
@@ -260,6 +263,389 @@ describe("apiFetch", () => {
         }
       },
     );
+  });
+});
+
+describe("silent refresh on 401 (#53)", () => {
+  const REFRESH_URL = "http://localhost:8000/v1/auth/refresh";
+  const json = (status: number, data: unknown) =>
+    ({ ok: status >= 200 && status < 300, status, json: async () => data }) as Response;
+  const authOf = (init: RequestInit | undefined) =>
+    (init?.headers as Record<string, string> | undefined)?.Authorization;
+  const refreshCalls = () =>
+    vi.mocked(fetch).mock.calls.filter(([url]) => url === REFRESH_URL);
+
+  let onSessionExpired: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+    sessionStorage.clear();
+    sessionStorage.setItem(TOKEN_KEY, "old-token");
+    onSessionExpired = vi.fn();
+    window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+  });
+  afterEach(() => {
+    window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+    vi.unstubAllGlobals();
+  });
+
+  /** API that 401s the old token, accepts the new one, and answers the
+   * refresh endpoint with `refresh` (default: a new token). */
+  function mockApi(refresh: () => Promise<Response> = async () =>
+    json(200, { access_token: "new-token", expires_in: 900 })) {
+    vi.mocked(fetch).mockImplementation(async (url, init) => {
+      if (url === REFRESH_URL) return refresh();
+      return authOf(init) === "Bearer new-token"
+        ? json(200, { ok: true })
+        : json(401, { detail: "Token expired" });
+    });
+  }
+
+  it("refreshes once and replays the original request with the new token", async () => {
+    mockApi();
+    const onRefreshed = vi.fn();
+    window.addEventListener(TOKEN_REFRESHED_EVENT, onRefreshed);
+    try {
+      const result = await apiFetch("/v1/things", {
+        method: "POST",
+        body: { a: 1 },
+        token: "old-token",
+      });
+
+      expect(result).toEqual({ ok: true });
+      const calls = vi.mocked(fetch).mock.calls;
+      expect(calls.map(([url]) => url)).toEqual([
+        "http://localhost:8000/v1/things",
+        REFRESH_URL,
+        "http://localhost:8000/v1/things",
+      ]);
+      expect(authOf(calls[1][1])).toBe("Bearer old-token");
+      expect(calls[2][1]).toMatchObject({ method: "POST", body: JSON.stringify({ a: 1 }) });
+      expect(sessionStorage.getItem(TOKEN_KEY)).toBe("new-token");
+      expect((onRefreshed.mock.calls[0][0] as CustomEvent).detail).toBe("new-token");
+      expect(onSessionExpired).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener(TOKEN_REFRESHED_EVENT, onRefreshed);
+    }
+  });
+
+  it("also refreshes and replays for apiFetchBlob", async () => {
+    const blob = new Blob(["x"]);
+    vi.mocked(fetch).mockImplementation(async (url, init) => {
+      if (url === REFRESH_URL) return json(200, { access_token: "new-token" });
+      if (authOf(init) === "Bearer new-token") {
+        return { ok: true, status: 200, blob: async () => blob, headers: new Headers() } as Response;
+      }
+      return json(401, { detail: "Token expired" });
+    });
+
+    const result = await apiFetchBlob("/v1/tts", { token: "old-token" });
+
+    expect(result.blob).toBe(blob);
+    expect(refreshCalls()).toHaveLength(1);
+  });
+
+  it.each([401, 403])("logs out when the refresh itself is rejected with %d", async (status) => {
+    mockApi(async () => json(status, { detail: "Account is disabled" }));
+
+    await expect(apiFetch("/v1/things", { token: "old-token" })).rejects.toMatchObject({
+      status: 401,
+    });
+
+    expect(refreshCalls()).toHaveLength(1);
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
+    expect(onSessionExpired).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs out when the refresh fails with a network error", async () => {
+    mockApi(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+
+    await expect(apiFetch("/v1/things", { token: "old-token" })).rejects.toMatchObject({
+      status: 401,
+    });
+
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
+    expect(onSessionExpired).toHaveBeenCalledTimes(1);
+  });
+
+  it("replays only once: a 401 on the replay logs out without another refresh", async () => {
+    vi.mocked(fetch).mockImplementation(async (url) =>
+      url === REFRESH_URL
+        ? json(200, { access_token: "new-token" })
+        : json(401, { detail: "nope" }),
+    );
+
+    await expect(apiFetch("/v1/things", { token: "old-token" })).rejects.toMatchObject({
+      status: 401,
+    });
+
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(3);
+    expect(refreshCalls()).toHaveLength(1);
+    expect(onSessionExpired).toHaveBeenCalledTimes(1);
+  });
+
+  it("shares one refresh between concurrent 401s", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    mockApi(async () => {
+      await gate;
+      return json(200, { access_token: "new-token" });
+    });
+
+    const requests = Array.from({ length: 5 }, (_, i) =>
+      apiFetch(`/v1/things/${i}`, { token: "old-token" }),
+    );
+    await vi.waitFor(() => expect(refreshCalls()).toHaveLength(1));
+    release();
+
+    await expect(Promise.all(requests)).resolves.toHaveLength(5);
+    expect(refreshCalls()).toHaveLength(1);
+    expect(onSessionExpired).not.toHaveBeenCalled();
+  });
+
+  it("replays with an already-refreshed stored token instead of refreshing again", async () => {
+    sessionStorage.setItem(TOKEN_KEY, "new-token");
+    mockApi();
+
+    await expect(apiFetch("/v1/things", { token: "old-token" })).resolves.toEqual({ ok: true });
+
+    expect(refreshCalls()).toHaveLength(0);
+  });
+
+  describe("replay identity guard (#53 review)", () => {
+    const jwt = (claims: Record<string, unknown>) =>
+      `h.${btoa(JSON.stringify(claims)).replace(/=+$/, "")}.s`;
+    const mine = jwt({ sub: "1", active_tenant_id: "10", exp: 2e9 });
+
+    function mockServer(accepts: string, refresh?: () => Promise<Response>) {
+      vi.mocked(fetch).mockImplementation(async (url, init) => {
+        if (url === REFRESH_URL && refresh) return refresh();
+        return authOf(init) === `Bearer ${accepts}`
+          ? json(200, { ok: true })
+          : json(401, { detail: "Token expired" });
+      });
+    }
+
+    it("replays with a newer stored token of the same user and org", async () => {
+      const newer = jwt({ sub: "1", active_tenant_id: "10", exp: 2e9 + 1 });
+      sessionStorage.setItem(TOKEN_KEY, newer);
+      mockServer(newer);
+
+      await expect(apiFetch("/v1/things", { token: mine })).resolves.toEqual({ ok: true });
+      expect(refreshCalls()).toHaveLength(0);
+    });
+
+    it.each([
+      ["another org (switchOrg)", { sub: "1", active_tenant_id: "20", exp: 2e9 }],
+      ["another user", { sub: "2", active_tenant_id: "10", exp: 2e9 }],
+    ])(
+      "does not replay with a stored token for %s, and keeps that session",
+      async (_label, claims) => {
+        const other = jwt(claims);
+        sessionStorage.setItem(TOKEN_KEY, other);
+        sessionStorage.setItem(TOKEN_RECEIVED_AT_KEY, "1234567");
+        mockServer(other);
+
+        // The stale caller still gets its 401 ...
+        const err = await apiFetch("/v1/things", { token: mine }).catch((e) => e);
+        expect(err).toBeInstanceOf(ApiError);
+        expect(err).toMatchObject({ status: 401 });
+        // ... with no replay as someone else ...
+        expect(vi.mocked(fetch).mock.calls).toHaveLength(1);
+        // ... and the current, valid session is left alone.
+        expect(sessionStorage.getItem(TOKEN_KEY)).toBe(other);
+        expect(sessionStorage.getItem(TOKEN_RECEIVED_AT_KEY)).toBe("1234567");
+        expect(onSessionExpired).not.toHaveBeenCalled();
+      },
+    );
+
+    it("keeps the session for a stale apiFetchBlob request too", async () => {
+      const other = jwt({ sub: "1", active_tenant_id: "20", exp: 2e9 });
+      sessionStorage.setItem(TOKEN_KEY, other);
+      mockServer(other);
+
+      await expect(apiFetchBlob("/v1/tts", { token: mine })).rejects.toMatchObject({
+        status: 401,
+      });
+      expect(sessionStorage.getItem(TOKEN_KEY)).toBe(other);
+      expect(onSessionExpired).not.toHaveBeenCalled();
+    });
+
+    it("does not replay with a token swapped in for another org mid-refresh", async () => {
+      const other = jwt({ sub: "1", active_tenant_id: "20", exp: 2e9 });
+      sessionStorage.setItem(TOKEN_KEY, mine);
+      mockServer(other, async () => {
+        sessionStorage.setItem(TOKEN_KEY, other); // switchOrg lands meanwhile
+        return json(200, { access_token: jwt({ sub: "1", active_tenant_id: "10" }) });
+      });
+
+      await expect(apiFetch("/v1/things", { token: mine })).rejects.toMatchObject({
+        status: 401,
+      });
+      expect(vi.mocked(fetch).mock.calls).toHaveLength(2); // original + refresh
+      expect(sessionStorage.getItem(TOKEN_KEY)).toBe(other);
+      expect(onSessionExpired).not.toHaveBeenCalled();
+    });
+
+    it("still logs out when the caller's own token is rejected on refresh", async () => {
+      sessionStorage.setItem(TOKEN_KEY, mine);
+      sessionStorage.setItem(TOKEN_RECEIVED_AT_KEY, "1234567");
+      mockServer("nobody", async () => json(401, { detail: "Account is disabled" }));
+
+      await expect(apiFetch("/v1/things", { token: mine })).rejects.toMatchObject({
+        status: 401,
+      });
+      expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
+      expect(sessionStorage.getItem(TOKEN_RECEIVED_AT_KEY)).toBeNull();
+      expect(onSessionExpired).toHaveBeenCalledTimes(1);
+    });
+
+    it("still logs out when the replay with a same-session token 401s", async () => {
+      const newer = jwt({ sub: "1", active_tenant_id: "10", exp: 2e9 + 1 });
+      sessionStorage.setItem(TOKEN_KEY, newer);
+      mockServer("nobody");
+
+      await expect(apiFetch("/v1/things", { token: mine })).rejects.toMatchObject({
+        status: 401,
+      });
+      expect(vi.mocked(fetch).mock.calls).toHaveLength(2); // original + replay
+      expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
+      expect(onSessionExpired).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not replay in another org when its own refresh re-derived the org", async () => {
+      // The API falls back to the home org on refresh when the user was removed
+      // from / suspended in the org they had switched into: a request meant for
+      // org 10 must never be silently re-sent in org 99.
+      const minted = jwt({ sub: "1", active_tenant_id: "99", exp: 2e9 });
+      sessionStorage.setItem(TOKEN_KEY, mine);
+      mockServer(minted, async () => json(200, { access_token: minted }));
+      const onRefreshed = vi.fn();
+      window.addEventListener(TOKEN_REFRESHED_EVENT, onRefreshed);
+      try {
+        await expect(
+          apiFetch("/v1/things", { method: "POST", body: { a: 1 }, token: mine }),
+        ).rejects.toMatchObject({ status: 401 });
+        // Original request + refresh only -- no replay as org 99.
+        expect(vi.mocked(fetch).mock.calls.map(([url]) => url)).toEqual([
+          "http://localhost:8000/v1/things",
+          REFRESH_URL,
+        ]);
+        // The new token is still adopted, and the session is kept.
+        expect(sessionStorage.getItem(TOKEN_KEY)).toBe(minted);
+        expect((onRefreshed.mock.calls[0][0] as CustomEvent).detail).toBe(minted);
+        expect(onSessionExpired).not.toHaveBeenCalled();
+      } finally {
+        window.removeEventListener(TOKEN_REFRESHED_EVENT, onRefreshed);
+      }
+    });
+
+    it("does not hand a caller another token's in-flight refresh result", async () => {
+      // A refresh for org 10's token is still in flight when switchOrg swaps in
+      // org 20's token; a request made with the org-20 token then 401s. It must
+      // get its own refresh, not org 10's result.
+      const other = jwt({ sub: "1", active_tenant_id: "20", exp: 2e9 });
+      const otherRefreshed = jwt({ sub: "1", active_tenant_id: "20", exp: 2e9 + 1 });
+      let releaseMine!: () => void;
+      const mineGate = new Promise<void>((r) => (releaseMine = r));
+      sessionStorage.setItem(TOKEN_KEY, mine);
+      vi.mocked(fetch).mockImplementation(async (url, init) => {
+        if (url === REFRESH_URL) {
+          if (authOf(init) === `Bearer ${mine}`) {
+            await mineGate;
+            return json(200, { access_token: jwt({ sub: "1", active_tenant_id: "10" }) });
+          }
+          return json(200, { access_token: otherRefreshed });
+        }
+        return authOf(init) === `Bearer ${otherRefreshed}`
+          ? json(200, { ok: true })
+          : json(401, { detail: "Token expired" });
+      });
+
+      const pendingMine = refreshAccessToken(mine);
+      sessionStorage.setItem(TOKEN_KEY, other); // switchOrg lands meanwhile
+
+      await expect(apiFetch("/v1/things", { token: other })).resolves.toEqual({ ok: true });
+      expect(refreshCalls().map(([, init]) => authOf(init))).toEqual([
+        `Bearer ${mine}`,
+        `Bearer ${other}`,
+      ]);
+      expect(sessionStorage.getItem(TOKEN_KEY)).toBe(otherRefreshed);
+      expect(onSessionExpired).not.toHaveBeenCalled();
+
+      releaseMine();
+      // The superseded refresh doesn't resurrect org 10 over org 20.
+      await expect(pendingMine).resolves.toBe(otherRefreshed);
+      expect(sessionStorage.getItem(TOKEN_KEY)).toBe(otherRefreshed);
+    });
+
+    it("replays with the token its own refresh minted for the same user and org", async () => {
+      const minted = jwt({ sub: "1", active_tenant_id: "10", exp: 2e9 + 1 });
+      sessionStorage.setItem(TOKEN_KEY, mine);
+      mockServer(minted, async () => json(200, { access_token: minted }));
+
+      await expect(apiFetch("/v1/things", { token: mine })).resolves.toEqual({ ok: true });
+      expect(onSessionExpired).not.toHaveBeenCalled();
+    });
+  });
+
+  it("records the local receive time alongside a refreshed token", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(1_234_567);
+    mockApi();
+    try {
+      await apiFetch("/v1/things", { token: "old-token" });
+      expect(sessionStorage.getItem(TOKEN_RECEIVED_AT_KEY)).toBe("1234567");
+    } finally {
+      vi.mocked(Date.now).mockRestore();
+    }
+  });
+
+  it("does not refresh an unauthenticated request", async () => {
+    mockApi();
+
+    await expect(apiFetch("/v1/things")).rejects.toMatchObject({ status: 401 });
+
+    expect(refreshCalls()).toHaveLength(0);
+    expect(onSessionExpired).toHaveBeenCalledTimes(1);
+  });
+
+  it("never recurses: a 401 from the refresh endpoint makes exactly one refresh call", async () => {
+    vi.mocked(fetch).mockResolvedValue(json(401, { detail: "Token expired" }));
+
+    await expect(refreshAccessToken("old-token")).resolves.toBeNull();
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith(
+      REFRESH_URL,
+      expect.objectContaining({ method: "POST", headers: { Authorization: "Bearer old-token" } }),
+    );
+    // Rejection is reported to the caller, not acted on here.
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBe("old-token");
+    expect(onSessionExpired).not.toHaveBeenCalled();
+  });
+
+  it("rejects (rather than resolving null) on a transient 5xx", async () => {
+    vi.mocked(fetch).mockResolvedValue(json(503, { detail: "unavailable" }));
+
+    await expect(refreshAccessToken("old-token")).rejects.toMatchObject({ status: 503 });
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBe("old-token");
+  });
+
+  it("does not resurrect a session that was logged out while the refresh was in flight", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    vi.mocked(fetch).mockImplementation(async () => {
+      await gate;
+      return json(200, { access_token: "new-token" });
+    });
+
+    const pending = refreshAccessToken("old-token");
+    sessionStorage.removeItem(TOKEN_KEY); // logout
+    release();
+
+    await expect(pending).resolves.toBeNull();
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
   });
 });
 
