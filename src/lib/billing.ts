@@ -15,6 +15,10 @@ export interface Subscription {
   provider: string | null;
   /** True when there's a provider subscription the customer portal can manage. */
   manageable: boolean;
+  /** Whether the CALLER may start a checkout / open the portal (org owner, billing
+   * manager, or Platform Admin — minder#2036). The backend enforces it; this only
+   * decides which actions to show. Absent on older backends → treated as allowed. */
+  can_manage?: boolean;
 }
 
 export function fetchSubscription(token: string, signal?: AbortSignal) {

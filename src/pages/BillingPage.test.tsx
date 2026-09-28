@@ -28,6 +28,7 @@ function sub(overrides: Partial<Subscription> = {}): Subscription {
     valid_until: null,
     provider: null,
     manageable: false,
+    can_manage: true,
     ...overrides,
   };
 }
@@ -127,5 +128,46 @@ describe("BillingPage", () => {
     fireEvent.click(await screen.findByText("Upgrade to Pro"));
     expect(await screen.findByText("Billing is not configured")).toBeTruthy();
     expect(redirectTo).not.toHaveBeenCalled();
+  });
+
+  it("hides checkout and portal actions from callers without billing-manage", async () => {
+    apiFetch.mockResolvedValueOnce(
+      sub({
+        tier: "pro",
+        baseline: false,
+        status: "active",
+        manageable: true,
+        provider: "lemonsqueezy",
+        can_manage: false,
+      }),
+    );
+    render(<BillingPage />);
+    expect(await screen.findByText("Pro")).toBeTruthy();
+    expect(screen.queryByText("Manage subscription")).toBeNull();
+    expect(screen.queryByText(/Upgrade to/)).toBeNull();
+    expect(screen.getByText(/owners and billing managers/)).toBeTruthy();
+    expect(apiFetch).toHaveBeenCalledTimes(1); // only the subscription read
+  });
+
+  it("keeps the actions when an older backend omits can_manage", async () => {
+    const { can_manage: _omit, ...legacy } = sub();
+    void _omit;
+    apiFetch.mockResolvedValueOnce(legacy);
+    render(<BillingPage />);
+    expect(await screen.findByText("Upgrade to Pro")).toBeTruthy();
+    expect(screen.queryByText(/owners and billing managers/)).toBeNull();
+  });
+
+  it("shows the permission error when the plan itself is off-limits", async () => {
+    apiFetch.mockRejectedValueOnce(
+      new Error("You don't have permission to view billing for this organization"),
+    );
+    render(<BillingPage />);
+    expect(
+      await screen.findByText(
+        "You don't have permission to view billing for this organization",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Upgrade to/)).toBeNull();
   });
 });

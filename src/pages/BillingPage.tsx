@@ -109,6 +109,8 @@ export function BillingPage() {
   }
 
   const sub = subRes.data;
+  // minder#2036: members without billing-manage authority get a read-only view.
+  const canManage = sub?.can_manage !== false;
 
   return (
     <>
@@ -129,28 +131,37 @@ export function BillingPage() {
         <>
           <PlanCard sub={sub} />
 
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            {sub.manageable && (
-              <button
-                onClick={handleManage}
-                disabled={busy}
-                className={secondaryButtonClass}
-              >
-                <Icon name="billing" className="mr-1.5 h-4 w-4" />
-                Manage subscription
-              </button>
-            )}
-            {UPGRADE_TIERS.filter((t) => t !== sub.tier).map((tier) => (
-              <button
-                key={tier}
-                onClick={() => handleUpgrade(tier)}
-                disabled={busy}
-                className={primaryButtonClass}
-              >
-                Upgrade to {titleCase(tier)}
-              </button>
-            ))}
-          </div>
+          {!canManage && (
+            <InfoCallout icon="lock">
+              Only your organization's owners and billing managers can change the
+              plan or payment details.
+            </InfoCallout>
+          )}
+
+          {canManage && (
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              {sub.manageable && (
+                <button
+                  onClick={handleManage}
+                  disabled={busy}
+                  className={secondaryButtonClass}
+                >
+                  <Icon name="billing" className="mr-1.5 h-4 w-4" />
+                  Manage subscription
+                </button>
+              )}
+              {UPGRADE_TIERS.filter((t) => t !== sub.tier).map((tier) => (
+                <button
+                  key={tier}
+                  onClick={() => handleUpgrade(tier)}
+                  disabled={busy}
+                  className={primaryButtonClass}
+                >
+                  Upgrade to {titleCase(tier)}
+                </button>
+              ))}
+            </div>
+          )}
 
           {status && <StatusLine isError={isError}>{status}</StatusLine>}
         </>
