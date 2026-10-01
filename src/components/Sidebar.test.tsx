@@ -11,9 +11,32 @@ vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
 }));
 
+let mockBilling = true;
+vi.mock("../lib/useBillingAccess", () => ({
+  useBillingAccess: () => mockBilling,
+}));
+
 describe("Sidebar", () => {
   beforeEach(() => {
     mockAuth = { role: "" };
+    mockBilling = true;
+  });
+
+  it("shows Billing only to callers who may view billing (#64)", () => {
+    const { unmount } = render(
+      <MemoryRouter>
+        <Sidebar open={false} onNavigate={() => {}} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("Billing").closest("a")?.getAttribute("href")).toBe("/billing");
+    unmount();
+    mockBilling = false;
+    render(
+      <MemoryRouter>
+        <Sidebar open={false} onNavigate={() => {}} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByText("Billing")).toBeNull();
   });
   afterEach(cleanup);
 

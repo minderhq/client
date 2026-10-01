@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 
 import { useAuth } from "../lib/auth";
 import { entryIsActive, NAV_SECTIONS } from "../lib/nav";
+import { useBillingAccess } from "../lib/useBillingAccess";
 import { sectionLabelClass } from "../lib/ui";
 import { BrandMark } from "./BrandMark";
 import { Icon } from "./Icon";
@@ -28,6 +29,7 @@ export function Sidebar({
 }) {
   const { role } = useAuth();
   const isAdmin = role === "admin";
+  const billing = useBillingAccess();
   const { pathname } = useLocation();
 
   return (
@@ -61,7 +63,9 @@ export function Sidebar({
 
       <nav className="flex flex-1 flex-col gap-5 px-3 pb-6">
         {NAV_SECTIONS.map((section, i) => {
-          const items = section.items.filter((item) => !item.adminOnly || isAdmin);
+          const items = section.items.filter(
+            (item) => (!item.adminOnly || isAdmin) && (!item.requiresBilling || billing),
+          );
           if (items.length === 0) return null;
           return (
             <div key={section.label ?? `top-${i}`}>

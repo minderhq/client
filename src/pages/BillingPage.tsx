@@ -67,11 +67,14 @@ export function PlanCard({ sub }: { sub: Subscription }) {
 }
 
 export function BillingPage() {
-  const { token } = useAuth();
+  const { token, sessionKey } = useAuth();
 
+  // Keyed on the session identity (user + active org): an org switch that
+  // doesn't remount the page must not leave the previous org's plan and
+  // can_manage on screen (#64).
   const subRes = useAsyncResource(
     (signal) => fetchSubscription(token, signal),
-    { enabled: Boolean(token) },
+    { enabled: Boolean(token), deps: [sessionKey] },
   );
 
   const [status, setStatus] = useState("");
