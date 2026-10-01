@@ -9,6 +9,8 @@ export interface NavLeaf {
   end?: boolean;
   /** Hidden for non-admins (the destination 403s them anyway). */
   adminOnly?: boolean;
+  /** Shown only when the caller may view this org's billing (#64). */
+  requiresBilling?: boolean;
   /** Extra search terms for the command palette (synonyms not in the label). */
   keywords?: string;
   /** One-line "what you do here", shown as a sidebar tooltip, on the page
@@ -141,7 +143,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Organization",
     items: [
       { to: "/organization", label: "Overview", icon: "org", end: true, description: "Your org, its members & switching", keywords: "organization tenant workspace switch members" },
-      { to: "/billing", label: "Billing", icon: "billing", description: "Your plan, subscription & upgrades", keywords: "subscription plan upgrade payment tier pricing invoice" },
+      { to: "/billing", label: "Billing", icon: "billing", requiresBilling: true, description: "Your plan, subscription & upgrades", keywords: "subscription plan upgrade payment tier pricing invoice" },
       { to: "/platform/teams", label: "Teams", icon: "teams", description: "Group people & share resources", keywords: "groups members sharing collaborate" },
       { to: "/organizations", label: "All Organizations", icon: "org", adminOnly: true, description: "Every org on the instance + provisioning (admin)", keywords: "organizations tenants provision create admin" },
       { to: "/platform/users", label: "All Users", icon: "users", adminOnly: true, description: "Instance-wide accounts & roles (admin) — distinct from this org's members above", keywords: "users accounts roles admin people members" },

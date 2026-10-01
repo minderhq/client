@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { apiFetch } from "../lib/api";
+import { useBillingAccess } from "../lib/useBillingAccess";
 import { useAuth } from "../lib/auth";
 import { NAV_DESTINATIONS } from "../lib/nav";
 import { getTheme, setTheme, type Theme } from "../lib/theme";
@@ -36,6 +37,7 @@ export function CommandPalette({
   const { role, sessionKey } = useAuth();
   const tokenRef = useTokenRef();
   const isAdmin = role === "admin";
+  const billing = useBillingAccess();
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -44,7 +46,7 @@ export function CommandPalette({
 
   const commands = useMemo<Command[]>(() => {
     const nav: Command[] = NAV_DESTINATIONS.filter(
-      (dest) => !dest.adminOnly || isAdmin,
+      (dest) => (!dest.adminOnly || isAdmin) && (!dest.requiresBilling || billing),
     ).map((dest) => ({
       id: `nav:${dest.to}:${dest.label}`,
       label: dest.label,
@@ -67,7 +69,7 @@ export function CommandPalette({
       { id: "act:theme", label: "Toggle theme", sublabel: "System / light / dark", icon: "theme-dark", group: "Actions", keywords: "dark light mode appearance", run: cycleTheme },
     ];
     return [...actions, ...nav];
-  }, [isAdmin]);
+  }, [isAdmin, billing]);
 
   const staticResults = useMemo(() => {
     const q = query.trim().toLowerCase();
