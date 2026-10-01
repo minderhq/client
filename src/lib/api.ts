@@ -99,6 +99,26 @@ const refreshInFlight = new Map<string, Promise<string | null>>();
  * expiry, abandoned after it. */
 export const REFRESH_TIMEOUT_MS = 15_000;
 
+/** Takes over `next`, a token the API just minted for the session that sent
+ * `previous` (a refresh, or a password change that revoked every older token,
+ * minderhq/minder#2041): stores it and announces it via TOKEN_REFRESHED_EVENT,
+ * so every listener moves to it. If the session moved on in the meantime
+ * (logout, an org switch), nothing is resurrected: returns the current token
+ * instead. */
+export function adoptAccessToken(
+  previous: string,
+  next: string,
+  receivedAt: number = Date.now(),
+): string | null {
+  const current = sessionStorage.getItem(TOKEN_KEY);
+  if (current !== previous) return current;
+  storeToken(next, receivedAt);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(TOKEN_REFRESHED_EVENT, { detail: next }));
+  }
+  return next;
+}
+
 /** Exchanges `token` for a fresh one via `POST /v1/auth/refresh` (the API
  * re-validates the account and re-mints from the bearer token, which may
  * already have expired -- whether it still accepts it is the API's call,
@@ -132,16 +152,8 @@ export function refreshAccessToken(token: string): Promise<string | null> {
       }
       // The session moved on while the refresh was in flight: logout (storage
       // cleared) or a token swap (switchOrg / loginWithToken). Don't resurrect
-      // the old session over it -- hand back whatever is current instead.
-      const current = sessionStorage.getItem(TOKEN_KEY);
-      if (current !== token) return current;
-      storeToken(data.access_token, sentAt);
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(
-          new CustomEvent(TOKEN_REFRESHED_EVENT, { detail: data.access_token }),
-        );
-      }
-      return data.access_token;
+      // the old session over it -- adoptAccessToken hands back what's current.
+      return adoptAccessToken(token, data.access_token, sentAt);
     })().finally(() => {
       refreshInFlight.delete(token);
     });
