@@ -48,9 +48,8 @@ interface AuthContextValue {
    * a tab reloaded or woken after expiry mustn't flash the logged-out state
    * or route to login before that refresh settles. */
   isAuthenticated: boolean;
-  /** Set when the login response says an admin reset this account's password
-   * (minderhq/minder#1776): the app must force the change-password form
-   * before anything else. */
+  /** Set when the login response says an admin reset this account's password:
+   * the app must force the change-password form before anything else. */
   mustChangePassword: boolean;
   /** Clear the forced-change state after a successful password change. */
   clearMustChangePassword: () => void;
@@ -234,7 +233,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Past expiry (#56) -- a token reloaded after it expired, or a timer that
   // fired late after a wake -- exactly one refresh is still tried. Today's API
   // rejects it (401/403), which logs out as it always did; once
-  // minderhq/minder#1933 adds a grace window on /refresh, it succeeds. The
+  // the API adds a grace window on /refresh, it succeeds. The
   // client doesn't guess that window's length: the server decides. If that
   // one attempt fails transiently, the token is abandoned (reads as logged
   // out) rather than retried forever.

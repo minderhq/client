@@ -170,7 +170,7 @@ describe("SettingsPage", () => {
     expect(await screen.findByText("nope")).toBeTruthy();
   });
 
-  describe("change password (minderhq/minder#1776)", () => {
+  describe("change password", () => {
     function fill(current: string, next: string, confirm: string) {
       fireEvent.change(screen.getByLabelText("Current password"), {
         target: { value: current },

@@ -7,8 +7,8 @@ import { secondaryButtonClass } from "../lib/ui";
 import { ChangePasswordSection } from "./SettingsPage";
 
 /** Shown in place of every route while `mustChangePassword` is set, i.e. the
- * login response said an admin reset this account's password
- * (minderhq/minder#1776). The admin knows the current password, so the user
+ * login response said an admin reset this account's password.
+ * The admin knows the current password, so the user
  * must pick their own before using the app; a successful change clears the
  * flag server-side and here. */
 export function ForcePasswordChangePage() {

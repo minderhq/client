@@ -100,8 +100,8 @@ const refreshInFlight = new Map<string, Promise<string | null>>();
 export const REFRESH_TIMEOUT_MS = 15_000;
 
 /** Takes over `next`, a token the API just minted for the session that sent
- * `previous` (a refresh, or a password change that revoked every older token,
- * minderhq/minder#2041): stores it and announces it via TOKEN_REFRESHED_EVENT,
+ * `previous` (a refresh, or a password change that revoked every older
+ * token): stores it and announces it via TOKEN_REFRESHED_EVENT,
  * so every listener moves to it. If the session moved on in the meantime
  * (logout, an org switch), nothing is resurrected: returns the current token
  * instead. */

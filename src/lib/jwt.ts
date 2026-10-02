@@ -57,7 +57,7 @@ export function localExpiryMs(
  * refreshes at 80% of its life and one picked up from sessionStorage late in
  * its life refreshes almost immediately. An already-expired token is due at
  * once (0): the client still tries one refresh (#56) -- the API may accept it
- * inside its grace window (minderhq/minder#1933), and otherwise rejects it
+ * inside its grace window, and otherwise rejects it
  * with 401/403, which logs out as before. `null` only when the token has no
  * expiry, so there is nothing to schedule. */
 export function refreshDelayMs(

@@ -26,7 +26,7 @@ const TOKEN_DEPS_SELECTORS = [
   },
 ];
 
-// minderhq/minder#2069 (G7): the tier vocabulary lives in ONE module
+// The tier vocabulary lives in ONE module
 // (src/lib/billing.ts, mirroring the backend's shared/models/tiers.py);
 // authorization should follow capabilities the API returns, not plan names
 // sprinkled through the UI. "free" is deliberately not matched: it is also a
@@ -34,7 +34,7 @@ const TOKEN_DEPS_SELECTORS = [
 const TIER_LITERAL_SELECTOR = {
   selector: "Literal[value=/^(community|pro|professional|enterprise)$/]",
   message:
-    "Tier names belong in src/lib/billing.ts only (minderhq/minder#2069): import a constant from there instead of a tier string literal.",
+    "Tier names belong in src/lib/billing.ts only: import a constant from there instead of a tier string literal.",
 };
 const TIER_LITERAL_EXEMPT = [
   "src/lib/billing.ts",
