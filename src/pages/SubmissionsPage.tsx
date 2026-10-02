@@ -6,6 +6,7 @@ import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
 import { apiFetch, friendlyErrorMessage } from "../lib/api";
+import { DEFAULT_SUBMISSION_TIER } from "../lib/billing";
 import { useAsyncResource } from "../lib/useAsyncResource";
 import { useAuth } from "../lib/auth";
 import {
@@ -80,7 +81,7 @@ function NewSubmissionForm({ onCreated }: { onCreated: () => void }) {
   const [dockerImage, setDockerImage] = useState("");
   const [pricingModel, setPricingModel] =
     useState<(typeof PRICING_MODELS)[number]>("free");
-  const [baseTier, setBaseTier] = useState("community");
+  const [baseTier, setBaseTier] = useState<string>(DEFAULT_SUBMISSION_TIER);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [isError, setIsError] = useState(false);
