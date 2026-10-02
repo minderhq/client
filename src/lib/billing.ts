@@ -59,3 +59,7 @@ export function openBillingPortal(token: string) {
  * tier vocabulary (shared/models/tiers); a tier with no configured provider
  * variant simply 422s at checkout, surfaced to the user. */
 export const UPGRADE_TIERS = ["pro", "enterprise"] as const;
+
+/** Default `base_tier` proposed for a new plugin submission (the free baseline
+ * plan; same vocabulary as UPGRADE_TIERS). */
+export const DEFAULT_SUBMISSION_TIER = "community";
