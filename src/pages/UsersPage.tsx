@@ -105,7 +105,7 @@ function RoleControl({
   );
 }
 
-/** Deactivate / reactivate an account (minderhq/minder#1803): the gateway's
+/** Deactivate / reactivate an account: the gateway's
  * soft, reversible kill-switch -- a deactivated account can't sign in
  * (password or SSO) or refresh its token, but its data stays intact. Hidden on
  * the caller's own row (the gateway refuses self-deactivation anyway); the
@@ -182,7 +182,7 @@ interface ResetPasswordResult {
   temporary_password: string | null;
 }
 
-/** Admin reset of another user's LOCAL password (minderhq/minder#1776):
+/** Admin reset of another user's LOCAL password:
  * either the admin types a new password or the gateway generates a strong
  * temporary one, which is shown exactly once here. Either way the user's
  * sessions are signed out and they must change it on next sign-in. Hidden on

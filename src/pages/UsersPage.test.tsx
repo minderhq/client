@@ -150,7 +150,7 @@ describe("UsersPage", () => {
     await screen.findByText("managed by Authelia");
   });
 
-  describe("deactivate / reactivate (minderhq/minder#1803)", () => {
+  describe("deactivate / reactivate", () => {
     function listing(users: ManagedUser[]) {
       apiFetch.mockImplementation(
         (_path: string, opts?: { method?: string }) => {

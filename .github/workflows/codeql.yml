@@ -1,6 +1,6 @@
 name: CodeQL
 
-# minderhq/minder#2071 (G14): static analysis for the SPA's TypeScript (and
+# Static analysis for the SPA's TypeScript (and
 # this repo's workflows). Public repo -> GitHub-hosted, code scanning is free.
 # Results land in Security > Code scanning; findings annotate the PR.
 

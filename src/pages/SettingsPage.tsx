@@ -224,7 +224,7 @@ export function SettingsPage() {
   );
 }
 
-/** Change the caller's own LOCAL password (minderhq/minder#1776). SSO-linked
+/** Change the caller's own LOCAL password. SSO-linked
  * accounts are refused by the gateway with a 409 whose message points at the
  * Authelia portal — surfaced as-is, since the client can't tell the two
  * account kinds apart from the JWT alone. */
