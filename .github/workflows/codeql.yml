@@ -1,0 +1,49 @@
+name: CodeQL
+
+# minderhq/minder#2071 (G14): static analysis for the SPA's TypeScript (and
+# this repo's workflows). Public repo -> GitHub-hosted, code scanning is free.
+# Results land in Security > Code scanning; findings annotate the PR.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: [ '**/*.md' ]
+  pull_request:
+    branches: [main]
+    paths-ignore: [ '**/*.md' ]
+  schedule:
+    - cron: '23 4 * * 1'  # weekly, so new queries run against an idle main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, actions]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          # No build step needed for either language.
+          build-mode: none
+          queries: security-extended
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
