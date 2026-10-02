@@ -29,9 +29,9 @@ jobs:
     # cache is runner-independent, so self-hosted gave it nothing here anyway.)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.14.0'
           cache: 'npm'
@@ -61,9 +61,9 @@ jobs:
     # cache is runner-independent, so self-hosted gave it nothing here anyway.)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Build image
         # A plain `docker build` here had no layer caching at all -- on
@@ -76,7 +76,7 @@ jobs:
         # cache backend (type=gha) gives buildx a persistent layer cache
         # across runs regardless of runner type -- validation-only build
         # (push: false), nothing is published from here.
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           tags: minder-client:ci
