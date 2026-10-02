@@ -101,3 +101,28 @@ tests via `@testing-library/react` work, but add an explicit `cleanup()` in
 `afterEach` — there's no global setup file, so auto-cleanup isn't registered.
 Fake-timer tests must use `vi.advanceTimersByTimeAsync` (not `waitFor`, which
 deadlocks under fake timers).
+
+## API contract
+
+`openapi/api-gateway.json` is the API Gateway's OpenAPI spec, synced from the
+published copy on the docs site
+(`https://raw.githubusercontent.com/minderhq/docs/main/docs/api/openapi/api-gateway.json`).
+
+- **`npm run gen:api`** regenerates `src/lib/api-types.gen.ts` from it with
+  `openapi-typescript` (pinned devDependency). Never edit the generated file;
+  the hand-written DTOs in `lib/types.ts` etc. can adopt these types over time.
+- **`src/lib/apiContract.test.ts`** (part of `npm test`) checks every `/v1/...`
+  path the client uses -- and, for `apiFetch`/`apiFetchBlob`/`fetch` calls with
+  an inline `method`, the method -- exists in the spec. A call to a route the
+  gateway doesn't serve fails CI. Known gaps go in its `KNOWN_MISSING` map, each
+  with a reason.
+- **CI drift check:** CI downloads the published spec, runs `gen:api`, and fails
+  if `openapi/` or the generated types differ from what's committed. When the
+  gateway's API changes, sync with:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/minderhq/docs/main/docs/api/openapi/api-gateway.json \
+  -o openapi/api-gateway.json
+npm run gen:api
+npm test
+```
