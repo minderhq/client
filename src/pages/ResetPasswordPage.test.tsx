@@ -98,6 +98,16 @@ describe("ResetPasswordPage", () => {
     );
   });
 
+  it("counts the minimum length in characters as the gateway does, not UTF-16 units", async () => {
+    renderAt("/reset-password#token=t");
+    await screen.findByLabelText("New password");
+    // Four emoji: 8 UTF-16 units, but 4 characters, which the gateway refuses.
+    fill("\u{1F600}".repeat(4));
+    submit();
+    expect((await screen.findByRole("alert")).textContent).toMatch(/at least 8 characters/);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("checks the confirmation matches", async () => {
     renderAt("/reset-password#token=t");
     await screen.findByLabelText("New password");

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import { StatusLine } from "../components/StatusLine";
@@ -49,11 +49,23 @@ export function LoginPage() {
     usePasswordResetAvailable();
 
   // Back from a password reset: put the cursor where the user continues.
-  const focusAfterReset = routeState?.notice
-    ? routeState.username
-      ? "password"
-      : "username"
-    : null;
+  const [focusAfterReset] = useState(() =>
+    routeState?.notice ? (routeState.username ? "password" : "username") : null,
+  );
+
+  // The reset notice, prefill and SSO error are read into state above. Drop
+  // them from the history entry (React Router keeps navigation state in
+  // history.state), so a reload or Back/Forward doesn't show them again.
+  useEffect(() => {
+    if (routeState?.notice || routeState?.oidcError) {
+      navigate(
+        { pathname: location.pathname, search: location.search },
+        { replace: true, state: null },
+      );
+    }
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (isAuthenticated) return <Navigate to="/" replace />;
 

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TOKEN_KEY, TOKEN_REFRESHED_EVENT } from "./api";
-import { changePassword } from "./password";
+import { changePassword, passwordByteLength, passwordLength } from "./password";
 
 function respond(status: number, body?: unknown): Response {
   return {
@@ -56,5 +56,18 @@ describe("changePassword (#62)", () => {
       "switched-org-token",
     );
     expect(sessionStorage.getItem(TOKEN_KEY)).toBe("switched-org-token");
+  });
+});
+
+describe("password length units", () => {
+  it("counts characters as code points, the unit of the gateway's minimum", () => {
+    expect(passwordLength("abcdefgh")).toBe(8);
+    expect(passwordLength("\u{1F600}".repeat(4))).toBe(4);
+    expect(passwordLength("é".repeat(8))).toBe(8);
+  });
+
+  it("counts bytes as UTF-8, the unit of the 72-byte maximum", () => {
+    expect(passwordByteLength("\u{1F600}")).toBe(4);
+    expect(passwordByteLength("é")).toBe(2);
   });
 });

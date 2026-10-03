@@ -10,6 +10,13 @@ export const MIN_PASSWORD_LENGTH = 8;
  * to four. */
 export const MAX_PASSWORD_BYTES = 72;
 
+/** Length of `password` in Unicode code points, the unit MIN_PASSWORD_LENGTH
+ * uses: the gateway (pydantic `min_length`) counts an emoji as one character,
+ * where `String.length` counts two UTF-16 units. */
+export function passwordLength(password: string): number {
+  return [...password].length;
+}
+
 /** Length of `password` in UTF-8 bytes, the unit MAX_PASSWORD_BYTES uses. */
 export function passwordByteLength(password: string): number {
   return new TextEncoder().encode(password).length;

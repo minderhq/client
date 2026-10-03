@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { InfoCallout } from "../components/InfoCallout";
 import { PasswordResetRequestForm } from "../components/PasswordResetRequestForm";
@@ -10,6 +10,7 @@ import {
   MAX_PASSWORD_BYTES,
   MIN_PASSWORD_LENGTH,
   passwordByteLength,
+  passwordLength,
 } from "../lib/password";
 import {
   confirmPasswordReset,
@@ -74,6 +75,7 @@ const labelClass = "mb-1 block text-sm font-medium text-gray-700 dark:text-gray-
 export function ResetPasswordPage() {
   const { isAuthenticated, username, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   useNoReferrer();
 
   const [token, setToken] = useState<string | null>(null);
@@ -94,11 +96,29 @@ export function ResetPasswordPage() {
   const confirmRef = useRef<HTMLInputElement>(null);
   const expiredRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  // Take the token out of the address bar before the first paint.
+  useLayoutEffect(() => {
     // Kept on a second run (StrictMode), when the fragment is already gone.
     const fromUrl = takeResetTokenFromUrl();
     if (fromUrl) setToken(fromUrl);
     setChecked(true);
+  }, []);
+
+  // That replaceState bypasses React Router, whose in-memory location would
+  // keep `#token=...` (readable through useLocation()) until the next
+  // navigation. Replace the router's location too, without the hash, keeping
+  // path, query and state. This must be a passive effect: BrowserRouter
+  // subscribes to history in its own layout effect, which runs after this
+  // page's, so a navigate() from the layout effect above would be lost.
+  useEffect(() => {
+    if (location.hash) {
+      navigate(
+        { pathname: location.pathname, search: location.search },
+        { replace: true, state: location.state },
+      );
+    }
+    // Once, on mount: the router's location only carries the hash on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -128,7 +148,7 @@ export function ResetPasswordPage() {
     e.preventDefault();
     if (!token || busy) return;
     setError({ text: "", field: null });
-    if (password.length < MIN_PASSWORD_LENGTH) {
+    if (passwordLength(password) < MIN_PASSWORD_LENGTH) {
       fail(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`, "password");
       return;
     }

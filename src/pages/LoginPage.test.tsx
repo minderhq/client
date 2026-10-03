@@ -21,7 +21,7 @@ vi.mock("react-router-dom", () => ({
     </a>
   ),
   useNavigate: () => navigate,
-  useLocation: () => ({ state: locationState }),
+  useLocation: () => ({ pathname: "/login", search: "", state: locationState }),
   Navigate: ({ to, replace }: { to: string; replace?: boolean }) => (
     <div data-testid="navigate" data-to={to} data-replace={String(replace)} />
   ),
@@ -195,5 +195,34 @@ describe("LoginPage", () => {
     render(<LoginPage />);
     expect((screen.getByLabelText("Username") as HTMLInputElement).value).toBe("alice");
     expect(document.activeElement).toBe(screen.getByLabelText("Password"));
+  });
+
+  it("consumes the reset notice from the history entry, so a reload doesn't repeat it", () => {
+    locationState = { notice: "Your password has been reset.", username: "alice" };
+    render(<LoginPage />);
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith(
+      { pathname: "/login", search: "" },
+      { replace: true, state: null },
+    );
+    // Still shown for this visit.
+    expect(screen.getByRole("status").textContent).toBe("Your password has been reset.");
+  });
+
+  it("consumes a failed-SSO error from the history entry, so a reload doesn't repeat it", () => {
+    locationState = { oidcError: "Access denied" };
+    render(<LoginPage />);
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith(
+      { pathname: "/login", search: "" },
+      { replace: true, state: null },
+    );
+    // Still shown for this visit.
+    expect(screen.getByText("Access denied")).toBeTruthy();
+  });
+
+  it("leaves the history entry alone on a plain visit", () => {
+    render(<LoginPage />);
+    expect(navigate).not.toHaveBeenCalled();
   });
 });
