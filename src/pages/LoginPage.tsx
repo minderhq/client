@@ -5,6 +5,12 @@ import { StatusLine } from "../components/StatusLine";
 import { friendlyErrorMessage, oidcLoginUrl } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { redirectTo } from "../lib/redirect";
+import {
+  registrationErrorMessage,
+  registrationRefusal,
+  useRegistrationMode,
+} from "../lib/registration";
+import { rememberReturnPath, safeReturnPath } from "../lib/returnPath";
 import { beginSsoLogin } from "../lib/ssoLogin";
 import {
   cardClass,
@@ -21,11 +27,28 @@ import {
  * reachable on the same `apiBaseUrl` the rest of the client already uses, so this
  * form works over plain localhost. The SSO button below is shown only when
  * VITE_OIDC_LOGIN_URL is configured (a Traefik + real-domain deployment) — no
- * dead-end button over localhost. */
+ * dead-end button over localhost.
+ *
+ * The "Create one" form follows the instance's registration mode: shown in
+ * `open` mode (or when the API doesn't report a mode), replaced by an
+ * "accounts are by invitation" note in `invite` mode, and by an SSO/admin
+ * pointer in `closed` mode. A page that sends the user here can pass
+ * `state.from` (an in-app path) to come back to after signing in. */
 export function LoginPage() {
   const { isAuthenticated, login, register } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const locationState = location.state as {
+    oidcError?: string;
+    from?: string;
+  } | null;
+  const returnPath = safeReturnPath(locationState?.from);
+  const registration = useRegistrationMode();
+  // Set when the API refuses a sign-up with `invite_required` although the
+  // mode looked open (stale or unknown mode): stop offering the form.
+  const [inviteOnly, setInviteOnly] = useState(false);
+  const signUpMode = inviteOnly ? "invite" : registration.mode;
 
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
@@ -36,22 +59,32 @@ export function LoginPage() {
   // via AuthCallbackPage's navigate("/login", {state: {oidcError}}) -- surface
   // it instead of silently landing on a blank login form.
   const [error, setError] = useState(
-    (location.state as { oidcError?: string } | null)?.oidcError ?? "",
+    locationState?.oidcError ?? "",
   );
 
-  if (isAuthenticated) return <Navigate to="/" replace />;
+  if (isAuthenticated) return <Navigate to={returnPath ?? "/"} replace />;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError("");
-    try {
-      if (mode === "register") {
+    if (mode === "register") {
+      try {
         await register(username, email, password);
+      } catch (err) {
+        if (registrationRefusal(err) === "invite_required") {
+          setInviteOnly(true);
+          setMode("login");
+        }
+        setError(registrationErrorMessage(err));
+        setBusy(false);
+        return;
       }
+    }
+    try {
       // register() only creates the account (no token), so log in either way.
       await login(username, password);
-      navigate("/", { replace: true });
+      navigate(returnPath ?? "/", { replace: true });
     } catch (err) {
       setError(friendlyErrorMessage(err));
       setBusy(false);
@@ -137,6 +170,29 @@ export function LoginPage() {
         <StatusLine isError>{error}</StatusLine>
       </form>
 
+      {mode === "login" && signUpMode === "invite" && (
+        <p className="mt-3 text-center text-sm text-gray-600 dark:text-gray-400">
+          No account yet? Accounts on this instance are created by invitation.
+          If you were invited, open the link in your invitation. Otherwise, ask
+          an administrator of your organization to invite you.
+        </p>
+      )}
+
+      {mode === "login" && signUpMode === "closed" && (
+        <p className="mt-3 text-center text-sm text-gray-600 dark:text-gray-400">
+          No account yet? Sign-up is turned off on this instance.{" "}
+          {oidcLoginUrl
+            ? "Sign in with SSO below; your account is set up the first time you do."
+            : "Ask an administrator to create an account for you."}
+        </p>
+      )}
+
+      {/* While the mode is still loading, offer nothing rather than a form
+          that may turn out not to work. */}
+      {(mode === "register" ||
+        (!registration.loading &&
+          signUpMode !== "invite" &&
+          signUpMode !== "closed")) && (
       <p className="mt-3 text-center text-sm text-gray-600 dark:text-gray-400">
         {mode === "login" ? (
           <>
@@ -168,6 +224,7 @@ export function LoginPage() {
           </>
         )}
       </p>
+      )}
 
       {/* Only offer SSO when it's actually configured (VITE_OIDC_LOGIN_URL set
           to a real Traefik hostname). Otherwise the button dead-ends: the old
@@ -188,6 +245,7 @@ export function LoginPage() {
               // Record this browser's pending login before leaving, so the
               // callback only accepts the sign-in it started.
               e.preventDefault();
+              rememberReturnPath(returnPath);
               redirectTo(beginSsoLogin(oidcLoginUrl));
             }}
             className={`block text-center ${secondaryButtonClass}`}

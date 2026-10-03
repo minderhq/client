@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import {
+  ApiError,
   apiBaseUrl,
   clearStoredToken,
   handleUnauthorized,
@@ -62,10 +63,14 @@ interface AuthContextValue {
    * active_tenant_id + org_role) and adopts it, so every subsequent request
    * reads/writes in that org's tenant context. */
   switchOrg: (organizationId: number) => Promise<void>;
+  /** Create a local account. `inviteToken` (from an `/invite/:token` link)
+   * admits it on an invite-only instance and joins the invite's team/org in
+   * the same step. Rejects with an ApiError (status + the API's `detail`). */
   register: (
     username: string,
     email: string,
     password: string,
+    inviteToken?: string,
   ) => Promise<void>;
   logout: () => void;
 }
@@ -154,13 +159,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const register = useCallback(
-    async (user: string, email: string, password: string) => {
+    async (user: string, email: string, password: string, inviteToken?: string) => {
       const res = await fetch(`${apiBaseUrl}/v1/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: user, email, password }),
+        body: JSON.stringify(
+          inviteToken
+            ? { username: user, email, password, invite_token: inviteToken }
+            : { username: user, email, password },
+        ),
       });
-      if (!res.ok) throw new Error(await parseError(res));
+      // ApiError keeps the status, so callers can tell a refusal code (403)
+      // or an existing account (409) from other failures.
+      if (!res.ok) throw new ApiError(await parseError(res), res.status);
     },
     [],
   );

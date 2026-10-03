@@ -2,14 +2,16 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { InfoCallout } from "../components/InfoCallout";
+import { InviteSignUpForm, type SignUpOutcome } from "../components/InviteSignUpForm";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
-import { apiFetch, friendlyErrorMessage } from "../lib/api";
+import { ApiError, apiFetch, friendlyErrorMessage, oidcLoginUrl } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { primaryButtonClass } from "../lib/ui";
+import { useRegistrationMode } from "../lib/registration";
+import { primaryButtonClass, secondaryButtonClass } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
 
-interface InviteInfo {
+export interface InviteInfo {
   id: number;
   email: string;
   // Team invite (null for an org invite) …
@@ -21,30 +23,89 @@ interface InviteInfo {
   org_name?: string | null;
   org_role?: string | null;
   status: "pending" | "accepted" | "revoked" | "expired";
+  // Optional, used when the API provides them: who sent the invite, and
+  // whether it only works for `email` (false = a shareable link). Without
+  // `email_bound` the address is treated as bound, which is what a default
+  // single-use invite is.
+  invited_by_name?: string | null;
+  email_bound?: boolean | null;
 }
 
-/** Landing page for a shared invite link (`/invite/:token`). There is no
- * separate "create an account via the invite" step here -- a brand-new
- * person registers/logs in through the normal /login flow first (this page
- * just tells them to, and to come back to this same link afterward, since
- * LoginPage always redirects to "/" post-auth with no return-path support
- * yet), then redeems while authenticated. Works the same for an existing
- * local or OIDC-linked account. */
+const INVALID_LINK =
+  "This invite link isn't valid. Check that you copied the whole link, or ask the person who invited you for a new one.";
+
+async function fetchInvite(inviteToken: string, signal: AbortSignal): Promise<InviteInfo> {
+  try {
+    return await apiFetch<InviteInfo>(`/v1/invites/by-token/${inviteToken}`, { signal });
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) throw new Error(INVALID_LINK);
+    throw e;
+  }
+}
+
+/** Where a new member lands: org invites on the Organization page, team
+ * invites on Teams. */
+function landingPath(info: InviteInfo | null): string {
+  return info?.organization_id ? "/organization" : "/platform/teams";
+}
+
+/** Message for a failed redeem by a signed-in user. */
+function redeemErrorMessage(e: unknown, info: InviteInfo | null, myEmail: string): string {
+  if (e instanceof ApiError) {
+    if (e.status === 403) {
+      const who = myEmail ? `, but you're signed in as ${myEmail}` : "";
+      return `This invite was sent to ${info?.email || "a different address"}${who}. Sign out and sign in with the invited account, or ask for an invite to your own address.`;
+    }
+    if (e.status === 409) return "This invite has already been used.";
+    if (e.status === 410) {
+      return "This invite has expired. Ask the person who invited you for a new link.";
+    }
+    if (e.status === 404) return INVALID_LINK;
+  }
+  return friendlyErrorMessage(e);
+}
+
+const UNAVAILABLE: Record<Exclude<InviteInfo["status"], "pending">, [string, string]> = {
+  expired: [
+    "This invite has expired.",
+    "Ask the person who invited you to send a new one.",
+  ],
+  revoked: [
+    "This invite was withdrawn.",
+    "If you still need access, ask the person who invited you for a new invite.",
+  ],
+  accepted: ["This invite has already been used.", ""],
+};
+
+/** Landing page for an invite link (`/invite/:token`). Three ways in:
+ * - signed in: "Join" redeems the invite for the current account;
+ * - signed out, with an account: "Sign in to accept" goes to /login and
+ *   comes back here afterwards;
+ * - signed out, no account: "Create account" registers WITH the invite token,
+ *   which accepts the invite in the same step, then signs in and lands in the
+ *   team/org. (Not offered where the instance has sign-up turned off.) */
 export function InviteRedeemPage() {
   const { token: invitedTokenParam } = useParams<{ token: string }>();
   const inviteToken = invitedTokenParam ?? "";
-  const { token, isAuthenticated, loginWithToken } = useAuth();
+  const { token, email: myEmail, isAuthenticated, loginWithToken } = useAuth();
   const navigate = useNavigate();
+  const registration = useRegistrationMode();
 
-  const infoRes = useAsyncResource(
-    (signal) =>
-      apiFetch<InviteInfo>(`/v1/invites/by-token/${inviteToken}`, { signal }),
-    { deps: [inviteToken] },
-  );
+  const infoRes = useAsyncResource((signal) => fetchInvite(inviteToken, signal), {
+    deps: [inviteToken],
+  });
 
   const [redeeming, setRedeeming] = useState(false);
   const [status, setStatus] = useState("");
   const [isError, setIsError] = useState(false);
+  const [signUpOutcome, setSignUpOutcome] = useState<SignUpOutcome | null>(null);
+
+  const info = infoRes.data;
+  const invitePath = `/invite/${inviteToken}`;
+
+  function signIn(returnTo: string = invitePath) {
+    navigate("/login", { state: { from: returnTo } });
+  }
 
   async function handleRedeem() {
     setRedeeming(true);
@@ -63,60 +124,82 @@ export function InviteRedeemPage() {
         { method: "POST", token },
       );
       loginWithToken(result.access_token, sentAt);
-      // Org invites land on the Organization page; team invites on Teams.
-      navigate(infoRes.data?.organization_id ? "/organization" : "/platform/teams", {
-        replace: true,
-      });
+      navigate(landingPath(info), { replace: true });
     } catch (e) {
-      setStatus(friendlyErrorMessage(e));
+      setStatus(redeemErrorMessage(e, info, myEmail));
       setIsError(true);
       setRedeeming(false);
     }
   }
 
   // An invite is either org-scoped or team-scoped; present whichever it is.
-  const info = infoRes.data;
   const isOrg = !!info?.organization_id;
   const targetName = isOrg ? info?.org_name : info?.team_name;
   const targetRole = isOrg ? info?.org_role : info?.team_role;
+  const signUpAllowed = !registration.loading && registration.mode !== "closed";
 
   return (
-    <>
+    <div className="mx-auto max-w-md">
       <PageHeader icon="mail" title="Invitation" />
 
-      <StatusLine isError={!!infoRes.error}>
-        {infoRes.error ?? (infoRes.loading ? "Loading…" : "")}
-      </StatusLine>
+      <StatusLine>{infoRes.loading ? "Loading invite…" : ""}</StatusLine>
+
+      {infoRes.error && (
+        <div role="alert">
+          <InfoCallout icon="warning">{infoRes.error}</InfoCallout>
+        </div>
+      )}
 
       {info && info.status !== "pending" && (
-        <InfoCallout icon="warning">
-          This invite is {info.status} and can no longer be redeemed.
-        </InfoCallout>
+        <div role="alert">
+          <InfoCallout icon="warning">
+            {UNAVAILABLE[info.status]?.[0] ?? `This invite is ${info.status}.`}{" "}
+            {UNAVAILABLE[info.status]?.[1]}
+            {info.status === "accepted" &&
+              (isAuthenticated ? (
+                <Link to={landingPath(info)} className="underline">
+                  Go to {targetName ?? "your team"}
+                </Link>
+              ) : (
+                <>
+                  If you accepted it,{" "}
+                  <Link to="/login" className="underline">
+                    sign in
+                  </Link>{" "}
+                  to continue.
+                </>
+              ))}
+          </InfoCallout>
+        </div>
       )}
 
       {info && info.status === "pending" && (
         <>
           <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-            You've been invited to join{" "}
-            <strong>{targetName}</strong>
-            {isOrg ? " (organization)" : ""} as a <strong>{targetRole}</strong> (
-            {info.email}).
+            {info.invited_by_name ? (
+              <>
+                <strong>{info.invited_by_name}</strong> invited you
+              </>
+            ) : (
+              "You've been invited"
+            )}{" "}
+            to join <strong>{targetName}</strong>
+            {isOrg ? " (organization)" : " (team)"} as a <strong>{targetRole}</strong>
+            {info.email ? (
+              <>
+                {" "}
+                (<span className="break-all">{info.email}</span>)
+              </>
+            ) : null}
+            .
           </p>
-
-          {!isAuthenticated && (
-            <InfoCallout icon="lock">
-              Log in or create an account first, using the email address this
-              invite was sent to, then come back to this same link to accept
-              it. <Link to="/login" className="underline">Go to login</Link>
-            </InfoCallout>
-          )}
 
           {isAuthenticated && (
             <>
               <button
                 onClick={handleRedeem}
                 disabled={redeeming}
-                className={primaryButtonClass}
+                className={`w-full sm:w-auto ${primaryButtonClass}`}
               >
                 {redeeming ? "Joining…" : `Join ${targetName}`}
               </button>
@@ -125,8 +208,80 @@ export function InviteRedeemPage() {
               </StatusLine>
             </>
           )}
+
+          {!isAuthenticated && signUpOutcome && (
+            <div role="alert" className="flex flex-col gap-3">
+              <InfoCallout
+                icon={signUpOutcome.kind === "refused" ? "warning" : "info"}
+              >
+                {signUpOutcome.message}
+              </InfoCallout>
+              {(signUpOutcome.kind === "created-not-signed-in" ||
+                (signUpOutcome.kind === "refused" &&
+                  signUpOutcome.refusal === "invite_cannot_create_account")) && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    signIn(
+                      signUpOutcome.kind === "created-not-signed-in"
+                        ? landingPath(info)
+                        : invitePath,
+                    )
+                  }
+                  className={`w-full sm:w-auto ${primaryButtonClass}`}
+                >
+                  {signUpOutcome.kind === "created-not-signed-in"
+                    ? "Sign in"
+                    : "Sign in to accept"}
+                </button>
+              )}
+            </div>
+          )}
+
+          {!isAuthenticated && !signUpOutcome && (
+            <div className="flex flex-col gap-4">
+              <section
+                aria-labelledby="invite-signin-heading"
+                className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <h2
+                  id="invite-signin-heading"
+                  className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  Already have an account?
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => signIn()}
+                  className={`w-full sm:w-auto ${secondaryButtonClass}`}
+                >
+                  Sign in to accept
+                </button>
+              </section>
+
+              {signUpAllowed && (
+                <InviteSignUpForm
+                  inviteToken={inviteToken}
+                  inviteEmail={info.email ?? ""}
+                  emailLocked={!!info.email && info.email_bound !== false}
+                  onSignedIn={() => navigate(landingPath(info), { replace: true })}
+                  onStopped={setSignUpOutcome}
+                  onSignInInstead={() => signIn()}
+                />
+              )}
+
+              {!registration.loading && registration.mode === "closed" && (
+                <InfoCallout icon="lock">
+                  New accounts can't be created here on this instance.{" "}
+                  {oidcLoginUrl
+                    ? "Sign in with SSO to accept; your account is set up the first time you do."
+                    : "Ask an administrator to create an account for you, then sign in to accept."}
+                </InfoCallout>
+              )}
+            </div>
+          )}
         </>
       )}
-    </>
+    </div>
   );
 }
