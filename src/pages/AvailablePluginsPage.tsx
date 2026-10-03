@@ -614,6 +614,8 @@ export function AvailablePluginsPage() {
   // the same way nav.ts hides admin-only destinations (the backend 403s others).
   const isAdmin = role === "admin";
   const { confirm, dialog } = useConfirm();
+  const featuredHeadingId = useId();
+  const allPluginsHeadingId = useId();
   // Seed from ?q= so the ⌘K palette can deep-link to a specific plugin (#1210).
   const [searchParams, setSearchParams] = useSearchParams();
   // The source filter lives in ?source= and is derived from the URL on every
@@ -844,9 +846,9 @@ export function AvailablePluginsPage() {
         />
       )}
       {visibleFeatured.length > 0 && !query.trim() && (
-        <section className="mb-6" aria-labelledby="featured-heading">
+        <section className="mb-6" aria-labelledby={featuredHeadingId}>
           <h2
-            id="featured-heading"
+            id={featuredHeadingId}
             className="mb-2 flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100"
           >
             <Icon name="star" size={16} className="shrink-0 text-indigo-500 dark:text-indigo-400" />
@@ -901,9 +903,9 @@ export function AvailablePluginsPage() {
         </p>
       )}
 
-      <section aria-labelledby="all-plugins-heading">
+      <section aria-labelledby={allPluginsHeadingId}>
         <h2
-          id="all-plugins-heading"
+          id={allPluginsHeadingId}
           className="mb-2 text-base font-semibold text-gray-900 dark:text-gray-100"
         >
           All plugins
