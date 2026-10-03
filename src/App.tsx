@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { BrandMark } from "./components/BrandMark";
@@ -14,6 +14,7 @@ import { UserMenu } from "./components/UserMenu";
 import { AuthProvider } from "./lib/auth";
 import { LEGACY_REDIRECTS, ROUTES, SECTION_REDIRECTS } from "./lib/routes";
 import { iconButtonClass, kbdClass, pageEnterClass } from "./lib/ui";
+import { useRouteFocus } from "./lib/useRouteFocus";
 import { AskPage } from "./pages/AskPage";
 import { AuthCallbackPage } from "./pages/AuthCallbackPage";
 import { AvailableBundlesPage } from "./pages/AvailableBundlesPage";
@@ -65,6 +66,9 @@ export function App() {
   // Re-key the ErrorBoundary per route so navigating to another page clears a
   // previous page's crash instead of staying stuck on the fallback.
   const location = useLocation();
+  // Focus the new page's heading after a client-side navigation (a11y).
+  const mainRef = useRef<HTMLElement>(null);
+  useRouteFocus(mainRef);
 
   // Global ⌘K / Ctrl-K toggles the command palette from anywhere.
   useEffect(() => {
@@ -139,7 +143,7 @@ export function App() {
             </div>
           </header>
 
-          <main className="mx-auto w-full max-w-5xl flex-1 p-6">
+          <main ref={mainRef} className="mx-auto w-full max-w-5xl flex-1 p-6">
             <ErrorBoundary key={location.pathname}>
               <div className={pageEnterClass}>
                 <ForcePasswordChangeGate>

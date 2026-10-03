@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, useLocation, type Location } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -287,5 +287,46 @@ describe("App — Settings › MindHub & sources gating", () => {
     expect(screen.getByText(/Only a Platform Admin/)).toBeTruthy();
     expect(screen.queryByRole("region", { name: "MindHub connection" })).toBeNull();
     expect(screen.queryByText(/No plugin source repositories yet/)).toBeNull();
+  });
+});
+
+describe("App — focus after navigation", () => {
+  afterEach(() => {
+    sessionStorage.clear();
+    cleanup();
+  });
+
+  it("moves focus to the new page's heading when a tab is followed", async () => {
+    renderAt(ROUTES.discoverPlugins);
+    const tabs = screen.getByRole("navigation", { name: "Discover sections" });
+    fireEvent.click(within(tabs).getByRole("link", { name: "AI tools" }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("heading", { level: 1, name: "Discover AI tools" }),
+      ),
+    );
+  });
+
+  it("leaves focus alone on the first load, including a legacy redirect", async () => {
+    renderAt("/plugins/available");
+    // Two frames: past the one the focus effect would have used.
+    for (let i = 0; i < 2; i++) {
+      await act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
+    }
+    expect(currentLocation?.pathname).toBe(ROUTES.discoverPlugins);
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("does not move focus when only the query string changes", async () => {
+    renderAt(ROUTES.discoverPlugins);
+    // The source filter lives in ?source=: changing it rewrites the URL.
+    const filter = screen.getByRole("combobox", { name: "Filter by source" });
+    filter.focus();
+    fireEvent.change(filter, { target: { value: "private" } });
+    for (let i = 0; i < 2; i++) {
+      await act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
+    }
+    expect(currentLocation?.search).toBe("?source=private");
+    expect(document.activeElement).toBe(filter);
   });
 });
