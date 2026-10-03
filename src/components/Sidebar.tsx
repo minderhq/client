@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import { useAuth } from "../lib/auth";
@@ -15,8 +16,8 @@ const inactiveItemClass =
 
 /** The platform's persistent nav — a single always-visible tree, grouped by
  * what the user is trying to DO (Knowledge / Marketplace / Platform /
- * Organization / Settings) rather than by backend service. Renders from the shared
- * NAV_SECTIONS model (lib/nav.ts) the ⌘K palette also uses. The repetitive
+ * Organization / Settings) rather than by backend service. Renders from the
+ * shared NAV_SECTIONS model (lib/nav.ts) the ⌘K palette also uses. The repetitive
  * Available/Installed pages collapse into one entry each (their siblings are
  * in-page tabs), and every row carries a plain-language tooltip so "what does
  * this do" is answerable without clicking. */
@@ -30,6 +31,7 @@ export function Sidebar({
   const { role } = useAuth();
   const access = { isAdmin: role === "admin", billing: useBillingAccess() };
   const { pathname } = useLocation();
+  const sectionIdPrefix = useId();
 
   return (
     <aside
@@ -70,10 +72,10 @@ export function Sidebar({
             <div
               key={section.label ?? `top-${i}`}
               role={section.label ? "group" : undefined}
-              aria-labelledby={section.label ? `nav-section-${i}` : undefined}
+              aria-labelledby={section.label ? `${sectionIdPrefix}-${i}` : undefined}
             >
               {section.label && (
-                <p id={`nav-section-${i}`} className={`mb-1.5 px-3 ${sectionLabelClass}`}>
+                <p id={`${sectionIdPrefix}-${i}`} className={`mb-1.5 px-3 ${sectionLabelClass}`}>
                   {section.label}
                 </p>
               )}
