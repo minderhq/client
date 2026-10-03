@@ -209,6 +209,18 @@ describe("LoginPage", () => {
     expect(screen.getByRole("status").textContent).toBe("Your password has been reset.");
   });
 
+  it("consumes a failed-SSO error from the history entry, so a reload doesn't repeat it", () => {
+    locationState = { oidcError: "Access denied" };
+    render(<LoginPage />);
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith(
+      { pathname: "/login", search: "" },
+      { replace: true, state: null },
+    );
+    // Still shown for this visit.
+    expect(screen.getByText("Access denied")).toBeTruthy();
+  });
+
   it("leaves the history entry alone on a plain visit", () => {
     render(<LoginPage />);
     expect(navigate).not.toHaveBeenCalled();

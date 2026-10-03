@@ -53,11 +53,11 @@ export function LoginPage() {
     routeState?.notice ? (routeState.username ? "password" : "username") : null,
   );
 
-  // The reset notice and prefill are read into state above. Drop them from
-  // the history entry (React Router keeps navigation state in history.state),
-  // so a reload or Back/Forward doesn't announce the reset again.
+  // The reset notice, prefill and SSO error are read into state above. Drop
+  // them from the history entry (React Router keeps navigation state in
+  // history.state), so a reload or Back/Forward doesn't show them again.
   useEffect(() => {
-    if (routeState?.notice) {
+    if (routeState?.notice || routeState?.oidcError) {
       navigate(
         { pathname: location.pathname, search: location.search },
         { replace: true, state: null },
