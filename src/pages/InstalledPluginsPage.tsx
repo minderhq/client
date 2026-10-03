@@ -9,7 +9,7 @@ import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
 import { PluginVersion } from "../components/PluginVersion";
 import { Skeleton } from "../components/Skeleton";
-import { SourceBadge } from "../components/SourceBadge";
+import { SourceBadge, SourceLegend } from "../components/SourceBadge";
 import { StatusLine } from "../components/StatusLine";
 import { apiFetch, friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -444,7 +444,8 @@ function formatTimestamp(iso: string): string {
 }
 
 /** What plugin-registry reports for this plugin on this installation: whether
- * it's enabled there, and its last health check. When the runtime list loaded
+ * it's enabled there, and its health (the last-check time is in the card's
+ * meta line, see HealthCheckedAt). When the runtime list loaded
  * but doesn't include the plugin, says so -- a marketplace install record
  * doesn't load a plugin by itself (today's two-plane model, #2091). Shows
  * nothing when the runtime list couldn't be loaded. */
@@ -481,18 +482,26 @@ function RuntimeState({
           {runtime.enabled ? "Enabled on this installation" : "Disabled on this installation"}
         </span>
       )}
-      <span
-        className={`${badgeClass} ${HEALTH_TONE[health] ?? ""}`}
-        title={
-          runtime.last_health_check
-            ? `Last health check: ${formatTimestamp(runtime.last_health_check)}`
-            : "No health check has run yet."
-        }
-      >
+      <span className={`${badgeClass} ${HEALTH_TONE[health] ?? ""}`}>
         <Icon name="health" size={12} className="shrink-0" />
         Health: {health}
       </span>
     </>
+  );
+}
+
+/** When plugin-registry last health-checked the plugin, as quiet visible text
+ * (not a hover-only tooltip) so keyboard, touch and screen-reader users get it
+ * too. */
+function HealthCheckedAt({ runtime }: { runtime: RuntimePlugin }) {
+  if (!runtime.last_health_check) return <span>No health check yet</span>;
+  return (
+    <span>
+      Health checked{" "}
+      <time dateTime={runtime.last_health_check}>
+        {formatTimestamp(runtime.last_health_check)}
+      </time>
+    </span>
   );
 }
 
@@ -586,11 +595,12 @@ export function InstalledPluginCard({
               </span>
             )}
           </div>
-          {(hasVersion || hasNeeds) && (
+          {(hasVersion || hasNeeds || runtime) && (
             <p className="mt-1.5 flex flex-wrap items-center gap-x-3 text-xs text-gray-500 dark:text-gray-400">
               {hasVersion && (
                 <PluginVersion installed={entry.installedVersion} listed={entry.listedVersion} />
               )}
+              {runtime && <HealthCheckedAt runtime={runtime} />}
               {hasNeeds && <span>Needs: {entry.requiresServices.join(", ")}</span>}
             </p>
           )}
@@ -711,6 +721,7 @@ export function InstalledPluginsPage() {
               .
             </EmptyState>
           )}
+          {entries.length > 0 && <SourceLegend className="mb-3" />}
           {entries.length > 0 && (
             <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
               Some of these expose AI tools the assistant can call —{" "}

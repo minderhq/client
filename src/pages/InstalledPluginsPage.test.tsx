@@ -215,6 +215,10 @@ describe("InstalledPluginsPage", () => {
     expect(within(card).getByText("First-party")).toBeTruthy();
     expect(within(card).getByText("Enabled on this installation")).toBeTruthy();
     expect(within(card).getByText(/Health: healthy/)).toBeTruthy();
+    // last-check time is visible text, not a hover-only tooltip
+    const checked = within(card).getByText(/Health checked/);
+    expect(checked.querySelector("time")?.getAttribute("dateTime")).toBe("2026-01-01T00:05:00Z");
+    expect(card.querySelector("[title^='Last health check']")).toBeNull();
     expect(within(card).getByText("v2.1.0")).toBeTruthy();
     expect(within(card).getByText(/no marketplace install/)).toBeTruthy();
     // Nothing for the marketplace lifecycle endpoints to act on.
@@ -232,6 +236,7 @@ describe("InstalledPluginsPage", () => {
     const card = heading.closest("section")!;
     expect(card.querySelector("[data-source]")).toBeNull();
     expect(within(card).getByText(/Health: unknown/)).toBeTruthy();
+    expect(within(card).getByText("No health check yet")).toBeTruthy();
   });
 
   it("merges a marketplace install with its runtime entry into ONE card", async () => {

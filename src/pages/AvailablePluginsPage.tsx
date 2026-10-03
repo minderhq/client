@@ -7,7 +7,7 @@ import { EmptyState } from "../components/EmptyState";
 import { PageHeader } from "../components/PageHeader";
 import { PluginRatings } from "../components/PluginRatings";
 import { ListedVersion } from "../components/PluginVersion";
-import { SourceBadge } from "../components/SourceBadge";
+import { SourceBadge, SourceLegend } from "../components/SourceBadge";
 import { StatusLine } from "../components/StatusLine";
 import { apiFetch, friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -797,6 +797,7 @@ export function AvailablePluginsPage() {
         source={source}
         onSourceChange={setSource}
       />
+      <SourceLegend className="mb-4" />
 
       {plugins.length === 0 && (
         <EmptyState>

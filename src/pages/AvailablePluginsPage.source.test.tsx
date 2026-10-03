@@ -113,13 +113,26 @@ describe("Browse source badges", () => {
     await screen.findByText("Weather");
     const badgeOf = (name: string) => {
       const card = screen.getByRole("heading", { name }).closest("section")!;
-      return Array.from(card.querySelectorAll("[data-source]")).map((b) => b.textContent);
+      return Array.from(card.querySelectorAll("[data-source]")).map((b) =>
+        b.getAttribute("data-source"),
+      );
     };
-    expect(badgeOf("Weather")).toEqual(["Source: First-party"]);
-    expect(badgeOf("Internal CRM")).toEqual(["Source: Private git"]);
-    expect(badgeOf("Jokes")).toEqual(["Source: Submitted on this instance"]);
+    expect(badgeOf("Weather")).toEqual(["first_party"]);
+    expect(badgeOf("Internal CRM")).toEqual(["private_git"]);
+    expect(badgeOf("Jokes")).toEqual(["submitted"]);
+    const firstParty = screen
+      .getByRole("heading", { name: "Weather" })
+      .closest("section")!
+      .querySelector("[data-source]")!;
+    expect(firstParty.textContent).toMatch(/^Source: First-party \(/);
     // no origin, no repository: nothing to go on, so no badge rather than a guess
     expect(badgeOf("Legacy")).toEqual([]);
+  });
+
+  it("offers the source legend next to the filters", async () => {
+    mockCatalog([FIRST]);
+    renderAt("/plugins/available");
+    expect(await screen.findByText("What do the source badges mean?")).toBeTruthy();
   });
 
   it("shows the listed version on Browse cards", async () => {
