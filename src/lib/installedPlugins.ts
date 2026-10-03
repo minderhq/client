@@ -39,7 +39,17 @@ function displayNameOf(
 /** Runtime ∪ installations, de-duplicated by plugin name, each joined to its
  * catalog row (by marketplace id for installations, by name for runtime-only
  * plugins), sorted by display name. Any of the inputs may be null (not loaded /
- * failed); the merge then works with what it has. */
+ * failed); the merge then works with what it has.
+ *
+ * Known limitation -- name collisions: the name is the only key the runtime
+ * list shares with the catalog. Catalog names are unique, but a runtime plugin
+ * with no catalog row of its own can share a name with someone ELSE's row.
+ * Examples: a git or manifest install named like a developer submission, or a
+ * vendored plugin whose catalog sync was refused (409) because a submission
+ * already took the name. That runtime plugin then shows the other row's
+ * source badge and listed version, and an install record for that row merges
+ * into its card. Pinned by tests; the fix is backend #2206 (source and
+ * marketplace id on `GET /v1/plugins`, so the join stops being by name). */
 export function mergeInstalledPlugins(
   installations: readonly Installation[] | null,
   runtime: readonly RuntimePlugin[] | null,

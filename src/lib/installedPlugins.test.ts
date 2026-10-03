@@ -178,4 +178,52 @@ describe("mergeInstalledPlugins", () => {
     );
     expect(entries.map((e) => e.displayName)).toEqual(["A", "b", "c"]);
   });
+
+  // Known limitation, pinned so a change is deliberate: the runtime list and the
+  // catalog share only the plugin name, so a runtime plugin with no catalog row
+  // of its own picks up a same-named row that isn't its own. Real fix:
+  // backend #2206 (install source + marketplace id on GET /v1/plugins).
+  describe("name collisions (current behaviour, fixed by backend #2206)", () => {
+    const submittedJokes = cat({
+      id: "id-jokes",
+      name: "jokes",
+      display_name: "Jokes (submitted)",
+      origin: "submitted",
+      current_version: "9.0.0",
+      repository_url: "https://github.com/someone/jokes",
+    });
+
+    it("a runtime plugin named like a submitted catalog row takes that row's badge and version", () => {
+      // e.g. an admin installed an unrelated repo from git whose manifest is
+      // also named "jokes" -- it has no catalog row, so the name join finds
+      // the developer submission.
+      const [entry] = mergeInstalledPlugins(
+        null,
+        [rt({ name: "jokes", version: "0.1.0" })],
+        [submittedJokes],
+      );
+      expect(entry.catalog?.id).toBe("id-jokes");
+      expect(entry.source).toBe("submitted");
+      expect(entry.displayName).toBe("Jokes (submitted)");
+      expect(entry.installedVersion).toBe("0.1.0"); // still the running one
+      expect(entry.listedVersion).toBe("9.0.0"); // ...compared to the other row's
+    });
+
+    it("an install of the submitted row and the same-named runtime plugin merge into one card", () => {
+      const entries = mergeInstalledPlugins(
+        [inst({ plugin_id: "id-jokes", name: "jokes", display_name: "Jokes (submitted)" })],
+        [rt({ name: "jokes", version: "0.1.0" })],
+        [submittedJokes],
+      );
+      expect(entries).toHaveLength(1);
+      expect(entries[0].installation?.plugin_id).toBe("id-jokes");
+      expect(entries[0].runtime?.version).toBe("0.1.0");
+    });
+
+    it("without the colliding row, the same runtime plugin gets no badge (no guess)", () => {
+      const [entry] = mergeInstalledPlugins(null, [rt({ name: "jokes" })], [cat()]);
+      expect(entry.catalog).toBeNull();
+      expect(entry.source).toBeNull();
+    });
+  });
 });
