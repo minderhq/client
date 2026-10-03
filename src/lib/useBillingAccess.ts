@@ -14,6 +14,33 @@ import { useTokenRef } from "./useTokenRef";
  * outcome keeps it visible and lets the page itself report the problem. The
  * server enforces either way; this only stops showing members a dead end. */
 const cache = new Map<string, boolean>();
+/** One shared request per session identity while it's in flight: the
+ * sidebar, PageTabs and the command palette all mount this hook at once, and
+ * a cold load would otherwise send the same request three times. */
+const inflight = new Map<string, Promise<boolean>>();
+
+function probe(sessionKey: string, token: string): Promise<boolean> {
+  let pending = inflight.get(sessionKey);
+  if (!pending) {
+    // No AbortSignal: the request is shared, so one caller unmounting must
+    // not cancel it for the others. Callers that went away just ignore it.
+    pending = fetchSubscription(token)
+      .then(
+        () => {
+          cache.set(sessionKey, true);
+          return true;
+        },
+        (err: unknown) => {
+          const denied = err instanceof ApiError && err.status === 403;
+          if (denied) cache.set(sessionKey, false);
+          return !denied;
+        },
+      )
+      .finally(() => inflight.delete(sessionKey));
+    inflight.set(sessionKey, pending);
+  }
+  return pending;
+}
 
 export function useBillingAccess(): boolean {
   const { sessionKey } = useAuth();
@@ -28,19 +55,13 @@ export function useBillingAccess(): boolean {
       setVisible(known);
       return;
     }
-    const controller = new AbortController();
-    fetchSubscription(token, controller.signal)
-      .then(() => {
-        cache.set(sessionKey, true);
-        setVisible(true);
-      })
-      .catch((err: unknown) => {
-        if (controller.signal.aborted) return;
-        const denied = err instanceof ApiError && err.status === 403;
-        if (denied) cache.set(sessionKey, false);
-        setVisible(!denied);
-      });
-    return () => controller.abort();
+    let current = true;
+    probe(sessionKey, token).then((v) => {
+      if (current) setVisible(v);
+    });
+    return () => {
+      current = false;
+    };
   }, [sessionKey, tokenRef]);
 
   return visible;
@@ -49,4 +70,5 @@ export function useBillingAccess(): boolean {
 /** Test hook: forget what was learned. */
 export function resetBillingAccessCache(): void {
   cache.clear();
+  inflight.clear();
 }

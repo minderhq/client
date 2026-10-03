@@ -53,4 +53,36 @@ describe("useBillingAccess (#64)", () => {
     await waitFor(() => expect(fetchSubscription).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(switched.result.current).toBe(true));
   });
+
+  it("shares one in-flight request between every caller on a cold load", async () => {
+    let resolve!: (v: unknown) => void;
+    fetchSubscription.mockReturnValue(new Promise((r) => (resolve = r)));
+    // Sidebar, PageTabs and the command palette mount together.
+    const hooks = [1, 2, 3].map(() => renderHook(() => useBillingAccess()));
+    expect(fetchSubscription).toHaveBeenCalledTimes(1);
+    resolve({ tier: "pro" });
+    for (const h of hooks) await waitFor(() => expect(h.result.current).toBe(true));
+    expect(fetchSubscription).toHaveBeenCalledTimes(1);
+  });
+
+  it("shares a denial too, and one caller unmounting doesn't cancel it for the rest", async () => {
+    let reject!: (e: unknown) => void;
+    fetchSubscription.mockReturnValue(new Promise((_, r) => (reject = r)));
+    const first = renderHook(() => useBillingAccess());
+    const second = renderHook(() => useBillingAccess());
+    first.unmount();
+    reject(new ApiError("forbidden", 403));
+    await waitFor(() => expect(second.result.current).toBe(false));
+    expect(fetchSubscription).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks again after a non-403 failure (nothing cached, nothing left in flight)", async () => {
+    fetchSubscription.mockRejectedValueOnce(new ApiError("boom", 503));
+    const first = renderHook(() => useBillingAccess());
+    await waitFor(() => expect(fetchSubscription).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(first.result.current).toBe(true));
+    fetchSubscription.mockResolvedValue({ tier: "pro" });
+    renderHook(() => useBillingAccess());
+    await waitFor(() => expect(fetchSubscription).toHaveBeenCalledTimes(2));
+  });
 });
