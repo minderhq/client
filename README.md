@@ -48,7 +48,7 @@ each also has a matching `ARG` default in the `Dockerfile`.
 ## Emailed account links (token routes)
 
 Pages opened from an emailed link carry a one-time secret in the URL fragment,
-for example `/reset-password#token=…` (email password reset, minderhq/minder#2138).
+for example `/reset-password#token=…` (email password reset, #2138).
 They follow the rules in `src/lib/tokenPage.ts`:
 
 - read the token from the fragment once, then clear it with `history.replaceState`;
