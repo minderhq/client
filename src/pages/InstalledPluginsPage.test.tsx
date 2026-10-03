@@ -253,7 +253,7 @@ describe("InstalledPluginsPage", () => {
     expect(screen.getAllByRole("heading", { name: "Weather" })).toHaveLength(1);
     const card = cardFor("Weather");
     expect(within(card).getByText("Enabled on this installation")).toBeTruthy();
-    expect(within(card).getByText("✓ Your install: enabled")).toBeTruthy();
+    expect(within(card).getByText("Your install: enabled")).toBeTruthy();
     // the running version, even though the install record has none
     expect(within(card).getByText("v2.1.0")).toBeTruthy();
     expect(within(card).getByRole("button", { name: /Uninstall/ })).toBeTruthy();
@@ -408,6 +408,30 @@ describe("InstalledPluginsPage", () => {
   });
 });
 
+describe("InstalledPluginCard — accessibility (#2195)", () => {
+  it("names every action after the plugin and uses a text + icon install badge", () => {
+    render(
+      <InstalledPluginCard
+        entry={entryOf(installation({ enabled: true }))}
+        token="tok"
+        onUninstalled={vi.fn()}
+        onToggleEnabled={vi.fn()}
+        confirm={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { level: 3, name: "My Plugin" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Disable My Plugin" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Uninstall My Plugin" })).toBeTruthy();
+    expect(screen.getByText("Configure", { selector: "summary" }).getAttribute("aria-label")).toBe(
+      "Configure My Plugin",
+    );
+    const badge = screen.getByText("Your install: enabled");
+    expect(badge.querySelector("svg")).toBeTruthy();
+    expect(badge.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
+  });
+});
+
 describe("InstalledPluginCard — enable/disable", () => {
   it("disables an enabled plugin and reports the new state", async () => {
     apiFetch.mockResolvedValue({});
@@ -422,7 +446,7 @@ describe("InstalledPluginCard — enable/disable", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Disable" }));
+    fireEvent.click(screen.getByRole("button", { name: "Disable My Plugin" }));
 
     await waitFor(() =>
       expect(onToggleEnabled).toHaveBeenCalledWith("plugin-1", false),
@@ -446,7 +470,7 @@ describe("InstalledPluginCard — enable/disable", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Enable" }));
+    fireEvent.click(screen.getByRole("button", { name: "Enable My Plugin" }));
 
     await waitFor(() =>
       expect(onToggleEnabled).toHaveBeenCalledWith("plugin-1", true),
@@ -470,7 +494,7 @@ describe("InstalledPluginCard — enable/disable", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Disable" }));
+    fireEvent.click(screen.getByRole("button", { name: "Disable My Plugin" }));
 
     await screen.findByText("plugin-registry unreachable");
     expect(onToggleEnabled).not.toHaveBeenCalled();
@@ -491,7 +515,7 @@ describe("InstalledPluginCard — uninstall", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Uninstall" }));
+    fireEvent.click(screen.getByRole("button", { name: "Uninstall My Plugin" }));
     await waitFor(() => expect(confirm).toHaveBeenCalled());
 
     expect(apiFetch).not.toHaveBeenCalled();
@@ -512,7 +536,7 @@ describe("InstalledPluginCard — uninstall", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Uninstall" }));
+    fireEvent.click(screen.getByRole("button", { name: "Uninstall My Plugin" }));
 
     await waitFor(() =>
       expect(onUninstalled).toHaveBeenCalledWith("plugin-1"),
