@@ -1,8 +1,10 @@
 import { useCallback, useId, useState } from "react";
 
+import { CardListSkeleton } from "../components/CardListSkeleton";
 import { Icon } from "../components/Icon";
 import { EmptyState } from "../components/EmptyState";
 import { InfoCallout } from "../components/InfoCallout";
+import { LoadError } from "../components/LoadError";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
 import { apiFetch, friendlyErrorMessage } from "../lib/api";
@@ -514,12 +516,17 @@ function SubmissionCard({
 
       {editable && !editing && (
         <div className="mt-3 flex gap-2">
-          <button onClick={() => setEditing(true)} className={secondaryButtonClass}>
+          <button
+            onClick={() => setEditing(true)}
+            aria-label={`Edit ${submission.display_name}`}
+            className={secondaryButtonClass}
+          >
             Edit
           </button>
           <button
             onClick={handleSubmitForReview}
             disabled={busy}
+            aria-label={`${submission.status === "rejected" ? "Resubmit for review" : "Submit for review"}: ${submission.display_name}`}
             className={primaryButtonClass}
           >
             {submission.status === "rejected" ? "Resubmit for review" : "Submit for review"}
@@ -573,20 +580,28 @@ export function SubmissionsPage() {
       ) : (
         <>
           <NewSubmissionForm onCreated={loadMine} />
-          <StatusLine isError={!!error}>
-            {error ?? (loading ? "Loading your submissions…" : "")}
-          </StatusLine>
+          <StatusLine>{loading ? "Loading your submissions…" : ""}</StatusLine>
 
           <h2 className="mb-2 text-base font-semibold text-gray-900 dark:text-gray-100">
             Your submissions
           </h2>
-          {submissions.length === 0 ? (
-            <EmptyState>You haven't submitted any plugins yet.</EmptyState>
-          ) : (
-            submissions.map((s) => (
-              <SubmissionCard key={s.id} submission={s} onChanged={loadMine} />
-            ))
+          {/* "Nothing submitted" only once a load has succeeded (#2195) --
+              never while the first one is in flight, never after a failure. */}
+          {loading && !data && <CardListSkeleton />}
+          {error && (
+            <LoadError
+              title="Couldn't load your submissions."
+              message={error}
+              what="your submissions"
+              onRetry={loadMine}
+            />
           )}
+          {data && !error && submissions.length === 0 && (
+            <EmptyState>You haven't submitted any plugins yet.</EmptyState>
+          )}
+          {submissions.map((s) => (
+            <SubmissionCard key={s.id} submission={s} onChanged={loadMine} />
+          ))}
         </>
       )}
     </>
