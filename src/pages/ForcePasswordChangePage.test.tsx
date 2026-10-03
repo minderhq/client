@@ -93,7 +93,7 @@ describe("ForcePasswordChangeGate (#1776)", () => {
     expect(logout).toHaveBeenCalled();
   });
 
-  it.each(["/reset-password", "/Reset-Password/", "/forgot-password"])(
+  it.each(["/reset-password", "/Reset-Password/", "/reset%2Dpassword", "/forgot-password"])(
     "lets the public recovery route %s through while a change is required (#2138)",
     (path) => {
       renderAt(
@@ -115,5 +115,14 @@ describe("ForcePasswordChangeGate (#1776)", () => {
     expect(isGateExemptPath("/reset-password-x")).toBe(false);
     expect(isGateExemptPath("/settings")).toBe(false);
     expect(isGateExemptPath("/")).toBe(false);
+    // React Router decodes the path before matching, so these render the
+    // recovery pages and must be exempt too.
+    expect(isGateExemptPath("/reset%2Dpassword")).toBe(true);
+    expect(isGateExemptPath("/%72eset-password/")).toBe(true);
+    // An encoded slash stays a slash inside the segment, as in React Router.
+    expect(isGateExemptPath("/reset-password%2F")).toBe(false);
+    // A malformed encoding isn't decoded, so it stays gated.
+    expect(isGateExemptPath("/reset-password%")).toBe(false);
+    expect(isGateExemptPath("/reset%E0password")).toBe(false);
   });
 });
