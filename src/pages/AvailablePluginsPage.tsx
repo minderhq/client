@@ -806,6 +806,9 @@ export function AvailablePluginsPage() {
   // results in state; they no longer answer the current query, so the error
   // replaces the list. A failed Load more keeps what already loaded.
   const listFailed = !!pluginsError && !pluginsErrorOnMore;
+  // Cards only while they answer the current request: not after a failed
+  // search, and not while its retry is in flight (`loaded` is cleared then).
+  const showList = pluginsLoaded && !listFailed;
   // Only a successful load can prove the catalog is empty: never while the
   // first page (or a new search) is in flight, and never after a failure.
   const showSkeleton = !pluginsLoaded && !pluginsError;
@@ -942,14 +945,14 @@ export function AvailablePluginsPage() {
                 : "No plugins in the catalog yet."}
           </EmptyState>
         )}
-        {!listFailed && !pluginsLoading && plugins.length > 0 && visiblePlugins.length === 0 && (
+        {showList && !pluginsLoading && plugins.length > 0 && visiblePlugins.length === 0 && (
           <EmptyState>
             {filtersActive
               ? "No plugins on this page match the selected filters."
               : "Every plugin on this page is already shown above in Featured."}
           </EmptyState>
         )}
-        {!listFailed &&
+        {showList &&
           visiblePlugins.map((plugin) => (
             <PluginCard
               key={plugin.id}
@@ -972,7 +975,7 @@ export function AvailablePluginsPage() {
             onRetry={retryPlugins}
           />
         )}
-        {hasMorePlugins && !listFailed && !pluginsError && (
+        {hasMorePlugins && showList && !pluginsError && (
           <button onClick={loadMorePlugins} disabled={pluginsLoading} className={secondaryButtonClass}>
             Load more
           </button>

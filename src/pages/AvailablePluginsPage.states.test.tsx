@@ -222,6 +222,35 @@ describe("Discover plugins: catalog states", () => {
     expect(screen.getByRole("button", { name: "Retry loading search results" })).toBeTruthy();
   });
 
+  it("shows a skeleton -- not the previous query's cards -- while retrying a failed search", async () => {
+    let searchCalls = 0;
+    const retry = deferred<unknown>();
+    routeApi({
+      catalog: () => ({ plugins: [WEATHER], total: 1 }),
+      search: () => {
+        searchCalls += 1;
+        if (searchCalls === 1) throw new Error("Search is down");
+        return retry.promise;
+      },
+    });
+    renderAt();
+    await screen.findByRole("heading", { level: 3, name: "Weather" });
+
+    fireEvent.change(screen.getByLabelText("Search plugins"), { target: { value: "news" } });
+    await screen.findByRole("alert", undefined, { timeout: 1500 });
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry loading search results" }));
+
+    // Retry in flight: the error is gone, but Weather answered the old query.
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByRole("heading", { level: 3, name: "Weather" })).toBeNull();
+    expect(screen.getByTestId("card-list-skeleton")).toBeTruthy();
+
+    await act(async () => retry.resolve({ plugins: [NEWS], total: 1 }));
+    expect(screen.getByRole("heading", { level: 3, name: "News" })).toBeTruthy();
+    expect(screen.queryByTestId("card-list-skeleton")).toBeNull();
+  });
+
   it("keeps loaded plugins when Load more fails, and Retry appends the missing page", async () => {
     let failMore = true;
     routeApi({

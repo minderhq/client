@@ -20,8 +20,10 @@ interface Page<T> {
  * Exposes the request lifecycle as well as the legacy `status` line (#2195), so
  * a page can tell "still loading" from "loaded, and empty" from "failed" and
  * never shows its empty state before the first page has actually arrived:
- * `loading` is true while a page is in flight, `loaded` once any page has
- * committed, `error` carries the latest failure (`errorOnMore` when it was a
+ * `loading` is true while a page is in flight; `loaded` is true while `items`
+ * answer the current request -- set when a page commits, cleared when a
+ * first-page (replace) load fails, since the items left in state then belong
+ * to the previous query and must not reappear while a retry is in flight; `error` carries the latest failure (`errorOnMore` when it was a
  * Load more, so the page knows the items it shows are still current), and
  * `retry()` repeats the request that failed rather than starting over.
  */
@@ -69,6 +71,9 @@ export function usePaginatedList<T>(
         setIsError(true);
         setError(message);
         setErrorOnMore(!replace);
+        // A failed Load more leaves the loaded items current; a failed replace
+        // (new search/filter, first page) does not.
+        if (replace) setLoaded(false);
         setLoading(false);
       }
     },

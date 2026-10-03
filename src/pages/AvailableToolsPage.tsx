@@ -134,7 +134,9 @@ export function AvailableToolsPage() {
         />
       )}
       {isEmpty && <EmptyState>No AI tools in the catalog yet.</EmptyState>}
-      {!(error && !errorOnMore) &&
+      {/* Only while the tools answer the current request (`loaded`). */}
+      {loaded &&
+        !(error && !errorOnMore) &&
         catalogTools.map((t) => <CatalogToolCard key={t.id} tool={t} />)}
       {error && errorOnMore && (
         <LoadError
@@ -144,7 +146,7 @@ export function AvailableToolsPage() {
           onRetry={retry}
         />
       )}
-      {hasMoreCatalogTools && !error && (
+      {hasMoreCatalogTools && loaded && !error && (
         <button onClick={loadMoreCatalogTools} disabled={loading} className={secondaryButtonClass}>
           Load more
         </button>
