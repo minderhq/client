@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
 
 import { ApiError, apiFetch } from "./api";
+import type { components } from "./api-types.gen";
 
 /** What the sign-in page may offer (public `GET /v1/auth/capabilities`). */
-export interface AuthCapabilities {
-  password_reset_email: boolean;
-  email_verification: boolean;
-  registration_mode: string;
-}
+export type AuthCapabilities = components["schemas"]["CapabilitiesResponse"];
 
 /** The one error every failed reset confirm returns (400): unknown, expired,
  * already used or superseded token alike. */

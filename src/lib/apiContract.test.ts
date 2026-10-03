@@ -20,14 +20,7 @@ const HTTP_METHODS = ["get", "put", "post", "delete", "options", "head", "patch"
 // params shown as {}; "*" = method not statically known). Each needs a
 // reason; an entry that no longer matches a missing call fails the test, so
 // fix the call (or the gateway) and delete the entry.
-const KNOWN_MISSING: Record<string, string> = {
-  "GET /v1/auth/capabilities":
-    "email password reset: served by the gateway, not yet in the published spec",
-  "POST /v1/auth/password-reset/request":
-    "email password reset: served by the gateway, not yet in the published spec",
-  "POST /v1/auth/password-reset/confirm":
-    "email password reset: served by the gateway, not yet in the published spec",
-};
+const KNOWN_MISSING: Record<string, string> = {};
 
 interface Route {
   segments: string[];
