@@ -11,8 +11,9 @@ vi.mock("../lib/api", () => ({
   apiFetch: (...args: unknown[]) => apiFetch(...args),
   friendlyErrorMessage: (e: unknown) => (e instanceof Error ? e.message : "error"),
 }));
+let mockAuth = { token: "tok", role: "admin" };
 vi.mock("../lib/auth", () => ({
-  useAuth: () => ({ token: "tok", role: "admin" }),
+  useAuth: () => mockAuth,
 }));
 
 function bundle(overrides: Partial<Bundle> = {}): Bundle {
@@ -29,6 +30,7 @@ function bundle(overrides: Partial<Bundle> = {}): Bundle {
 afterEach(() => {
   cleanup();
   apiFetch.mockReset();
+  mockAuth = { token: "tok", role: "admin" };
 });
 
 describe("AvailableBundlesPage", () => {
@@ -78,5 +80,32 @@ describe("AvailableBundlesPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Retry loading service bundles" }));
     expect(await screen.findByRole("heading", { level: 3, name: "voice" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Enable voice" })).toBeTruthy();
+  });
+
+  it("tells a non-admin once, for the whole list, and every card's button points at that note", async () => {
+    mockAuth = { token: "tok", role: "member" };
+    apiFetch.mockResolvedValue({
+      bundles: [bundle({ name: "voice" }), bundle({ name: "monitoring" }), bundle({ name: "rag" })],
+      count: 3,
+    });
+    render(<AvailableBundlesPage />, { wrapper: MemoryRouter });
+
+    await screen.findByRole("heading", { level: 3, name: "rag" });
+    const notes = screen.getAllByText("Only an admin can enable or disable bundles.");
+    expect(notes).toHaveLength(1);
+    for (const name of ["voice", "monitoring", "rag"]) {
+      const button = screen.getByRole("button", { name: `Enable ${name}` });
+      expect(button.hasAttribute("disabled")).toBe(true);
+      expect(button.getAttribute("aria-describedby")).toBe(notes[0].id);
+    }
+  });
+
+  it("shows no admin note to an admin", async () => {
+    apiFetch.mockResolvedValue({ bundles: [bundle({ name: "voice" })], count: 1 });
+    render(<AvailableBundlesPage />, { wrapper: MemoryRouter });
+
+    const button = await screen.findByRole("button", { name: "Enable voice" });
+    expect(button.getAttribute("aria-describedby")).toBeNull();
+    expect(screen.queryByText(/Only an admin can/)).toBeNull();
   });
 });

@@ -3,6 +3,7 @@ import { useId, useState } from "react";
 import {
   type Bundle,
   type BundleService,
+  BUNDLE_TOGGLE_ACTION,
   bundleAdminReason,
   type DisableResponse,
   type EnableResponse,
@@ -63,6 +64,21 @@ function ServiceRow({
   );
 }
 
+/** The one visible "why can't I enable or disable bundles?" line a bundle
+ * list shows above its cards; each card's button references it by `id`
+ * (BundleCard's `adminNoteId`). */
+export function BundleAdminNote({ id, reason }: { id: string; reason: string }) {
+  return (
+    <p
+      id={id}
+      className="mb-3 flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400"
+    >
+      <Icon name="lock" size={14} className="shrink-0" />
+      {reason}
+    </p>
+  );
+}
+
 /** Enable/disable card shared by both Available Bundles (shows disabled
  * bundles, "Enable" action) and Installed Bundles (shows enabled bundles,
  * "Disable" action) -- the toggle logic already adapts to bundle.enabled, so
@@ -72,19 +88,21 @@ export function BundleCard({
   token,
   isAdmin,
   onChanged,
+  adminNoteId,
 }: {
   bundle: Bundle;
   token: string;
   isAdmin: boolean;
   onChanged: () => void;
+  /** Id of a page-level note saying why a non-admin can't enable or disable
+   * bundles. A list page shows that reason once, instead of on every card,
+   * and each card's button points at it with aria-describedby (#2195). When
+   * omitted (a card on its own), the card shows the reason itself. */
+  adminNoteId?: string;
 }) {
   const { confirm, dialog } = useConfirm();
   const reasonId = useId();
-  const disabledReason = bundleAdminReason(
-    isAdmin,
-    !!token,
-    bundle.enabled ? "disable bundles" : "enable bundles",
-  );
+  const disabledReason = bundleAdminReason(isAdmin, !!token, BUNDLE_TOGGLE_ACTION);
   const actionLabel = bundle.enabled ? "Disable" : "Enable";
   const [status, setStatus] = useState("");
   const [isError, setIsError] = useState(false);
@@ -176,12 +194,14 @@ export function BundleCard({
               onClick={handleToggle}
               disabled={!isAdmin || busy}
               aria-label={`${actionLabel} ${bundle.name}`}
-              aria-describedby={disabledReason ? reasonId : undefined}
+              aria-describedby={
+                disabledReason ? (adminNoteId ?? reasonId) : undefined
+              }
               className={bundle.enabled ? secondaryButtonClass : primaryButtonClass}
             >
               {actionLabel}
             </button>
-            {disabledReason && (
+            {disabledReason && !adminNoteId && (
               <p id={reasonId} className={`${fieldHintClass} text-right`}>
                 {disabledReason}
               </p>

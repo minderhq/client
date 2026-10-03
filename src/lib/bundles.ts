@@ -158,6 +158,9 @@ export function planBundleImport(
   return plan;
 }
 
+/** The action named in a non-admin's reason for bundle Enable/Disable. */
+export const BUNDLE_TOGGLE_ACTION = "enable or disable bundles";
+
 /** Why a non-admin can't enable, disable, reconcile or import bundles --
  * shown as visible text next to the disabled control (and linked to it with
  * aria-describedby), not only in a hover `title` that keyboard, touch and

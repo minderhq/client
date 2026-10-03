@@ -1,6 +1,6 @@
 import { useCallback, useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { BundleCard } from "../components/BundleCard";
+import { BundleAdminNote, BundleCard } from "../components/BundleCard";
 import { CardListSkeleton } from "../components/CardListSkeleton";
 import { useConfirm } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
@@ -16,6 +16,7 @@ import {
   type BundleImportPlan,
   type BundlesResponse,
   type ReconcileResponse,
+  BUNDLE_TOGGLE_ACTION,
   bundleAdminReason,
   bundlesToStateExport,
   outcomeSummary,
@@ -241,6 +242,8 @@ export function InstalledBundlesPage() {
   const isAdmin = role === "admin";
   const reconcileReasonId = useId();
   const reconcileReason = bundleAdminReason(isAdmin, !!token, "reconcile");
+  const adminNoteId = useId();
+  const adminReason = bundleAdminReason(isAdmin, !!token, BUNDLE_TOGGLE_ACTION);
   const bundlesRes = useAsyncResource((signal) =>
     apiFetch<BundlesResponse>("/v1/bundles", { signal }),
   );
@@ -342,6 +345,9 @@ export function InstalledBundlesPage() {
           .
         </EmptyState>
       )}
+      {adminReason && installed.length > 0 && (
+        <BundleAdminNote id={adminNoteId} reason={adminReason} />
+      )}
       {installed.map((b) => (
         <BundleCard
           key={b.name}
@@ -349,6 +355,7 @@ export function InstalledBundlesPage() {
           token={token}
           isAdmin={isAdmin}
           onChanged={bundlesRes.reload}
+          adminNoteId={adminReason ? adminNoteId : undefined}
         />
       ))}
     </>

@@ -78,8 +78,8 @@ describe("BundleCard accessibility (#2195)", () => {
     const button = screen.getByRole("button", { name: "Enable voice" });
     expect(button.hasAttribute("disabled")).toBe(true);
     expect(button.getAttribute("title")).toBeNull();
-    expect(screen.getByText("Only an admin can enable bundles.")).toBeTruthy();
-    expect(reasonFor(button)).toBe("Only an admin can enable bundles.");
+    expect(screen.getByText("Only an admin can enable or disable bundles.")).toBeTruthy();
+    expect(reasonFor(button)).toBe("Only an admin can enable or disable bundles.");
   });
 
   it("tells a logged-out visitor to log in as an admin", () => {
@@ -93,7 +93,7 @@ describe("BundleCard accessibility (#2195)", () => {
     );
 
     expect(reasonFor(screen.getByRole("button", { name: "Disable rag" }))).toBe(
-      "Log in as an admin to disable bundles.",
+      "Log in as an admin to enable or disable bundles.",
     );
   });
 
@@ -107,5 +107,25 @@ describe("BundleCard accessibility (#2195)", () => {
     expect(screen.getByText("Core is the always-on kernel, so it can't be disabled.")).toBeTruthy();
     expect(container.querySelector("[title]")).toBeNull();
     expect(container.textContent).not.toContain("🔒");
+  });
+
+  it("defers to a page-level note when given one, instead of repeating the reason", () => {
+    render(
+      <>
+        <p id="page-note">Only an admin can enable or disable bundles.</p>
+        <BundleCard
+          bundle={makeBundle({ name: "voice", core: false, enabled: false })}
+          token="tok"
+          isAdmin={false}
+          onChanged={() => {}}
+          adminNoteId="page-note"
+        />
+      </>,
+    );
+
+    expect(screen.getAllByText("Only an admin can enable or disable bundles.")).toHaveLength(1);
+    expect(reasonFor(screen.getByRole("button", { name: "Enable voice" }))).toBe(
+      "Only an admin can enable or disable bundles.",
+    );
   });
 });
