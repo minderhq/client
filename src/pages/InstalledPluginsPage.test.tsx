@@ -704,6 +704,40 @@ describe("ConfigurePanel", () => {
     });
   });
 
+  it("shows a neutral 'no settings' line for plugin-registry's 404 'is not running' (#2193)", async () => {
+    apiFetch.mockRejectedValue(
+      Object.assign(new Error("Plugin 'from-git' is not running"), { status: 404 }),
+    );
+    render(<ConfigurePanel name="from-git" token="tok" />);
+
+    fireEvent.click(screen.getByText("Configure"));
+
+    expect(await screen.findByText("No settings available for this plugin.")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText(/is not running/)).toBeNull();
+  });
+
+  it("keeps any other 404 an error", async () => {
+    apiFetch.mockRejectedValue(Object.assign(new Error("Not Found"), { status: 404 }));
+    render(<ConfigurePanel name="my-plugin" token="tok" />);
+
+    fireEvent.click(screen.getByText("Configure"));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("Not Found");
+    expect(screen.queryByText("No settings available for this plugin.")).toBeNull();
+  });
+
+  it("keeps a 'not running' message with a non-404 status an error", async () => {
+    apiFetch.mockRejectedValue(
+      Object.assign(new Error("Plugin 'x' is not running"), { status: 503 }),
+    );
+    render(<ConfigurePanel name="x" token="tok" />);
+
+    fireEvent.click(screen.getByText("Configure"));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("Plugin 'x' is not running");
+  });
+
   it("shows a friendly error when the config fetch fails", async () => {
     apiFetch.mockRejectedValue(new Error("plugin-registry unreachable"));
     render(<ConfigurePanel name="my-plugin" token="tok" />);

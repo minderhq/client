@@ -15,7 +15,7 @@ import { apiFetch, friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useAutoClearTimeout } from "../lib/browser";
 import type { InstalledEntry } from "../lib/installedPlugins";
-import type { RuntimePlugin } from "../lib/marketplace";
+import { isPluginNotRunningError, type RuntimePlugin } from "../lib/marketplace";
 import type { Installation } from "../lib/types";
 import { useInstalledPlugins } from "../lib/useInstalledPlugins";
 import { usePluginLifecycle } from "../lib/usePluginLifecycle";
@@ -260,6 +260,10 @@ export function ConfigurePanel({ name, token }: { name: string; token: string })
   const baseId = useId();
   const [loaded, setLoaded] = useState(false);
   const [configurable, setConfigurable] = useState(false);
+  // plugin-registry has no in-process instance to read settings from (a
+  // manifest/webhook plugin, or one that isn't loaded) -- see
+  // isPluginNotRunningError. Neutral, not an error.
+  const [noInstance, setNoInstance] = useState(false);
   const [schema, setSchema] = useState<ConfigField[]>([]);
   const [display, setDisplay] = useState<PluginDisplay | null>(null);
   const [requires, setRequires] = useState<PluginRequires | null>(null);
@@ -290,6 +294,13 @@ export function ConfigurePanel({ name, token }: { name: string; token: string })
       setLoaded(true);
       setStatus("");
     } catch (e) {
+      if (isPluginNotRunningError(e)) {
+        setNoInstance(true);
+        setConfigurable(false);
+        setLoaded(true);
+        setStatus("");
+        return;
+      }
       setStatus(friendlyErrorMessage(e));
       setIsError(true);
     }
@@ -380,7 +391,9 @@ export function ConfigurePanel({ name, token }: { name: string; token: string })
         {status && <StatusLine isError={isError} className="mb-2">{status}</StatusLine>}
         {loaded && !configurable && (
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            This plugin has no configurable settings.
+            {noInstance
+              ? "No settings available for this plugin."
+              : "This plugin has no configurable settings."}
           </p>
         )}
         {loaded && configurable && (

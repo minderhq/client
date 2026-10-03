@@ -4,6 +4,7 @@ import {
   fetchCatalogPlugins,
   fetchMyInstallations,
   fetchRuntimePlugins,
+  isPluginNotRunningError,
   MAX_PAGES,
 } from "./marketplace";
 
@@ -107,6 +108,23 @@ describe("fetchCatalogPlugins page cap", () => {
     expect(result.items).toHaveLength(MAX_PAGES * 100);
     expect(warn).toHaveBeenCalledWith(expect.stringMatching(/Marketplace catalog: stopped after 20 pages/));
     warn.mockRestore();
+  });
+});
+
+describe("isPluginNotRunningError", () => {
+  const err = (message: string, status?: number) =>
+    Object.assign(new Error(message), status === undefined ? {} : { status });
+
+  it("matches plugin-registry's 404 'is not running'", () => {
+    expect(isPluginNotRunningError(err("Plugin 'from-git' is not running", 404))).toBe(true);
+  });
+
+  it("rejects other 404s, other statuses, and non-errors", () => {
+    expect(isPluginNotRunningError(err("Not Found", 404))).toBe(false);
+    expect(isPluginNotRunningError(err("Plugin 'x' is not running", 500))).toBe(false);
+    expect(isPluginNotRunningError(err("Plugin 'x' is not running"))).toBe(false);
+    expect(isPluginNotRunningError("Plugin 'x' is not running")).toBe(false);
+    expect(isPluginNotRunningError(null)).toBe(false);
   });
 });
 

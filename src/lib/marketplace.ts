@@ -162,6 +162,22 @@ export function fetchRuntimePlugins(
   );
 }
 
+/** Whether `e` is plugin-registry's 404 "Plugin 'x' is not running" from a
+ * per-plugin endpoint such as `GET /v1/plugins/{name}/config`. It means the
+ * plugin has no loaded in-process instance to ask: manifest/webhook plugins
+ * (uploaded or installed from git) never have one, and neither does a plugin
+ * that isn't loaded. That's "no settings here", not a failure. Matched on
+ * status + message, so any other 404 (e.g. a gateway route miss) stays an
+ * error. Duck-typed rather than `instanceof ApiError` so it works on any
+ * error carrying a `status`. */
+export function isPluginNotRunningError(e: unknown): boolean {
+  return (
+    e instanceof Error &&
+    (e as Error & { status?: unknown }).status === 404 &&
+    /\bis not running\b/.test(e.message)
+  );
+}
+
 /** The caller's own marketplace installation records (per-user). */
 export async function fetchMyInstallations(
   token: string,
