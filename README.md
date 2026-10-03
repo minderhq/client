@@ -71,8 +71,9 @@ src/
   render from `lib/nav.ts` (see "Navigation and routes" below).
 - **`RedirectWithQuery.tsx`** — `<Navigate replace>` that keeps `?query` and
   `#hash`, used for every redirect in `lib/routes.ts`.
-- **`MindHubConnectionPlaceholder.tsx`** — informational panel on Settings ›
-  MindHub & sources until the real connection (#2201) lands. No controls.
+- **`MindHubConnectionPlaceholder.tsx`** — informational panel on Installation
+  settings › MindHub & sources until the real connection (#2201) lands. No
+  controls.
 - **`PageHeader.tsx`**, **`InfoCallout.tsx`**, **`ConfirmDialog.tsx`** (via
   `useConfirm()`), **`Sidebar.tsx`**, **`UserMenu.tsx`**.
 
@@ -124,7 +125,7 @@ after a client-side navigation.
 | Marketplace › Installed | Plugins `/marketplace/installed/plugins` · AI tools `/marketplace/installed/ai-tools` · Service bundles `/marketplace/installed/service-bundles` | everyone (actions need login / admin, as before) |
 | Marketplace › Publish | Submissions `/marketplace/publish/submissions` · Submission review `/marketplace/publish/submission-review` | everyone · admin |
 | Organization › Billing & licenses | Billing `/billing` · Licenses `/billing/licenses` | billing access (#64) · everyone |
-| Settings › MindHub & sources | `/settings/sources`, `/settings/sources/:repositoryId` | admin |
+| Installation settings › MindHub & sources | `/settings/sources`, `/settings/sources/:repositoryId` | admin |
 
 Old URLs (`/plugins/*`, `/ai-tools/*`, `/bundles/*`, `/platform/bundles`,
 `/marketplace/plugins/*`, …) redirect to these, query string included. Add to

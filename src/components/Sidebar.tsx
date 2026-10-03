@@ -16,7 +16,7 @@ const inactiveItemClass =
 
 /** The platform's persistent nav — a single always-visible tree, grouped by
  * what the user is trying to DO (Knowledge / Marketplace / Platform /
- * Organization / Settings) rather than by backend service. Renders from the
+ * Organization / Installation settings) rather than by backend service. Renders from the
  * shared NAV_SECTIONS model (lib/nav.ts) the ⌘K palette also uses. The repetitive
  * Available/Installed pages collapse into one entry each (their siblings are
  * in-page tabs), and every row carries a plain-language tooltip so "what does

@@ -179,7 +179,10 @@ export const NAV_SECTIONS: NavSection[] = [
     // A). Today: the read-only plugin source repositories, plus a placeholder
     // for the MindHub connection (#2201). Gated on role === "admin" like every
     // other operator item until #2200 refines the roles.
-    label: "Settings",
+    // "Installation settings", not "Settings": the user menu's Settings is
+    // your own account; this is the installation's (glossary: "installation",
+    // not "instance", for the deployment).
+    label: "Installation settings",
     items: [
       { to: ROUTES.sources, label: "MindHub & sources", title: "MindHub & sources", icon: "sources", match: ROUTES.sources, adminOnly: true, description: "Where this installation's plugins come from (operators)", keywords: "mindhub sources plugin source repositories git private mirror connect operator platform admin" },
     ],

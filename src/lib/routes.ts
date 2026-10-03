@@ -9,7 +9,7 @@
  *   Marketplace › Installed  /marketplace/installed/{plugins,ai-tools,service-bundles}
  *   Marketplace › Publish    /marketplace/publish/{submissions,submission-review}
  *   Organization › Billing & licenses   /billing, /billing/licenses
- *   Settings › MindHub & sources        /settings/sources(/:repositoryId)
+ *   Installation settings › MindHub & sources   /settings/sources(/:repositoryId)
  *
  * "Service bundle" (a runtime grouping of services the bundle reconciler turns
  * on and off) is kept distinct from plugins in both the label and the path.

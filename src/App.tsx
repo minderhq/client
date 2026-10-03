@@ -204,7 +204,7 @@ export function App() {
                       element={<ReviewQueuePage />}
                     />
 
-                    {/* Organization › Billing & licenses, Settings › MindHub & sources. */}
+                    {/* Organization › Billing & licenses, Installation settings › MindHub & sources. */}
                     <Route path={ROUTES.licenses} element={<MyLicensesPage />} />
                     <Route path={ROUTES.sources} element={<PluginSourceRepositoriesPage />} />
                     <Route

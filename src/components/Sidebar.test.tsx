@@ -163,14 +163,14 @@ describe("Sidebar", () => {
     ).toBeNull();
   });
 
-  it("shows Settings › MindHub & sources to an admin only", () => {
+  it("shows Installation settings › MindHub & sources to an admin only", () => {
     const { unmount } = render(
       <MemoryRouter>
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
-    // A non-admin sees no Settings section at all, not an empty heading.
-    expect(screen.queryByRole("group", { name: "Settings" })).toBeNull();
+    // A non-admin sees no Installation settings section at all, not an empty heading.
+    expect(screen.queryByRole("group", { name: "Installation settings" })).toBeNull();
     expect(screen.queryByText("MindHub & sources")).toBeNull();
     unmount();
 
@@ -180,7 +180,7 @@ describe("Sidebar", () => {
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
-    const settings = screen.getByRole("group", { name: "Settings" });
+    const settings = screen.getByRole("group", { name: "Installation settings" });
     expect(
       within(settings).getByText("MindHub & sources").closest("a")?.getAttribute("href"),
     ).toBe("/settings/sources");

@@ -97,7 +97,7 @@ describe("nav — marketplace IA (#2197)", () => {
       "Marketplace",
       "Platform",
       "Organization",
-      "Settings",
+      "Installation settings",
     ]);
   });
 
@@ -139,11 +139,11 @@ describe("nav — marketplace IA (#2197)", () => {
     expect(visibleRows("Organization", MEMBER)["Billing & licenses"]).toBe(ROUTES.licenses);
   });
 
-  it("shows Settings › MindHub & sources to admins only", () => {
-    expect(visibleRows("Settings", MEMBER)).toEqual({});
-    expect(visibleRows("Settings", BILLING_MEMBER)).toEqual({});
-    expect(visibleRows("Settings", ADMIN)).toEqual({ "MindHub & sources": ROUTES.sources });
-    const entry = section("Settings").items[0];
+  it("shows Installation settings › MindHub & sources to admins only", () => {
+    expect(visibleRows("Installation settings", MEMBER)).toEqual({});
+    expect(visibleRows("Installation settings", BILLING_MEMBER)).toEqual({});
+    expect(visibleRows("Installation settings", ADMIN)).toEqual({ "MindHub & sources": ROUTES.sources });
+    const entry = section("Installation settings").items[0];
     expect(entryIsActive(entry, `${ROUTES.sources}/r1`)).toBe(true);
     expect(entryIsActive(entry, "/settings")).toBe(false);
   });
@@ -180,7 +180,7 @@ describe("nav — marketplace IA (#2197)", () => {
 
   it("only links to routes declared in lib/routes.ts for the moved pages", () => {
     const declared = new Set<string>(Object.values(ROUTES));
-    const marketplaceLinks = [...section("Marketplace").items, ...section("Settings").items]
+    const marketplaceLinks = [...section("Marketplace").items, ...section("Installation settings").items]
       .flatMap((i) => [i, ...(i.tabs ?? [])])
       .map((l) => l.to);
     for (const to of marketplaceLinks) expect(declared.has(to)).toBe(true);

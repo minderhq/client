@@ -292,7 +292,7 @@ describe("App — page titles match the nav (#2197)", () => {
   );
 });
 
-describe("App — Settings › MindHub & sources gating", () => {
+describe("App — Installation settings › MindHub & sources gating", () => {
   afterEach(() => {
     sessionStorage.clear();
     cleanup();
