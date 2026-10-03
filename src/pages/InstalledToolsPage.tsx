@@ -1,9 +1,11 @@
 import { useId, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { CardListSkeleton } from "../components/CardListSkeleton";
 import { Icon } from "../components/Icon";
 import { EmptyState } from "../components/EmptyState";
 import { InfoCallout } from "../components/InfoCallout";
+import { LoadError } from "../components/LoadError";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
 import { ApiError, apiFetch, friendlyErrorMessage } from "../lib/api";
@@ -94,7 +96,10 @@ export function TryItPanel({ tool, token }: { tool: LiveTool; token: string }) {
 
   return (
     <details className="group mt-2">
-      <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400">
+      <summary
+        aria-label={`Try it: ${tool.function.name}`}
+        className="flex cursor-pointer list-none items-center gap-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400"
+      >
         <Icon name="chevron-right" size={13} className="shrink-0 transition group-open:rotate-90" />
         <Icon name="play" size={13} className="shrink-0" />
         Try it
@@ -115,13 +120,15 @@ export function TryItPanel({ tool, token }: { tool: LiveTool; token: string }) {
           className={`${inputClass} font-mono text-xs`}
         />
         {method !== "GET" && (
-          <p className="text-xs text-amber-700 dark:text-amber-400">
-            ⚠️ This is a {method} action — it may change data, not just read it.
+          <p className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
+            <Icon name="warning" size={13} className="shrink-0" />
+            This is a {method} action — it may change data, not just read it.
           </p>
         )}
         <button
           onClick={handleRun}
           disabled={running}
+          aria-label={`${running ? "Running" : "Run"} ${tool.function.name}`}
           className={`${secondaryButtonClass} self-start`}
         >
           <Icon name={running ? "reset" : "play"} size={15} className={running ? "animate-spin" : undefined} />
@@ -146,10 +153,15 @@ export function TryItPanel({ tool, token }: { tool: LiveTool; token: string }) {
 function LiveToolCard({ tool, token }: { tool: LiveTool; token: string }) {
   return (
     <section className="mb-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-      <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
-        <Icon name="ai-tools" size={16} className="shrink-0 text-indigo-500 dark:text-indigo-400" /> {tool.function.name}
-        <span className={badgeClass}>{tool.metadata.plugin}</span>
-      </h3>
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
+          <Icon name="ai-tools" size={16} className="shrink-0 text-indigo-500 dark:text-indigo-400" /> {tool.function.name}
+        </h3>
+        <span className={badgeClass}>
+          <span className="sr-only">Plugin: </span>
+          {tool.metadata.plugin}
+        </span>
+      </div>
       <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
         {tool.function.description || "No description provided."}
       </p>
@@ -203,15 +215,23 @@ export function InstalledToolsPage() {
         </Link>{" "}
         — installing and enabling that plugin is what makes them live.
       </InfoCallout>
-      <StatusLine isError={!!liveTools.error}>
-        {liveTools.error ?? (liveTools.loading ? "Loading…" : "")}
-      </StatusLine>
-      {liveTools.data !== null && liveTools.data.length === 0 && (
+      <StatusLine>{liveTools.loading ? "Loading AI tools…" : ""}</StatusLine>
+      <h2 className="sr-only">Callable AI tools</h2>
+      {liveTools.loading && liveTools.data === null && <CardListSkeleton />}
+      {liveTools.error && (
+        <LoadError
+          title="Couldn't load the AI tools that are live right now."
+          message={liveTools.error}
+          what="installed AI tools"
+          onRetry={liveTools.reload}
+        />
+      )}
+      {!liveTools.loading && !liveTools.error && liveTools.data?.length === 0 && (
         <EmptyState className="mb-6">
           No plugin is currently exposing an AI tool.
         </EmptyState>
       )}
-      {liveTools.data?.map((t) => (
+      {!liveTools.error && liveTools.data?.map((t) => (
         <LiveToolCard
           key={`${t.metadata.plugin}:${t.function.name}`}
           tool={t}

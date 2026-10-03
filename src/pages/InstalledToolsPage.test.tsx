@@ -98,12 +98,12 @@ describe("TryItPanel", () => {
     );
   });
 
-  it("warns that a non-GET tool may change data", () => {
+  it("warns that a non-GET tool may change data (with an icon, not an emoji)", () => {
     render(<TryItPanel tool={tool({ method: "POST" })} token="tok" />);
     fireEvent.click(screen.getByText("Try it"));
-    expect(
-      screen.getByText(/it may change data, not just read it/),
-    ).toBeTruthy();
+    const warning = screen.getByText(/it may change data, not just read it/);
+    expect(warning.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
+    expect(warning.querySelector("svg")).toBeTruthy();
   });
 
   it("does not warn for a GET tool", () => {
@@ -206,6 +206,38 @@ describe("InstalledToolsPage", () => {
     renderPage();
 
     await screen.findByText("plugin-registry unreachable");
+  });
+
+  it("shows a skeleton, not the empty state, while loading; an error offers Retry (#2195)", async () => {
+    let reject!: (e: unknown) => void;
+    apiFetch.mockReturnValueOnce(new Promise((_, r) => (reject = r)));
+    renderPage();
+
+    expect(screen.getByTestId("card-list-skeleton")).toBeTruthy();
+    expect(screen.queryByText("No plugin is currently exposing an AI tool.")).toBeNull();
+
+    reject(new Error("plugin-registry unreachable"));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't load the AI tools that are live right now.");
+    expect(screen.queryByText("No plugin is currently exposing an AI tool.")).toBeNull();
+
+    apiFetch.mockResolvedValueOnce({ tools: [tool()] });
+    fireEvent.click(screen.getByRole("button", { name: "Retry loading installed AI tools" }));
+    expect(await screen.findByRole("heading", { level: 3, name: "get_weather" })).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("names each tool's Try it and Run controls after the tool", async () => {
+    apiFetch.mockResolvedValue({ tools: [tool()] });
+    renderPage();
+    await screen.findByRole("heading", { level: 3, name: "get_weather" });
+
+    expect(screen.getByText("Try it", { selector: "summary" }).getAttribute("aria-label")).toBe(
+      "Try it: get_weather",
+    );
+    expect(screen.getByRole("button", { name: "Run get_weather" })).toBeTruthy();
+    // Card titles are h3 under the page's (visually hidden) h2.
+    expect(screen.getByRole("heading", { level: 2, name: "Callable AI tools" })).toBeTruthy();
   });
 
   it("renders (does not crash) when the response omits `tools` entirely", async () => {
