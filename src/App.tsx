@@ -24,6 +24,7 @@ import { BillingPage } from "./pages/BillingPage";
 import { CloudProvidersPage } from "./pages/CloudProvidersPage";
 import { ConversationsPage } from "./pages/ConversationsPage";
 import { ForcePasswordChangeGate } from "./pages/ForcePasswordChangePage";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { GraphExplorerPage } from "./pages/GraphExplorerPage";
 import { HomePage } from "./pages/HomePage";
 import { InstalledBundlesPage } from "./pages/InstalledBundlesPage";
@@ -39,6 +40,7 @@ import { PluginSourceRepositoriesPage } from "./pages/PluginSourceRepositoriesPa
 import { PublicChatConversationsPage } from "./pages/PublicChatConversationsPage";
 import { PublicChatEndpointsPage } from "./pages/PublicChatEndpointsPage";
 import { RagPipelinesPage } from "./pages/RagPipelinesPage";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { ReviewQueuePage } from "./pages/ReviewQueuePage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SubmissionsPage } from "./pages/SubmissionsPage";
@@ -145,6 +147,8 @@ export function App() {
                     <Route path="/ask" element={<AskPage />} />
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/auth/callback" element={<AuthCallbackPage />} />
+                    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                    <Route path="/reset-password" element={<ResetPasswordPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/billing" element={<BillingPage />} />
                     <Route path="/invite/:token" element={<InviteRedeemPage />} />

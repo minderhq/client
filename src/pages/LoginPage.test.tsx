@@ -7,17 +7,30 @@ const login = vi.fn();
 const register = vi.fn();
 const navigate = vi.fn();
 let isAuthenticated = false;
-let locationState: { oidcError?: string } | null = null;
+let locationState: { oidcError?: string; notice?: string; username?: string } | null = null;
+let passwordResetAvailable = false;
+let capabilitiesLoading = false;
 
 vi.mock("../lib/auth", () => ({
   useAuth: () => ({ isAuthenticated, login, register }),
 }));
 vi.mock("react-router-dom", () => ({
+  Link: ({ to, children, className }: { to: string; children: React.ReactNode; className?: string }) => (
+    <a href={to} className={className}>
+      {children}
+    </a>
+  ),
   useNavigate: () => navigate,
   useLocation: () => ({ state: locationState }),
   Navigate: ({ to, replace }: { to: string; replace?: boolean }) => (
     <div data-testid="navigate" data-to={to} data-replace={String(replace)} />
   ),
+}));
+vi.mock("../lib/passwordReset", () => ({
+  usePasswordResetAvailable: () => ({
+    loading: capabilitiesLoading,
+    available: passwordResetAvailable,
+  }),
 }));
 const redirectTo = vi.fn();
 vi.mock("../lib/redirect", () => ({
@@ -53,6 +66,8 @@ describe("LoginPage", () => {
     navigate.mockClear();
     isAuthenticated = false;
     locationState = null;
+    passwordResetAvailable = false;
+    capabilitiesLoading = false;
   });
   afterEach(() => cleanup());
 
@@ -137,5 +152,48 @@ describe("LoginPage", () => {
     const pending = JSON.parse(sessionStorage.getItem("minder_sso_pending") ?? "{}");
     expect(pending.nonce).toBe(nonce);
     sessionStorage.clear();
+  });
+
+  it("offers 'Forgot password?' only when the server can send reset emails", () => {
+    passwordResetAvailable = true;
+    render(<LoginPage />);
+    const link = screen.getByRole("link", { name: "Forgot password?" });
+    expect(link.getAttribute("href")).toBe("/forgot-password");
+    expect(screen.queryByText(/Ask your administrator/)).toBeNull();
+    // Not offered while creating an account.
+    fireEvent.click(screen.getByRole("button", { name: "Create one" }));
+    expect(screen.queryByRole("link", { name: "Forgot password?" })).toBeNull();
+  });
+
+  it("without email reset, shows an ask-your-administrator hint instead of a link", () => {
+    render(<LoginPage />);
+    expect(screen.queryByRole("link", { name: "Forgot password?" })).toBeNull();
+    expect(screen.getByText(/Ask your administrator to reset it/)).toBeTruthy();
+  });
+
+  it("shows neither while the capabilities are loading", () => {
+    capabilitiesLoading = true;
+    render(<LoginPage />);
+    expect(screen.queryByRole("link", { name: "Forgot password?" })).toBeNull();
+    expect(screen.queryByText(/Ask your administrator/)).toBeNull();
+  });
+
+  it("tells SSO users where their password is reset", () => {
+    render(<LoginPage />);
+    expect(screen.getByText(/SSO accounts reset their password at their identity provider/)).toBeTruthy();
+  });
+
+  it("after a reset shows the notice and focuses the username field", () => {
+    locationState = { notice: "Your password has been reset." };
+    render(<LoginPage />);
+    expect(screen.getByRole("status").textContent).toBe("Your password has been reset.");
+    expect(document.activeElement).toBe(screen.getByLabelText("Username"));
+  });
+
+  it("after a reset prefills a known username and focuses the password", () => {
+    locationState = { notice: "Your password has been reset.", username: "alice" };
+    render(<LoginPage />);
+    expect((screen.getByLabelText("Username") as HTMLInputElement).value).toBe("alice");
+    expect(document.activeElement).toBe(screen.getByLabelText("Password"));
   });
 });
