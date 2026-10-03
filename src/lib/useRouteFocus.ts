@@ -10,19 +10,22 @@ import { useLocation, useNavigationType } from "react-router-dom";
  * the page's <h1> (made programmatically focusable), or to `container` if the
  * page has none.
  *
- * Runs on pathname changes only: a filter that rewrites the query string
- * (?q=, ?source=) must not yank focus out of the field being typed in. It
- * skips the first render and REPLACE navigations (redirects, including the
- * legacy-URL redirects), so loading a page or an old bookmark leaves focus
- * where the browser put it. */
+ * Runs only when the pathname actually differs from the previous one: a
+ * query-only change (?q=, ?source=), whether it pushes, replaces or comes from
+ * Back, must not yank focus out of the field being used. The previous
+ * pathname is tracked in a ref rather than inferred from the effect re-running,
+ * because the effect also re-runs when only the navigation type changes.
+ * REPLACE navigations (redirects, including the legacy-URL ones) never move
+ * focus, so loading a page or an old bookmark leaves focus where the browser
+ * put it. */
 export function useRouteFocus(container: RefObject<HTMLElement | null>): void {
   const { pathname } = useLocation();
   const navigationType = useNavigationType();
-  const firstPathname = useRef(pathname);
+  const previousPathname = useRef(pathname);
 
   useEffect(() => {
-    if (pathname === firstPathname.current) return;
-    firstPathname.current = "";
+    if (pathname === previousPathname.current) return;
+    previousPathname.current = pathname;
     if (navigationType === "REPLACE") return;
     // After paint, so the new page (and its heading) is in the DOM.
     const id = requestAnimationFrame(() => {

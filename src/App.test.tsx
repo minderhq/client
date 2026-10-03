@@ -1,5 +1,11 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter, useLocation, type Location } from "react-router-dom";
+import {
+  MemoryRouter,
+  useLocation,
+  useNavigate,
+  type Location,
+  type NavigateFunction,
+} from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
@@ -40,9 +46,18 @@ vi.mock("./lib/api", async () => {
 
 // The router's current location, captured by a probe rendered next to <App/>.
 let currentLocation: Location | null = null;
+let currentNavigate: NavigateFunction | null = null;
 function LocationProbe() {
   currentLocation = useLocation();
+  currentNavigate = useNavigate();
   return null;
+}
+
+/** Let two animation frames pass: past the one a focus move would use. */
+async function nextFrames() {
+  for (let i = 0; i < 2; i++) {
+    await act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
+  }
 }
 
 function renderAt(path: string) {
@@ -317,16 +332,46 @@ describe("App — focus after navigation", () => {
     expect(document.activeElement).toBe(document.body);
   });
 
-  it("does not move focus when only the query string changes", async () => {
-    renderAt(ROUTES.discoverPlugins);
-    // The source filter lives in ?source=: changing it rewrites the URL.
+  it("does not move focus on a query-only change after a real navigation", async () => {
+    renderAt(ROUTES.discoverAiTools);
+    // A real navigation first (PUSH), so the first-load case is behind us.
+    const tabs = screen.getByRole("navigation", { name: "Discover sections" });
+    fireEvent.click(within(tabs).getByRole("link", { name: "Plugins" }));
+    const heading = screen.getByRole("heading", { level: 1, name: "Discover plugins" });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+
+    // The source filter rewrites ?source= (a REPLACE)…
     const filter = screen.getByRole("combobox", { name: "Filter by source" });
     filter.focus();
     fireEvent.change(filter, { target: { value: "private" } });
-    for (let i = 0; i < 2; i++) {
-      await act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
-    }
+    await nextFrames();
     expect(currentLocation?.search).toBe("?source=private");
     expect(document.activeElement).toBe(filter);
+
+    // …then a PUSH to the same pathname with a new query (what a palette
+    // result on the current page does): the navigation type changes, the
+    // pathname doesn't, so focus must stay put.
+    act(() => currentNavigate!(`${ROUTES.discoverPlugins}?source=private&q=crm`));
+    await nextFrames();
+    expect(currentLocation?.search).toBe("?source=private&q=crm");
+    expect(document.activeElement).toBe(filter);
   });
+
+  it("does not move focus when Back returns to the same pathname", async () => {
+    renderAt(ROUTES.discoverAiTools);
+    const tabs = screen.getByRole("navigation", { name: "Discover sections" });
+    fireEvent.click(within(tabs).getByRole("link", { name: "Plugins" }));
+    await waitFor(() =>
+      expect(document.activeElement?.textContent).toBe("Discover plugins"),
+    );
+    act(() => currentNavigate!(`${ROUTES.discoverPlugins}?q=crm`));
+    await nextFrames();
+    const filter = screen.getByRole("combobox", { name: "Filter by source" });
+    filter.focus();
+    act(() => currentNavigate!(-1)); // POP, same pathname, query dropped
+    await nextFrames();
+    expect(currentLocation?.search).toBe("");
+    expect(document.activeElement).toBe(filter);
+  });
+
 });
