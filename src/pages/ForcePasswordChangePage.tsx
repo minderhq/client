@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 
 import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../lib/auth";
+import { isGateExemptPath } from "../lib/recoveryRoutes";
 import { secondaryButtonClass } from "../lib/ui";
 import { ChangePasswordSection } from "./SettingsPage";
 
@@ -37,8 +39,14 @@ export function ForcePasswordChangePage() {
 }
 
 /** Renders the forced change-password screen instead of `children` (the app's
- * routes) while the signed-in user must change their password (#1776). */
+ * routes) while the signed-in user must change their password (#1776),
+ * except on the public account-recovery routes (lib/recoveryRoutes). */
 export function ForcePasswordChangeGate({ children }: { children: ReactNode }) {
   const { mustChangePassword } = useAuth();
-  return mustChangePassword ? <ForcePasswordChangePage /> : <>{children}</>;
+  const { pathname } = useLocation();
+  return mustChangePassword && !isGateExemptPath(pathname) ? (
+    <ForcePasswordChangePage />
+  ) : (
+    <>{children}</>
+  );
 }
