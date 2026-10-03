@@ -17,6 +17,19 @@ import type { Installation } from "./types";
  * (`string & {}`) because the column is a free-form string server-side. */
 export type PluginOrigin = "first_party" | "submitted" | (string & {});
 
+/** A catalog row's lifecycle state: the marketplace's full `PluginStatus`
+ * enum. The #402 submission flow is draft → submitted → in_review → approved
+ * or rejected, and archived delists a plugin. `approved` is the publicly
+ * visible state; `pending` is the legacy pre-#402 value, kept for back-compat. */
+export type PluginStatus =
+  | "draft"
+  | "submitted"
+  | "in_review"
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "archived";
+
 /** One marketplace catalog row (`GET /v1/marketplace/plugins`, the plugin
  * service's `PluginResponse`). */
 export interface CatalogPlugin {
@@ -33,7 +46,7 @@ export interface CatalogPlugin {
   current_version: string | null;
   pricing_model: "free" | "paid" | "freemium";
   base_tier: string;
-  status: "pending" | "approved" | "rejected" | "archived";
+  status: PluginStatus;
   featured: boolean;
   download_count: number;
   rating_average: number | null;
@@ -67,7 +80,10 @@ export interface CatalogPluginListResponse {
  * per-user marketplace installation record. Note what it does NOT carry: no
  * origin/source, no repository URL, no marketplace id and no "configurable"
  * flag -- callers join the catalog by `name` for the first two and fetch
- * `/v1/plugins/{name}/config` lazily for the last. */
+ * `/v1/plugins/{name}/config` lazily for the last. Nor `license_key_masked` /
+ * `updated_at`: those belong to the license-update response
+ * (`PluginLicenseUpdateResponse`), and the list's `response_model` drops
+ * anything not on `PluginInfo`. */
 export interface RuntimePlugin {
   name: string;
   version: string;
