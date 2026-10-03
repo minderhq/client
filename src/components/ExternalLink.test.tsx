@@ -29,9 +29,29 @@ describe("ExternalLink", () => {
       expect(screen.queryByRole("link")).toBeNull();
       expect(container.querySelector("a")).toBeNull();
       expect(screen.getByText(href)).toBeTruthy();
-      expect(screen.getByText(/not linked: only http and https URLs open/)).toBeTruthy();
+      expect(screen.getByText(/not linked: only http and https URLs without credentials open/)).toBeTruthy();
     },
   );
+
+  it("shows the normalized URL it opens, not the raw input", () => {
+    render(<ExternalLink href={"HTTPS://GitHub.com\\acme\\weather"} />);
+
+    const link = screen.getByRole("link");
+    expect(link.getAttribute("href")).toBe("https://github.com/acme/weather");
+    expect(link.textContent).toBe("https://github.com/acme/weather (opens in a new tab)");
+  });
+
+  it.each([
+    "https://example.com\t@evil.com",
+    "https://user:pass@example.com/repo",
+    "https://github.com@evil.example.com/acme",
+  ])("never links %j, whose host would be hidden behind userinfo", (href) => {
+    const { container } = render(<ExternalLink href={href} />);
+    expect(container.querySelector("a")).toBeNull();
+    // Raw text, as submitted (getByText would collapse the tab).
+    expect(container.querySelector("code")?.textContent).toBe(href);
+    expect(screen.getByText(/not linked/)).toBeTruthy();
+  });
 
   it("renders nothing for an empty value", () => {
     const { container } = render(<ExternalLink href={null} />);

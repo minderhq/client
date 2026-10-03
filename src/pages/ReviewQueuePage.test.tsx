@@ -404,7 +404,7 @@ describe("ReviewQueuePage", () => {
       expect(within(runs).queryByRole("link")).toBeNull();
       expect(runs.querySelector(`a[href^="${url.split(":")[0]}"]`)).toBeNull();
       expect(within(runs).getByText(url)).toBeTruthy();
-      expect(within(runs).getByText(/not linked: only http and https URLs open/)).toBeTruthy();
+      expect(within(runs).getByText(/not linked: only http and https URLs without credentials open/)).toBeTruthy();
     });
 
     it("never injects markup from submission text", async () => {
