@@ -240,6 +240,23 @@ describe("App — redirects (#2197)", () => {
     },
   );
 
+  it.each([
+    ["a%2Fb", "a/b"],
+    ["a%20b%3Fc%23d", "a b?c#d"],
+    ["100%25", "100%"],
+    ["%E2%9C%93", "✓"],
+  ])(
+    "keeps an unusual repository id (%s) encoded across the sources redirect",
+    (encoded, decoded) => {
+      signIn("admin");
+      renderAt(`/plugins/sources/${encoded}?q=x`);
+      // Same single encoding as sourceRepositoryRoute(): no "/" splitting the
+      // segment, no double encoding.
+      expect(currentLocation?.pathname).toBe(`/settings/sources/${encodeURIComponent(decoded)}`);
+      expect(currentLocation?.search).toBe("?q=x");
+    },
+  );
+
   it("lands an old ?source= bookmark on Discover plugins with the filter applied", () => {
     renderAt("/plugins/available?source=first-party");
     expect(currentLocation?.pathname).toBe(ROUTES.discoverPlugins);
