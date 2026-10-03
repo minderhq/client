@@ -42,15 +42,18 @@ function downloadJson(filename: string, data: unknown) {
 
 function PreviewGroup({
   title,
+  note,
   items,
 }: {
   title: string;
+  note?: string;
   items: string[];
 }) {
   if (items.length === 0) return null;
   return (
     <div className="mt-2 first:mt-0">
       <p className="font-medium">{`${title} (${items.length})`}</p>
+      {note && <p className="text-xs text-gray-500 dark:text-gray-400">{note}</p>}
       <ul className="ml-5 list-disc">
         {items.map((item) => (
           <li key={item}>{item}</li>
@@ -70,7 +73,8 @@ function ImportPreview({ plan }: { plan: BundleImportPlan }) {
         items={plan.changes.filter((c) => c.enabled).map((c) => c.name)}
       />
       <PreviewGroup
-        title="Will be disabled (services no other enabled bundle claims will stop)"
+        title="Will be disabled"
+        note="Services no other enabled bundle claims will stop."
         items={plan.changes.filter((c) => !c.enabled).map((c) => c.name)}
       />
       <PreviewGroup title="Already as requested" items={plan.unchanged} />

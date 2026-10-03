@@ -231,7 +231,7 @@ describe("ExportImportPanel import: preview, confirm, cancel (#2195)", () => {
     const text = dialog.textContent!;
     expect(text).toContain("Will be enabled (1)monitoring");
     expect(text).toContain("Will be disabled");
-    expect(text).toMatch(/Will be disabled[^)]*\) \(1\)voice/);
+    expect(text).toContain("Will be disabled (1)Services no other enabled bundle claims will stop.voice");
     expect(text).toContain("Already as requested (1)chat");
     expect(text).toContain("Skipped (2)core-services (core can't be disabled)no-such-bundle (unknown bundle)");
     // The preview is part of the dialog's description, read with the question.
