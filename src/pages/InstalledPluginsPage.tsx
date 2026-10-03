@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { CardListSkeleton } from "../components/CardListSkeleton";
 import { Icon } from "../components/Icon";
 import { PluginLogo } from "../components/PluginLogo";
 import { useConfirm } from "../components/ConfirmDialog";
@@ -8,7 +9,6 @@ import { EmptyState } from "../components/EmptyState";
 import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
 import { PluginVersion } from "../components/PluginVersion";
-import { Skeleton } from "../components/Skeleton";
 import { SourceBadge, SourceLegend } from "../components/SourceBadge";
 import { StatusLine } from "../components/StatusLine";
 import { apiFetch, friendlyErrorMessage } from "../lib/api";
@@ -627,24 +627,6 @@ export function InstalledPluginCard({
   );
 }
 
-/** Placeholder cards while the first load is in flight -- the page never shows
- * its "nothing installed" state before it actually knows (#2195). */
-function InstalledSkeleton() {
-  return (
-    <div aria-hidden="true">
-      {[0, 1].map((i) => (
-        <div key={i} className={`mb-4 ${cardClass}`}>
-          <Skeleton className="h-5 w-48" />
-          <div className="mt-2 flex gap-1.5">
-            <Skeleton className="h-5 w-24" />
-            <Skeleton className="h-5 w-40" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function InstalledPluginsPage() {
   const { token, sessionKey, isAuthenticated } = useAuth();
   const tokenRef = useTokenRef();
@@ -712,7 +694,7 @@ export function InstalledPluginsPage() {
                   : "Only part of the catalog could be loaded, so some source badges and listed versions may be missing."}
             </p>
           )}
-          {firstLoad && <InstalledSkeleton />}
+          {firstLoad && <CardListSkeleton />}
           {isEmpty && (
             <EmptyState>
               No plugins installed yet —{" "}
