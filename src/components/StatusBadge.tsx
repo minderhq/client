@@ -38,3 +38,17 @@ export function StatusBadge({
     </span>
   );
 }
+
+/** The caller's own marketplace install state -- one component so Discover
+ * and Installed plugins word it identically (#2195). "Your install:" stays
+ * visible: on Installed it sits beside the runtime "Enabled on this
+ * installation" badge, and the two mean different things. */
+export function InstallStateBadge({ enabled }: { enabled: boolean }) {
+  return (
+    <StatusBadge
+      icon={enabled ? "check" : "close"}
+      label={enabled ? "Your install: Enabled" : "Your install: Disabled"}
+      tone={enabled ? "success" : "neutral"}
+    />
+  );
+}

@@ -253,7 +253,7 @@ describe("InstalledPluginsPage", () => {
     expect(screen.getAllByRole("heading", { name: "Weather" })).toHaveLength(1);
     const card = cardFor("Weather");
     expect(within(card).getByText("Enabled on this installation")).toBeTruthy();
-    expect(within(card).getByText("Your install: enabled")).toBeTruthy();
+    expect(within(card).getByText("Your install: Enabled")).toBeTruthy();
     // the running version, even though the install record has none
     expect(within(card).getByText("v2.1.0")).toBeTruthy();
     expect(within(card).getByRole("button", { name: /Uninstall/ })).toBeTruthy();
@@ -426,7 +426,7 @@ describe("InstalledPluginCard — accessibility (#2195)", () => {
     expect(screen.getByText("Configure", { selector: "summary" }).getAttribute("aria-label")).toBe(
       "Configure My Plugin",
     );
-    const badge = screen.getByText("Your install: enabled");
+    const badge = screen.getByText("Your install: Enabled");
     expect(badge.querySelector("svg")).toBeTruthy();
     expect(badge.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
   });

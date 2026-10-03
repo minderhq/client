@@ -406,7 +406,7 @@ describe("Discover plugins: accessible names, badges and headings", () => {
     const featured = card.querySelector("[data-status-badge='Featured']")!;
     expect(featured.textContent).toBe("Featured");
     expect(featured.querySelector("svg")).toBeTruthy();
-    const installState = card.querySelector("[data-status-badge='Enabled']")!;
+    const installState = card.querySelector("[data-status-badge='Your install: Enabled']")!;
     expect(installState.textContent).toBe("Your install: Enabled");
     // The badge sits beside the title, so the heading's name is just the plugin.
     expect(screen.getByRole("heading", { level: 3, name: "Weather" })).toBeTruthy();

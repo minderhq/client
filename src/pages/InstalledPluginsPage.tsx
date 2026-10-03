@@ -10,7 +10,7 @@ import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
 import { PluginVersion } from "../components/PluginVersion";
 import { SourceBadge, SourceLegend } from "../components/SourceBadge";
-import { StatusBadge } from "../components/StatusBadge";
+import { InstallStateBadge } from "../components/StatusBadge";
 import { StatusLine } from "../components/StatusLine";
 import { apiFetch, friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -618,11 +618,7 @@ export function InstalledPluginCard({
             <SourceBadge source={entry.source} />
             <RuntimeState runtime={runtime} runtimeKnown={runtimeKnown} />
             {installation && (
-              <StatusBadge
-                icon={installation.enabled ? "check" : "close"}
-                label={installation.enabled ? "Your install: enabled" : "Your install: disabled"}
-                tone={installation.enabled ? "success" : "neutral"}
-              />
+              <InstallStateBadge enabled={installation.enabled} />
             )}
           </div>
           {(hasVersion || hasNeeds || runtime) && (

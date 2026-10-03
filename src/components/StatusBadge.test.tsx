@@ -1,7 +1,7 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { StatusBadge } from "./StatusBadge";
+import { InstallStateBadge, StatusBadge } from "./StatusBadge";
 
 afterEach(cleanup);
 
@@ -33,5 +33,12 @@ describe("StatusBadge", () => {
       .filter((c) => /^bg-/.test(c));
 
     expect(bg).toEqual(["bg-amber-100"]);
+  });
+
+  it("words the caller's install state the same everywhere it appears", () => {
+    const { container, rerender } = render(<InstallStateBadge enabled />);
+    expect(container.textContent).toBe("Your install: Enabled");
+    rerender(<InstallStateBadge enabled={false} />);
+    expect(container.textContent).toBe("Your install: Disabled");
   });
 });

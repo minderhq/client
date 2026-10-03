@@ -466,7 +466,7 @@ describe("AvailablePluginsPage", () => {
     });
     const { container } = render(<AvailablePluginsPage />);
     const statusBadge = () =>
-      container.querySelector("[data-status-badge='Enabled'], [data-status-badge='Disabled']");
+      container.querySelector("[data-status-badge^='Your install:']");
     await screen.findByRole("button", { name: "Disable Weather" });
     expect(statusBadge()?.textContent).toBe("Your install: Enabled");
 

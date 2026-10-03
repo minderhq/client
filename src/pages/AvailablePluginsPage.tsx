@@ -10,7 +10,7 @@ import { PageHeader } from "../components/PageHeader";
 import { PluginRatings } from "../components/PluginRatings";
 import { ListedVersion } from "../components/PluginVersion";
 import { SourceBadge, SourceLegend } from "../components/SourceBadge";
-import { StatusBadge } from "../components/StatusBadge";
+import { InstallStateBadge, StatusBadge } from "../components/StatusBadge";
 import { StatusLine } from "../components/StatusLine";
 import { apiFetch, friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -477,12 +477,7 @@ export function PluginCard({
               >
                 <Icon name="delete" size={15} /> Uninstall
               </button>
-              <StatusBadge
-                icon={installation.enabled ? "check" : "close"}
-                label={installation.enabled ? "Enabled" : "Disabled"}
-                tone={installation.enabled ? "success" : "neutral"}
-                srPrefix="Your install"
-              />
+              <InstallStateBadge enabled={installation.enabled} />
             </>
           )}
           {!isAuthenticated && (
