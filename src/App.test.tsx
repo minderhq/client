@@ -3,6 +3,8 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
+import { TOKEN_KEY } from "./lib/api";
+import { MUST_CHANGE_PASSWORD_KEY } from "./lib/auth";
 
 // Every page fetches on mount. A bare `{}` stub trips a real (if low-risk --
 // the backend always sends these keys) defensive-coding gap in HealthStrip,
@@ -65,6 +67,31 @@ describe("App", () => {
     // No #token in a MemoryRouter test, so the page offers a new link.
     expect(screen.getByRole("heading", { name: "Reset your password" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Send me a new link" })).toBeTruthy();
+  });
+
+  it("opens a reset link in a tab that must change its password (#2138)", () => {
+    // A signed-in session flagged must_change_password: the forced-change
+    // gate covers the app's routes, but not the public recovery routes.
+    const b64 = (o: object) => btoa(JSON.stringify(o)).replace(/=+$/, "");
+    const now = Math.floor(Date.now() / 1000);
+    sessionStorage.setItem(
+      TOKEN_KEY,
+      `${b64({ alg: "HS256" })}.${b64({ sub: "7", username: "alice", iat: now, exp: now + 3600 })}.sig`,
+    );
+    sessionStorage.setItem(MUST_CHANGE_PASSWORD_KEY, "1");
+    window.history.replaceState(null, "", "/reset-password#token=mpr_gated-tab-token");
+    try {
+      renderAt("/reset-password");
+      expect(screen.getByRole("heading", { name: "Choose a new password" })).toBeTruthy();
+      expect(screen.queryByText(/An administrator reset your password/)).toBeNull();
+      expect(window.location.hash).toBe("");
+      cleanup();
+      // Every other route is still gated.
+      renderAt("/settings");
+      expect(screen.getByText(/An administrator reset your password/)).toBeTruthy();
+    } finally {
+      window.history.replaceState(null, "", "/");
+    }
   });
 
   it("redirects an unmatched path home", () => {
