@@ -4,6 +4,8 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { StatusLine } from "../components/StatusLine";
 import { friendlyErrorMessage, oidcLoginUrl } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { redirectTo } from "../lib/redirect";
+import { beginSsoLogin } from "../lib/ssoLogin";
 import {
   cardClass,
   inputClass,
@@ -182,6 +184,12 @@ export function LoginPage() {
 
           <a
             href={oidcLoginUrl}
+            onClick={(e) => {
+              // Record this browser's pending login before leaving, so the
+              // callback only accepts the sign-in it started.
+              e.preventDefault();
+              redirectTo(beginSsoLogin(oidcLoginUrl));
+            }}
             className={`block text-center ${secondaryButtonClass}`}
           >
             Sign in with SSO (Authelia)

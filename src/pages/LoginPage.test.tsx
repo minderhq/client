@@ -19,6 +19,10 @@ vi.mock("react-router-dom", () => ({
     <div data-testid="navigate" data-to={to} data-replace={String(replace)} />
   ),
 }));
+const redirectTo = vi.fn();
+vi.mock("../lib/redirect", () => ({
+  redirectTo: (url: string) => redirectTo(url),
+}));
 vi.mock("../lib/api", () => ({
   friendlyErrorMessage: (e: unknown) => (e instanceof Error ? e.message : "error"),
   oidcLoginUrl: "https://sso.example.com/authorize",
@@ -118,5 +122,20 @@ describe("LoginPage", () => {
     render(<LoginPage />);
     const link = screen.getByRole("link", { name: /Sign in with SSO/i });
     expect(link.getAttribute("href")).toBe("https://sso.example.com/authorize");
+  });
+
+  it("starts SSO with a fresh nonce that it records as the pending login", () => {
+    redirectTo.mockClear();
+    sessionStorage.clear();
+    render(<LoginPage />);
+    fireEvent.click(screen.getByRole("link", { name: /Sign in with SSO/i }));
+    expect(redirectTo).toHaveBeenCalledTimes(1);
+    const url = new URL(redirectTo.mock.calls[0][0] as string);
+    expect(url.origin + url.pathname).toBe("https://sso.example.com/authorize");
+    const nonce = url.searchParams.get("cnonce") ?? "";
+    expect(nonce).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    const pending = JSON.parse(sessionStorage.getItem("minder_sso_pending") ?? "{}");
+    expect(pending.nonce).toBe(nonce);
+    sessionStorage.clear();
   });
 });
