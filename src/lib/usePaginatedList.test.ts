@@ -143,6 +143,7 @@ describe("usePaginatedList", () => {
       await result.current.reload();
     });
     expect(result.current.error).toBe("backend down");
+    expect(result.current.errorOnMore).toBe(false);
     expect(result.current.loading).toBe(false);
     expect(result.current.loaded).toBe(false);
 
@@ -173,6 +174,7 @@ describe("usePaginatedList", () => {
       await result.current.loadMore();
     });
     expect(result.current.error).toBe("flaky");
+    expect(result.current.errorOnMore).toBe(true);
     expect(result.current.items).toEqual(["item0"]);
 
     await act(async () => {

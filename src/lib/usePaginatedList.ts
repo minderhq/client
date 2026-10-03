@@ -21,8 +21,9 @@ interface Page<T> {
  * a page can tell "still loading" from "loaded, and empty" from "failed" and
  * never shows its empty state before the first page has actually arrived:
  * `loading` is true while a page is in flight, `loaded` once any page has
- * committed, `error` carries the latest failure, and `retry()` repeats the
- * request that failed (first page or Load more) rather than starting over.
+ * committed, `error` carries the latest failure (`errorOnMore` when it was a
+ * Load more, so the page knows the items it shows are still current), and
+ * `retry()` repeats the request that failed rather than starting over.
  */
 export function usePaginatedList<T>(
   fetchPage: (offset: number) => Promise<Page<T>>,
@@ -34,6 +35,7 @@ export function usePaginatedList<T>(
   const [status, setStatus] = useState("");
   const [isError, setIsError] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorOnMore, setErrorOnMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const runIdRef = useRef(0);
@@ -49,6 +51,7 @@ export function usePaginatedList<T>(
       setStatus("Loading…");
       setIsError(false);
       setError(null);
+      setErrorOnMore(false);
       setLoading(true);
       try {
         const page = await fetchPage(nextOffset);
@@ -65,6 +68,7 @@ export function usePaginatedList<T>(
         setStatus(message);
         setIsError(true);
         setError(message);
+        setErrorOnMore(!replace);
         setLoading(false);
       }
     },
@@ -87,6 +91,7 @@ export function usePaginatedList<T>(
     status,
     isError,
     error,
+    errorOnMore,
     loading,
     loaded,
     reload,
