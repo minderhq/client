@@ -97,7 +97,7 @@ export const NAV_SECTIONS: NavSection[] = [
         tabs: [
           { to: "/plugins/available", label: "Browse", icon: "available-plugins", end: true, description: "The plugin catalog" },
           { to: "/plugins/sources", label: "Sources", icon: "sources", description: "Source repositories that contribute plugins", keywords: "repository repositories source github group" },
-          { to: "/plugins/installed", label: "Installed", icon: "installed", description: "Plugins you've installed" },
+          { to: "/plugins/installed", label: "Installed", icon: "installed", description: "What runs on this installation, plus your installs", keywords: "running runtime version health first-party" },
           { to: "/plugins/submissions", label: "Submit", icon: "submit", description: "Publish your own plugin" },
           { to: "/plugins/licenses", label: "Licenses", icon: "licenses", description: "Your plugin license tiers" },
           { to: "/plugins/review", label: "Review Queue", icon: "review", adminOnly: true, description: "Approve submitted plugins" },

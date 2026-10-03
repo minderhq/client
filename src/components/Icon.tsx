@@ -2,6 +2,7 @@ import {
   Activity,
   Archive,
   ArrowRight,
+  BadgeCheck,
   Bot,
   Boxes,
   CreditCard,
@@ -10,6 +11,7 @@ import {
   ChevronsUpDown,
   ChevronDown,
   ChevronRight,
+  CircleArrowUp,
   CircleHelp,
   CircleUser,
   ClipboardCheck,
@@ -20,8 +22,10 @@ import {
   FileText,
   Filter,
   FolderGit2,
+  GitBranch,
   GitMerge,
   Globe,
+  HeartPulse,
   Info,
   KeyRound,
   Layers,
@@ -105,6 +109,11 @@ export const ICONS = {
   review: ClipboardCheck,
   licenses: KeyRound,
   sources: FolderGit2,
+  // Plugin source badges / version + health hints (#2193)
+  "source-first-party": BadgeCheck,
+  "source-git": GitBranch,
+  "version-up": CircleArrowUp,
+  health: HeartPulse,
   // AI tools
   "ai-tools": Zap,
   // Bundles
