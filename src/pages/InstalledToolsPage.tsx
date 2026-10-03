@@ -161,11 +161,11 @@ function LiveToolCard({ tool, token }: { tool: LiveTool; token: string }) {
   );
 }
 
-/** AI Tools actually callable right now, computed fresh from the plugins
+/** AI tools actually callable right now, computed fresh from the plugins
  * currently running on Plugin Registry -- exactly what the AI chat's own
  * function-calling feeds on. Each one carries its full JSON-Schema
- * parameter list (unlike the durable Discover AI tools catalog), which is what makes a
- * runnable example possible only here. */
+ * parameter list (unlike the durable Discover AI tools catalog), which is
+ * what makes a runnable example possible only here. */
 export function InstalledToolsPage() {
   const { token } = useAuth();
   const liveTools = useAsyncResource(

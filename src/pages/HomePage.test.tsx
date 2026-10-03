@@ -143,7 +143,7 @@ describe("HomePage", () => {
 
     await screen.findByText("2"); // Knowledge Bases count (kbCount, not readyKbCount)
     expect(screen.getByText("3")).toBeTruthy(); // Pipelines
-    expect(screen.getByText("2/5")).toBeTruthy(); // Service Bundles Enabled
+    expect(screen.getByText("2/5")).toBeTruthy(); // Service bundles enabled
     expect(screen.getByText("4")).toBeTruthy(); // Models
   });
 
@@ -165,7 +165,7 @@ describe("HomePage", () => {
     expect(href(/^Discover plugins$/)).toBe("/marketplace/discover/plugins");
     expect(href(/^Discover AI tools$/)).toBe("/marketplace/discover/ai-tools");
     expect(href(/^Discover service bundles$/)).toBe("/marketplace/discover/service-bundles");
-    expect(href(/Service Bundles Enabled/)).toBe("/marketplace/installed/service-bundles");
+    expect(href(/Service bundles enabled/i)).toBe("/marketplace/installed/service-bundles");
     // No link on Home still points at a pre-#2197 marketplace URL.
     for (const a of screen.getAllByRole("link")) {
       expect(a.getAttribute("href")).not.toMatch(/^\/(plugins|ai-tools|bundles)(\/|$)/);

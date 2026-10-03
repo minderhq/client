@@ -272,7 +272,7 @@ export function ReviewQueuePage() {
       </div>
 
       <StatusLine isError={!!error}>
-        {error ?? (loading ? "Loading review queue…" : "")}
+        {error ?? (loading ? "Loading submissions to review…" : "")}
       </StatusLine>
 
       {submissions.length === 0 ? (

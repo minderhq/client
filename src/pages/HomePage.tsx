@@ -269,7 +269,7 @@ export function HomePage() {
         <StatCard
           to={ROUTES.installedServiceBundles}
           icon="bundles"
-          label="Service Bundles Enabled"
+          label="Service bundles enabled"
           value={stats.data ? `${stats.data.bundlesEnabled}/${stats.data.bundlesTotal}` : null}
           loading={stats.loading}
         />
