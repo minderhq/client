@@ -10,6 +10,7 @@ import {
   MAX_PASSWORD_BYTES,
   MIN_PASSWORD_LENGTH,
   passwordByteLength,
+  passwordLength,
 } from "../lib/password";
 import {
   confirmPasswordReset,
@@ -128,7 +129,7 @@ export function ResetPasswordPage() {
     e.preventDefault();
     if (!token || busy) return;
     setError({ text: "", field: null });
-    if (password.length < MIN_PASSWORD_LENGTH) {
+    if (passwordLength(password) < MIN_PASSWORD_LENGTH) {
       fail(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`, "password");
       return;
     }
