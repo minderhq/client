@@ -1,4 +1,4 @@
-import { badgeClass, badgeTone } from "../lib/ui";
+import { badgeBaseClass, badgeNeutralToneClass, badgeTone } from "../lib/ui";
 import { Icon, type IconName } from "./Icon";
 
 export type StatusTone = keyof typeof badgeTone | "neutral";
@@ -25,10 +25,11 @@ export function StatusBadge({
   srPrefix?: string;
   className?: string;
 }) {
-  const toneClass = tone === "neutral" ? "" : ` ${badgeTone[tone]}`;
+  // Base + exactly one colour set, so the tone can't lose to the neutral grey.
+  const toneClass = tone === "neutral" ? badgeNeutralToneClass : badgeTone[tone];
   return (
     <span
-      className={`${badgeClass}${toneClass}${className ? ` ${className}` : ""}`}
+      className={`${badgeBaseClass} ${toneClass}${className ? ` ${className}` : ""}`}
       data-status-badge={label}
     >
       {srPrefix && <span className="sr-only">{`${srPrefix}: `}</span>}

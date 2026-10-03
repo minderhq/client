@@ -57,8 +57,18 @@ export const cardHoverClass =
 export const surfaceMutedClass =
   "rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950/40";
 
-export const badgeClass =
-  "inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+/** A badge's shape without its colours -- for a badge that takes a tone from
+ * `badgeTone`. Appending a tone to `badgeClass` instead leaves two competing
+ * background utilities, and Tailwind resolves those by stylesheet order, not
+ * class order (gray beats amber), so the tone can silently lose. */
+export const badgeBaseClass =
+  "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium";
+
+/** The neutral badge colours `badgeClass` uses. */
+export const badgeNeutralToneClass =
+  "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+
+export const badgeClass = `${badgeBaseClass} ${badgeNeutralToneClass}`;
 
 /** Small pill used for filterable tags / explore links. */
 export const chipClass =
