@@ -104,37 +104,52 @@ interface ListPage<T> {
   total: number | undefined;
 }
 
+/** A whole list fetched across pages. `truncated` is true when the page cap
+ * stopped the walk while the server still had more, so the list is known to be
+ * incomplete and callers must not treat "missing" as "absent". */
+export interface PagedList<T> {
+  items: T[];
+  truncated: boolean;
+}
+
 /** Walks a limit/offset list endpoint to the end. Stops on the reported
  * `total`, on a short/empty page (so a response without `total` can't loop),
- * or after `maxPages` as a hard backstop. */
+ * or after `maxPages` as a hard backstop. Hitting the backstop isn't silent: it
+ * logs a console warning and reports `truncated` so the UI can say so. */
 async function fetchAllPages<T>(
+  label: string,
   fetchPage: (offset: number) => Promise<ListPage<T>>,
   pageSize: number,
   maxPages: number,
-): Promise<T[]> {
+): Promise<PagedList<T>> {
   const all: T[] = [];
   for (let page = 0; page < maxPages; page++) {
     const { items, total } = await fetchPage(all.length);
     all.push(...items);
-    if (items.length < pageSize) break;
-    if (total !== undefined && all.length >= total) break;
+    if (items.length < pageSize) return { items: all, truncated: false };
+    if (total !== undefined && all.length >= total) return { items: all, truncated: false };
   }
-  return all;
+  console.warn(
+    `${label}: stopped after ${maxPages} pages (${all.length} items); the list is incomplete.`,
+  );
+  return { items: all, truncated: true };
 }
 
 /** plugin-registry's `/v1/plugins` caps `limit` at 500. */
 export const RUNTIME_PAGE_SIZE = 500;
 /** The marketplace catalog caps `limit` at 100. */
 export const CATALOG_PAGE_SIZE = 100;
-const MAX_PAGES = 20;
+/** Backstop on how many pages one list fetch may walk. */
+export const MAX_PAGES = 20;
 
 /** Every plugin plugin-registry has loaded on this installation, across all
  * pages. A response missing `plugins` is treated as empty, not a crash. */
 export function fetchRuntimePlugins(
   token: string,
   signal?: AbortSignal,
-): Promise<RuntimePlugin[]> {
+): Promise<PagedList<RuntimePlugin>> {
   return fetchAllPages(
+    "Runtime plugin list",
     async (offset) => {
       const res = await apiFetch<Partial<RuntimePluginListResponse>>(
         `/v1/plugins?limit=${RUNTIME_PAGE_SIZE}&offset=${offset}`,
@@ -166,8 +181,9 @@ export async function fetchMyInstallations(
 export function fetchCatalogPlugins(
   token: string,
   signal?: AbortSignal,
-): Promise<CatalogPlugin[]> {
+): Promise<PagedList<CatalogPlugin>> {
   return fetchAllPages(
+    "Marketplace catalog",
     async (offset) => {
       const res = await apiFetch<Partial<CatalogPluginListResponse>>(
         `/v1/marketplace/plugins?limit=${CATALOG_PAGE_SIZE}&offset=${offset}`,

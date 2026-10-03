@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { fetchCatalogPlugins, fetchMyInstallations, fetchRuntimePlugins } from "./marketplace";
+import {
+  fetchCatalogPlugins,
+  fetchMyInstallations,
+  fetchRuntimePlugins,
+  MAX_PAGES,
+} from "./marketplace";
 
 const apiFetch = vi.fn();
 vi.mock("./api", () => ({
@@ -18,7 +23,8 @@ describe("fetchRuntimePlugins", () => {
     const signal = new AbortController().signal;
     const result = await fetchRuntimePlugins("tok", signal);
 
-    expect(result).toHaveLength(2);
+    expect(result.items).toHaveLength(2);
+    expect(result.truncated).toBe(false);
     expect(apiFetch).toHaveBeenCalledTimes(1);
     expect(apiFetch).toHaveBeenCalledWith("/v1/plugins?limit=500&offset=0", { token: "tok", signal });
   });
@@ -29,7 +35,8 @@ describe("fetchRuntimePlugins", () => {
       .mockResolvedValueOnce({ plugins: named(1, "q"), total: 501 });
     const result = await fetchRuntimePlugins("tok");
 
-    expect(result).toHaveLength(501);
+    expect(result.items).toHaveLength(501);
+    expect(result.truncated).toBe(false);
     expect(apiFetch.mock.calls.map((c) => c[0])).toEqual([
       "/v1/plugins?limit=500&offset=0",
       "/v1/plugins?limit=500&offset=500",
@@ -38,19 +45,35 @@ describe("fetchRuntimePlugins", () => {
 
   it("stops on an empty page even without a total (no runaway loop)", async () => {
     apiFetch.mockResolvedValueOnce({ plugins: named(500) }).mockResolvedValueOnce({ plugins: [] });
-    expect(await fetchRuntimePlugins("tok")).toHaveLength(500);
+    expect(await fetchRuntimePlugins("tok")).toEqual({ items: named(500), truncated: false });
     expect(apiFetch).toHaveBeenCalledTimes(2);
   });
 
-  it("caps the number of pages", async () => {
+  it("caps the number of pages, and reports + warns that the list is incomplete", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     apiFetch.mockResolvedValue({ plugins: named(500), total: 1_000_000 });
-    await fetchRuntimePlugins("tok");
-    expect(apiFetch).toHaveBeenCalledTimes(20);
+    const result = await fetchRuntimePlugins("tok");
+
+    expect(apiFetch).toHaveBeenCalledTimes(MAX_PAGES);
+    expect(result.truncated).toBe(true);
+    expect(result.items).toHaveLength(MAX_PAGES * 500);
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/Runtime plugin list: stopped after 20 pages/));
+    warn.mockRestore();
+  });
+
+  it("is not truncated when the last allowed page completes the list", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    apiFetch.mockResolvedValue({ plugins: named(500), total: MAX_PAGES * 500 });
+    const result = await fetchRuntimePlugins("tok");
+
+    expect(result.truncated).toBe(false);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it("treats a response without `plugins` as empty", async () => {
     apiFetch.mockResolvedValue({});
-    expect(await fetchRuntimePlugins("tok")).toEqual([]);
+    expect(await fetchRuntimePlugins("tok")).toEqual({ items: [], truncated: false });
   });
 
   it("propagates errors", async () => {
@@ -64,11 +87,26 @@ describe("fetchCatalogPlugins", () => {
     apiFetch
       .mockResolvedValueOnce({ plugins: named(100), total: 150 })
       .mockResolvedValueOnce({ plugins: named(50, "q"), total: 150 });
-    expect(await fetchCatalogPlugins("tok")).toHaveLength(150);
+    const result = await fetchCatalogPlugins("tok");
+    expect(result.items).toHaveLength(150);
+    expect(result.truncated).toBe(false);
     expect(apiFetch.mock.calls.map((c) => c[0])).toEqual([
       "/v1/marketplace/plugins?limit=100&offset=0",
       "/v1/marketplace/plugins?limit=100&offset=100",
     ]);
+  });
+});
+
+describe("fetchCatalogPlugins page cap", () => {
+  it("reports a catalog cut short by the page cap and warns", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    apiFetch.mockResolvedValue({ plugins: named(100), total: 5000 });
+    const result = await fetchCatalogPlugins("tok");
+
+    expect(result.truncated).toBe(true);
+    expect(result.items).toHaveLength(MAX_PAGES * 100);
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/Marketplace catalog: stopped after 20 pages/));
+    warn.mockRestore();
   });
 });
 

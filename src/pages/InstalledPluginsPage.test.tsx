@@ -324,6 +324,46 @@ describe("InstalledPluginsPage", () => {
     expect(document.querySelector("[data-source]")).toBeNull();
   });
 
+  it("says when the catalog was cut short by the page cap", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    apiFetch.mockImplementation((path: string) => {
+      if (path.startsWith("/v1/marketplace/plugins?"))
+        return Promise.resolve({ plugins: Array(100).fill(catalogRow()), total: 5000 });
+      if (path.startsWith("/v1/plugins?"))
+        return Promise.resolve({ plugins: [runtimePlugin()], total: 1 });
+      return Promise.resolve({ installations: [], count: 0 });
+    });
+    render(<InstalledPluginsPage />);
+
+    expect(
+      await screen.findByText(
+        "Only part of the catalog could be loaded, so some source badges and listed versions may be missing.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Weather" })).toBeTruthy();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("doesn't claim 'not running' when the runtime list was cut short", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    apiFetch.mockImplementation((path: string) => {
+      if (path.startsWith("/v1/plugins?"))
+        return Promise.resolve({ plugins: Array(500).fill(runtimePlugin()), total: 1_000_000 });
+      if (path.startsWith("/v1/marketplace/plugins?"))
+        return Promise.resolve({ plugins: [], total: 0 });
+      return Promise.resolve({ installations: [installation()], count: 1 });
+    });
+    render(<InstalledPluginsPage />);
+
+    expect(
+      await screen.findByText(/Only part of the runtime plugin list could be loaded/),
+    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "My Plugin" })).toBeTruthy();
+    expect(screen.queryByText("Not running on this installation")).toBeNull();
+    warn.mockRestore();
+  });
+
   it("treats a response that omits `installations` as an empty list, not a crash", async () => {
     apiFetch.mockResolvedValue({ count: 0 });
     render(<InstalledPluginsPage />);

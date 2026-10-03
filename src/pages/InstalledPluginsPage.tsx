@@ -632,6 +632,8 @@ export function InstalledPluginsPage() {
     installationsError,
     runtimeError,
     catalogError,
+    runtimeTruncated,
+    catalogTruncated,
     reload,
     removeInstallation,
     setInstallationEnabled,
@@ -677,6 +679,15 @@ export function InstalledPluginsPage() {
               Source and listed-version details are unavailable right now ({catalogError}).
             </p>
           )}
+          {(runtimeTruncated || catalogTruncated) && !loading && (
+            <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+              {runtimeTruncated && catalogTruncated
+                ? "Only part of the runtime plugin list and the catalog could be loaded, so some plugins, source badges and listed versions may be missing."
+                : runtimeTruncated
+                  ? "Only part of the runtime plugin list could be loaded, so some running plugins may be missing here."
+                  : "Only part of the catalog could be loaded, so some source badges and listed versions may be missing."}
+            </p>
+          )}
           {firstLoad && <InstalledSkeleton />}
           {isEmpty && (
             <EmptyState>
@@ -701,7 +712,7 @@ export function InstalledPluginsPage() {
               key={entry.name}
               entry={entry}
               token={token}
-              runtimeKnown={runtime !== null}
+              runtimeKnown={runtime !== null && !runtimeTruncated}
               onUninstalled={removeInstallation}
               onToggleEnabled={setInstallationEnabled}
               confirm={confirm}

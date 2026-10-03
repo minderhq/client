@@ -18,6 +18,12 @@ interface LoadState {
   installationsError: string | null;
   runtimeError: string | null;
   catalogError: string | null;
+  /** The runtime list hit the page cap, so a plugin missing from it may still
+   * be running: callers must not claim "not running". */
+  runtimeTruncated: boolean;
+  /** The catalog hit the page cap, so some badges/listed versions may be
+   * missing. */
+  catalogTruncated: boolean;
   /** True until every request of the current load has settled. */
   loading: boolean;
 }
@@ -29,6 +35,8 @@ const EMPTY: Omit<LoadState, "loading"> = {
   installationsError: null,
   runtimeError: null,
   catalogError: null,
+  runtimeTruncated: false,
+  catalogTruncated: false,
 };
 
 function settledError(r: PromiseSettledResult<unknown>): string | null {
@@ -87,10 +95,14 @@ export function useInstalledPlugins({
       fetchCatalogPlugins(token, signal),
     ]).then(([inst, rt, cat]) => {
       if (runIdRef.current !== myRun || signal.aborted) return;
+      const runtime = settledValue(rt);
+      const catalog = settledValue(cat);
       setState({
         installations: settledValue(inst),
-        runtime: settledValue(rt),
-        catalog: settledValue(cat),
+        runtime: runtime?.items ?? null,
+        catalog: catalog?.items ?? null,
+        runtimeTruncated: runtime?.truncated ?? false,
+        catalogTruncated: catalog?.truncated ?? false,
         installationsError: settledError(inst),
         runtimeError: settledError(rt),
         catalogError: settledError(cat),
