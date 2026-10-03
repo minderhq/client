@@ -16,6 +16,13 @@ interface Page<T> {
  * Guards against out-of-order responses (#502): each `load()` takes a
  * monotonic run id and only the newest run may commit — so a search-as-you-type
  * whose earlier request resolves LAST can't render results for the wrong query.
+ *
+ * Exposes the request lifecycle as well as the legacy `status` line (#2195), so
+ * a page can tell "still loading" from "loaded, and empty" from "failed" and
+ * never shows its empty state before the first page has actually arrived:
+ * `loading` is true while a page is in flight, `loaded` once any page has
+ * committed, `error` carries the latest failure, and `retry()` repeats the
+ * request that failed (first page or Load more) rather than starting over.
  */
 export function usePaginatedList<T>(
   fetchPage: (offset: number) => Promise<Page<T>>,
@@ -26,13 +33,23 @@ export function usePaginatedList<T>(
   const [offset, setOffset] = useState(0);
   const [status, setStatus] = useState("");
   const [isError, setIsError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const runIdRef = useRef(0);
+  const lastRequestRef = useRef<{ offset: number; replace: boolean }>({
+    offset: 0,
+    replace: true,
+  });
 
   const load = useCallback(
     async (nextOffset: number, replace: boolean) => {
       const myRun = ++runIdRef.current;
+      lastRequestRef.current = { offset: nextOffset, replace };
       setStatus("Loading…");
       setIsError(false);
+      setError(null);
+      setLoading(true);
       try {
         const page = await fetchPage(nextOffset);
         if (runIdRef.current !== myRun) return; // superseded by a newer load
@@ -40,10 +57,15 @@ export function usePaginatedList<T>(
         setTotal(page.total);
         setOffset(nextOffset);
         setStatus("");
+        setLoaded(true);
+        setLoading(false);
       } catch (e) {
         if (runIdRef.current !== myRun) return;
-        setStatus(friendlyErrorMessage(e));
+        const message = friendlyErrorMessage(e);
+        setStatus(message);
         setIsError(true);
+        setError(message);
+        setLoading(false);
       }
     },
     [fetchPage],
@@ -54,14 +76,22 @@ export function usePaginatedList<T>(
     () => load(offset + pageSize, false),
     [load, offset, pageSize],
   );
+  const retry = useCallback(() => {
+    const { offset: lastOffset, replace } = lastRequestRef.current;
+    return load(lastOffset, replace);
+  }, [load]);
 
   return {
     items,
     total,
     status,
     isError,
+    error,
+    loading,
+    loaded,
     reload,
     loadMore,
+    retry,
     hasMore: items.length < total,
   };
 }
