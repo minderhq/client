@@ -1,237 +1,74 @@
-import { useCallback, useId, useState } from "react";
+import { useCallback, useState } from "react";
 
-import { Icon } from "../components/Icon";
 import { EmptyState } from "../components/EmptyState";
 import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
+import { Skeleton } from "../components/Skeleton";
 import { StatusLine } from "../components/StatusLine";
-import { apiFetch, friendlyErrorMessage } from "../lib/api";
+import { SubmissionReviewCard } from "../components/SubmissionReviewCard";
+import { apiFetch } from "../lib/api";
 import { useAsyncResource } from "../lib/useAsyncResource";
 import { useAuth } from "../lib/auth";
 import {
-  badgeClass,
-  cardClass,
-  destructiveButtonClass,
-  inputClass,
-  mutedTextClass,
-  primaryButtonClass,
-  secondaryButtonClass,
-} from "../lib/ui";
-import { submissionStatusBadgeColor, type Submission } from "./SubmissionsPage";
+  REVIEW_QUEUE_PAGE_SIZE,
+  REVIEW_STATUS_FILTERS,
+  submissionStatusLabel,
+  type ReviewQueueResponse,
+  type ReviewStatusFilter,
+} from "../lib/submissionReview";
+import { cardClass, inputClass, mutedTextClass, secondaryButtonClass } from "../lib/ui";
 
-interface SubmissionListResponse {
-  plugins: Submission[];
+/** The response tagged with the filter it was fetched for, so a filter
+ * change never shows the previous status's cards while the new list loads. */
+interface QueueResult {
+  filter: ReviewStatusFilter;
+  response: ReviewQueueResponse;
 }
 
-const STATUS_FILTERS: Submission["status"][] = [
-  "submitted",
-  "in_review",
-  "rejected",
-  "approved",
-  "archived",
-  "draft",
-  "pending",
-];
-
-// Mirrors core/review.py's ALLOWED_TRANSITIONS exactly -- only the reviewer
-// (not the submission's own developer) actions this page exposes.
-function reviewerActionsFor(status: Submission["status"]): Array<"claim" | "approve" | "reject" | "archive"> {
-  if (status === "submitted") return ["claim", "reject"];
-  if (status === "in_review") return ["approve", "reject"];
-  if (status === "approved") return ["archive"];
-  if (status === "pending") return ["approve", "reject", "archive"];
-  return []; // draft, rejected, archived -- nothing a reviewer can do here
-}
-
-function RejectForm({
-  onConfirm,
-  onCancel,
-  busy,
-}: {
-  onConfirm: (notes: string) => void;
-  onCancel: () => void;
-  busy: boolean;
-}) {
-  const idBase = useId();
-  const [notes, setNotes] = useState("");
-
+function LoadingCards() {
   return (
-    <div className="mt-2 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-      <label
-        htmlFor={`${idBase}-notes`}
-        className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
-      >
-        Feedback for the developer (required)
-      </label>
-      <textarea
-        id={`${idBase}-notes`}
-        className={inputClass}
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        rows={2}
-        placeholder="What needs to change before this can be resubmitted?"
-      />
-      <div className="mt-2 flex gap-2">
-        <button
-          type="button"
-          disabled={busy || !notes.trim()}
-          onClick={() => onConfirm(notes.trim())}
-          className={destructiveButtonClass}
-        >
-          Confirm reject
-        </button>
-        <button type="button" onClick={onCancel} className={secondaryButtonClass}>
-          Cancel
-        </button>
-      </div>
+    <div aria-hidden="true">
+      {[0, 1].map((i) => (
+        <div key={i} className={`mb-4 ${cardClass}`}>
+          <Skeleton className="h-5 w-48" />
+          <Skeleton className="mt-2 block h-4 w-72" />
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
-function ReviewCard({
-  submission,
-  onChanged,
-}: {
-  submission: Submission;
-  onChanged: () => void;
-}) {
-  const { token } = useAuth();
-  const [busy, setBusy] = useState(false);
-  const [rejecting, setRejecting] = useState(false);
-  const [status, setStatus] = useState("");
-  const [isError, setIsError] = useState(false);
-
-  const setStatusMsg = useCallback((msg: string, err = false) => {
-    setStatus(msg);
-    setIsError(err);
-  }, []);
-
-  async function runAction(path: string, body?: unknown) {
-    setBusy(true);
-    setStatusMsg("Working…");
-    try {
-      await apiFetch(`/v1/marketplace/submissions/${submission.id}${path}`, {
-        method: "POST",
-        token,
-        body,
-      });
-      setRejecting(false);
-      onChanged();
-    } catch (err) {
-      setStatusMsg(friendlyErrorMessage(err), true);
-      setBusy(false);
-    }
-  }
-
-  const actions = reviewerActionsFor(submission.status);
-
-  return (
-    <section className={`mb-4 ${cardClass}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
-            <Icon name="plugins" size={16} className="shrink-0 text-indigo-500 dark:text-indigo-400" /> {submission.display_name}
-          </h3>
-          {submission.description && (
-            <p className="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
-              {submission.description}
-            </p>
-          )}
-          <p className={`mt-1 ${mutedTextClass}`}>
-            {submission.name} · by {submission.author} · {submission.pricing_model}
-          </p>
-        </div>
-        <span
-          className={`${badgeClass} ${submissionStatusBadgeColor(submission.status)} flex-shrink-0`}
-        >
-          {submission.status.replace("_", " ")}
-        </span>
-      </div>
-
-      {submission.review_notes && (
-        <p className="mt-3 rounded-lg bg-gray-50 p-2 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-          <strong>Previous feedback:</strong> {submission.review_notes}
-        </p>
-      )}
-
-      {actions.length === 0 && (
-        <p className={`mt-3 ${mutedTextClass}`}>
-          No reviewer action available in this status.
-        </p>
-      )}
-
-      {actions.length > 0 && !rejecting && (
-        <div className="mt-3 flex gap-2">
-          {actions.includes("claim") && (
-            <button
-              disabled={busy}
-              onClick={() => runAction("/claim")}
-              className={primaryButtonClass}
-            >
-              Claim
-            </button>
-          )}
-          {actions.includes("approve") && (
-            <button
-              disabled={busy}
-              onClick={() => runAction("/approve")}
-              className={primaryButtonClass}
-            >
-              Approve
-            </button>
-          )}
-          {actions.includes("reject") && (
-            <button
-              disabled={busy}
-              onClick={() => setRejecting(true)}
-              className={destructiveButtonClass}
-            >
-              Reject
-            </button>
-          )}
-          {actions.includes("archive") && (
-            <button
-              disabled={busy}
-              onClick={() => runAction("/archive")}
-              className={secondaryButtonClass}
-            >
-              Archive
-            </button>
-          )}
-        </div>
-      )}
-
-      {rejecting && (
-        <RejectForm
-          busy={busy}
-          onCancel={() => setRejecting(false)}
-          onConfirm={(notes) => runAction("/reject", { notes })}
-        />
-      )}
-
-      <StatusLine isError={isError}>{status}</StatusLine>
-    </section>
-  );
+function emptyMessage(filter: ReviewStatusFilter): string {
+  return filter === "submitted"
+    ? "No submissions are waiting for review."
+    : `No submissions with the status "${submissionStatusLabel(filter)}".`;
 }
 
 export function ReviewQueuePage() {
   const { token, sessionKey, role, isAuthenticated } = useAuth();
   const isAdmin = role === "admin";
-  const [statusFilter, setStatusFilter] = useState<Submission["status"]>("submitted");
-  const {
-    data,
-    error,
-    loading,
-    reload: loadQueue,
-  } = useAsyncResource(
+  const [statusFilter, setStatusFilter] = useState<ReviewStatusFilter>("submitted");
+  const [notice, setNotice] = useState("");
+  const { data, error, loading, reload } = useAsyncResource<QueueResult>(
     (signal) =>
-      apiFetch<SubmissionListResponse>(
-        `/v1/marketplace/submissions?status=${statusFilter}`,
+      apiFetch<ReviewQueueResponse>(
+        `/v1/marketplace/submissions?status=${encodeURIComponent(statusFilter)}&limit=${REVIEW_QUEUE_PAGE_SIZE}`,
         { token, signal },
-      ),
+      ).then((response) => ({ filter: statusFilter, response })),
     { deps: [statusFilter, sessionKey], enabled: isAdmin },
   );
-  const submissions = data?.plugins ?? [];
+
+  const handleActionDone = useCallback(
+    (message: string) => {
+      setNotice(message);
+      reload();
+    },
+    [reload],
+  );
 
   if (!isAuthenticated || !isAdmin) {
     return (
@@ -244,6 +81,10 @@ export function ReviewQueuePage() {
       </>
     );
   }
+
+  const current = data?.filter === statusFilter ? data.response : null;
+  const submissions = current?.plugins ?? [];
+  const total = current?.total ?? submissions.length;
 
   return (
     <>
@@ -261,26 +102,49 @@ export function ReviewQueuePage() {
           id="review-status-filter"
           className={`${inputClass} max-w-xs`}
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as Submission["status"])}
+          onChange={(e) => {
+            setNotice("");
+            setStatusFilter(e.target.value as ReviewStatusFilter);
+          }}
         >
-          {STATUS_FILTERS.map((s) => (
+          {REVIEW_STATUS_FILTERS.map((s) => (
             <option key={s} value={s}>
-              {s.replace("_", " ")}
+              {submissionStatusLabel(s)}
             </option>
           ))}
         </select>
       </div>
 
-      <StatusLine isError={!!error}>
-        {error ?? (loading ? "Loading submissions to review…" : "")}
-      </StatusLine>
-
-      {submissions.length === 0 ? (
-        <EmptyState>No submissions in status "{statusFilter.replace("_", " ")}".</EmptyState>
+      {error ? (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <StatusLine isError className="!mb-0">
+            Couldn't load submissions: {error}
+          </StatusLine>
+          <button type="button" onClick={reload} className={secondaryButtonClass}>
+            Try again
+          </button>
+        </div>
       ) : (
-        submissions.map((s) => (
-          <ReviewCard key={s.id} submission={s} onChanged={loadQueue} />
-        ))
+        <StatusLine>{loading ? "Loading submissions…" : notice}</StatusLine>
+      )}
+
+      {!current && loading && <LoadingCards />}
+
+      {current && !error && submissions.length === 0 && (
+        <EmptyState>{emptyMessage(statusFilter)}</EmptyState>
+      )}
+
+      {submissions.length > 0 && (
+        <>
+          <p className={`mb-3 ${mutedTextClass}`}>
+            {total > submissions.length
+              ? `Showing the ${submissions.length} oldest of ${total} submissions.`
+              : `${submissions.length} ${submissions.length === 1 ? "submission" : "submissions"}, oldest first.`}
+          </p>
+          {submissions.map((s) => (
+            <SubmissionReviewCard key={s.id} submission={s} onActionDone={handleActionDone} />
+          ))}
+        </>
       )}
     </>
   );
