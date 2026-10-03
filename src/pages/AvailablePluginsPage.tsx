@@ -6,10 +6,26 @@ import { useConfirm } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 import { PageHeader } from "../components/PageHeader";
 import { PluginRatings } from "../components/PluginRatings";
+import { ListedVersion } from "../components/PluginVersion";
+import { SourceBadge } from "../components/SourceBadge";
 import { StatusLine } from "../components/StatusLine";
 import { apiFetch, friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useAutoClearTimeout } from "../lib/browser";
+import type {
+  CatalogPlugin,
+  CatalogPluginListResponse,
+  MyInstallationsResponse,
+} from "../lib/marketplace";
+import {
+  matchesSourceFilter,
+  parseSourceFilter,
+  resolveSource,
+  SOURCE_FILTER_KINDS,
+  SOURCE_META,
+  SOURCE_PARAM,
+  type SourceKind,
+} from "../lib/pluginSource";
 import type { Installation } from "../lib/types";
 import { useDebouncedValue } from "../lib/useDebouncedValue";
 import { usePaginatedList } from "../lib/usePaginatedList";
@@ -24,47 +40,9 @@ import {
 } from "../lib/ui";
 import { useTokenRef } from "../lib/useTokenRef";
 
-export interface Plugin {
-  id: string;
-  name: string;
-  display_name: string;
-  description: string | null;
-  author: string;
-  repository_url: string | null;
-  distribution_type: "git" | "docker" | "hybrid";
-  docker_image: string | null;
-  current_version: string | null;
-  pricing_model: "free" | "paid" | "freemium";
-  base_tier: string;
-  status: "pending" | "approved" | "rejected" | "archived";
-  featured: boolean;
-  download_count: number;
-  rating_average: number | null;
-  rating_count: number;
-  created_at: string;
-  updated_at: string;
-  published_at: string | null;
-  developer_id: string | null;
-  category_id: string | null;
-  requires_services: string[];
-  /** Screenshot/media image URLs shown as a gallery on the listing (#1521).
-   * Additive: legacy listings and any plugin whose author hasn't attached media
-   * return an empty array. */
-  screenshots: string[];
-}
-
-interface PluginListResponse {
-  plugins: Plugin[];
-  count: number;
-  total: number;
-  limit: number;
-  offset: number;
-}
-
-interface MyInstallationsResponse {
-  installations: Installation[];
-  count: number;
-}
+/** A marketplace catalog row. The shape lives in lib/marketplace.ts (#2198);
+ * re-exported under its historical name for existing importers. */
+export type Plugin = CatalogPlugin;
 
 interface DependencyEntry {
   plugin_id: string;
@@ -103,9 +81,16 @@ function formatShortDate(iso: string): string {
 /** Source/distribution metadata the list already carries but the card never
  * rendered -- repository link, what actually ships (git/docker/hybrid), and
  * when it was published. */
-function PluginMetaRow({ plugin }: { plugin: Plugin }) {
+function PluginMetaRow({
+  plugin,
+  installation,
+}: {
+  plugin: Plugin;
+  installation: Installation | undefined;
+}) {
   return (
     <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-gray-500 dark:text-gray-400">
+      <ListedVersion listed={plugin.current_version} installed={installation?.version} />
       <span title={plugin.docker_image ?? undefined}>
         ships as {plugin.distribution_type}
       </span>
@@ -413,12 +398,13 @@ export function PluginCard({
             {plugin.download_count} install{plugin.download_count === 1 ? "" : "s"}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
+            <SourceBadge source={resolveSource(plugin)} />
             <PricingBadge plugin={plugin} />
             {plugin.category_id && (
               <span className={badgeClass}>{plugin.category_id}</span>
             )}
           </div>
-          <PluginMetaRow plugin={plugin} />
+          <PluginMetaRow plugin={plugin} installation={installation} />
           <PluginScreenshotGallery plugin={plugin} />
           {plugin.repository_url && isAdmin && (
             <InstallFromRepoPanel
@@ -505,6 +491,8 @@ function SearchAndFilters({
   category,
   onCategoryChange,
   categories,
+  source,
+  onSourceChange,
 }: {
   query: string;
   onQueryChange: (q: string) => void;
@@ -513,6 +501,8 @@ function SearchAndFilters({
   category: string;
   onCategoryChange: (v: string) => void;
   categories: string[];
+  source: SourceKind | null;
+  onSourceChange: (v: SourceKind | null) => void;
 }) {
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -533,6 +523,24 @@ function SearchAndFilters({
         {PRICING_MODEL_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}
+          </option>
+        ))}
+      </select>
+      {/* Source is a filter over the one catalog, not a separate store (epic
+          #2192). Client-side over the loaded pages -- the catalog API has no
+          source param -- and mirrored in ?source= so a filtered view is
+          shareable. Options come from SOURCE_FILTER_KINDS, so MindHub joins
+          by adding one entry there (Phase 2). */}
+      <select
+        className={`${inputClass} w-auto`}
+        aria-label="Filter by source"
+        value={source ? SOURCE_META[source].param : ""}
+        onChange={(e) => onSourceChange(parseSourceFilter(e.target.value))}
+      >
+        <option value="">All sources</option>
+        {SOURCE_FILTER_KINDS.map((kind) => (
+          <option key={kind} value={SOURCE_META[kind].param}>
+            {SOURCE_META[kind].filterLabel}
           </option>
         ))}
       </select>
@@ -563,7 +571,25 @@ export function AvailablePluginsPage() {
   const isAdmin = role === "admin";
   const { confirm, dialog } = useConfirm();
   // Seed from ?q= so the ⌘K palette can deep-link to a specific plugin (#1210).
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // The source filter lives in ?source= and is derived from the URL on every
+  // render (not copied into state), so a shared link opens on the same filter.
+  // Changes replace the history entry rather than pushing one per tweak.
+  const source = parseSourceFilter(searchParams.get(SOURCE_PARAM));
+  const setSource = useCallback(
+    (next: SourceKind | null) => {
+      setSearchParams(
+        (prev) => {
+          const params = new URLSearchParams(prev);
+          if (next) params.set(SOURCE_PARAM, SOURCE_META[next].param);
+          else params.delete(SOURCE_PARAM);
+          return params;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
   const [queryInput, setQueryInput] = useState(() => searchParams.get("q") ?? "");
   const query = useDebouncedValue(queryInput, 300);
   const [pricingModel, setPricingModel] = useState("");
@@ -574,7 +600,7 @@ export function AvailablePluginsPage() {
 
   const loadFeatured = useCallback(async () => {
     try {
-      const res = await apiFetch<PluginListResponse>("/v1/marketplace/plugins/featured?limit=6");
+      const res = await apiFetch<CatalogPluginListResponse>("/v1/marketplace/plugins/featured?limit=6");
       setFeatured(res.plugins);
     } catch {
       // best-effort -- the full catalog below still shows featured plugins
@@ -600,7 +626,7 @@ export function AvailablePluginsPage() {
         if (category) path += `&category=${encodeURIComponent(category)}`;
         if (pricingModel) path += `&pricing_model=${encodeURIComponent(pricingModel)}`;
       }
-      const res = await apiFetch<PluginListResponse>(path);
+      const res = await apiFetch<CatalogPluginListResponse>(path);
       return { items: res.plugins, total: res.total };
     },
     [query, category, pricingModel],
@@ -688,8 +714,13 @@ export function AvailablePluginsPage() {
       // of its own), so this filter has to apply uniformly to both rather
       // than just the search branch.
       (!pricingModel || plugin.pricing_model === pricingModel) &&
-      (!category || plugin.category_id === category),
+      (!category || plugin.category_id === category) &&
+      matchesSourceFilter(resolveSource(plugin), source),
   );
+  const visibleFeatured = featured.filter((plugin) =>
+    matchesSourceFilter(resolveSource(plugin), source),
+  );
+  const filtersActive = !!(category || pricingModel || source);
 
   function installationFor(pluginId: string) {
     return myInstallations.find((i) => i.plugin_id === pluginId);
@@ -715,13 +746,13 @@ export function AvailablePluginsPage() {
       />
       <StatusLine isError={isStatusError}>{status}</StatusLine>
 
-      {featured.length > 0 && !query.trim() && (
+      {visibleFeatured.length > 0 && !query.trim() && (
         <section className="mb-6">
           <h2 className="mb-2 flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
             <Icon name="star" size={16} className="shrink-0 text-indigo-500 dark:text-indigo-400" />
             Featured
           </h2>
-          {featured.map((plugin) => (
+          {visibleFeatured.map((plugin) => (
             <PluginCard
               key={plugin.id}
               plugin={plugin}
@@ -763,6 +794,8 @@ export function AvailablePluginsPage() {
         category={category}
         onCategoryChange={setCategory}
         categories={availableCategories}
+        source={source}
+        onSourceChange={setSource}
       />
 
       {plugins.length === 0 && (
@@ -776,7 +809,7 @@ export function AvailablePluginsPage() {
       )}
       {plugins.length > 0 && visiblePlugins.length === 0 && (
         <EmptyState>
-          {category || pricingModel
+          {filtersActive
             ? "No plugins on this page match the selected filters."
             : "Every plugin on this page is already shown above in Featured."}
         </EmptyState>
