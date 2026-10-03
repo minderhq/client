@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -59,5 +59,24 @@ describe("AvailableBundlesPage", () => {
     expect(
       screen.getByRole("link", { name: "Installed service bundles" }).getAttribute("href"),
     ).toBe("/marketplace/installed/service-bundles");
+  });
+  it("shows a skeleton, not the empty state, while loading; an error offers Retry (#2195)", async () => {
+    let reject!: (e: unknown) => void;
+    apiFetch.mockReturnValueOnce(new Promise((_, r) => (reject = r)));
+    render(<AvailableBundlesPage />, { wrapper: MemoryRouter });
+
+    expect(screen.getByTestId("card-list-skeleton")).toBeTruthy();
+    expect(screen.queryByText(/Every service bundle is already enabled/)).toBeNull();
+
+    reject(new Error("bundle reconciler down"));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't load the service bundles.");
+    expect(alert.textContent).toContain("bundle reconciler down");
+    expect(screen.queryByText(/Every service bundle is already enabled/)).toBeNull();
+
+    apiFetch.mockResolvedValueOnce({ bundles: [bundle({ name: "voice" })], count: 1 });
+    fireEvent.click(screen.getByRole("button", { name: "Retry loading service bundles" }));
+    expect(await screen.findByRole("heading", { level: 3, name: "voice" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Enable voice" })).toBeTruthy();
   });
 });

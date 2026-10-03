@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import {
   type Bundle,
   type BundleService,
+  bundleAdminReason,
   type DisableResponse,
   type EnableResponse,
   otherClaimants,
@@ -10,8 +11,15 @@ import {
 } from "../lib/bundles";
 import { apiFetch, friendlyErrorMessage } from "../lib/api";
 import { Icon } from "./Icon";
-import { badgeClass, cardClass, primaryButtonClass, secondaryButtonClass } from "../lib/ui";
+import {
+  badgeClass,
+  cardClass,
+  fieldHintClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+} from "../lib/ui";
 import { useConfirm } from "./ConfirmDialog";
+import { StatusBadge } from "./StatusBadge";
 import { StatusLine } from "./StatusLine";
 
 function ServiceRow({
@@ -71,6 +79,13 @@ export function BundleCard({
   onChanged: () => void;
 }) {
   const { confirm, dialog } = useConfirm();
+  const reasonId = useId();
+  const disabledReason = bundleAdminReason(
+    isAdmin,
+    !!token,
+    bundle.enabled ? "disable bundles" : "enable bundles",
+  );
+  const actionLabel = bundle.enabled ? "Disable" : "Enable";
   const [status, setStatus] = useState("");
   const [isError, setIsError] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -127,19 +142,17 @@ export function BundleCard({
       {dialog}
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
-            <Icon name="bundles" size={16} className="shrink-0 text-indigo-500 dark:text-indigo-400" /> {bundle.name}
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
+              <Icon name="bundles" size={16} className="shrink-0 text-indigo-500 dark:text-indigo-400" /> {bundle.name}
+            </h3>
             {bundle.core && <span className={badgeClass}>core</span>}
-            <span
-              className={
-                bundle.enabled
-                  ? "inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-950 dark:text-green-300"
-                  : "inline-block rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300"
-              }
-            >
-              {bundle.enabled ? "enabled" : "disabled"}
-            </span>
-          </h2>
+            <StatusBadge
+              icon={bundle.enabled ? "check" : "close"}
+              label={bundle.enabled ? "Enabled" : "Disabled"}
+              tone={bundle.enabled ? "success" : "neutral"}
+            />
+          </div>
           <ul className="mt-2 flex flex-col gap-1">
             {bundle.services.map((s) => (
               <ServiceRow key={s.name} service={s} bundleName={bundle.name} />
@@ -147,30 +160,33 @@ export function BundleCard({
           </ul>
         </div>
         {bundle.core ? (
-          // A disabled "Disable" button only explained the always-on kernel via
-          // a hover title -- invisible on touch and easy to miss even with a
-          // mouse. Say it in visible text instead of hiding the reason.
-          <span
-            className="whitespace-nowrap text-xs text-gray-500 dark:text-gray-400"
-            title="core is the always-on kernel — it can't be disabled"
-          >
-            🔒 Always on
-          </span>
+          // There's no "Disable" button to explain: say why in visible text.
+          <div className="max-w-[14rem] text-right">
+            <p className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-gray-600 dark:text-gray-300">
+              <Icon name="lock" size={13} className="shrink-0" />
+              Always on
+            </p>
+            <p className={fieldHintClass}>
+              Core is the always-on kernel, so it can't be disabled.
+            </p>
+          </div>
         ) : (
-          <button
-            onClick={handleToggle}
-            disabled={!isAdmin || busy}
-            title={
-              !isAdmin
-                ? token
-                  ? "Admin role required"
-                  : "Log in as an admin to enable or disable bundles"
-                : undefined
-            }
-            className={bundle.enabled ? secondaryButtonClass : primaryButtonClass}
-          >
-            {bundle.enabled ? "Disable" : "Enable"}
-          </button>
+          <div className="flex max-w-[14rem] flex-col items-end">
+            <button
+              onClick={handleToggle}
+              disabled={!isAdmin || busy}
+              aria-label={`${actionLabel} ${bundle.name}`}
+              aria-describedby={disabledReason ? reasonId : undefined}
+              className={bundle.enabled ? secondaryButtonClass : primaryButtonClass}
+            >
+              {actionLabel}
+            </button>
+            {disabledReason && (
+              <p id={reasonId} className={`${fieldHintClass} text-right`}>
+                {disabledReason}
+              </p>
+            )}
+          </div>
         )}
       </div>
       {status && <StatusLine isError={isError} className="mt-2">{status}</StatusLine>}

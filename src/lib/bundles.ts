@@ -124,3 +124,51 @@ export function parseBundleStateExport(data: unknown): BundleStateExport {
   }
   return out;
 }
+
+/** What importing a bundle-state file would do, worked out before anything is
+ * applied so the user can review it and confirm (#2195). `changes` keeps the
+ * file's order (the order the enable/disable calls are made in); bundles the
+ * file doesn't mention aren't listed anywhere and are left untouched. */
+export interface BundleImportPlan {
+  changes: { name: string; enabled: boolean }[];
+  /** In the file and already in the requested state. */
+  unchanged: string[];
+  /** In the file but not actionable, with the reason. */
+  skipped: { name: string; reason: string }[];
+}
+
+export function planBundleImport(
+  current: Bundle[],
+  desired: BundleStateExport,
+): BundleImportPlan {
+  const byName = new Map(current.map((b) => [b.name, b]));
+  const plan: BundleImportPlan = { changes: [], unchanged: [], skipped: [] };
+  for (const [name, { enabled }] of Object.entries(desired)) {
+    const bundle = byName.get(name);
+    if (!bundle) {
+      plan.skipped.push({ name, reason: "unknown bundle" });
+    } else if (bundle.enabled === enabled) {
+      plan.unchanged.push(name);
+    } else if (bundle.core && !enabled) {
+      plan.skipped.push({ name, reason: "core can't be disabled" });
+    } else {
+      plan.changes.push({ name, enabled });
+    }
+  }
+  return plan;
+}
+
+/** Why a non-admin can't enable, disable, reconcile or import bundles --
+ * shown as visible text next to the disabled control (and linked to it with
+ * aria-describedby), not only in a hover `title` that keyboard, touch and
+ * screen-reader users never get (#2195). Null for an admin. */
+export function bundleAdminReason(
+  isAdmin: boolean,
+  isLoggedIn: boolean,
+  action: string,
+): string | null {
+  if (isAdmin) return null;
+  return isLoggedIn
+    ? `Only an admin can ${action}.`
+    : `Log in as an admin to ${action}.`;
+}
