@@ -82,13 +82,20 @@ export function Sidebar({
               <div className="flex flex-col gap-0.5">
                 {items.map((item) => {
                   const active = entryIsActive(item, pathname);
+                  // aria-current="page" only when this row IS the current page.
+                  // When the caller sees a tab strip for this entry, the active
+                  // tab is the page and this row is its parent section, so
+                  // "true" (likewise on a nested route like a repository detail).
+                  const ownsPage =
+                    (item.tabs?.length ?? 0) <= 1 && pathname === item.to;
+                  const current = active ? (ownsPage ? "page" : "true") : undefined;
                   return (
                     <Link
                       key={item.to}
                       to={item.to}
                       onClick={onNavigate}
                       title={item.description}
-                      aria-current={active ? "page" : undefined}
+                      aria-current={current}
                       className={`group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition ${
                         active ? activeItemClass : inactiveItemClass
                       }`}

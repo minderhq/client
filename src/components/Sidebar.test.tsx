@@ -186,30 +186,66 @@ describe("Sidebar", () => {
     ).toBe("/settings/sources");
   });
 
-  it("is a labelled navigation landmark marking the current entry with aria-current", () => {
+  /** Every sidebar link that carries aria-current, as label → value. */
+  function currentRows(): Record<string, string | null> {
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    return Object.fromEntries(
+      within(nav)
+        .getAllByRole("link")
+        .filter((a) => a.hasAttribute("aria-current"))
+        .map((a) => [a.textContent, a.getAttribute("aria-current")]),
+    );
+  }
+
+  it("marks a plain entry on its own route as the current page", () => {
     render(
-      <MemoryRouter initialEntries={["/marketplace/installed/ai-tools"]}>
+      <MemoryRouter initialEntries={["/rag/pipelines"]}>
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
-    const nav = screen.getByRole("navigation", { name: "Main" });
-    const current = within(nav)
-      .getAllByRole("link")
-      .filter((a) => a.getAttribute("aria-current") === "page");
-    expect(current.map((a) => a.textContent)).toEqual(["Installed"]);
+    expect(currentRows()).toEqual({ Pipelines: "page" });
   });
 
-  it("keeps MindHub & sources current on a source repository's detail page", () => {
+  it("marks a tabbed entry as the current section, not the page (the tab is the page)", () => {
+    for (const path of ["/marketplace/installed/ai-tools", "/marketplace/installed/plugins"]) {
+      const { unmount } = render(
+        <MemoryRouter initialEntries={[path]}>
+          <Sidebar open={false} onNavigate={() => {}} />
+        </MemoryRouter>,
+      );
+      expect(currentRows()).toEqual({ Installed: "true" });
+      unmount();
+    }
+  });
+
+  it("marks an entry 'page' when the caller sees no tab strip for it", () => {
+    // A non-admin sees only Submissions in Publish, so no tab strip renders
+    // and the sidebar row is the only current-page marker.
+    render(
+      <MemoryRouter initialEntries={["/marketplace/publish/submissions"]}>
+        <Sidebar open={false} onNavigate={() => {}} />
+      </MemoryRouter>,
+    );
+    expect(currentRows()).toEqual({ Publish: "page" });
+  });
+
+  it("marks MindHub & sources 'page' on the list and 'true' on a repository's detail", () => {
     mockAuth = { role: "admin" };
+    const { unmount } = render(
+      <MemoryRouter initialEntries={["/settings/sources"]}>
+        <Sidebar open={false} onNavigate={() => {}} />
+      </MemoryRouter>,
+    );
+    expect(currentRows()).toEqual({ "MindHub & sources": "page" });
+    unmount();
     render(
       <MemoryRouter initialEntries={["/settings/sources/r1"]}>
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
-    expect(
-      screen.getByText("MindHub & sources").closest("a")?.getAttribute("aria-current"),
-    ).toBe("page");
+    expect(currentRows()).toEqual({ "MindHub & sources": "true" });
   });
+
 
   it("hides admin-only Members from a non-admin but shows it to an admin", () => {
     const { unmount } = render(

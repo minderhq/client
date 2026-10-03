@@ -277,6 +277,19 @@ describe("App — page titles match the nav (#2197)", () => {
     expect(links.map((a) => a.textContent)).toEqual(["Plugins", "AI tools", "Service bundles"]);
     expect(links.map((a) => a.getAttribute("aria-current"))).toEqual([null, "page", null]);
   });
+
+  it.each([ROUTES.discoverPlugins, ROUTES.installedAiTools, ROUTES.billing])(
+    "marks exactly one link as the current page on %s (the tab; its sidebar entry is 'true')",
+    (path) => {
+      signIn("admin");
+      renderAt(path);
+      const pages = document.querySelectorAll('a[aria-current="page"]');
+      expect(pages).toHaveLength(1);
+      expect(pages[0].closest("nav")?.getAttribute("aria-label")).toMatch(/ sections$/);
+      const sidebar = screen.getByRole("navigation", { name: "Main" });
+      expect(sidebar.querySelectorAll('a[aria-current="true"]')).toHaveLength(1);
+    },
+  );
 });
 
 describe("App — Settings › MindHub & sources gating", () => {
