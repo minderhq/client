@@ -8,7 +8,7 @@ import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LoginPage } from "./LoginPage";
-import { ResetPasswordPage } from "./ResetPasswordPage";
+import { PASSWORD_RESET_DONE, ResetPasswordPage } from "./ResetPasswordPage";
 
 vi.mock("../lib/auth", () => ({
   useAuth: () => ({
@@ -137,4 +137,27 @@ describe("ResetPasswordPage in a BrowserRouter", () => {
     expect(window.location.href).not.toContain(TOKEN);
   });
 
+  it("shows the reset notice on the login page once, not again on reload", async () => {
+    // Where ResetPasswordPage's navigate("/login", {state}) leaves history.
+    window.history.replaceState(
+      { usr: { notice: PASSWORD_RESET_DONE, username: "alice" }, key: "k", idx: 0 },
+      "",
+      "/login",
+    );
+    renderApp();
+    expect(screen.getByText(PASSWORD_RESET_DONE)).toBeTruthy();
+    expect((screen.getByLabelText("Username") as HTMLInputElement).value).toBe("alice");
+    // LoginPage consumes the state from the history entry...
+    await waitFor(() => expect(window.history.state?.usr ?? null).toBeNull());
+    expect(window.location.pathname).toBe("/login");
+    // ...and keeps the notice and the prefill for this visit.
+    expect(screen.getByText(PASSWORD_RESET_DONE)).toBeTruthy();
+    expect((screen.getByLabelText("Username") as HTMLInputElement).value).toBe("alice");
+
+    // A reload renders from the same history entry: no notice.
+    cleanup();
+    renderApp();
+    expect(screen.getByRole("heading", { name: "Log in" })).toBeTruthy();
+    expect(screen.queryByText(PASSWORD_RESET_DONE)).toBeNull();
+  });
 });
