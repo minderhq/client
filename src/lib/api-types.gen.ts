@@ -3517,7 +3517,9 @@ export interface operations {
     };
     oidc_login_v1_auth_oidc_login_get: {
         parameters: {
-            query?: never;
+            query?: {
+                cnonce?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3531,6 +3533,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
