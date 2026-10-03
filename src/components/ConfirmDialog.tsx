@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { type ReactNode, useCallback, useId, useRef, useState } from "react";
 
 import { destructiveButtonClass, primaryButtonClass, secondaryButtonClass } from "../lib/ui";
 
@@ -9,6 +9,9 @@ interface ConfirmOptions {
   /** Filled red confirm button for hard-to-undo actions (delete/uninstall),
    * distinct in weight from routine confirmations (disable/reconcile). */
   danger?: boolean;
+  /** Structured detail under the message -- e.g. a preview list of what the
+   * action will change. Read out with the message (aria-describedby). */
+  details?: ReactNode;
 }
 
 interface PendingConfirm extends ConfirmOptions {
@@ -29,6 +32,7 @@ interface PendingConfirm extends ConfirmOptions {
 export function useConfirm() {
   const [pending, setPending] = useState<PendingConfirm | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const descriptionId = useId();
 
   const confirm = useCallback((options: ConfirmOptions) => {
     return new Promise<boolean>((resolve) => {
@@ -74,7 +78,8 @@ export function useConfirm() {
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
-        className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl dark:bg-gray-900"
+        aria-describedby={descriptionId}
+        className={`w-full ${pending.details ? "max-w-md" : "max-w-sm"} rounded-xl bg-white p-5 shadow-xl dark:bg-gray-900`}
         onClick={(e) => e.stopPropagation()}
       >
         <h2
@@ -83,7 +88,14 @@ export function useConfirm() {
         >
           {pending.title}
         </h2>
-        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{pending.message}</p>
+        <div id={descriptionId}>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{pending.message}</p>
+          {pending.details && (
+            <div className="mt-3 text-sm text-gray-700 dark:text-gray-300">
+              {pending.details}
+            </div>
+          )}
+        </div>
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"
