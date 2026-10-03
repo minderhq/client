@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { PasswordResetRequestForm } from "../components/PasswordResetRequestForm";
 import { StatusLine } from "../components/StatusLine";
@@ -36,6 +36,7 @@ type LinkProblem = "missing" | "invalid";
 export function ResetPasswordPage() {
   const { isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   useNoReferrerMeta();
 
   // Read during the first render, before the layout effect below clears it.
@@ -60,6 +61,25 @@ export function ResetPasswordPage() {
   // Clear the secret from the address bar before the first paint.
   useLayoutEffect(() => {
     clearUrlFragment();
+  }, []);
+
+  // That replaceState bypasses React Router, whose in-memory location would
+  // keep `#token=…` until the next navigation, where useLocation() could read
+  // it. So the router's location is replaced too, without the hash and keeping
+  // the path, query and router state. That also goes through
+  // history.replaceState, so no history entry with the token is created. It
+  // has to be a passive effect: BrowserRouter subscribes to history in its own
+  // layout effect, which runs after this page's, so a navigate() from the
+  // layout effect above would never reach the router.
+  useEffect(() => {
+    if (location.hash) {
+      navigate(
+        { pathname: location.pathname, search: location.search },
+        { replace: true, state: location.state },
+      );
+    }
+    // Once, on mount: the token is read during the first render only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // When the link turns out to be unusable after a submit, move focus to the
@@ -100,6 +120,15 @@ export function ResetPasswordPage() {
       // signed in, end its session now, rather than leaving a dead token for
       // the next refresh to discover. That also keeps LoginPage from
       // redirecting a "signed-in" tab away from the confirmation.
+      //
+      // This also signs out a session that belongs to a different account
+      // (say, someone resetting another person's password in their own tab).
+      // That is deliberate. The 204 carries no body, so there's no account to
+      // compare this session with, and the token itself is opaque. Guessing
+      // from claims would risk keeping a revoked session alive in the common
+      // case, where it's the same account. Signing out a session that was
+      // still valid costs only a sign-in. Keeping a revoked one leaves a tab
+      // that looks signed in while its refresh is already rejected.
       if (isAuthenticated) logout();
       const state: PasswordResetLoginState = { passwordReset: true };
       navigate("/login", { replace: true, state });
