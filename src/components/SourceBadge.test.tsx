@@ -14,6 +14,14 @@ const CASES: [SourceKind, string][] = [
 ];
 
 describe("SourceBadge", () => {
+  it.each(CASES)("gives %s exactly one background colour (its own tone, never the grey)", (kind) => {
+    const { container } = render(<SourceBadge source={kind} />);
+    const badge = container.querySelector(`[data-source="${kind}"]`) as HTMLElement;
+    const bg = badge.className.split(/\s+/).filter((c) => /^bg-/.test(c));
+
+    expect(bg).toEqual(SOURCE_META[kind].toneClass.split(/\s+/).filter((c) => /^bg-/.test(c)));
+  });
+
   it.each(CASES)("renders %s as text + icon with an accessible name", (kind, label) => {
     const { container } = render(<SourceBadge source={kind} />);
     const badge = container.querySelector(`[data-source="${kind}"]`) as HTMLElement;
