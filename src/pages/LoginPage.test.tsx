@@ -15,7 +15,7 @@ vi.mock("../lib/auth", () => ({
 }));
 vi.mock("react-router-dom", () => ({
   useNavigate: () => navigate,
-  useLocation: () => ({ state: locationState }),
+  useLocation: () => ({ pathname: "/login", search: "", state: locationState }),
   Navigate: ({ to, replace }: { to: string; replace?: boolean }) => (
     <div data-testid="navigate" data-to={to} data-replace={String(replace)} />
   ),
@@ -181,9 +181,29 @@ describe("LoginPage", () => {
       expect(document.activeElement).toBe(notice);
     });
 
-    it("shows no reset confirmation on a plain visit", () => {
+    it("consumes the reset state once, so a reload doesn't repeat the notice", () => {
+      locationState = { passwordReset: true };
+      const { rerender } = render(<LoginPage />);
+      expect(navigate).toHaveBeenCalledTimes(1);
+      expect(navigate).toHaveBeenCalledWith(
+        { pathname: "/login", search: "" },
+        { replace: true, state: null },
+      );
+      // The navigation clears the state; the notice stays for this visit.
+      locationState = null;
+      rerender(<LoginPage />);
+      expect(screen.getByText(/Your password was reset/)).toBeTruthy();
+      expect(navigate).toHaveBeenCalledTimes(1);
+      // A reload of the replaced entry renders fresh, with no state.
+      cleanup();
       render(<LoginPage />);
       expect(screen.queryByText(/Your password was reset/)).toBeNull();
+    });
+
+    it("shows no reset confirmation on a plain visit, and doesn't navigate", () => {
+      render(<LoginPage />);
+      expect(screen.queryByText(/Your password was reset/)).toBeNull();
+      expect(navigate).not.toHaveBeenCalled();
     });
   });
 });

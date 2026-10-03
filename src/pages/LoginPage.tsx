@@ -40,14 +40,24 @@ export function LoginPage() {
     | { oidcError?: string; passwordReset?: boolean }
     | null;
   const [error, setError] = useState(routerState?.oidcError ?? "");
-  // Set by ResetPasswordPage after a completed email reset.
-  const passwordWasReset = routerState?.passwordReset === true;
+  // Set by ResetPasswordPage after a completed email reset. Read once:
+  // router state lives in history.state, so it would otherwise show the notice
+  // again on every reload of this page.
+  const [passwordWasReset] = useState(routerState?.passwordReset === true);
   const resetNoticeRef = useRef<HTMLDivElement>(null);
-  // Focus the confirmation so screen readers announce it: a live region that
-  // is already present on first render isn't reliably read out.
   useEffect(() => {
-    if (passwordWasReset) resetNoticeRef.current?.focus();
-  }, [passwordWasReset]);
+    if (!passwordWasReset) return;
+    // Focus the confirmation so screen readers announce it: a live region that
+    // is already present on first render isn't reliably read out.
+    resetNoticeRef.current?.focus();
+    // Consume the state: replace this entry with the same URL and no state.
+    navigate(
+      { pathname: location.pathname, search: location.search },
+      { replace: true, state: null },
+    );
+    // Once, on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // "Forgot password?" is offered only when the gateway reports email reset.
   // On any failure to read the capabilities, the link stays hidden.
   const { passwordResetEmail } = useAuthCapabilities();
