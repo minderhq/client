@@ -1,10 +1,12 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation, type Location } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
 import { TOKEN_KEY } from "./lib/api";
 import { MUST_CHANGE_PASSWORD_KEY } from "./lib/auth";
+import { NAV_SECTIONS } from "./lib/nav";
+import { LEGACY_REDIRECTS, ROUTES, SECTION_REDIRECTS } from "./lib/routes";
 
 // Every page fetches on mount. A bare `{}` stub trips a real (if low-risk --
 // the backend always sends these keys) defensive-coding gap in HealthStrip,
@@ -29,15 +31,36 @@ vi.mock("./lib/api", async () => {
     services: [],
     bundles: [],
     tools: [],
+    repositories: [],
+    organizations: [],
+    licenses: [],
   };
   return { ...actual, apiFetch: vi.fn().mockResolvedValue(safeEmptyResponse) };
 });
+
+// The router's current location, captured by a probe rendered next to <App/>.
+let currentLocation: Location | null = null;
+function LocationProbe() {
+  currentLocation = useLocation();
+  return null;
+}
 
 function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <App />
+      <LocationProbe />
     </MemoryRouter>,
+  );
+}
+
+/** Sign in (sessionStorage JWT) with the given instance role. */
+function signIn(role: string) {
+  const b64 = (o: object) => btoa(JSON.stringify(o)).replace(/=+$/, "");
+  const now = Math.floor(Date.now() / 1000);
+  sessionStorage.setItem(
+    TOKEN_KEY,
+    `${b64({ alg: "HS256" })}.${b64({ sub: "7", username: "alice", role, iat: now, exp: now + 3600 })}.sig`,
   );
 }
 
@@ -90,19 +113,19 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "Minder" })).toBeTruthy();
   });
 
-  it("redirects the old /marketplace path to Available Plugins", () => {
+  it("redirects the old /marketplace path to Discover plugins", () => {
     renderAt("/marketplace");
-    expect(screen.getByRole("heading", { name: "Available Plugins" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Discover plugins" })).toBeTruthy();
   });
 
-  it("redirects the old /platform/bundles path to Available Bundles", () => {
+  it("redirects the old /platform/bundles path to Discover service bundles", () => {
     renderAt("/platform/bundles");
-    expect(screen.getByRole("heading", { name: "Available Bundles" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Discover service bundles" })).toBeTruthy();
   });
 
-  it("redirects the section-index /ai-tools path to the AI Tool Catalog", () => {
+  it("redirects the old section-index /ai-tools path to Discover AI tools", () => {
     renderAt("/ai-tools");
-    expect(screen.getByRole("heading", { name: "AI Tool Catalog" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Discover AI tools" })).toBeTruthy();
   });
 
   it("redirects the old /knowledge-bases path to the RAG section", () => {
@@ -140,5 +163,129 @@ describe("App", () => {
     const sidebar = container.querySelector("aside")!;
     fireEvent.click(within(sidebar).getByText("Pipelines"));
     expect(container.querySelector(".fixed.inset-0.z-30")).toBeNull();
+  });
+});
+
+// The full old → new map (#2197). Spelled out here rather than derived from
+// LEGACY_REDIRECTS, so an accidental edit to the table fails a test.
+const EXPECTED_REDIRECTS: Record<string, string> = {
+  "/knowledge-bases": "/rag",
+  "/rag-pipelines": "/rag/pipelines",
+  "/plugin-config": "/marketplace/installed/plugins",
+  "/marketplace": "/marketplace/discover/plugins",
+  "/marketplace/discover": "/marketplace/discover/plugins",
+  "/marketplace/installed": "/marketplace/installed/plugins",
+  "/marketplace/publish": "/marketplace/publish/submissions",
+  "/marketplace/plugins": "/marketplace/discover/plugins",
+  "/marketplace/plugins/available": "/marketplace/discover/plugins",
+  "/marketplace/plugins/installed": "/marketplace/installed/plugins",
+  "/marketplace/plugins/ai-tools": "/marketplace/discover/ai-tools",
+  "/marketplace/bundles": "/marketplace/discover/service-bundles",
+  "/platform/bundles": "/marketplace/discover/service-bundles",
+  "/plugins": "/marketplace/discover/plugins",
+  "/plugins/available": "/marketplace/discover/plugins",
+  "/plugins/installed": "/marketplace/installed/plugins",
+  "/plugins/config": "/marketplace/installed/plugins",
+  "/plugins/ai-tools": "/marketplace/discover/ai-tools",
+  "/plugins/submissions": "/marketplace/publish/submissions",
+  "/plugins/review": "/marketplace/publish/submission-review",
+  "/plugins/licenses": "/billing/licenses",
+  "/plugins/sources": "/settings/sources",
+  "/plugins/sources/r1": "/settings/sources/r1",
+  "/ai-tools": "/marketplace/discover/ai-tools",
+  "/ai-tools/available": "/marketplace/discover/ai-tools",
+  "/ai-tools/installed": "/marketplace/installed/ai-tools",
+  "/bundles": "/marketplace/discover/service-bundles",
+  "/bundles/available": "/marketplace/discover/service-bundles",
+  "/bundles/installed": "/marketplace/installed/service-bundles",
+};
+
+describe("App — redirects (#2197)", () => {
+  afterEach(() => {
+    sessionStorage.clear();
+    cleanup();
+    currentLocation = null;
+  });
+
+  it("covers every entry of the redirect tables", () => {
+    const tables = [...SECTION_REDIRECTS, ...LEGACY_REDIRECTS].map((r) =>
+      r.from.replace(":repositoryId", "r1"),
+    );
+    expect(tables.sort()).toEqual(Object.keys(EXPECTED_REDIRECTS).sort());
+  });
+
+  it.each(Object.entries(EXPECTED_REDIRECTS))(
+    "redirects %s to %s, keeping the query string and hash",
+    (from, to) => {
+      signIn("admin");
+      renderAt(`${from}?source=private&q=crm#top`);
+      expect(currentLocation?.pathname).toBe(to);
+      expect(currentLocation?.search).toBe("?source=private&q=crm");
+      expect(currentLocation?.hash).toBe("#top");
+    },
+  );
+
+  it("lands an old ?source= bookmark on Discover plugins with the filter applied", () => {
+    renderAt("/plugins/available?source=first-party");
+    expect(currentLocation?.pathname).toBe(ROUTES.discoverPlugins);
+    expect(currentLocation?.search).toBe("?source=first-party");
+    expect(screen.getByRole("heading", { name: "Discover plugins" })).toBeTruthy();
+  });
+});
+
+describe("App — page titles match the nav (#2197)", () => {
+  afterEach(() => {
+    sessionStorage.clear();
+    cleanup();
+  });
+
+  const titled = NAV_SECTIONS.flatMap((s) => s.items)
+    .flatMap((i) => [i, ...(i.tabs ?? [])])
+    .filter((l) => l.title)
+    .map((l) => [l.to, l.title!] as const);
+
+  it("checks every titled destination", () => {
+    expect(titled.map(([to]) => to).sort()).toEqual(Object.values(ROUTES).sort());
+  });
+
+  it.each(titled)("renders %s with the heading %s", (to, title) => {
+    signIn("admin");
+    renderAt(to);
+    expect(screen.getByRole("heading", { level: 1, name: title })).toBeTruthy();
+  });
+
+  it("labels each grouped page's tab strip with its tab labels, current tab marked", () => {
+    signIn("admin");
+    renderAt(ROUTES.installedAiTools);
+    const tabs = screen.getByRole("navigation", { name: "Installed sections" });
+    const links = within(tabs).getAllByRole("link");
+    expect(links.map((a) => a.textContent)).toEqual(["Plugins", "AI tools", "Service bundles"]);
+    expect(links.map((a) => a.getAttribute("aria-current"))).toEqual([null, "page", null]);
+  });
+});
+
+describe("App — Settings › MindHub & sources gating", () => {
+  afterEach(() => {
+    sessionStorage.clear();
+    cleanup();
+  });
+
+  it("shows an admin the sources list and the MindHub placeholder, with no fake controls", async () => {
+    signIn("admin");
+    renderAt(ROUTES.sources);
+    const panel = screen.getByRole("region", { name: "MindHub connection" });
+    expect(within(panel).queryByRole("button")).toBeNull();
+    expect(within(panel).queryByRole("textbox")).toBeNull();
+    expect(within(panel).queryByRole("link")).toBeNull();
+    expect(await screen.findByText(/No plugin source repositories yet/)).toBeTruthy();
+  });
+
+  it("tells a non-admin the page is for operators instead of showing it", () => {
+    signIn("member");
+    renderAt(ROUTES.sources);
+    expect(screen.getByRole("heading", { level: 1, name: "MindHub & sources" })).toBeTruthy();
+    expect(screen.getByText(/Only a Platform Admin/)).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "MindHub connection" })).toBeNull();
+    expect(screen.queryByText(/No plugin source repositories yet/)).toBeNull();
   });
 });

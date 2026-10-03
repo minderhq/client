@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 import { BundleCard } from "../components/BundleCard";
 import { EmptyState } from "../components/EmptyState";
 import { InfoCallout } from "../components/InfoCallout";
@@ -6,11 +8,12 @@ import { StatusLine } from "../components/StatusLine";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { type BundlesResponse } from "../lib/bundles";
+import { ROUTES } from "../lib/routes";
 import { useAsyncResource } from "../lib/useAsyncResource";
 
 /** Bundles NOT currently enabled -- the ones you could turn on. A bundle that
  * gets enabled here disappears from this list and reappears on Installed
- * Bundles, mirroring how Available/Installed Plugins already behave. */
+ * service bundles, mirroring how Discover and Installed plugins behave. */
 export function AvailableBundlesPage() {
   const { token, role } = useAuth();
   const isAdmin = role === "admin";
@@ -25,8 +28,8 @@ export function AvailableBundlesPage() {
     <>
       <PageHeader
         icon="bundles"
-        title="Available Bundles"
-        subtitle="Optional feature bundles you haven't turned on yet — each claims a set of services shared with other bundles where needed. Browsing is open for everyone; enabling requires an admin account."
+        title="Discover service bundles"
+        subtitle="Optional service bundles you haven't turned on yet — each claims a set of services shared with other bundles where needed. Browsing is open for everyone; enabling requires an admin account."
       />
       <InfoCallout icon="info">
         Enabling only starts containers that already exist. A service that
@@ -40,7 +43,11 @@ export function AvailableBundlesPage() {
 
       {bundlesRes.data && available.length === 0 && (
         <EmptyState>
-          Every bundle is already enabled — see Installed Bundles.
+          Every service bundle is already enabled — see{" "}
+          <Link to={ROUTES.installedServiceBundles} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+            Installed service bundles
+          </Link>
+          .
         </EmptyState>
       )}
       {available.map((b) => (

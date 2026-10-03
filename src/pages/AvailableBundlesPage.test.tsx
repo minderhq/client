@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Bundle } from "../lib/bundles";
@@ -40,7 +41,7 @@ describe("AvailableBundlesPage", () => {
       ],
       count: 3,
     });
-    render(<AvailableBundlesPage />);
+    render(<AvailableBundlesPage />, { wrapper: MemoryRouter });
 
     expect(await screen.findByText("monitoring")).toBeTruthy();
     expect(screen.getByText("voice")).toBeTruthy();
@@ -52,10 +53,11 @@ describe("AvailableBundlesPage", () => {
       bundles: [bundle({ name: "core", enabled: true })],
       count: 1,
     });
-    render(<AvailableBundlesPage />);
+    render(<AvailableBundlesPage />, { wrapper: MemoryRouter });
 
+    expect(await screen.findByText(/Every service bundle is already enabled/)).toBeTruthy();
     expect(
-      await screen.findByText("Every bundle is already enabled — see Installed Bundles."),
-    ).toBeTruthy();
+      screen.getByRole("link", { name: "Installed service bundles" }).getAttribute("href"),
+    ).toBe("/marketplace/installed/service-bundles");
   });
 });

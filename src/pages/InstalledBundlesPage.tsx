@@ -1,5 +1,5 @@
 import { useCallback, useId, useRef, useState } from "react";
-
+import { Link } from "react-router-dom";
 import { Icon } from "../components/Icon";
 import { BundleCard } from "../components/BundleCard";
 import { EmptyState } from "../components/EmptyState";
@@ -15,6 +15,7 @@ import {
   outcomeSummary,
   parseBundleStateExport,
 } from "../lib/bundles";
+import { ROUTES } from "../lib/routes";
 import { secondaryButtonClass } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
 
@@ -149,7 +150,7 @@ export function ExportImportPanel({
 }
 
 /** Bundles currently enabled — export/import and the docker-version detail
- * per claimed service live here rather than on Available Bundles, since both
+ * per claimed service live here rather than on Discover service bundles, since both
  * are specifically about the bundles you're actually running. */
 export function InstalledBundlesPage() {
   const { token, role } = useAuth();
@@ -190,8 +191,8 @@ export function InstalledBundlesPage() {
     <>
       <PageHeader
         icon="bundles"
-        title="Installed Bundles"
-        subtitle="Feature bundles currently turned on, the Docker image each claimed service actually runs, and export/import for the whole set. Disabling or reconciling requires an admin account."
+        title="Installed service bundles"
+        subtitle="Service bundles currently turned on, the Docker image each claimed service actually runs, and export/import for the whole set. Disabling or reconciling requires an admin account."
       />
 
       {bundlesRes.data && (
@@ -233,7 +234,11 @@ export function InstalledBundlesPage() {
 
       {bundlesRes.data && installed.length === 0 && (
         <EmptyState>
-          No bundles are enabled yet — see Available Bundles.
+          No service bundles are enabled yet — see{" "}
+          <Link to={ROUTES.discoverServiceBundles} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+            Discover service bundles
+          </Link>
+          .
         </EmptyState>
       )}
       {installed.map((b) => (

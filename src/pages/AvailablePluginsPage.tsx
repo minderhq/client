@@ -39,6 +39,7 @@ import {
   secondaryButtonClass,
 } from "../lib/ui";
 import { useTokenRef } from "../lib/useTokenRef";
+import { ROUTES } from "../lib/routes";
 
 /** A marketplace catalog row. The shape lives in lib/marketplace.ts (#2198);
  * re-exported under its historical name for existing importers. */
@@ -462,10 +463,10 @@ export function PluginCard({
         <p className="mt-2 rounded-lg bg-green-50 p-2 text-xs text-green-900 dark:bg-green-950 dark:text-green-100">
           ✅ Installed. If this plugin exposes an AI tool,{" "}
           <Link
-            to="/ai-tools/installed"
+            to={ROUTES.installedAiTools}
             className="underline hover:text-green-700 dark:hover:text-green-300"
           >
-            check Live Tools
+            check Installed AI tools
           </Link>{" "}
           to confirm it's live.
         </p>
@@ -741,7 +742,7 @@ export function AvailablePluginsPage() {
       {dialog}
       <PageHeader
         icon="available-plugins"
-        title="Available Plugins"
+        title="Discover plugins"
         subtitle="Browse and install Minder plugins. Browsing is open for everyone; log in to install, enable, disable, or uninstall."
       />
       <StatusLine isError={isStatusError}>{status}</StatusLine>
@@ -779,7 +780,7 @@ export function AvailablePluginsPage() {
         <p className="mb-6 text-xs text-gray-500 dark:text-gray-400">
           You have {myInstallations.length} plugin{myInstallations.length === 1 ? "" : "s"}{" "}
           installed —{" "}
-          <Link to="/plugins/installed" className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+          <Link to={ROUTES.installedPlugins} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
             manage or configure them
           </Link>
           .

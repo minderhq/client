@@ -236,7 +236,7 @@ export function ReviewQueuePage() {
   if (!isAuthenticated || !isAdmin) {
     return (
       <>
-        <PageHeader icon="review" title="Review Queue" />
+        <PageHeader icon="review" title="Submission review" />
         <InfoCallout icon="lock">
           Admins only — log in with an admin account to review plugin
           submissions.
@@ -249,7 +249,7 @@ export function ReviewQueuePage() {
     <>
       <PageHeader
         icon="review"
-        title="Review Queue"
+        title="Submission review"
         subtitle="Developer-submitted plugins waiting on admin review. Oldest first."
       />
 

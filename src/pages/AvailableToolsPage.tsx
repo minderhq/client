@@ -9,6 +9,7 @@ import { StatusLine } from "../components/StatusLine";
 import { apiFetch } from "../lib/api";
 import { badgeClass, secondaryButtonClass } from "../lib/ui";
 import { usePaginatedList } from "../lib/usePaginatedList";
+import { ROUTES } from "../lib/routes";
 
 interface CatalogTool {
   id: string;
@@ -57,8 +58,8 @@ function CatalogToolCard({ tool }: { tool: CatalogTool }) {
 
 /** The durable catalog of AI Tools plugins offer -- every tool ever
  * registered, whether or not the plugin that provides it is running right now
- * (whether it's callable right now is the Live Tools view). No runnable
- * example here: unlike Live Tools' entries, catalog rows don't carry a full
+ * (whether it's callable right now is the Installed AI tools view). No runnable
+ * example here: unlike Installed AI tools' entries, catalog rows don't carry a full
  * JSON-Schema parameter list to build one from. This page has nothing to log
  * in for -- it's read-only either way. */
 export function AvailableToolsPage() {
@@ -85,14 +86,14 @@ export function AvailableToolsPage() {
     <>
       <PageHeader
         icon="ai-tools"
-        title="AI Tool Catalog"
+        title="Discover AI tools"
         subtitle={
           <>
-            The durable catalog of AI Tools plugins offer, with tier info —
+            The durable catalog of AI tools plugins offer, with tier info —
             includes tools from plugins that aren't running right now, and can
             lag behind{" "}
-            <Link to="/ai-tools/installed" className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
-              Live Tools
+            <Link to={ROUTES.installedAiTools} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+              Installed AI tools
             </Link>{" "}
             since it's only updated when a plugin (re)loads. This page has
             nothing to log in for — it's read-only either way.
@@ -103,8 +104,8 @@ export function AvailableToolsPage() {
         This is the catalog, not what's callable right now. A tool listed
         here is only callable once the plugin that provides it is installed
         and running — see{" "}
-        <Link to="/ai-tools/installed" className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
-          Live Tools
+        <Link to={ROUTES.installedAiTools} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+          Installed AI tools
         </Link>{" "}
         for what's live this moment.
       </InfoCallout>

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -22,21 +22,27 @@ describe("Sidebar", () => {
     mockBilling = true;
   });
 
-  it("shows Billing only to callers who may view billing (#64)", () => {
+  it("opens Billing & licenses on Billing only for callers who may view billing (#64)", () => {
     const { unmount } = render(
       <MemoryRouter>
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
-    expect(screen.getByText("Billing").closest("a")?.getAttribute("href")).toBe("/billing");
+    expect(
+      screen.getByText("Billing & licenses").closest("a")?.getAttribute("href"),
+    ).toBe("/billing");
     unmount();
+    // Without billing access the entry stays (Licenses is open to everyone)
+    // but skips the Billing page the caller can't see.
     mockBilling = false;
     render(
       <MemoryRouter>
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
-    expect(screen.queryByText("Billing")).toBeNull();
+    expect(
+      screen.getByText("Billing & licenses").closest("a")?.getAttribute("href"),
+    ).toBe("/billing/licenses");
   });
   afterEach(cleanup);
 
@@ -55,11 +61,14 @@ describe("Sidebar", () => {
       screen.getByText("Pipelines").closest("a")?.getAttribute("href"),
     ).toBe("/rag/pipelines");
     expect(
-      screen.getByText("AI Tools").closest("a")?.getAttribute("href"),
-    ).toBe("/ai-tools/available");
+      screen.getByText("Discover").closest("a")?.getAttribute("href"),
+    ).toBe("/marketplace/discover/plugins");
     expect(
-      screen.getByText("Bundles").closest("a")?.getAttribute("href"),
-    ).toBe("/bundles/available");
+      screen.getByText("Installed").closest("a")?.getAttribute("href"),
+    ).toBe("/marketplace/installed/plugins");
+    expect(
+      screen.getByText("Publish").closest("a")?.getAttribute("href"),
+    ).toBe("/marketplace/publish/submissions");
     expect(screen.getByText("Models").closest("a")?.getAttribute("href")).toBe(
       "/platform",
     );
@@ -134,19 +143,72 @@ describe("Sidebar", () => {
     );
   });
 
-  it("collapses the plugin family into a single 'Plugins' entry (Submit/Review are now in-page tabs)", () => {
+  it("shows one Marketplace section of Discover / Installed / Publish (#2197)", () => {
     render(
       <MemoryRouter>
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
 
-    // One family entry, not five separate rows.
+    const marketplace = screen.getByRole("group", { name: "Marketplace" });
     expect(
-      screen.getByText("Plugins").closest("a")?.getAttribute("href"),
-    ).toBe("/plugins/available");
-    expect(screen.queryByText("Submit a Plugin")).toBeNull();
-    expect(screen.queryByText("Review Queue")).toBeNull();
+      within(marketplace).getAllByRole("link").map((a) => a.textContent),
+    ).toEqual(["Discover", "Installed", "Publish"]);
+    // The old per-type stores and their tabs are gone from the sidebar.
+    for (const old of ["Plugins", "AI Tools", "Bundles", "Submit a Plugin", "Review Queue"]) {
+      expect(screen.queryByText(old)).toBeNull();
+    }
+    expect(
+      within(screen.getByRole("group", { name: "Platform" })).queryByText(/bundles/i),
+    ).toBeNull();
+  });
+
+  it("shows Settings › MindHub & sources to an admin only", () => {
+    const { unmount } = render(
+      <MemoryRouter>
+        <Sidebar open={false} onNavigate={() => {}} />
+      </MemoryRouter>,
+    );
+    // A non-admin sees no Settings section at all, not an empty heading.
+    expect(screen.queryByRole("group", { name: "Settings" })).toBeNull();
+    expect(screen.queryByText("MindHub & sources")).toBeNull();
+    unmount();
+
+    mockAuth = { role: "admin" };
+    render(
+      <MemoryRouter>
+        <Sidebar open={false} onNavigate={() => {}} />
+      </MemoryRouter>,
+    );
+    const settings = screen.getByRole("group", { name: "Settings" });
+    expect(
+      within(settings).getByText("MindHub & sources").closest("a")?.getAttribute("href"),
+    ).toBe("/settings/sources");
+  });
+
+  it("is a labelled navigation landmark marking the current entry with aria-current", () => {
+    render(
+      <MemoryRouter initialEntries={["/marketplace/installed/ai-tools"]}>
+        <Sidebar open={false} onNavigate={() => {}} />
+      </MemoryRouter>,
+    );
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    const current = within(nav)
+      .getAllByRole("link")
+      .filter((a) => a.getAttribute("aria-current") === "page");
+    expect(current.map((a) => a.textContent)).toEqual(["Installed"]);
+  });
+
+  it("keeps MindHub & sources current on a source repository's detail page", () => {
+    mockAuth = { role: "admin" };
+    render(
+      <MemoryRouter initialEntries={["/settings/sources/r1"]}>
+        <Sidebar open={false} onNavigate={() => {}} />
+      </MemoryRouter>,
+    );
+    expect(
+      screen.getByText("MindHub & sources").closest("a")?.getAttribute("aria-current"),
+    ).toBe("page");
   });
 
   it("hides admin-only Members from a non-admin but shows it to an admin", () => {
