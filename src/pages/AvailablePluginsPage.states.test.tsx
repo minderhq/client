@@ -380,6 +380,10 @@ describe("Discover plugins: accessible names, badges and headings", () => {
     );
     const repoSummary = within(news).getByText("Install from this repo", { selector: "summary" });
     expect(repoSummary.getAttribute("aria-label")).toBe("Install from this repo: News");
+    // The disclosure and its submit button must not share a name.
+    expect(
+      within(news).getByRole("button", { name: "Install News from this repo" }).textContent,
+    ).toBe("Install from this repo");
 
     // No action button on the page is left with a bare, ambiguous verb.
     const bare = screen

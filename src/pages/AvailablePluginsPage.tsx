@@ -235,7 +235,9 @@ function InstallFromRepoPanel({
 }: {
   repositoryUrl: string;
   /** Completes the summary's and the button's accessible names, since every
-   * card with a repository carries the same "Install from this repo". */
+   * card with a repository carries the same "Install from this repo". The two
+   * get different names ("Install from this repo: X" opens the form, "Install
+   * X from this repo" submits it) so they can't be confused. */
   pluginName: string;
   token: string;
 }) {
@@ -331,7 +333,7 @@ function InstallFromRepoPanel({
         <button
           type="submit"
           disabled={busy}
-          aria-label={`Install from this repo: ${pluginName}`}
+          aria-label={`Install ${pluginName} from this repo`}
           className={primaryButtonClass}
         >
           Install from this repo

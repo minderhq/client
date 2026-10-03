@@ -278,7 +278,7 @@ describe("PluginCard", () => {
       target: { value: "plugins/weather" },
     });
     fireEvent.click(
-      screen.getByRole("button", { name: "Install from this repo: Weather" }),
+      screen.getByRole("button", { name: "Install Weather from this repo" }),
     );
 
     await screen.findByText(/installed successfully/);
@@ -308,7 +308,7 @@ describe("PluginCard", () => {
       screen.getByText("Install from this repo", { selector: "summary" }),
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Install from this repo: Weather" }),
+      screen.getByRole("button", { name: "Install Weather from this repo" }),
     );
 
     await screen.findByText(/installed successfully/);
@@ -330,7 +330,7 @@ describe("PluginCard", () => {
       screen.getByText("Install from this repo", { selector: "summary" }),
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Install from this repo: Weather" }),
+      screen.getByRole("button", { name: "Install Weather from this repo" }),
     );
 
     await screen.findByText("Repository URL is not allowed");
