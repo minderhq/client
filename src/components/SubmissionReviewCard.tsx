@@ -47,10 +47,12 @@ function RejectForm({
 }: {
   pluginName: string;
   busy: boolean;
-  onConfirm: (notes: string) => void;
+  /** `trigger` is the confirm button, for focus to return to on failure. */
+  onConfirm: (notes: string, trigger: HTMLElement | null) => void;
   onCancel: () => void;
 }) {
   const idBase = useId();
+  const confirmRef = useRef<HTMLButtonElement>(null);
   const [notes, setNotes] = useState("");
   const hasNotes = notes.trim() !== "";
   const hintId = `${idBase}-hint`;
@@ -60,7 +62,7 @@ function RejectForm({
       className="mt-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700"
       onSubmit={(e) => {
         e.preventDefault();
-        if (hasNotes && !busy) onConfirm(notes.trim());
+        if (hasNotes && !busy) onConfirm(notes.trim(), confirmRef.current);
       }}
       onKeyDown={(e) => {
         if (e.key === "Escape") {
@@ -93,7 +95,12 @@ function RejectForm({
           : "Write feedback to enable Confirm reject. The developer needs it to fix and resubmit."}
       </p>
       <div className="mt-2 flex flex-wrap gap-2">
-        <button type="submit" disabled={busy || !hasNotes} className={destructiveButtonClass}>
+        <button
+          ref={confirmRef}
+          type="submit"
+          disabled={busy || !hasNotes}
+          className={destructiveButtonClass}
+        >
           <ActionLabel verb="Confirm reject" name={pluginName} />
         </button>
         <button type="button" onClick={onCancel} className={secondaryButtonClass}>
@@ -120,7 +127,9 @@ export function SubmissionReviewCard({
 }: {
   submission: ReviewSubmission;
   /** Called after a successful action with a message for the page to
-   * announce; the page reloads the queue. */
+   * announce. The page reloads the queue (where this card usually
+   * disappears, since its status changed) and takes focus to its status
+   * line, so focus never falls back to <body>. */
   onActionDone: (message: string) => void;
 }) {
   const { token } = useAuth();
@@ -131,11 +140,19 @@ export function SubmissionReviewCard({
   const [status, setStatus] = useState("");
   const [isError, setIsError] = useState(false);
   const rejectButtonRef = useRef<HTMLButtonElement>(null);
+  // Synchronous re-entry guard: `busy` disables the buttons only after a
+  // re-render, so a fast second click/submit could otherwise slip through.
+  const inFlightRef = useRef(false);
 
   const name = submission.display_name;
   const actions = reviewerActionsFor(submission.status);
 
-  async function runAction(action: ReviewerAction, body?: unknown) {
+  /** Run one transition. On failure the error shows on the card and focus
+   * returns to `trigger` (the button that started it) once it's re-enabled;
+   * on success the page takes over focus (see `onActionDone`). */
+  async function runAction(action: ReviewerAction, trigger: HTMLElement | null, body?: unknown) {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setBusy(true);
     setIsError(false);
     setStatus("Working…");
@@ -152,6 +169,12 @@ export function SubmissionReviewCard({
       setIsError(true);
       setStatus(friendlyErrorMessage(err));
       setBusy(false);
+      // Next frame: the trigger is still disabled until this re-renders.
+      requestAnimationFrame(() => {
+        if (trigger?.isConnected) trigger.focus();
+      });
+    } finally {
+      inFlightRef.current = false;
     }
   }
 
@@ -180,7 +203,7 @@ export function SubmissionReviewCard({
       trigger.focus();
       return;
     }
-    await runAction(action);
+    await runAction(action, trigger);
   }
 
   function closeRejectForm() {
@@ -193,13 +216,13 @@ export function SubmissionReviewCard({
     <section aria-labelledby={headingId} className={`mb-4 ${cardClass}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3
+          <h2
             id={headingId}
             className="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100"
           >
             <Icon name="plugins" size={16} className="shrink-0 text-indigo-500 dark:text-indigo-400" />
             {name}
-          </h3>
+          </h2>
           <p className={`mt-0.5 ${mutedTextClass}`}>
             <code className="font-mono text-[13px]">{submission.name}</code>
           </p>
@@ -228,7 +251,7 @@ export function SubmissionReviewCard({
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => runAction("claim")}
+                onClick={(e) => runAction("claim", e.currentTarget)}
                 className={primaryButtonClass}
               >
                 <ActionLabel verb="Claim" name={name} />
@@ -273,7 +296,7 @@ export function SubmissionReviewCard({
             pluginName={name}
             busy={busy}
             onCancel={closeRejectForm}
-            onConfirm={(notes) => runAction("reject", { notes })}
+            onConfirm={(notes, trigger) => runAction("reject", trigger, { notes })}
           />
         )}
 

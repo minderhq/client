@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { EmptyState } from "../components/EmptyState";
 import { InfoCallout } from "../components/InfoCallout";
@@ -53,6 +53,9 @@ export function ReviewQueuePage() {
   const isAdmin = role === "admin";
   const [statusFilter, setStatusFilter] = useState<ReviewStatusFilter>("submitted");
   const [notice, setNotice] = useState("");
+  // Focus target after a successful action: the acted-on card usually leaves
+  // the list, and focus must not fall back to <body>.
+  const statusRef = useRef<HTMLDivElement>(null);
   const { data, error, loading, reload } = useAsyncResource<QueueResult>(
     (signal) =>
       apiFetch<ReviewQueueResponse>(
@@ -66,6 +69,7 @@ export function ReviewQueuePage() {
     (message: string) => {
       setNotice(message);
       reload();
+      requestAnimationFrame(() => statusRef.current?.focus());
     },
     [reload],
   );
@@ -115,7 +119,13 @@ export function ReviewQueuePage() {
         </select>
       </div>
 
-      {error ? (
+      {/* Programmatically focusable (not in the tab order) so focus can land
+          on the action's result message. */}
+      <div ref={statusRef} tabIndex={-1} className="outline-none">
+        <StatusLine>{notice || (loading && !error ? "Loading submissions…" : "")}</StatusLine>
+      </div>
+
+      {error && (
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <StatusLine isError className="!mb-0">
             Couldn't load submissions: {error}
@@ -124,8 +134,6 @@ export function ReviewQueuePage() {
             Try again
           </button>
         </div>
-      ) : (
-        <StatusLine>{loading ? "Loading submissions…" : notice}</StatusLine>
       )}
 
       {!current && loading && <LoadingCards />}
@@ -134,12 +142,14 @@ export function ReviewQueuePage() {
         <EmptyState>{emptyMessage(statusFilter)}</EmptyState>
       )}
 
-      {submissions.length > 0 && (
+      {/* After a failed (re)load the last list may be out of date (an action
+          may have moved a card), so it isn't shown under the error. */}
+      {!error && submissions.length > 0 && (
         <>
           <p className={`mb-3 ${mutedTextClass}`}>
             {total > submissions.length
-              ? `Showing the ${submissions.length} oldest of ${total} submissions.`
-              : `${submissions.length} ${submissions.length === 1 ? "submission" : "submissions"}, oldest first.`}
+              ? `Showing ${submissions.length} of ${total} (oldest submissions first).`
+              : `${submissions.length} ${submissions.length === 1 ? "submission" : "submissions"} (oldest submissions first).`}
           </p>
           {submissions.map((s) => (
             <SubmissionReviewCard key={s.id} submission={s} onActionDone={handleActionDone} />

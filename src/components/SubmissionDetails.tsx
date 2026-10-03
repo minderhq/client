@@ -123,9 +123,9 @@ export function SubmissionDetails({
   return (
     <div className="mt-4 space-y-4">
       <section aria-labelledby={runsId}>
-        <h4 id={runsId} className={sectionLabelClass}>
+        <h3 id={runsId} className={sectionLabelClass}>
           What will run
-        </h4>
+        </h3>
         <dl className={dlClass}>
           {distribution && <Detail label="Distribution">{distribution}</Detail>}
           {present(submission.docker_image) && (
@@ -161,9 +161,9 @@ export function SubmissionDetails({
 
       {submissionRows.length > 0 && (
         <section aria-labelledby={submissionId}>
-          <h4 id={submissionId} className={sectionLabelClass}>
+          <h3 id={submissionId} className={sectionLabelClass}>
             Submission
-          </h4>
+          </h3>
           <dl className={dlClass}>{submissionRows}</dl>
         </section>
       )}

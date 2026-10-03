@@ -96,6 +96,12 @@ function listCalls() {
   return apiFetch.mock.calls.filter(([, init]) => init?.method !== "POST");
 }
 
+/** Let pending promises, timers and animation frames run, so a late second
+ * request (or focus move) would have happened by the time we assert. */
+async function settle() {
+  await new Promise((r) => setTimeout(r, 50));
+}
+
 function asAdmin() {
   mockAuth = { token: "tok", role: "admin", isAuthenticated: true, sessionKey: 1 };
 }
@@ -138,7 +144,7 @@ describe("ReviewQueuePage", () => {
         queueUrl("submitted"),
         expect.objectContaining({ token: "tok", signal: expect.any(AbortSignal) }),
       );
-      expect(screen.getByText("1 submission, oldest first.")).toBeTruthy();
+      expect(screen.getByText("1 submission (oldest submissions first).")).toBeTruthy();
     });
 
     it("shows a loading status and no empty-state message while the first load is in flight", async () => {
@@ -180,13 +186,29 @@ describe("ReviewQueuePage", () => {
       expect(screen.queryByRole("alert")).toBeNull();
     });
 
+    it("doesn't show the last list under the error when a reload fails", async () => {
+      mockApi({ queue: { submitted: { plugins: [submission()], total: 1 } } });
+      render(<ReviewQueuePage />);
+      fireEvent.click(await screen.findByRole("button", { name: "Claim Weather Plus" }));
+
+      // The claim succeeds, but the reload after it fails.
+      mockApi({ queue: { submitted: new Error("Gateway timeout") } });
+
+      await screen.findByText("Couldn't load submissions: Gateway timeout");
+      expect(screen.queryByRole("region", { name: "Weather Plus" })).toBeNull();
+      expect(screen.queryByText(/oldest submissions first/)).toBeNull();
+      expect(screen.queryByText(/No submissions/)).toBeNull();
+      // The action's own result is still announced.
+      expect(screen.getByText(/Claimed Weather Plus/)).toBeTruthy();
+    });
+
     it("says when the queue holds more than one page", async () => {
       mockApi({
         queue: { submitted: { plugins: [submission()], total: 140 } },
       });
       render(<ReviewQueuePage />);
 
-      await screen.findByText("Showing the 1 oldest of 140 submissions.");
+      await screen.findByText("Showing 1 of 140 (oldest submissions first).");
     });
   });
 
@@ -250,6 +272,16 @@ describe("ReviewQueuePage", () => {
   });
 
   describe("submission details", () => {
+    it("nests headings under the page h1: cards are h2, their sections h3", async () => {
+      mockApi({ queue: { submitted: { plugins: [submission()], total: 1 } } });
+      render(<ReviewQueuePage />);
+
+      expect(await screen.findByRole("heading", { level: 2, name: "Weather Plus" })).toBeTruthy();
+      expect(screen.getByRole("heading", { level: 3, name: "What will run" })).toBeTruthy();
+      expect(screen.getByRole("heading", { level: 3, name: "Submission" })).toBeTruthy();
+      expect(screen.queryAllByRole("heading", { level: 4 })).toHaveLength(0);
+    });
+
     it("shows everything a reviewer needs to judge a submission", async () => {
       mockApi({ queue: { submitted: { plugins: [submission()], total: 1 } } });
       render(<ReviewQueuePage />);
@@ -452,6 +484,52 @@ describe("ReviewQueuePage", () => {
       await vi.waitFor(() => expect(listCalls()).toHaveLength(2));
     });
 
+    it("sends exactly one request when Claim is clicked twice", async () => {
+      mockApi({ queue: { submitted: { plugins: [submission()] } } });
+      render(<ReviewQueuePage />);
+      const claim = await screen.findByRole("button", { name: "Claim Weather Plus" });
+
+      fireEvent.click(claim);
+      fireEvent.click(claim);
+
+      await screen.findByText(/Claimed Weather Plus/);
+      await vi.waitFor(() => expect(listCalls()).toHaveLength(2));
+      await settle();
+      expect(postCalls()).toHaveLength(1);
+    });
+
+    it("moves focus to the result message after a successful action, not <body>", async () => {
+      mockApi({ queue: { submitted: { plugins: [submission()] } } });
+      render(<ReviewQueuePage />);
+      const claim = await screen.findByRole("button", { name: "Claim Weather Plus" });
+      claim.focus();
+
+      mockApi({ queue: { submitted: { plugins: [] } } }); // the card leaves the list
+      fireEvent.click(claim);
+
+      await screen.findByText("No submissions are waiting for review.");
+      await vi.waitFor(() =>
+        expect(document.activeElement?.textContent).toMatch(/^Claimed Weather Plus\./),
+      );
+      expect(document.activeElement).not.toBe(document.body);
+      expect(document.activeElement?.getAttribute("tabindex")).toBe("-1");
+    });
+
+    it("returns focus to Claim when the claim fails", async () => {
+      mockApi({
+        queue: { submitted: { plugins: [submission()] } },
+        post: () => Promise.reject(new Error("Cannot move a submission")),
+      });
+      render(<ReviewQueuePage />);
+      const claim = await screen.findByRole("button", { name: "Claim Weather Plus" });
+      claim.focus();
+      fireEvent.click(claim);
+
+      await screen.findByText("Cannot move a submission");
+      await vi.waitFor(() => expect(document.activeElement).toBe(claim));
+      expect(claim.hasAttribute("disabled")).toBe(false);
+    });
+
     it("names every action button after the plugin", async () => {
       mockApi({
         queue: {
@@ -568,10 +646,36 @@ describe("ReviewQueuePage", () => {
             "Submission status changed concurrently; re-read and retry",
           ),
         );
-        // Buttons are usable again after the failure.
-        expect(
-          within(card).getByRole("button", { name: "Approve Weather Plus" }).hasAttribute("disabled"),
-        ).toBe(false);
+        // Buttons are usable again, and focus is back on Approve.
+        const approve = within(card).getByRole("button", { name: "Approve Weather Plus" });
+        expect(approve.hasAttribute("disabled")).toBe(false);
+        await vi.waitFor(() => expect(document.activeElement).toBe(approve));
+      });
+
+      it("moves focus to the result message once approved", async () => {
+        const { dialog } = await openApprove();
+        mockApi({ queue: { submitted: { plugins: [] } } });
+
+        fireEvent.click(within(dialog).getByRole("button", { name: "Approve" }));
+
+        await vi.waitFor(() =>
+          expect(document.activeElement?.textContent).toBe(
+            "Approved Weather Plus. It's now listed in the catalog.",
+          ),
+        );
+      });
+
+      it("sends exactly one approve when the confirm button is double-clicked", async () => {
+        const { dialog } = await openApprove();
+        const confirmButton = within(dialog).getByRole("button", { name: "Approve" });
+
+        fireEvent.click(confirmButton);
+        fireEvent.click(confirmButton);
+
+        await screen.findByText("Approved Weather Plus. It's now listed in the catalog.");
+        await vi.waitFor(() => expect(listCalls()).toHaveLength(2));
+        await settle();
+        expect(postCalls()).toHaveLength(1);
       });
     });
 
@@ -601,6 +705,19 @@ describe("ReviewQueuePage", () => {
         await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
         expect(postCalls()).toHaveLength(0);
         await vi.waitFor(() => expect(document.activeElement).toBe(button));
+      });
+
+      it("sends nothing when Escape dismisses the dialog, and refocuses Archive", async () => {
+        const { button, dialog } = await openArchive();
+
+        fireEvent.keyDown(within(dialog).getByRole("button", { name: "Archive" }), {
+          key: "Escape",
+        });
+
+        await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+        await settle();
+        expect(postCalls()).toHaveLength(0);
+        expect(document.activeElement).toBe(button);
       });
 
       it("archives on confirm", async () => {
@@ -652,6 +769,35 @@ describe("ReviewQueuePage", () => {
           { method: "POST", token: "tok", body: { notes: "Please fix X" } },
         ]);
         await screen.findByText("Rejected Weather Plus. The developer can see your feedback.");
+      });
+
+      it("sends exactly one reject when the form is submitted twice", async () => {
+        const notes = await openReject();
+        fireEvent.change(notes, { target: { value: "Please fix X" } });
+        const form = notes.closest("form")!;
+
+        fireEvent.submit(form);
+        fireEvent.submit(form);
+
+        await screen.findByText(/Rejected Weather Plus/);
+        await vi.waitFor(() => expect(listCalls()).toHaveLength(2));
+        await settle();
+        expect(postCalls()).toHaveLength(1);
+      });
+
+      it("keeps the feedback and refocuses Confirm reject when rejecting fails", async () => {
+        const notes = await openReject();
+        mockApi({
+          queue: { submitted: { plugins: [submission({ status: "in_review" })] } },
+          post: () => Promise.reject(new Error("review notes are required when rejecting")),
+        });
+        fireEvent.change(notes, { target: { value: "Please fix X" } });
+        const confirmButton = screen.getByRole("button", { name: "Confirm reject Weather Plus" });
+        fireEvent.click(confirmButton);
+
+        await screen.findByText("review notes are required when rejecting");
+        expect((notes as HTMLTextAreaElement).value).toBe("Please fix X");
+        await vi.waitFor(() => expect(document.activeElement).toBe(confirmButton));
       });
 
       it("cancels with Escape, sends nothing, and refocuses Reject", async () => {
