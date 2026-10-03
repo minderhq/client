@@ -1,25 +1,19 @@
 import { ApiError, apiFetch } from "./api";
+import type { components } from "./api-types.gen";
 import { useAsyncResource } from "./useAsyncResource";
+
+type Schemas = components["schemas"];
 
 /** Email password reset (email ADR Decision 6, gateway #2169). Every call
  * here is public and unauthenticated: no bearer token is sent, even when this
  * tab holds a session, so apiFetch's refresh-and-retry never runs for these
- * calls.
- *
- * These response shapes mirror the gateway's `CapabilitiesResponse`,
- * `PasswordResetRequestBody` and `PasswordResetConfirmBody`. They are written
- * by hand because the published spec that `api-types.gen.ts` is generated from
- * doesn't list these routes yet (see apiContract.test.ts KNOWN_MISSING).
- * Switch to the generated types once it does. */
+ * calls. Request and response shapes come from the generated gateway types. */
 
-/** `GET /v1/auth/capabilities`: what the sign-in page may offer. */
-export interface AuthCapabilities {
-  /** True when email is configured and email password reset is enabled.
-   * When false, the request and confirm routes aren't mounted (404). */
-  password_reset_email: boolean;
-  email_verification: boolean;
-  registration_mode: string;
-}
+/** `GET /v1/auth/capabilities`: what the sign-in page may offer.
+ * `password_reset_email` is true when email is configured and email password
+ * reset is enabled. When it's false, the request and confirm routes aren't
+ * mounted (404). */
+export type AuthCapabilities = Schemas["CapabilitiesResponse"];
 
 export function fetchAuthCapabilities(signal?: AbortSignal): Promise<AuthCapabilities> {
   return apiFetch<AuthCapabilities>("/v1/auth/capabilities", { signal });
@@ -69,7 +63,7 @@ export async function requestPasswordReset(email: string): Promise<ResetRequestO
   try {
     await apiFetch<unknown>("/v1/auth/password-reset/request", {
       method: "POST",
-      body: { email: email.trim() },
+      body: { email: email.trim() } satisfies Schemas["PasswordResetRequestBody"],
     });
     return "accepted";
   } catch (e) {
@@ -107,7 +101,10 @@ export async function confirmPasswordReset(
   try {
     await apiFetch<undefined>("/v1/auth/password-reset/confirm", {
       method: "POST",
-      body: { token, new_password: newPassword },
+      body: {
+        token,
+        new_password: newPassword,
+      } satisfies Schemas["PasswordResetConfirmBody"],
     });
     return "reset";
   } catch (e) {

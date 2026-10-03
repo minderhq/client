@@ -20,14 +20,7 @@ const HTTP_METHODS = ["get", "put", "post", "delete", "options", "head", "patch"
 // params shown as {}; "*" = method not statically known). Each needs a
 // reason; an entry that no longer matches a missing call fails the test, so
 // fix the call (or the gateway) and delete the entry.
-const NOT_YET_PUBLISHED =
-  "email password reset (gateway #2169, merged): in the gateway's own spec, " +
-  "not yet in the published docs copy this test checks against";
-const KNOWN_MISSING: Record<string, string> = {
-  "GET /v1/auth/capabilities": NOT_YET_PUBLISHED,
-  "POST /v1/auth/password-reset/request": NOT_YET_PUBLISHED,
-  "POST /v1/auth/password-reset/confirm": NOT_YET_PUBLISHED,
-};
+const KNOWN_MISSING: Record<string, string> = {};
 
 interface Route {
   segments: string[];
