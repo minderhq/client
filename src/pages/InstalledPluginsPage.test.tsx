@@ -165,7 +165,7 @@ describe("InstalledPluginsPage", () => {
     mockApi({});
     render(<InstalledPluginsPage />);
 
-    await screen.findByText("browse Available Plugins");
+    await screen.findByText("find one in Discover plugins");
     const paths = apiFetch.mock.calls.map((c) => c[0]);
     expect(paths).toEqual([
       "/v1/marketplace/installations/me",
@@ -175,11 +175,11 @@ describe("InstalledPluginsPage", () => {
     for (const call of apiFetch.mock.calls) expect(call[1]).toMatchObject({ token: "tok" });
   });
 
-  it("shows an empty state with a link to Available Plugins when nothing is installed or running", async () => {
+  it("shows an empty state with a link to Discover plugins when nothing is installed or running", async () => {
     mockApi({});
     render(<InstalledPluginsPage />);
 
-    expect(await screen.findByText("browse Available Plugins")).toBeTruthy();
+    expect(await screen.findByText("find one in Discover plugins")).toBeTruthy();
   });
 
   it("shows a loading state -- never the empty state -- until every request settles (#2195)", async () => {
@@ -191,19 +191,19 @@ describe("InstalledPluginsPage", () => {
     // installations + catalog have answered (empty); runtime hasn't yet.
     await waitFor(() => expect(apiFetch).toHaveBeenCalledTimes(3));
     await Promise.resolve();
-    expect(screen.queryByText("browse Available Plugins")).toBeNull();
+    expect(screen.queryByText("find one in Discover plugins")).toBeNull();
 
     runtime.resolve({ plugins: [], total: 0 });
-    expect(await screen.findByText("browse Available Plugins")).toBeTruthy();
+    expect(await screen.findByText("find one in Discover plugins")).toBeTruthy();
     expect(screen.queryByText("Loading installed plugins…")).toBeNull();
   });
 
-  it("renders installed plugin cards and the Live Tools cross-link when non-empty", async () => {
+  it("renders installed plugin cards and the Installed AI tools cross-link when non-empty", async () => {
     mockApi({ installations: [installation()] });
     render(<InstalledPluginsPage />);
 
     expect(await screen.findByText("My Plugin")).toBeTruthy();
-    expect(screen.getByText("check Live Tools")).toBeTruthy();
+    expect(screen.getByText("check Installed AI tools")).toBeTruthy();
   });
 
   it("lists a runtime-loaded first-party plugin that has no marketplace install (#2193)", async () => {
@@ -290,7 +290,7 @@ describe("InstalledPluginsPage", () => {
       await screen.findByText("Couldn't load your marketplace installs: marketplace unreachable"),
     ).toBeTruthy();
     expect(screen.getByRole("heading", { name: "weather" })).toBeTruthy();
-    expect(screen.queryByText("browse Available Plugins")).toBeNull();
+    expect(screen.queryByText("find one in Discover plugins")).toBeNull();
   });
 
   it("keeps the installations when the runtime list fails, without claiming 'not running'", async () => {
@@ -312,7 +312,7 @@ describe("InstalledPluginsPage", () => {
 
     expect(await screen.findByText(/marketplace unreachable/)).toBeTruthy();
     expect(screen.getByText(/registry down/)).toBeTruthy();
-    expect(screen.queryByText("browse Available Plugins")).toBeNull();
+    expect(screen.queryByText("find one in Discover plugins")).toBeNull();
 
     mockApi({ installations: [installation()] });
     fireEvent.click(screen.getByRole("button", { name: /Retry/ }));
@@ -373,7 +373,7 @@ describe("InstalledPluginsPage", () => {
     apiFetch.mockResolvedValue({ count: 0 });
     render(<InstalledPluginsPage />);
 
-    expect(await screen.findByText("browse Available Plugins")).toBeTruthy();
+    expect(await screen.findByText("find one in Discover plugins")).toBeTruthy();
   });
 
   it("removes an uninstalled plugin from the list without a re-fetch", async () => {
@@ -385,7 +385,7 @@ describe("InstalledPluginsPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /Uninstall/ }));
 
     await waitFor(() => expect(screen.queryByText("My Plugin")).toBeNull());
-    expect(await screen.findByText("browse Available Plugins")).toBeTruthy();
+    expect(await screen.findByText("find one in Discover plugins")).toBeTruthy();
     expect(apiFetch).toHaveBeenCalledTimes(4); // 3 loads + the DELETE, no reload
   });
 

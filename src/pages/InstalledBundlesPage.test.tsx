@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Bundle } from "../lib/bundles";
@@ -57,7 +58,7 @@ describe("InstalledBundlesPage", () => {
       ],
       count: 3,
     });
-    render(<InstalledBundlesPage />);
+    render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
 
     expect(await screen.findByText("core")).toBeTruthy();
     expect(screen.getByText("voice")).toBeTruthy();
@@ -69,11 +70,12 @@ describe("InstalledBundlesPage", () => {
       bundles: [bundle({ name: "monitoring", enabled: false })],
       count: 1,
     });
-    render(<InstalledBundlesPage />);
+    render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
 
+    expect(await screen.findByText(/No service bundles are enabled yet/)).toBeTruthy();
     expect(
-      await screen.findByText("No bundles are enabled yet — see Available Bundles."),
-    ).toBeTruthy();
+      screen.getByRole("link", { name: "Discover service bundles" }).getAttribute("href"),
+    ).toBe("/marketplace/discover/service-bundles");
   });
 
   it("shows an orphaned-services warning banner listing every orphan", async () => {
@@ -82,7 +84,7 @@ describe("InstalledBundlesPage", () => {
       count: 1,
       orphaned: ["old-worker", "stale-cache"],
     });
-    render(<InstalledBundlesPage />);
+    render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
 
     const banner = await screen.findByText(/Orphaned services/);
     expect(banner.textContent).toContain("old-worker, stale-cache");
@@ -100,7 +102,7 @@ describe("InstalledBundlesPage", () => {
         errors: [],
       })
       .mockResolvedValueOnce({ bundles: [bundle({ name: "core", enabled: true })], count: 1 });
-    render(<InstalledBundlesPage />);
+    render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
 
     fireEvent.click(await screen.findByRole("button", { name: /Reconcile/ }));
 
@@ -117,7 +119,7 @@ describe("InstalledBundlesPage", () => {
     apiFetch
       .mockResolvedValueOnce({ bundles: [bundle({ name: "core", enabled: true })], count: 1 })
       .mockRejectedValueOnce(new Error("plugin-registry unreachable"));
-    render(<InstalledBundlesPage />);
+    render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
 
     fireEvent.click(await screen.findByRole("button", { name: /Reconcile/ }));
 
@@ -129,7 +131,7 @@ describe("InstalledBundlesPage", () => {
   it("disables Reconcile with a login hint when logged out", async () => {
     mockAuth = { token: "", role: "" };
     apiFetch.mockResolvedValue({ bundles: [bundle({ name: "core", enabled: true })], count: 1 });
-    render(<InstalledBundlesPage />);
+    render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
 
     const btn = await screen.findByRole("button", { name: /Reconcile/ });
     expect(btn.hasAttribute("disabled")).toBe(true);
@@ -139,7 +141,7 @@ describe("InstalledBundlesPage", () => {
   it("disables Reconcile with an admin-role hint when logged in but not admin", async () => {
     mockAuth = { token: "tok", role: "member" };
     apiFetch.mockResolvedValue({ bundles: [bundle({ name: "core", enabled: true })], count: 1 });
-    render(<InstalledBundlesPage />);
+    render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
 
     const btn = await screen.findByRole("button", { name: /Reconcile/ });
     expect(btn.hasAttribute("disabled")).toBe(true);

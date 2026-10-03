@@ -63,10 +63,17 @@ src/
   recoverable "Try again / Reload" fallback instead of blanking the app.
 - **`SourceBadge.tsx`** / **`PluginVersion.tsx`** — a plugin's source badge
   (text + icon + accessible name) and its version with the "newer version
-  listed" hint, shared by the Browse and Installed cards.
+  listed" hint, shared by the Discover and Installed plugin cards.
 - **`StatusLine.tsx`** — accessible status/error line (aria-live: polite for info,
   assertive for errors). The standard way pages surface load/mutation status.
 - **`EmptyState.tsx`** — the "nothing here yet" line for empty lists (one voice).
+- **`Sidebar.tsx`** / **`PageTabs.tsx`** / **`CommandPalette.tsx`** — all three
+  render from `lib/nav.ts` (see "Navigation and routes" below).
+- **`RedirectWithQuery.tsx`** — `<Navigate replace>` that keeps `?query` and
+  `#hash`, used for every redirect in `lib/routes.ts`.
+- **`MindHubConnectionPlaceholder.tsx`** — informational panel on Installation
+  settings › MindHub & sources until the real connection (#2201) lands. No
+  controls.
 - **`PageHeader.tsx`**, **`InfoCallout.tsx`**, **`ConfirmDialog.tsx`** (via
   `useConfirm()`), **`Sidebar.tsx`**, **`UserMenu.tsx`**.
 
@@ -91,9 +98,9 @@ src/
 - **`marketplace.ts`** — typed marketplace / plugin-registry calls and shapes
   (catalog, runtime-loaded plugins, `installations/me`); the start of #2198's
   single typed module. **`installedPlugins.ts`** + **`useInstalledPlugins.ts`**
-  merge the runtime list with your installs for the Installed view;
+  merge the runtime list with your installs for Installed › Plugins;
   **`pluginSource.ts`** classifies a plugin's source (First-party / Private git /
-  Submitted, MindHub reserved) for `SourceBadge` and Browse's `?source=` filter;
+  Submitted, MindHub reserved) for `SourceBadge` and Discover's `?source=` filter;
   **`pluginVersion.ts`** compares installed vs listed versions.
 - **`ui.ts`** — Tailwind class constants (`inputClass`, `primaryButtonClass`,
   `cardClass`, `badgeClass`, …), the `badgeTone` {success,warn,danger} palette,
@@ -101,6 +108,28 @@ src/
   here instead of N pages.
 - **`stt.ts`** (`matchingSttLanguage`), **`browser.ts`**, **`links.ts`**
   (`openWebUiUrl`), **`useDebouncedValue.ts`**, **`useElapsedSeconds.ts`**.
+
+## Navigation and routes
+
+`src/lib/nav.ts` is the single source for the sidebar, the in-page tabs
+(`PageTabs`) and the ⌘K palette, including role gating (`visibleEntry` /
+`leafVisible`: `adminOnly`, `requiresBilling`). `src/lib/routes.ts` holds the
+marketplace routes and every redirect. One vocabulary is used for the route,
+the tab, the page title (`PageHeader`) and the palette entry; tests hold the
+pages' titles to `nav.ts`. `useRouteFocus` moves focus to the new page's `<h1>`
+after a client-side navigation.
+
+| Section › entry | Tabs → route | Who sees it |
+|---|---|---|
+| Marketplace › Discover | Plugins `/marketplace/discover/plugins` (`?source=`, `?q=`) · AI tools `/marketplace/discover/ai-tools` · Service bundles `/marketplace/discover/service-bundles` | everyone |
+| Marketplace › Installed | Plugins `/marketplace/installed/plugins` · AI tools `/marketplace/installed/ai-tools` · Service bundles `/marketplace/installed/service-bundles` | everyone (actions need login / admin, as before) |
+| Marketplace › Publish | Submissions `/marketplace/publish/submissions` · Submission review `/marketplace/publish/submission-review` | everyone · admin |
+| Organization › Billing & licenses | Billing `/billing` · Licenses `/billing/licenses` | billing access (#64) · everyone |
+| Installation settings › MindHub & sources | `/settings/sources`, `/settings/sources/:repositoryId` | admin |
+
+Old URLs (`/plugins/*`, `/ai-tools/*`, `/bundles/*`, `/platform/bundles`,
+`/marketplace/plugins/*`, …) redirect to these, query string included. Add to
+`LEGACY_REDIRECTS` when you move a page; never remove an entry.
 
 ## Tests
 

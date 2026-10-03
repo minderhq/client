@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { BrandMark } from "./components/BrandMark";
@@ -7,11 +7,14 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Icon } from "./components/Icon";
 import { OrgSwitcher } from "./components/OrgSwitcher";
 import { PageTabs } from "./components/PageTabs";
+import { RedirectWithQuery } from "./components/RedirectWithQuery";
 import { Sidebar } from "./components/Sidebar";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { UserMenu } from "./components/UserMenu";
 import { AuthProvider } from "./lib/auth";
+import { LEGACY_REDIRECTS, ROUTES, SECTION_REDIRECTS } from "./lib/routes";
 import { iconButtonClass, kbdClass, pageEnterClass } from "./lib/ui";
+import { useRouteFocus } from "./lib/useRouteFocus";
 import { AskPage } from "./pages/AskPage";
 import { AuthCallbackPage } from "./pages/AuthCallbackPage";
 import { AvailableBundlesPage } from "./pages/AvailableBundlesPage";
@@ -63,6 +66,9 @@ export function App() {
   // Re-key the ErrorBoundary per route so navigating to another page clears a
   // previous page's crash instead of staying stuck on the fallback.
   const location = useLocation();
+  // Focus the new page's heading after a client-side navigation (a11y).
+  const mainRef = useRef<HTMLElement>(null);
+  useRouteFocus(mainRef);
 
   // Global ⌘K / Ctrl-K toggles the command palette from anywhere.
   useEffect(() => {
@@ -137,7 +143,7 @@ export function App() {
             </div>
           </header>
 
-          <main className="mx-auto w-full max-w-5xl flex-1 p-6">
+          <main ref={mainRef} className="mx-auto w-full max-w-5xl flex-1 p-6">
             <ErrorBoundary key={location.pathname}>
               <div className={pageEnterClass}>
                 <ForcePasswordChangeGate>
@@ -178,57 +184,32 @@ export function App() {
                       element={<PublicChatConversationsPage />}
                     />
 
+                    {/* Marketplace (#2197): Discover / Installed / Publish, each
+                      with one tab per item type. Paths come from lib/routes.ts. */}
+                    <Route path={ROUTES.discoverPlugins} element={<AvailablePluginsPage />} />
+                    <Route path={ROUTES.discoverAiTools} element={<AvailableToolsPage />} />
                     <Route
-                      path="/plugins"
-                      element={<Navigate to="/plugins/available" replace />}
-                    />
-                    <Route
-                      path="/plugins/available"
-                      element={<AvailablePluginsPage />}
-                    />
-                    <Route
-                      path="/plugins/sources"
-                      element={<PluginSourceRepositoriesPage />}
-                    />
-                    <Route
-                      path="/plugins/sources/:repositoryId"
-                      element={<PluginSourceRepositoriesPage />}
-                    />
-                    <Route
-                      path="/plugins/installed"
-                      element={<InstalledPluginsPage />}
-                    />
-                    <Route
-                      path="/plugins/submissions"
-                      element={<SubmissionsPage />}
-                    />
-                    <Route path="/plugins/review" element={<ReviewQueuePage />} />
-                    <Route path="/plugins/licenses" element={<MyLicensesPage />} />
-
-                    <Route
-                      path="/ai-tools"
-                      element={<Navigate to="/ai-tools/available" replace />}
-                    />
-                    <Route
-                      path="/ai-tools/available"
-                      element={<AvailableToolsPage />}
-                    />
-                    <Route
-                      path="/ai-tools/installed"
-                      element={<InstalledToolsPage />}
-                    />
-
-                    <Route
-                      path="/bundles"
-                      element={<Navigate to="/bundles/available" replace />}
-                    />
-                    <Route
-                      path="/bundles/available"
+                      path={ROUTES.discoverServiceBundles}
                       element={<AvailableBundlesPage />}
                     />
+                    <Route path={ROUTES.installedPlugins} element={<InstalledPluginsPage />} />
+                    <Route path={ROUTES.installedAiTools} element={<InstalledToolsPage />} />
                     <Route
-                      path="/bundles/installed"
+                      path={ROUTES.installedServiceBundles}
                       element={<InstalledBundlesPage />}
+                    />
+                    <Route path={ROUTES.publishSubmissions} element={<SubmissionsPage />} />
+                    <Route
+                      path={ROUTES.publishSubmissionReview}
+                      element={<ReviewQueuePage />}
+                    />
+
+                    {/* Organization › Billing & licenses, Installation settings › MindHub & sources. */}
+                    <Route path={ROUTES.licenses} element={<MyLicensesPage />} />
+                    <Route path={ROUTES.sources} element={<PluginSourceRepositoriesPage />} />
+                    <Route
+                      path={`${ROUTES.sources}/:repositoryId`}
+                      element={<PluginSourceRepositoriesPage />}
                     />
 
                     <Route path="/platform" element={<ModelManagementPage />} />
@@ -242,57 +223,12 @@ export function App() {
                     <Route path="/organizations" element={<AllOrganizationsPage />} />
                     <Route path="/audit" element={<AuditLogPage />} />
 
-                    {/* Old flat/pre-restructure routes, kept as redirects so existing
-                      bookmarks/links still land somewhere sensible instead of the
-                      catch-all. */}
-                    <Route
-                      path="/knowledge-bases"
-                      element={<Navigate to="/rag" replace />}
-                    />
-                    <Route
-                      path="/rag-pipelines"
-                      element={<Navigate to="/rag/pipelines" replace />}
-                    />
-                    <Route
-                      path="/plugin-config"
-                      element={<Navigate to="/plugins/installed" replace />}
-                    />
-                    <Route
-                      path="/marketplace"
-                      element={<Navigate to="/plugins/available" replace />}
-                    />
-                    <Route
-                      path="/marketplace/plugins"
-                      element={<Navigate to="/plugins/available" replace />}
-                    />
-                    <Route
-                      path="/marketplace/plugins/available"
-                      element={<Navigate to="/plugins/available" replace />}
-                    />
-                    <Route
-                      path="/marketplace/plugins/installed"
-                      element={<Navigate to="/plugins/installed" replace />}
-                    />
-                    <Route
-                      path="/marketplace/plugins/ai-tools"
-                      element={<Navigate to="/ai-tools/available" replace />}
-                    />
-                    <Route
-                      path="/marketplace/bundles"
-                      element={<Navigate to="/bundles/available" replace />}
-                    />
-                    <Route
-                      path="/platform/bundles"
-                      element={<Navigate to="/bundles/available" replace />}
-                    />
-                    <Route
-                      path="/plugins/ai-tools"
-                      element={<Navigate to="/ai-tools/available" replace />}
-                    />
-                    <Route
-                      path="/plugins/config"
-                      element={<Navigate to="/plugins/installed" replace />}
-                    />
+                    {/* Section indexes and every pre-restructure URL redirect to
+                      the current page, keeping the query string (?source=, ?q=)
+                      so old bookmarks and docs links land on the same view. */}
+                    {[...SECTION_REDIRECTS, ...LEGACY_REDIRECTS].map(({ from, to }) => (
+                      <Route key={from} path={from} element={<RedirectWithQuery to={to} />} />
+                    ))}
 
                     {/* Unmatched paths (including the removed /model-management, still
                       served 200 by nginx's SPA fallback since it can't tell client-side

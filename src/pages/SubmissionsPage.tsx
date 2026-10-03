@@ -564,7 +564,7 @@ export function SubmissionsPage() {
     <>
       <PageHeader
         icon="submit"
-        title="Submit a Plugin"
+        title="Plugin submissions"
         subtitle="Publish your own plugin to the Minder marketplace. Every submission starts as a private draft and goes through an admin review before anyone else can see or install it."
       />
 

@@ -1,10 +1,18 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  MemoryRouter,
+  useLocation,
+  useNavigate,
+  type Location,
+  type NavigateFunction,
+} from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
 import { TOKEN_KEY } from "./lib/api";
 import { MUST_CHANGE_PASSWORD_KEY } from "./lib/auth";
+import { NAV_SECTIONS } from "./lib/nav";
+import { LEGACY_REDIRECTS, ROUTES, SECTION_REDIRECTS } from "./lib/routes";
 
 // Every page fetches on mount. A bare `{}` stub trips a real (if low-risk --
 // the backend always sends these keys) defensive-coding gap in HealthStrip,
@@ -29,15 +37,45 @@ vi.mock("./lib/api", async () => {
     services: [],
     bundles: [],
     tools: [],
+    repositories: [],
+    organizations: [],
+    licenses: [],
   };
   return { ...actual, apiFetch: vi.fn().mockResolvedValue(safeEmptyResponse) };
 });
+
+// The router's current location, captured by a probe rendered next to <App/>.
+let currentLocation: Location | null = null;
+let currentNavigate: NavigateFunction | null = null;
+function LocationProbe() {
+  currentLocation = useLocation();
+  currentNavigate = useNavigate();
+  return null;
+}
+
+/** Let two animation frames pass: past the one a focus move would use. */
+async function nextFrames() {
+  for (let i = 0; i < 2; i++) {
+    await act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
+  }
+}
 
 function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <App />
+      <LocationProbe />
     </MemoryRouter>,
+  );
+}
+
+/** Sign in (sessionStorage JWT) with the given instance role. */
+function signIn(role: string) {
+  const b64 = (o: object) => btoa(JSON.stringify(o)).replace(/=+$/, "");
+  const now = Math.floor(Date.now() / 1000);
+  sessionStorage.setItem(
+    TOKEN_KEY,
+    `${b64({ alg: "HS256" })}.${b64({ sub: "7", username: "alice", role, iat: now, exp: now + 3600 })}.sig`,
   );
 }
 
@@ -90,19 +128,19 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "Minder" })).toBeTruthy();
   });
 
-  it("redirects the old /marketplace path to Available Plugins", () => {
+  it("redirects the old /marketplace path to Discover plugins", () => {
     renderAt("/marketplace");
-    expect(screen.getByRole("heading", { name: "Available Plugins" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Discover plugins" })).toBeTruthy();
   });
 
-  it("redirects the old /platform/bundles path to Available Bundles", () => {
+  it("redirects the old /platform/bundles path to Discover service bundles", () => {
     renderAt("/platform/bundles");
-    expect(screen.getByRole("heading", { name: "Available Bundles" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Discover service bundles" })).toBeTruthy();
   });
 
-  it("redirects the section-index /ai-tools path to the AI Tool Catalog", () => {
+  it("redirects the old section-index /ai-tools path to Discover AI tools", () => {
     renderAt("/ai-tools");
-    expect(screen.getByRole("heading", { name: "AI Tool Catalog" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Discover AI tools" })).toBeTruthy();
   });
 
   it("redirects the old /knowledge-bases path to the RAG section", () => {
@@ -141,4 +179,229 @@ describe("App", () => {
     fireEvent.click(within(sidebar).getByText("Pipelines"));
     expect(container.querySelector(".fixed.inset-0.z-30")).toBeNull();
   });
+});
+
+// The full old → new map (#2197). Spelled out here rather than derived from
+// LEGACY_REDIRECTS, so an accidental edit to the table fails a test.
+const EXPECTED_REDIRECTS: Record<string, string> = {
+  "/knowledge-bases": "/rag",
+  "/rag-pipelines": "/rag/pipelines",
+  "/plugin-config": "/marketplace/installed/plugins",
+  "/marketplace": "/marketplace/discover/plugins",
+  "/marketplace/discover": "/marketplace/discover/plugins",
+  "/marketplace/installed": "/marketplace/installed/plugins",
+  "/marketplace/publish": "/marketplace/publish/submissions",
+  "/marketplace/plugins": "/marketplace/discover/plugins",
+  "/marketplace/plugins/available": "/marketplace/discover/plugins",
+  "/marketplace/plugins/installed": "/marketplace/installed/plugins",
+  "/marketplace/plugins/ai-tools": "/marketplace/discover/ai-tools",
+  "/marketplace/bundles": "/marketplace/discover/service-bundles",
+  "/platform/bundles": "/marketplace/discover/service-bundles",
+  "/plugins": "/marketplace/discover/plugins",
+  "/plugins/available": "/marketplace/discover/plugins",
+  "/plugins/installed": "/marketplace/installed/plugins",
+  "/plugins/config": "/marketplace/installed/plugins",
+  "/plugins/ai-tools": "/marketplace/discover/ai-tools",
+  "/plugins/submissions": "/marketplace/publish/submissions",
+  "/plugins/review": "/marketplace/publish/submission-review",
+  "/plugins/licenses": "/billing/licenses",
+  "/plugins/sources": "/settings/sources",
+  "/plugins/sources/r1": "/settings/sources/r1",
+  "/ai-tools": "/marketplace/discover/ai-tools",
+  "/ai-tools/available": "/marketplace/discover/ai-tools",
+  "/ai-tools/installed": "/marketplace/installed/ai-tools",
+  "/bundles": "/marketplace/discover/service-bundles",
+  "/bundles/available": "/marketplace/discover/service-bundles",
+  "/bundles/installed": "/marketplace/installed/service-bundles",
+};
+
+describe("App — redirects (#2197)", () => {
+  afterEach(() => {
+    sessionStorage.clear();
+    cleanup();
+    currentLocation = null;
+  });
+
+  it("covers every entry of the redirect tables", () => {
+    const tables = [...SECTION_REDIRECTS, ...LEGACY_REDIRECTS].map((r) =>
+      r.from.replace(":repositoryId", "r1"),
+    );
+    expect(tables.sort()).toEqual(Object.keys(EXPECTED_REDIRECTS).sort());
+  });
+
+  it.each(Object.entries(EXPECTED_REDIRECTS))(
+    "redirects %s to %s, keeping the query string and hash",
+    (from, to) => {
+      signIn("admin");
+      renderAt(`${from}?source=private&q=crm#top`);
+      expect(currentLocation?.pathname).toBe(to);
+      expect(currentLocation?.search).toBe("?source=private&q=crm");
+      expect(currentLocation?.hash).toBe("#top");
+    },
+  );
+
+  it.each([
+    ["a%2Fb", "a/b"],
+    ["a%20b%3Fc%23d", "a b?c#d"],
+    ["100%25", "100%"],
+    ["%E2%9C%93", "✓"],
+  ])(
+    "keeps an unusual repository id (%s) encoded across the sources redirect",
+    (encoded, decoded) => {
+      signIn("admin");
+      renderAt(`/plugins/sources/${encoded}?q=x`);
+      // Same single encoding as sourceRepositoryRoute(): no "/" splitting the
+      // segment, no double encoding.
+      expect(currentLocation?.pathname).toBe(`/settings/sources/${encodeURIComponent(decoded)}`);
+      expect(currentLocation?.search).toBe("?q=x");
+    },
+  );
+
+  it("lands an old ?source= bookmark on Discover plugins with the filter applied", () => {
+    renderAt("/plugins/available?source=first-party");
+    expect(currentLocation?.pathname).toBe(ROUTES.discoverPlugins);
+    expect(currentLocation?.search).toBe("?source=first-party");
+    expect(screen.getByRole("heading", { name: "Discover plugins" })).toBeTruthy();
+  });
+});
+
+describe("App — page titles match the nav (#2197)", () => {
+  afterEach(() => {
+    sessionStorage.clear();
+    cleanup();
+  });
+
+  const titled = NAV_SECTIONS.flatMap((s) => s.items)
+    .flatMap((i) => [i, ...(i.tabs ?? [])])
+    .filter((l) => l.title)
+    .map((l) => [l.to, l.title!] as const);
+
+  it("checks every titled destination", () => {
+    expect(titled.map(([to]) => to).sort()).toEqual(Object.values(ROUTES).sort());
+  });
+
+  it.each(titled)("renders %s with the heading %s", (to, title) => {
+    signIn("admin");
+    renderAt(to);
+    expect(screen.getByRole("heading", { level: 1, name: title })).toBeTruthy();
+  });
+
+  it("labels each grouped page's tab strip with its tab labels, current tab marked", () => {
+    signIn("admin");
+    renderAt(ROUTES.installedAiTools);
+    const tabs = screen.getByRole("navigation", { name: "Installed sections" });
+    const links = within(tabs).getAllByRole("link");
+    expect(links.map((a) => a.textContent)).toEqual(["Plugins", "AI tools", "Service bundles"]);
+    expect(links.map((a) => a.getAttribute("aria-current"))).toEqual([null, "page", null]);
+  });
+
+  it.each([ROUTES.discoverPlugins, ROUTES.installedAiTools, ROUTES.billing])(
+    "marks exactly one link as the current page on %s (the tab; its sidebar entry is 'true')",
+    (path) => {
+      signIn("admin");
+      renderAt(path);
+      const pages = document.querySelectorAll('a[aria-current="page"]');
+      expect(pages).toHaveLength(1);
+      expect(pages[0].closest("nav")?.getAttribute("aria-label")).toMatch(/ sections$/);
+      const sidebar = screen.getByRole("navigation", { name: "Main" });
+      expect(sidebar.querySelectorAll('a[aria-current="true"]')).toHaveLength(1);
+    },
+  );
+});
+
+describe("App — Installation settings › MindHub & sources gating", () => {
+  afterEach(() => {
+    sessionStorage.clear();
+    cleanup();
+  });
+
+  it("shows an admin the sources list and the MindHub placeholder, with no fake controls", async () => {
+    signIn("admin");
+    renderAt(ROUTES.sources);
+    const panel = screen.getByRole("region", { name: "MindHub connection" });
+    expect(within(panel).queryByRole("button")).toBeNull();
+    expect(within(panel).queryByRole("textbox")).toBeNull();
+    expect(within(panel).queryByRole("link")).toBeNull();
+    expect(await screen.findByText(/No plugin source repositories yet/)).toBeTruthy();
+  });
+
+  it("tells a non-admin the page is for operators instead of showing it", () => {
+    signIn("member");
+    renderAt(ROUTES.sources);
+    expect(screen.getByRole("heading", { level: 1, name: "MindHub & sources" })).toBeTruthy();
+    expect(screen.getByText(/Only a Platform Admin/)).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "MindHub connection" })).toBeNull();
+    expect(screen.queryByText(/No plugin source repositories yet/)).toBeNull();
+  });
+});
+
+describe("App — focus after navigation", () => {
+  afterEach(() => {
+    sessionStorage.clear();
+    cleanup();
+  });
+
+  it("moves focus to the new page's heading when a tab is followed", async () => {
+    renderAt(ROUTES.discoverPlugins);
+    const tabs = screen.getByRole("navigation", { name: "Discover sections" });
+    fireEvent.click(within(tabs).getByRole("link", { name: "AI tools" }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("heading", { level: 1, name: "Discover AI tools" }),
+      ),
+    );
+  });
+
+  it("leaves focus alone on the first load, including a legacy redirect", async () => {
+    renderAt("/plugins/available");
+    // Two frames: past the one the focus effect would have used.
+    for (let i = 0; i < 2; i++) {
+      await act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
+    }
+    expect(currentLocation?.pathname).toBe(ROUTES.discoverPlugins);
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("does not move focus on a query-only change after a real navigation", async () => {
+    renderAt(ROUTES.discoverAiTools);
+    // A real navigation first (PUSH), so the first-load case is behind us.
+    const tabs = screen.getByRole("navigation", { name: "Discover sections" });
+    fireEvent.click(within(tabs).getByRole("link", { name: "Plugins" }));
+    const heading = screen.getByRole("heading", { level: 1, name: "Discover plugins" });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+
+    // The source filter rewrites ?source= (a REPLACE)…
+    const filter = screen.getByRole("combobox", { name: "Filter by source" });
+    filter.focus();
+    fireEvent.change(filter, { target: { value: "private" } });
+    await nextFrames();
+    expect(currentLocation?.search).toBe("?source=private");
+    expect(document.activeElement).toBe(filter);
+
+    // …then a PUSH to the same pathname with a new query (what a palette
+    // result on the current page does): the navigation type changes, the
+    // pathname doesn't, so focus must stay put.
+    act(() => currentNavigate!(`${ROUTES.discoverPlugins}?source=private&q=crm`));
+    await nextFrames();
+    expect(currentLocation?.search).toBe("?source=private&q=crm");
+    expect(document.activeElement).toBe(filter);
+  });
+
+  it("does not move focus when Back returns to the same pathname", async () => {
+    renderAt(ROUTES.discoverAiTools);
+    const tabs = screen.getByRole("navigation", { name: "Discover sections" });
+    fireEvent.click(within(tabs).getByRole("link", { name: "Plugins" }));
+    await waitFor(() =>
+      expect(document.activeElement?.textContent).toBe("Discover plugins"),
+    );
+    act(() => currentNavigate!(`${ROUTES.discoverPlugins}?q=crm`));
+    await nextFrames();
+    const filter = screen.getByRole("combobox", { name: "Filter by source" });
+    filter.focus();
+    act(() => currentNavigate!(-1)); // POP, same pathname, query dropped
+    await nextFrames();
+    expect(currentLocation?.search).toBe("");
+    expect(document.activeElement).toBe(filter);
+  });
+
 });

@@ -86,7 +86,7 @@ export function MyLicensesPage() {
     <>
       <PageHeader
         icon="licenses"
-        title="My Licenses"
+        title="Plugin licenses"
         subtitle="The plugin tiers licensed to your account. Licenses are currently granted by an administrator — there's no self-service upgrade yet."
       />
 

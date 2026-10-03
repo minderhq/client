@@ -11,6 +11,7 @@ import { useAuth } from "../lib/auth";
 import { exampleForSchema } from "../lib/jsonSchemaExample";
 import { badgeClass, inputClass, secondaryButtonClass } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
+import { ROUTES } from "../lib/routes";
 
 export interface LiveTool {
   type: "function";
@@ -160,11 +161,11 @@ function LiveToolCard({ tool, token }: { tool: LiveTool; token: string }) {
   );
 }
 
-/** AI Tools actually callable right now, computed fresh from the plugins
+/** AI tools actually callable right now, computed fresh from the plugins
  * currently running on Plugin Registry -- exactly what the AI chat's own
  * function-calling feeds on. Each one carries its full JSON-Schema
- * parameter list (unlike the durable AI Tool Catalog), which is what makes a
- * runnable example possible only here. */
+ * parameter list (unlike the durable Discover AI tools catalog), which is
+ * what makes a runnable example possible only here. */
 export function InstalledToolsPage() {
   const { token } = useAuth();
   const liveTools = useAsyncResource(
@@ -183,10 +184,10 @@ export function InstalledToolsPage() {
     <>
       <PageHeader
         icon="ai-tools"
-        title="Live Tools"
+        title="Installed AI tools"
         subtitle={
           <>
-            Every AI Tool actually callable right now, from plugins currently
+            Every AI tool actually callable right now, from plugins currently
             running on Plugin Registry — exactly what the assistant's
             function-calling can reach. Browsing needs no login; running a tool
             that changes data does, same as anywhere else in Minder.
@@ -197,8 +198,8 @@ export function InstalledToolsPage() {
         This is what's live this moment, computed fresh on every request. If a
         plugin isn't running, its tools won't appear here even when they're in
         the{" "}
-        <Link to="/ai-tools/available" className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
-          AI Tool Catalog
+        <Link to={ROUTES.discoverAiTools} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+          Discover AI tools
         </Link>{" "}
         — installing and enabling that plugin is what makes them live.
       </InfoCallout>

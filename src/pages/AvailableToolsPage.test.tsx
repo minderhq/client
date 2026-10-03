@@ -52,14 +52,14 @@ describe("AvailableToolsPage", () => {
     apiFetch.mockReset();
   });
 
-  it("renders the catalog heading and points to Live Tools", async () => {
+  it("renders the Discover AI tools heading and points to Installed AI tools", async () => {
     apiFetch.mockResolvedValue({ tools: [], count: 0, total: 0, limit: 20, offset: 0 });
     renderPage();
 
-    expect(screen.getByRole("heading", { name: "AI Tool Catalog" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Discover AI tools" })).toBeTruthy();
     expect(
-      screen.getAllByText("Live Tools")[0].closest("a")?.getAttribute("href"),
-    ).toBe("/ai-tools/installed");
+      screen.getAllByText("Installed AI tools")[0].closest("a")?.getAttribute("href"),
+    ).toBe("/marketplace/installed/ai-tools");
   });
 
   it("shows an empty state when the catalog has no tools", async () => {

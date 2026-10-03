@@ -29,6 +29,7 @@ import {
   secondaryButtonClass,
 } from "../lib/ui";
 import { useTokenRef } from "../lib/useTokenRef";
+import { ROUTES } from "../lib/routes";
 
 interface ConfigField {
   key: string;
@@ -671,7 +672,7 @@ export function InstalledPluginsPage() {
       {dialog}
       <PageHeader
         icon="plugins"
-        title="Installed Plugins"
+        title="Installed plugins"
         subtitle="Everything running on this installation, plus the plugins you've installed from the marketplace — check versions and health, enable, disable, uninstall, or edit their settings. Requires login."
       />
       {!isAuthenticated && (
@@ -715,8 +716,8 @@ export function InstalledPluginsPage() {
           {isEmpty && (
             <EmptyState>
               No plugins installed yet —{" "}
-              <Link to="/plugins/available" className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
-                browse Available Plugins
+              <Link to={ROUTES.discoverPlugins} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+                find one in Discover plugins
               </Link>
               .
             </EmptyState>
@@ -725,8 +726,8 @@ export function InstalledPluginsPage() {
           {entries.length > 0 && (
             <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
               Some of these expose AI tools the assistant can call —{" "}
-              <Link to="/ai-tools/installed" className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
-                check Live Tools
+              <Link to={ROUTES.installedAiTools} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+                check Installed AI tools
               </Link>{" "}
               to see which are live right now.
             </p>

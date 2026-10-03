@@ -10,6 +10,7 @@ import { useAuth } from "../lib/auth";
 import type { BundlesResponse } from "../lib/bundles";
 import { type KbReadiness, kbReady, primaryAction } from "../lib/journey";
 import { openWebUiUrl } from "../lib/links";
+import { ROUTES } from "../lib/routes";
 import { cardClass, cardHoverClass, chipClass, primaryButtonClass, sectionLabelClass } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
 
@@ -145,9 +146,9 @@ interface ExploreLink {
 }
 
 const EXPLORE_LINKS: ExploreLink[] = [
-  { to: "/plugins/available", icon: "plugins", label: "Plugins" },
-  { to: "/ai-tools/available", icon: "ai-tools", label: "AI Tools" },
-  { to: "/bundles/available", icon: "bundles", label: "Bundles" },
+  { to: ROUTES.discoverPlugins, icon: "plugins", label: "Discover plugins" },
+  { to: ROUTES.discoverAiTools, icon: "ai-tools", label: "Discover AI tools" },
+  { to: ROUTES.discoverServiceBundles, icon: "bundles", label: "Discover service bundles" },
   { to: "/rag/graph", icon: "graph", label: "Knowledge Graph" },
   { to: "/platform/voice", icon: "voice", label: "Voice" },
   { to: "/platform/status", icon: "status", label: "Status" },
@@ -266,9 +267,9 @@ export function HomePage() {
           loading={stats.loading}
         />
         <StatCard
-          to="/bundles/installed"
+          to={ROUTES.installedServiceBundles}
           icon="bundles"
-          label="Bundles Enabled"
+          label="Service bundles enabled"
           value={stats.data ? `${stats.data.bundlesEnabled}/${stats.data.bundlesTotal}` : null}
           loading={stats.loading}
         />
