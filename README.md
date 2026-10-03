@@ -71,6 +71,13 @@ src/
   render from `lib/nav.ts` (see "Navigation and routes" below).
 - **`RedirectWithQuery.tsx`** — `<Navigate replace>` that keeps `?query` and
   `#hash`, used for every redirect in `lib/routes.ts`.
+- **`ExternalLink.tsx`** — new-tab link for an API-supplied URL
+  (`rel="noopener noreferrer"`). Only http(s) URLs become links (`lib/safeUrl.ts`);
+  anything else (`javascript:`, `data:`, …) shows as text with a note.
+- **`SubmissionReviewCard.tsx`** / **`SubmissionDetails.tsx`** — one submission in
+  Publish › Submission review: what will run, who submitted it and when, previous
+  feedback, the raw record, and the reviewer actions (approve/archive confirm,
+  reject needs feedback).
 - **`MindHubConnectionPlaceholder.tsx`** — informational panel on Installation
   settings › MindHub & sources until the real connection (#2201) lands. No
   controls.
@@ -102,6 +109,9 @@ src/
   **`pluginSource.ts`** classifies a plugin's source (First-party / Private git /
   Submitted, MindHub reserved) for `SourceBadge` and Discover's `?source=` filter;
   **`pluginVersion.ts`** compares installed vs listed versions.
+  **`submissionReview.ts`** holds the submission review queue's shapes, status
+  vocabulary, reviewer transitions (mirroring the backend state machine) and
+  confirm-dialog copy.
 - **`ui.ts`** — Tailwind class constants (`inputClass`, `primaryButtonClass`,
   `cardClass`, `badgeClass`, …), the `badgeTone` {success,warn,danger} palette,
   `confidenceBadgeColor`, `fieldHintClass`, `mutedTextClass`. Change a style once
