@@ -1,9 +1,10 @@
-import { useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import { StatusLine } from "../components/StatusLine";
 import { friendlyErrorMessage, oidcLoginUrl } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { useAuthCapabilities } from "../lib/passwordReset";
 import { redirectTo } from "../lib/redirect";
 import { beginSsoLogin } from "../lib/ssoLogin";
 import {
@@ -35,9 +36,21 @@ export function LoginPage() {
   // A failed OIDC/SSO redirect (denied consent, expired code, ...) lands here
   // via AuthCallbackPage's navigate("/login", {state: {oidcError}}) -- surface
   // it instead of silently landing on a blank login form.
-  const [error, setError] = useState(
-    (location.state as { oidcError?: string } | null)?.oidcError ?? "",
-  );
+  const routerState = location.state as
+    | { oidcError?: string; passwordReset?: boolean }
+    | null;
+  const [error, setError] = useState(routerState?.oidcError ?? "");
+  // Set by ResetPasswordPage after a completed email reset.
+  const passwordWasReset = routerState?.passwordReset === true;
+  const resetNoticeRef = useRef<HTMLDivElement>(null);
+  // Focus the confirmation so screen readers announce it: a live region that
+  // is already present on first render isn't reliably read out.
+  useEffect(() => {
+    if (passwordWasReset) resetNoticeRef.current?.focus();
+  }, [passwordWasReset]);
+  // "Forgot password?" is offered only when the gateway reports email reset.
+  // On any failure to read the capabilities, the link stays hidden.
+  const { passwordResetEmail } = useAuthCapabilities();
 
   if (isAuthenticated) return <Navigate to="/" replace />;
 
@@ -68,6 +81,18 @@ export function LoginPage() {
           ? "Sign in with your Minder account to make changes. Browsing stays open without logging in."
           : "Create a local Minder account, then you'll be signed in."}
       </p>
+
+      {passwordWasReset && (
+        <div
+          ref={resetNoticeRef}
+          tabIndex={-1}
+          role="status"
+          className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-sm text-emerald-900 outline-none dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-100"
+        >
+          Your password was reset and you were signed out everywhere. Sign in with
+          your new password.
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className={`flex flex-col gap-3 ${cardClass}`}>
         <div>
@@ -124,6 +149,16 @@ export function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             required
           />
+          {mode === "login" && passwordResetEmail && (
+            <p className="mt-1 text-right text-sm">
+              <Link
+                to="/forgot-password"
+                className="text-gray-600 underline hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400"
+              >
+                Forgot password?
+              </Link>
+            </p>
+          )}
         </div>
 
         <button type="submit" disabled={busy} className={primaryButtonClass}>

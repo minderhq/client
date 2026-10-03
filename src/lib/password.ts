@@ -4,6 +4,45 @@ import { adoptAccessToken, apiFetch } from "./api";
  * as registration (api-gateway's ChangePasswordRequest / RegisterRequest). */
 export const MIN_PASSWORD_LENGTH = 8;
 
+/** Maximum size of a new password in UTF-8 bytes. bcrypt reads only 72
+ * bytes, so the gateway refuses anything longer with a 422
+ * (ChangePasswordRequest / PasswordResetConfirmBody). */
+export const MAX_PASSWORD_BYTES = 72;
+
+/** A new password that breaks the policy: which field to fix, and why. */
+export interface NewPasswordProblem {
+  field: "password" | "confirmation";
+  message: string;
+}
+
+/** Checks a new password against the gateway's password policy before it is
+ * sent: at least MIN_PASSWORD_LENGTH characters, at most MAX_PASSWORD_BYTES
+ * UTF-8 bytes, and equal to its confirmation. Characters are counted as
+ * Unicode code points, as the gateway (pydantic `min_length`) counts them, not
+ * as UTF-16 units: an emoji counts as one. Returns the problem, or null when
+ * the password is acceptable. */
+export function newPasswordProblem(
+  password: string,
+  confirmation: string,
+): NewPasswordProblem | null {
+  if ([...password].length < MIN_PASSWORD_LENGTH) {
+    return {
+      field: "password",
+      message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+    };
+  }
+  if (new TextEncoder().encode(password).length > MAX_PASSWORD_BYTES) {
+    return {
+      field: "password",
+      message: `Password is too long. Use at most ${MAX_PASSWORD_BYTES} bytes (fewer characters if it contains accented letters or symbols).`,
+    };
+  }
+  if (password !== confirmation) {
+    return { field: "confirmation", message: "Passwords don't match." };
+  }
+  return null;
+}
+
 /** Change the authenticated caller's OWN local password
  * (POST /v1/auth/change-password).
  *

@@ -55,6 +55,18 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "Log in" })).toBeTruthy();
   });
 
+  it("renders the forgot-password page at /forgot-password", () => {
+    renderAt("/forgot-password");
+    expect(screen.getByRole("heading", { name: "Reset your password" })).toBeTruthy();
+  });
+
+  it("renders the reset-password page at /reset-password", () => {
+    renderAt("/reset-password");
+    // No #token in a MemoryRouter test, so the page offers a new link.
+    expect(screen.getByRole("heading", { name: "Reset your password" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Send me a new link" })).toBeTruthy();
+  });
+
   it("redirects an unmatched path home", () => {
     renderAt("/this-route-does-not-exist");
     expect(screen.getByRole("heading", { name: "Minder" })).toBeTruthy();

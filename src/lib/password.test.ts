@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TOKEN_KEY, TOKEN_REFRESHED_EVENT } from "./api";
-import { changePassword } from "./password";
+import {
+  changePassword,
+  MAX_PASSWORD_BYTES,
+  MIN_PASSWORD_LENGTH,
+  newPasswordProblem,
+} from "./password";
 
 function respond(status: number, body?: unknown): Response {
   return {
@@ -56,5 +61,37 @@ describe("changePassword (#62)", () => {
       "switched-org-token",
     );
     expect(sessionStorage.getItem(TOKEN_KEY)).toBe("switched-org-token");
+  });
+});
+
+describe("newPasswordProblem", () => {
+  it("accepts a password of 8 to 72 bytes that matches its confirmation", () => {
+    expect(newPasswordProblem("abcdefgh", "abcdefgh")).toBeNull();
+    expect(newPasswordProblem("a".repeat(MAX_PASSWORD_BYTES), "a".repeat(72))).toBeNull();
+  });
+
+  it("enforces the minimum length, counting code points like the gateway", () => {
+    expect(newPasswordProblem("short", "short")).toEqual({
+      field: "password",
+      message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+    });
+    // Four emoji are 8 UTF-16 units but 4 characters to the gateway.
+    expect(newPasswordProblem("😀😀😀😀", "😀😀😀😀")?.field).toBe("password");
+  });
+
+  it("refuses more than 72 UTF-8 bytes, as bcrypt does", () => {
+    expect(newPasswordProblem("a".repeat(73), "a".repeat(73))?.message).toMatch(
+      /at most 72 bytes/,
+    );
+    // 37 two-byte letters: 37 characters but 74 bytes.
+    const turkish = "ş".repeat(37);
+    expect(newPasswordProblem(turkish, turkish)?.message).toMatch(/too long/);
+  });
+
+  it("flags a mismatched confirmation on the confirmation field", () => {
+    expect(newPasswordProblem("abcdefgh", "abcdefgX")).toEqual({
+      field: "confirmation",
+      message: "Passwords don't match.",
+    });
   });
 });

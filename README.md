@@ -45,6 +45,22 @@ each also has a matching `ARG` default in the `Dockerfile`.
 > localhost dead-link class): render the link only when the deployment configures
 > it. See `src/lib/api.ts`.
 
+## Emailed account links (token routes)
+
+Pages opened from an emailed link carry a one-time secret in the URL fragment,
+for example `/reset-password#token=…` (email password reset, minderhq/minder#2138).
+They follow the rules in `src/lib/tokenPage.ts`:
+
+- read the token from the fragment once, then clear it with `history.replaceState`;
+- POST it only on an explicit user action, never on page load, because link
+  scanners run JavaScript;
+- `nginx.conf` serves the route with `Referrer-Policy: no-referrer` and
+  `Cache-Control: no-store`, and the page adds `<meta name="referrer"
+  content="no-referrer">` as a fallback for other hosts.
+
+A new token route must be added to nginx.conf's token location and to
+`TOKEN_ROUTES` in `src/nginxConfig.test.ts`.
+
 ## Layout
 
 ```
