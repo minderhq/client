@@ -338,10 +338,17 @@ describe("Discover plugins: accessible names, badges and headings", () => {
     expect(within(weather).getByRole("button", { name: "Install Weather" })).toBeTruthy();
     const depsSummary = within(weather).getByText("Dependencies & conflicts", { selector: "summary" });
     expect(depsSummary.getAttribute("aria-label")).toBe("Dependencies & conflicts for Weather");
+    expect(
+      within(weather).getByText("Ratings & reviews", { selector: "summary", exact: false })
+        .textContent,
+    ).toBe("Ratings & reviews for Weather");
 
     const news = screen.getByRole("heading", { name: "News" }).closest("section")!;
     expect(within(news).getByRole("button", { name: "Enable News" })).toBeTruthy();
     expect(within(news).getByRole("button", { name: "Uninstall News" })).toBeTruthy();
+    expect(within(news).getByRole("link", { name: /^Repository/ }).getAttribute("aria-label")).toBe(
+      "Repository for News (opens in a new tab)",
+    );
     const repoSummary = within(news).getByText("Install from this repo", { selector: "summary" });
     expect(repoSummary.getAttribute("aria-label")).toBe("Install from this repo: News");
 

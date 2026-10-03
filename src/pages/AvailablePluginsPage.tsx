@@ -104,6 +104,7 @@ function PluginMetaRow({
           href={plugin.repository_url}
           target="_blank"
           rel="noopener noreferrer"
+          aria-label={`Repository for ${plugin.display_name} (opens in a new tab)`}
           className="underline hover:text-indigo-600 dark:hover:text-indigo-400"
         >
           Repository ↗
@@ -439,6 +440,7 @@ export function PluginCard({
           <DependencyPanel pluginId={plugin.id} pluginName={plugin.display_name} />
           <PluginRatings
             pluginId={plugin.id}
+            pluginName={plugin.display_name}
             token={token}
             isAuthenticated={isAuthenticated}
             isInstalled={!!installation}
