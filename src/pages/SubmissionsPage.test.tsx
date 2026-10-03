@@ -175,4 +175,12 @@ describe("SubmissionsPage", () => {
     expect(await screen.findByRole("button", { name: "Edit Weather Plus" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Submit for review: Weather Plus" })).toBeTruthy();
   });
+  it("shows an in-review submission's status in its amber tone, not the neutral grey", async () => {
+    mockAuth = { token: "tok", isAuthenticated: true };
+    apiFetch.mockResolvedValue({ plugins: [submission({ status: "submitted" })] });
+    render(<SubmissionsPage />);
+
+    const badge = await screen.findByText("submitted");
+    expect(badge.className.split(/\s+/).filter((c) => /^bg-/.test(c))).toEqual(["bg-amber-100"]);
+  });
 });

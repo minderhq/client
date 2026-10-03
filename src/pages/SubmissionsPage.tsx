@@ -12,7 +12,8 @@ import { DEFAULT_SUBMISSION_TIER } from "../lib/billing";
 import { useAsyncResource } from "../lib/useAsyncResource";
 import { useAuth } from "../lib/auth";
 import {
-  badgeClass,
+  badgeBaseClass,
+  badgeNeutralToneClass,
   badgeTone,
   cardClass,
   fieldHintClass,
@@ -67,7 +68,7 @@ export function submissionStatusBadgeColor(status: SubmissionStatus): string {
   if (status === "approved") return badgeTone.success;
   if (status === "rejected") return badgeTone.danger;
   if (status === "submitted" || status === "in_review") return badgeTone.warn;
-  return ""; // draft/archived/pending -- neutral badgeClass alone
+  return ""; // draft/archived/pending -- the neutral tone
 }
 
 function NewSubmissionForm({ onCreated }: { onCreated: () => void }) {
@@ -502,7 +503,9 @@ function SubmissionCard({
           </p>
         </div>
         <span
-          className={`${badgeClass} ${submissionStatusBadgeColor(submission.status)} flex-shrink-0`}
+          // Base + one colour set: appended to badgeClass, the amber "submitted"
+          // / "in review" tone lost to its grey (Tailwind orders by stylesheet).
+          className={`${badgeBaseClass} ${submissionStatusBadgeColor(submission.status) || badgeNeutralToneClass} flex-shrink-0`}
         >
           {submission.status.replace("_", " ")}
         </span>
