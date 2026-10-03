@@ -55,6 +55,10 @@ const STATUS_LABELS: Record<PluginStatus, string> = {
   approved: "Approved",
   rejected: "Rejected",
   archived: "Archived",
+  // Defensive only: the queue endpoint filters on `origin = 'submitted'`,
+  // pre-#402 rows took the column default `origin = 'first_party'`, and this
+  // client no longer asks for `status=pending`. So the queue can't return a
+  // pending row today; the label is kept so a stray one still reads right.
   pending: "Pending (legacy)",
 };
 
@@ -83,6 +87,8 @@ export function reviewerActionsFor(status: string): ReviewerAction[] {
     case "approved":
       return ["archive"];
     case "pending":
+      // Defensive only (see STATUS_LABELS): the queue can't return a pending
+      // row today. These are the backend's legacy transitions for it.
       return ["approve", "reject", "archive"];
     default:
       return []; // draft, rejected, archived, or unknown
