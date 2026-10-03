@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import { StatusLine } from "../components/StatusLine";
 import { friendlyErrorMessage, oidcLoginUrl } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { usePasswordResetAvailable } from "../lib/passwordReset";
 import { redirectTo } from "../lib/redirect";
 import { beginSsoLogin } from "../lib/ssoLogin";
 import {
@@ -27,17 +28,32 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const routeState = location.state as
+    | { oidcError?: string; notice?: string; username?: string }
+    | null;
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [username, setUsername] = useState("");
+  // Prefilled when a password reset knew who was resetting.
+  const [username, setUsername] = useState(routeState?.username ?? "");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   // A failed OIDC/SSO redirect (denied consent, expired code, ...) lands here
   // via AuthCallbackPage's navigate("/login", {state: {oidcError}}) -- surface
   // it instead of silently landing on a blank login form.
-  const [error, setError] = useState(
-    (location.state as { oidcError?: string } | null)?.oidcError ?? "",
-  );
+  const [error, setError] = useState(routeState?.oidcError ?? "");
+  // A completed password reset lands here with a success notice (it never
+  // signs the user in).
+  const [notice, setNotice] = useState(routeState?.notice ?? "");
+  // "Forgot password?" is offered only when the server can send reset emails.
+  const { loading: capabilitiesLoading, available: passwordResetAvailable } =
+    usePasswordResetAvailable();
+
+  // Back from a password reset: put the cursor where the user continues.
+  const focusAfterReset = routeState?.notice
+    ? routeState.username
+      ? "password"
+      : "username"
+    : null;
 
   if (isAuthenticated) return <Navigate to="/" replace />;
 
@@ -45,6 +61,7 @@ export function LoginPage() {
     e.preventDefault();
     setBusy(true);
     setError("");
+    setNotice("");
     try {
       if (mode === "register") {
         await register(username, email, password);
@@ -84,6 +101,7 @@ export function LoginPage() {
             autoComplete="username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
+            autoFocus={focusAfterReset === "username"}
             required
           />
         </div>
@@ -122,8 +140,26 @@ export function LoginPage() {
             autoComplete={mode === "login" ? "current-password" : "new-password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            autoFocus={focusAfterReset === "password"}
             required
           />
+          {mode === "login" && passwordResetAvailable && (
+            <p className="mt-1 text-right text-sm">
+              <Link
+                to="/forgot-password"
+                className="text-gray-600 underline hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400"
+              >
+                Forgot password?
+              </Link>
+            </p>
+          )}
+          {/* No email reset on this server (e.g. no mail configured): no
+              dead-end link, just who can help. */}
+          {mode === "login" && !capabilitiesLoading && !passwordResetAvailable && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Forgot your password? Ask your administrator to reset it.
+            </p>
+          )}
         </div>
 
         <button type="submit" disabled={busy} className={primaryButtonClass}>
@@ -134,6 +170,7 @@ export function LoginPage() {
               : "Create account & log in"}
         </button>
 
+        <StatusLine>{notice}</StatusLine>
         <StatusLine isError>{error}</StatusLine>
       </form>
 
@@ -197,6 +234,9 @@ export function LoginPage() {
           <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
             SSO requires reaching Minder through its Traefik hostname with a real
             domain + TLS.
+          </p>
+          <p className="mt-1 text-center text-xs text-gray-500 dark:text-gray-400">
+            SSO accounts reset their password at their identity provider.
           </p>
         </>
       )}

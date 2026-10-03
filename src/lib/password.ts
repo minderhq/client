@@ -4,6 +4,17 @@ import { adoptAccessToken, apiFetch } from "./api";
  * as registration (api-gateway's ChangePasswordRequest / RegisterRequest). */
 export const MIN_PASSWORD_LENGTH = 8;
 
+/** Maximum size of a password in UTF-8 bytes. bcrypt only reads 72 bytes, so
+ * the gateway refuses anything longer (422) instead of silently truncating
+ * it. Counted in bytes, not characters: one non-ASCII character can take up
+ * to four. */
+export const MAX_PASSWORD_BYTES = 72;
+
+/** Length of `password` in UTF-8 bytes, the unit MAX_PASSWORD_BYTES uses. */
+export function passwordByteLength(password: string): number {
+  return new TextEncoder().encode(password).length;
+}
+
 /** Change the authenticated caller's OWN local password
  * (POST /v1/auth/change-password).
  *

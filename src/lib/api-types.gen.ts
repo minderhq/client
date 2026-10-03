@@ -124,6 +124,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Auth Capabilities */
+        get: operations["auth_capabilities_v1_auth_capabilities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/change-password": {
         parameters: {
             query?: never;
@@ -186,6 +203,40 @@ export interface paths {
         get: operations["oidc_login_v1_auth_oidc_login_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/password-reset/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Password Reset Confirm */
+        post: operations["password_reset_confirm_v1_auth_password_reset_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/password-reset/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Password Reset Request */
+        post: operations["password_reset_request_v1_auth_password_reset_request_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2040,6 +2091,15 @@ export interface components {
             /** User Id */
             user_id: number;
         };
+        /** CapabilitiesResponse */
+        CapabilitiesResponse: {
+            /** Email Verification */
+            email_verification: boolean;
+            /** Password Reset Email */
+            password_reset_email: boolean;
+            /** Registration Mode */
+            registration_mode: string;
+        };
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
             /** Current Password */
@@ -2710,6 +2770,21 @@ export interface components {
             /** Name */
             name?: string | null;
         };
+        /** PasswordResetAccepted */
+        PasswordResetAccepted: {
+            /**
+             * Detail
+             * @default If an account exists for that address, we've sent instructions.
+             */
+            detail: string;
+        };
+        /** PasswordResetConfirmBody */
+        PasswordResetConfirmBody: {
+            /** New Password */
+            new_password: string;
+            /** Token */
+            token: string;
+        };
         /** PasswordResetRequest */
         PasswordResetRequest: {
             /**
@@ -2719,6 +2794,11 @@ export interface components {
             mode: "set" | "generate";
             /** New Password */
             new_password?: string | null;
+        };
+        /** PasswordResetRequestBody */
+        PasswordResetRequestBody: {
+            /** Email */
+            email: string;
         };
         /** PasswordResetResponse */
         PasswordResetResponse: {
@@ -2850,6 +2930,8 @@ export interface components {
              * Format: email
              */
             email: string;
+            /** Invite Token */
+            invite_token?: string | null;
             /** Password */
             password: string;
             /** Username */
@@ -3416,6 +3498,26 @@ export interface operations {
             };
         };
     };
+    auth_capabilities_v1_auth_capabilities_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapabilitiesResponse"];
+                };
+            };
+        };
+    };
     change_password_v1_auth_change_password_post: {
         parameters: {
             query?: never;
@@ -3517,7 +3619,9 @@ export interface operations {
     };
     oidc_login_v1_auth_oidc_login_get: {
         parameters: {
-            query?: never;
+            query?: {
+                cnonce?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3531,6 +3635,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    password_reset_confirm_v1_auth_password_reset_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordResetConfirmBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    password_reset_request_v1_auth_password_reset_request_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordResetRequestBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordResetAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
