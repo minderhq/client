@@ -2,6 +2,7 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PENDING_SSO_KEY, PENDING_SSO_TTL_MS, beginSsoLogin } from "../lib/ssoLogin";
+import { rememberReturnPath } from "../lib/returnPath";
 import { AuthCallbackPage } from "./AuthCallbackPage";
 
 const loginWithToken = vi.fn();
@@ -49,6 +50,25 @@ describe("AuthCallbackPage", () => {
     // Send time = the navigation's start, never later than now (#56).
     expect(loginWithToken.mock.calls[0][1]).toBeLessThanOrEqual(Date.now());
     expect(navigate).toHaveBeenCalledWith("/", { replace: true });
+  });
+
+  it("returns to where sign-in started (e.g. an invite link)", () => {
+    const nonce = startLogin();
+    rememberReturnPath("/invite/tok123");
+    window.location.hash = `#token=abc.def.ghi&cnonce=${nonce}`;
+    render(<AuthCallbackPage />);
+    expect(navigate).toHaveBeenCalledWith("/invite/tok123", { replace: true });
+    expect(sessionStorage.getItem("minder_return_path")).toBeNull();
+  });
+
+  it("keeps the return path for the retry when SSO fails", () => {
+    rememberReturnPath("/invite/tok123");
+    window.location.hash = "#error=access_denied";
+    render(<AuthCallbackPage />);
+    expect(navigate).toHaveBeenCalledWith("/login", {
+      replace: true,
+      state: { oidcError: "access_denied", from: "/invite/tok123" },
+    });
   });
 
   it("URL-decodes the token before handing it to loginWithToken", () => {

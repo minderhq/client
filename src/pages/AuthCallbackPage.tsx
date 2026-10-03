@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../lib/auth";
+import { consumeReturnPath } from "../lib/returnPath";
 import { completeSsoLogin } from "../lib/ssoLogin";
 
 const SIGN_IN_INCOMPLETE = "Sign-in did not complete — please try again.";
@@ -30,11 +31,13 @@ export function AuthCallbackPage() {
     const hash = window.location.hash;
     const token = hashParam(hash, "token");
     const boundToThisLogin = completeSsoLogin(hashParam(hash, "cnonce"));
+    // Where the sign-in was started from (e.g. an invite link), if anywhere.
+    const returnPath = consumeReturnPath();
     if (token) {
       if (!boundToThisLogin) {
         navigate("/login", {
           replace: true,
-          state: { oidcError: SIGN_IN_INCOMPLETE },
+          state: { oidcError: SIGN_IN_INCOMPLETE, from: returnPath ?? undefined },
         });
         return;
       }
@@ -46,7 +49,7 @@ export function AuthCallbackPage() {
       const origin = performance.timeOrigin;
       const sentAt = Number.isFinite(origin) ? Math.min(origin, now) : now;
       loginWithToken(decodeURIComponent(token), Math.floor(sentAt));
-      navigate("/", { replace: true });
+      navigate(returnPath ?? "/", { replace: true });
       return;
     }
     // A real OIDC failure (denied consent, expired auth code, misconfigured
@@ -58,7 +61,10 @@ export function AuthCallbackPage() {
     const message = error
       ? decodeURIComponent(error.replace(/\+/g, " "))
       : SIGN_IN_INCOMPLETE;
-    navigate("/login", { replace: true, state: { oidcError: message } });
+    navigate("/login", {
+      replace: true,
+      state: { oidcError: message, from: returnPath ?? undefined },
+    });
     // Runs once on mount -- loginWithToken/navigate are stable (useCallback/
     // react-router), and re-running this on their identity would re-read a
     // hash that's already been consumed.
