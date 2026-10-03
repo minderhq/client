@@ -57,7 +57,9 @@ describe("nginx.conf token routes", () => {
   });
 
   for (const route of TOKEN_ROUTES) {
-    for (const path of [route, `${route}/`]) {
+    // React Router matches routes case-insensitively, so case variants render
+    // the same page and must get the same headers.
+    for (const path of [route, `${route}/`, route.toUpperCase(), "/Reset-Password/"]) {
       describe(path, () => {
         const loc = locationFor(all, path);
 
@@ -87,5 +89,6 @@ describe("nginx.conf token routes", () => {
     expect(loc?.pattern).toBe("/");
     expect(directives(loc!.body, "add_header")).toEqual([]);
     expect(locationFor(all, "/reset-password-extra")?.pattern).toBe("/");
+    expect(locationFor(all, "/Reset-Password-Extra")?.pattern).toBe("/");
   });
 });
