@@ -3,54 +3,104 @@
 // installation records (`/v1/marketplace/installations/me`). Those are two
 // independent planes today -- first-party plugins run with no per-user
 // install row at all -- until decision (B) on #2091 unifies them.
+//
+// Since #2223 both payloads carry what the merge needs (#2219): a running
+// plugin's `install_source` and `marketplace_plugin_id`, and an installation's
+// `origin`. The whole catalog is only fetched, and the name join and URL
+// heuristic only used, against an older backend that lacks those fields.
 
-import type { CatalogPlugin, RuntimePlugin } from "./marketplace";
-import type { SourceKind } from "./pluginSource";
+import { type CatalogPlugin, hasBackendField, type RuntimePlugin } from "./marketplace";
+import { type SourceKind, sourceFromInstallSource, sourceFromOrigin } from "./pluginSource";
 import { legacyCatalogRowSource } from "./pluginSourceLegacy";
 import { normalizeVersion } from "./pluginVersion";
 import type { Installation } from "./types";
 
 export interface InstalledEntry {
-  /** Plugin name -- the join key across all three payloads. */
+  /** Unique and stable across reloads: the runtime name for a running plugin,
+   * the catalog id for an installation-only one. Two entries may share a
+   * `name` (a git install named like someone else's submission), never a
+   * `key`. */
+  key: string;
+  /** The plugin's name: plugin-registry's for a running plugin (what its
+   * per-plugin endpoints take), else the installation's. */
   name: string;
   displayName: string;
   /** The caller's marketplace installation record, if they have one. */
   installation: Installation | null;
   /** plugin-registry's runtime entry, if it has this plugin loaded. */
   runtime: RuntimePlugin | null;
-  /** The matching catalog row, if one is listed. */
+  /** The matching catalog row -- only looked up against an older backend
+   * (see {@link needsCatalogFallback}); null otherwise. */
   catalog: CatalogPlugin | null;
   source: SourceKind | null;
   /** The version that's running (plugin-registry), else the one the
    * installation record holds; null when neither knows. */
   installedVersion: string | null;
-  /** The version the catalog lists, else the installation's copy of it. */
+  /** The version the catalog lists (the installation record's copy of it, or
+   * the catalog row on the legacy path); null when unknown. */
   listedVersion: string | null;
   requiresServices: string[];
 }
 
-function displayNameOf(
-  installation: Installation | null,
-  catalog: CatalogPlugin | null,
-  name: string,
-): string {
-  return installation?.display_name || catalog?.display_name || name;
+/** Whether the Installed view must fall back to fetching the whole catalog:
+ * true only when a payload comes from a backend older than #2219 -- a runtime
+ * entry without `install_source`/`marketplace_plugin_id`, or an installation
+ * without `origin`. The two services deploy independently, so each payload is
+ * checked on its own. Nothing loaded means nothing to classify. */
+export function needsCatalogFallback(
+  installations: readonly Installation[] | null,
+  runtime: readonly RuntimePlugin[] | null,
+): boolean {
+  return (
+    (runtime ?? []).some(
+      (rt) => !hasBackendField(rt, "install_source") || !hasBackendField(rt, "marketplace_plugin_id"),
+    ) || (installations ?? []).some((inst) => !hasBackendField(inst, "origin"))
+  );
 }
 
-/** Runtime ∪ installations, de-duplicated by plugin name, each joined to its
- * catalog row (by marketplace id for installations, by name for runtime-only
- * plugins), sorted by display name. Any of the inputs may be null (not loaded /
- * failed); the merge then works with what it has.
+/** The badge for one entry, from backend fields first:
  *
- * Known limitation -- name collisions: the name is the only key the runtime
- * list shares with the catalog. Catalog names are unique, but a runtime plugin
- * with no catalog row of its own can share a name with someone ELSE's row.
- * Examples: a git or manifest install named like a developer submission, or a
- * vendored plugin whose catalog sync was refused (409) because a submission
- * already took the name. That runtime plugin then shows the other row's
- * source badge and listed version, and an install record for that row merges
- * into its card. Pinned by tests; the fix is backend #2206 (source and
- * marketplace id on `GET /v1/plugins`, so the join stops being by name). */
+ *  1. a running plugin's `install_source` -- how it got onto this
+ *     installation (vendored → First-party, git → Private git, manifest →
+ *     Manifest upload);
+ *  2. else the installation record's catalog `origin` (first_party →
+ *     First-party, submitted → Submitted on this instance);
+ *  3. else nothing: a null or unknown value gets no badge, never a guess.
+ *
+ * Only a payload from an older backend falls back to the legacy URL heuristic
+ * on its catalog row, which is exactly what it showed before #2223. */
+function entrySource(
+  rt: RuntimePlugin | null,
+  inst: Installation | null,
+  row: CatalogPlugin | null,
+): SourceKind | null {
+  if (rt) {
+    const source = hasBackendField(rt, "install_source")
+      ? sourceFromInstallSource(rt.install_source)
+      : legacyCatalogRowSource(row);
+    if (source) return source;
+  }
+  if (inst) {
+    return hasBackendField(inst, "origin")
+      ? sourceFromOrigin(inst.origin)
+      : legacyCatalogRowSource(row);
+  }
+  return null;
+}
+
+/** Runtime ∪ installations, sorted by display name. Any of the inputs may be
+ * null (not loaded / failed); the merge then works with what it has.
+ *
+ * A running plugin is joined to the caller's installation record (and, on
+ * the legacy path, to its catalog row) by `marketplace_plugin_id`, never by
+ * name, so a same-named row that isn't its own can't take over its badge,
+ * version or card. The name is used only:
+ *  - when the registry predates the field (key absent): the pre-#2223 join;
+ *  - when the id is null for a vendored plugin and the same-named record is
+ *    a first-party listing: plugin-registry creates that listing by name for
+ *    the code plugins it ships, so it is this plugin's own row whose id the
+ *    registry hasn't resolved yet. A submission or another install can't
+ *    match this, so it can't reintroduce the collision. */
 export function mergeInstalledPlugins(
   installations: readonly Installation[] | null,
   runtime: readonly RuntimePlugin[] | null,
@@ -63,44 +113,75 @@ export function mergeInstalledPlugins(
     if (!catalogByName.has(row.name)) catalogByName.set(row.name, row);
   }
 
-  const byName = new Map<
-    string,
-    { installation: Installation | null; runtime: RuntimePlugin | null }
-  >();
+  // One record per catalog id (the first wins).
+  const instById = new Map<string, Installation>();
+  const instByName = new Map<string, Installation>();
   for (const inst of installations ?? []) {
-    if (!byName.has(inst.name)) byName.set(inst.name, { installation: inst, runtime: null });
+    if (instById.has(inst.plugin_id)) continue;
+    instById.set(inst.plugin_id, inst);
+    if (!instByName.has(inst.name)) instByName.set(inst.name, inst);
   }
-  for (const rt of runtime ?? []) {
-    const existing = byName.get(rt.name);
-    if (!existing) byName.set(rt.name, { installation: null, runtime: rt });
-    else if (!existing.runtime) existing.runtime = rt;
+
+  function installationFor(rt: RuntimePlugin): Installation | null {
+    if (!hasBackendField(rt, "marketplace_plugin_id")) return instByName.get(rt.name) ?? null;
+    if (rt.marketplace_plugin_id) return instById.get(rt.marketplace_plugin_id) ?? null;
+    const sameName = instByName.get(rt.name);
+    return sameName && rt.install_source === "vendored" && sameName.origin === "first_party"
+      ? sameName
+      : null;
+  }
+
+  function catalogRowFor(rt: RuntimePlugin | null, inst: Installation | null): CatalogPlugin | null {
+    if (inst) {
+      const row = catalogById.get(inst.plugin_id);
+      if (row) return row;
+    }
+    if (!rt) return null;
+    if (!hasBackendField(rt, "marketplace_plugin_id")) return catalogByName.get(rt.name) ?? null;
+    return rt.marketplace_plugin_id ? (catalogById.get(rt.marketplace_plugin_id) ?? null) : null;
+  }
+
+  function entry(
+    key: string,
+    name: string,
+    rt: RuntimePlugin | null,
+    inst: Installation | null,
+  ): InstalledEntry {
+    const row = catalogRowFor(rt, inst);
+    return {
+      key,
+      name,
+      displayName: inst?.display_name || row?.display_name || name,
+      installation: inst,
+      runtime: rt,
+      catalog: row,
+      source: entrySource(rt, inst, row),
+      installedVersion: normalizeVersion(rt?.version) ?? normalizeVersion(inst?.version),
+      listedVersion:
+        normalizeVersion(row?.current_version) ?? normalizeVersion(inst?.current_version),
+      requiresServices: inst?.requires_services ?? row?.requires_services ?? [],
+    };
   }
 
   const entries: InstalledEntry[] = [];
-  for (const [name, { installation, runtime: rt }] of byName) {
-    const row =
-      (installation && catalogById.get(installation.plugin_id)) ||
-      catalogByName.get(name) ||
-      null;
-    entries.push({
-      name,
-      displayName: displayNameOf(installation, row, name),
-      installation,
-      runtime: rt,
-      catalog: row,
-      source: legacyCatalogRowSource(row),
-      installedVersion:
-        normalizeVersion(rt?.version) ?? normalizeVersion(installation?.version),
-      listedVersion:
-        normalizeVersion(row?.current_version) ??
-        normalizeVersion(installation?.current_version),
-      requiresServices: installation?.requires_services ?? row?.requires_services ?? [],
-    });
+  const claimed = new Set<Installation>();
+  const seenRuntime = new Set<string>();
+  for (const rt of runtime ?? []) {
+    if (seenRuntime.has(rt.name)) continue; // registry names are unique; first wins
+    seenRuntime.add(rt.name);
+    let inst = installationFor(rt);
+    if (inst && claimed.has(inst)) inst = null;
+    if (inst) claimed.add(inst);
+    entries.push(entry(`runtime:${rt.name}`, rt.name, rt, inst));
+  }
+  for (const inst of instById.values()) {
+    if (!claimed.has(inst)) entries.push(entry(`installation:${inst.plugin_id}`, inst.name, null, inst));
   }
 
   return entries.sort(
     (a, b) =>
       a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" }) ||
-      a.name.localeCompare(b.name),
+      a.name.localeCompare(b.name) ||
+      a.key.localeCompare(b.key),
   );
 }

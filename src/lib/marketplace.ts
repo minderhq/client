@@ -75,15 +75,24 @@ export interface CatalogPluginListResponse {
   offset: number;
 }
 
+/** How plugin-registry installed a plugin (#2219, its `InstallSource`):
+ * `vendored` (a code plugin shipped in its plugins directory), `git`
+ * (install-from-git, or last refreshed from git) or `manifest` (a manifest
+ * upload). `mindhub` is reserved server-side and not emitted yet. Typed open
+ * so a value this client doesn't know yet still type-checks (it gets no
+ * badge). */
+export type InstallSource = "vendored" | "git" | "manifest" | (string & {});
+
 /** One plugin plugin-registry has loaded on this installation (`GET /v1/plugins`,
  * its `PluginInfo` model). This is what actually runs, independent of any
- * per-user marketplace installation record. Note what it does NOT carry: no
- * origin/source, no repository URL, no marketplace id and no "configurable"
- * flag -- callers join the catalog by `name` for the first two and fetch
- * `/v1/plugins/{name}/config` lazily for the last. Nor `license_key_masked` /
+ * per-user marketplace installation record. Not `license_key_masked` /
  * `updated_at`: those belong to the license-update response
  * (`PluginLicenseUpdateResponse`), and the list's `response_model` drops
- * anything not on `PluginInfo`. */
+ * anything not on `PluginInfo`.
+ *
+ * The four #2219 fields are optional because a registry older than #2219
+ * omits them entirely. Absent (the key isn't there) and null (the backend
+ * says "none") mean different things -- see {@link hasBackendField}. */
 export interface RuntimePlugin {
   name: string;
   version: string;
@@ -100,6 +109,28 @@ export interface RuntimePlugin {
   /** "unknown" until plugin-registry has run a health check. */
   health_status: string;
   last_health_check: string | null;
+  /** How it was installed; null only for a row the registry hasn't classified
+   * yet (backfilled on its next boot). */
+  install_source?: InstallSource | null;
+  /** The source repository of a `git` install, without credentials; null for
+   * every other install source. */
+  repository_url?: string | null;
+  /** The marketplace catalog row this plugin is linked to -- the join key to
+   * the catalog and to installation records (never the name). Null when it
+   * has no catalog row: git and manifest installs, or a code plugin whose
+   * catalog sync hasn't resolved. */
+  marketplace_plugin_id?: string | null;
+  /** Whether `GET /v1/plugins/{name}/config` has fields to edit. The same
+   * predicate the config endpoint uses, so the two never disagree. */
+  configurable?: boolean;
+}
+
+/** Whether `obj` carries `key` at all -- the way to tell a backend that
+ * predates a field (key absent) from one that sends it as null. FastAPI
+ * serialises every declared field, nulls included, so an absent key reliably
+ * means an older deploy. */
+export function hasBackendField<T extends object>(obj: T | null | undefined, key: keyof T): boolean {
+  return obj != null && Object.prototype.hasOwnProperty.call(obj, key);
 }
 
 export interface RuntimePluginListResponse {
@@ -206,10 +237,10 @@ export async function fetchMyInstallations(
   return res?.installations ?? [];
 }
 
-/** The whole public (approved) marketplace catalog, across all pages -- used
- * to look up `origin`/`repository_url`/`current_version` for installed and
- * runtime-loaded plugins, which the installations and runtime payloads don't
- * carry themselves. */
+/** The whole public (approved) marketplace catalog, across all pages. The
+ * Installed view only needs it against an older backend (before #2219), whose
+ * runtime list and installation records don't say where a plugin came from;
+ * see `needsCatalogFallback` in installedPlugins.ts. */
 export function fetchCatalogPlugins(
   token: string,
   signal?: AbortSignal,

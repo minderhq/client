@@ -743,7 +743,7 @@ export function InstalledPluginsPage() {
           )}
           {entries.map((entry) => (
             <InstalledPluginCard
-              key={entry.name}
+              key={entry.key}
               entry={entry}
               token={token}
               runtimeKnown={runtime !== null && !runtimeTruncated}
