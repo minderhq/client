@@ -4,23 +4,46 @@ import { ApiError } from "./api";
 import {
   isExistingEmail,
   parseRegistrationMode,
+  registrationModeFrom,
   registrationErrorMessage,
   registrationRefusal,
 } from "./registration";
 
 describe("parseRegistrationMode", () => {
-  it.each(["open", "invite", "closed"])("reads %s", (mode) => {
-    expect(parseRegistrationMode(mode)).toBe(mode);
+  it.each([
+    ["open", "open"],
+    ["invite", "invite"],
+    ["sso_only", "sso_only"],
+    // `closed` is the permanent alias of `sso_only` (and what the API reports).
+    ["closed", "sso_only"],
+  ])("reads %s as %s", (value, mode) => {
+    expect(parseRegistrationMode(value)).toBe(mode);
   });
 
-  it("treats an unknown value as invite, like the API does", () => {
-    expect(parseRegistrationMode("approval")).toBe("invite");
-  });
+  it.each(["approval", "CLOSED ", "Open", "inviteonly"])(
+    "treats the unknown value %j as invite, never open",
+    (value) => {
+      expect(parseRegistrationMode(value)).toBe("invite");
+    },
+  );
 
   it("is unknown when the API doesn't report a mode", () => {
     expect(parseRegistrationMode(undefined)).toBeNull();
     expect(parseRegistrationMode("")).toBeNull();
     expect(parseRegistrationMode(42)).toBeNull();
+  });
+});
+
+describe("registrationModeFrom", () => {
+  it("reads the mode from a capabilities answer", () => {
+    expect(
+      registrationModeFrom({ password_reset_email: false, registration_mode: "closed" }),
+    ).toBe("sso_only");
+  });
+
+  it("is unknown for a failed lookup or an API without the field", () => {
+    expect(registrationModeFrom(null)).toBeNull();
+    expect(registrationModeFrom({ password_reset_email: true })).toBeNull();
   });
 });
 

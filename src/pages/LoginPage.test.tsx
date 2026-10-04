@@ -276,12 +276,19 @@ describe("LoginPage", () => {
       expect(screen.getByRole("button", { name: "Log in" })).toBeTruthy();
     });
 
-    it("points to SSO instead of the form in closed mode", () => {
-      registrationMode = "closed";
+    it.each(["sso_only", "closed"])("points to SSO instead of the form in %s mode", (value) => {
+      registrationMode = value;
       render(<LoginPage />);
       expect(screen.queryByRole("button", { name: "Create one" })).toBeNull();
       expect(screen.getByText(/Sign-up is turned off/)).toBeTruthy();
       expect(screen.getByText(/Sign in with SSO below/)).toBeTruthy();
+    });
+
+    it("treats an unknown mode as invite-only, never as open", () => {
+      registrationMode = "approval";
+      render(<LoginPage />);
+      expect(screen.queryByRole("button", { name: "Create one" })).toBeNull();
+      expect(screen.getByText(/created by invitation/)).toBeTruthy();
     });
 
     it("falls back to sign-up when the capabilities lookup fails", () => {

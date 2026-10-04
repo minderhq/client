@@ -30,6 +30,7 @@ describe("LoginPage capabilities", () => {
     ["open", "Create one"],
     ["invite", /created by invitation/],
     ["closed", /Sign-up is turned off/],
+    ["sso_only", /Sign-up is turned off/],
     ["something-new", /created by invitation/],
   ])("makes one request and follows registration_mode %j", async (mode, text) => {
     apiFetch.mockResolvedValue({

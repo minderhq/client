@@ -33,7 +33,7 @@ import {
  * The "Create one" form follows the instance's registration mode: shown in
  * `open` mode (or when the API doesn't report a mode), replaced by an
  * "accounts are by invitation" note in `invite` mode, and by an SSO/admin
- * pointer in `closed` mode. A page that sends the user here can pass
+ * pointer in `sso_only` mode (reported as `closed`). A page that sends the user here can pass
  * `state.from` (an in-app path) to come back to after signing in. */
 export function LoginPage() {
   const { isAuthenticated, login, register } = useAuth();
@@ -229,7 +229,7 @@ export function LoginPage() {
         </p>
       )}
 
-      {mode === "login" && signUpMode === "closed" && (
+      {mode === "login" && signUpMode === "sso_only" && (
         <p className="mt-3 text-center text-sm text-gray-600 dark:text-gray-400">
           No account yet? Sign-up is turned off on this instance.{" "}
           {oidcLoginUrl
@@ -243,7 +243,7 @@ export function LoginPage() {
       {(mode === "register" ||
         (!capabilitiesLoading &&
           signUpMode !== "invite" &&
-          signUpMode !== "closed")) && (
+          signUpMode !== "sso_only")) && (
         <p className="mt-3 text-center text-sm text-gray-600 dark:text-gray-400">
           {mode === "login" ? (
             <>

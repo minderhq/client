@@ -2,19 +2,24 @@ import { ApiError, friendlyErrorMessage } from "./api";
 import { type AuthCapabilities, useAuthCapabilities } from "./passwordReset";
 
 /** How this instance admits new local accounts (`registration_mode` from the
- * public `GET /v1/auth/capabilities`):
- * - `open`   -- anyone may create an account on the login page;
- * - `invite` -- an account can only be created from an invite link;
- * - `closed` -- no local sign-up at all (SSO or admin-provisioned accounts). */
-export type RegistrationMode = "open" | "invite" | "closed";
+ * public `GET /v1/auth/capabilities`; ADR onboarding-registration-and-tier-limits,
+ * Decision 3):
+ * - `open`     -- anyone may create an account on the login page;
+ * - `invite`   -- an account can only be created from an invite link;
+ * - `sso_only` -- no local sign-up at all (SSO or admin-provisioned accounts).
+ *   The API reports it as `closed`, which stays a permanent alias. */
+export type RegistrationMode = "open" | "invite" | "sso_only";
 
 /** Reads the mode the API reports. Missing (an API that predates the field)
  * is `null` = unknown, and callers fall back to today's open behaviour (the
- * API still refuses with a 403 code we explain). Any other unrecognised value
- * is treated as `invite`, because that is how the API itself treats it. */
+ * API still refuses with a 403 code we explain). `closed` and `sso_only` are
+ * the same mode. Any other value is treated as `invite`, never as `open`:
+ * that is how an API without startup validation treats it, and it never
+ * offers a sign-up form the API would refuse. */
 export function parseRegistrationMode(value: unknown): RegistrationMode | null {
   if (typeof value !== "string" || !value) return null;
-  if (value === "open" || value === "closed") return value;
+  if (value === "open") return "open";
+  if (value === "sso_only" || value === "closed") return "sso_only";
   return "invite";
 }
 

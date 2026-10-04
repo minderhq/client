@@ -136,7 +136,7 @@ export function InviteRedeemPage() {
   const isOrg = !!info?.organization_id;
   const targetName = isOrg ? info?.org_name : info?.team_name;
   const targetRole = isOrg ? info?.org_role : info?.team_role;
-  const signUpAllowed = !registration.loading && registration.mode !== "closed";
+  const signUpAllowed = !registration.loading && registration.mode !== "sso_only";
 
   return (
     <div className="mx-auto max-w-md">
@@ -270,7 +270,7 @@ export function InviteRedeemPage() {
                 />
               )}
 
-              {!registration.loading && registration.mode === "closed" && (
+              {!registration.loading && registration.mode === "sso_only" && (
                 <InfoCallout icon="lock">
                   New accounts can't be created here on this instance.{" "}
                   {oidcLoginUrl

@@ -181,7 +181,7 @@ describe("InviteRedeemPage", () => {
     });
 
     it("offers no form on a closed instance, and points to SSO", async () => {
-      registrationState = { mode: "closed", loading: false };
+      registrationState = { mode: "sso_only", loading: false };
       oidcLoginUrl = "https://sso.example.com/authorize";
       await openAsNewcomer();
       expect(screen.queryByRole("button", { name: "Create account & join" })).toBeNull();
@@ -190,7 +190,7 @@ describe("InviteRedeemPage", () => {
     });
 
     it("points to an administrator on a closed instance without SSO", async () => {
-      registrationState = { mode: "closed", loading: false };
+      registrationState = { mode: "sso_only", loading: false };
       await openAsNewcomer();
       expect(screen.getByText(/Ask an administrator to create an account/)).toBeTruthy();
     });
