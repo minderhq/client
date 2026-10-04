@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { badgeTone, confidenceBadgeColor, sectionLabelClass, statusClass } from "./ui";
+import {
+  badgeTone,
+  confidenceBadgeColor,
+  pageEnterClass,
+  sectionLabelClass,
+  statusClass,
+} from "./ui";
 
 describe("confidenceBadgeColor", () => {
   it("maps high confidence (>= 0.8) to the success tone", () => {
@@ -39,5 +45,13 @@ describe("sectionLabelClass", () => {
 describe("statusClass", () => {
   it("has a dark-mode-specific error color -- plain text-red-600 with no dark variant failed WCAG AA contrast in dark mode per an axe-core audit (#509)", () => {
     expect(statusClass(true)).toContain("dark:text-red-400");
+  });
+});
+
+describe("pageEnterClass", () => {
+  // A transform left applied after the entrance animation would make the page
+  // the containing block for position:fixed overlays inside it (#86).
+  it("does not keep the animation's end state (no forwards/both fill)", () => {
+    expect(pageEnterClass).toMatch(/_backwards\]$/);
   });
 });
