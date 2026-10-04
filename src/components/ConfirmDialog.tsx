@@ -1,6 +1,7 @@
 import {
   type ReactNode,
   useCallback,
+  useEffect,
   useId,
   useLayoutEffect,
   useRef,
@@ -8,8 +9,10 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { lastInteractedElement, trackLastInteraction } from "../lib/lastInteraction";
 import { pushModalLayer } from "../lib/modalLayer";
 import { destructiveButtonClass, primaryButtonClass, secondaryButtonClass } from "../lib/ui";
+import { focusPageStart } from "../lib/useRouteFocus";
 
 interface ConfirmOptions {
   title: string;
@@ -26,7 +29,9 @@ interface ConfirmOptions {
 interface PendingConfirm extends ConfirmOptions {
   resolve: (value: boolean) => void;
   /** What had focus when confirm() was called -- usually the button that
-   * asked -- so closing the dialog can put focus back there. */
+   * asked -- so closing the dialog can put focus back there. Where a click
+   * doesn't focus the button (Safari, Firefox on macOS), the element last
+   * pressed instead. */
   returnFocusTo: HTMLElement | null;
 }
 
@@ -44,9 +49,10 @@ interface PendingConfirm extends ConfirmOptions {
  * The dialog is portalled into <body>, so its fixed backdrop covers the whole
  * viewport (sidebar and header included) wherever `dialog` is placed, and the
  * rest of the app is `inert` while it is open (see lib/modalLayer.ts). On
- * close, focus goes back to whatever had it when confirm() was called, before
- * the returned promise resolves -- so a caller that moves focus after the
- * `await` still wins.
+ * close, focus goes back to whatever had it when confirm() was called (or, if
+ * that is gone or disabled, to the page's heading, as after a navigation),
+ * before the returned promise resolves -- so a caller that moves focus after
+ * the `await` still wins.
  */
 export function useConfirm() {
   const [pending, setPending] = useState<PendingConfirm | null>(null);
@@ -57,10 +63,14 @@ export function useConfirm() {
   const descriptionId = useId();
   const open = pending !== null;
 
+  useEffect(() => trackLastInteraction(), []);
+
   const confirm = useCallback((options: ConfirmOptions) => {
     const active = document.activeElement;
     const returnFocusTo =
-      active instanceof HTMLElement && active !== document.body ? active : null;
+      active instanceof HTMLElement && active !== document.body
+        ? active
+        : lastInteractedElement();
     return new Promise<boolean>((resolve) => {
       setPending({ ...options, resolve, returnFocusTo });
     });
@@ -83,10 +93,19 @@ export function useConfirm() {
     if (!pending) return;
     // Lift `inert` first: an inert element can't take focus.
     releaseLayerRef.current?.();
-    const target = pending.returnFocusTo;
-    if (target?.isConnected) target.focus();
+    returnFocus(pending.returnFocusTo);
     pending.resolve(result);
     setPending(null);
+  }
+
+  /** Focus `target`; if it can't take focus (removed, disabled, hidden) and
+   * focus would otherwise drop to <body>, go to the page's heading instead
+   * -- the same place a navigation puts it (lib/useRouteFocus.ts). */
+  function returnFocus(target: HTMLElement | null) {
+    if (target?.isConnected) target.focus();
+    if (target && document.activeElement === target) return;
+    const main = document.querySelector("main");
+    if (main) focusPageStart(main);
   }
 
   /** Keep Tab/Shift+Tab cycling within the dialog's two buttons instead of

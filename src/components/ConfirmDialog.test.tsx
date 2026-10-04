@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { StrictMode, useState } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useConfirm } from "./ConfirmDialog";
 
@@ -34,8 +34,15 @@ function Harness({
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   document.title = "";
 });
+
+/** How many times `method` wrote the `inert` attribute on `el`. */
+function inertWrites(spy: { mock: { calls: unknown[][]; contexts: unknown[] } }, el: Element) {
+  return spy.mock.calls.filter((args, i) => args[0] === "inert" && spy.mock.contexts[i] === el)
+    .length;
+}
 
 describe("useConfirm", () => {
   it("renders no dialog until confirm() is called", () => {
@@ -306,6 +313,8 @@ describe("useConfirm inert", () => {
   });
 
   it("applies and removes inert exactly once under StrictMode", async () => {
+    const set = vi.spyOn(Element.prototype, "setAttribute");
+    const remove = vi.spyOn(Element.prototype, "removeAttribute");
     const { container } = render(
       <StrictMode>
         <Harness />
@@ -314,12 +323,61 @@ describe("useConfirm inert", () => {
     fireEvent.click(screen.getByText("Trigger"));
     await screen.findByRole("alertdialog");
     expect(container.hasAttribute("inert")).toBe(true);
+    expect(inertWrites(set, container)).toBe(1);
+    expect(inertWrites(remove, container)).toBe(0);
 
     fireEvent.keyDown(screen.getByRole("presentation"), { key: "Escape" });
 
     expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(container.hasAttribute("inert")).toBe(false);
+    expect(inertWrites(set, container)).toBe(1);
+    expect(inertWrites(remove, container)).toBe(1);
     await waitFor(() => expect(document.title).toBe("result:false"));
+  });
+
+  it("lets go of a lower dialog closed under an open one at once (out-of-order close)", async () => {
+    const { container } = render(<TwoDialogs />);
+    fireEvent.click(screen.getByText("Open first"));
+    const first = await screen.findByRole("alertdialog");
+    const firstBackdrop = backdropOf(first);
+    fireEvent.click(screen.getByText("Open second"));
+    const second = screen.getAllByRole("alertdialog").find((d) => d !== first)!;
+    expect(firstBackdrop.hasAttribute("inert")).toBe(true);
+
+    // Close the LOWER one first (a test can click through inert).
+    fireEvent.click(within(first).getByRole("button", { name: "Cancel" }));
+
+    expect(firstBackdrop.isConnected).toBe(false);
+    expect(firstBackdrop.hasAttribute("inert")).toBe(false);
+    expect(container.hasAttribute("inert")).toBe(true);
+    expect(backdropOf(second).hasAttribute("inert")).toBe(false);
+
+    fireEvent.click(within(second).getByRole("button", { name: "Cancel" }));
+    expect(container.hasAttribute("inert")).toBe(false);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("leaves inert that other code sets while a dialog is open", async () => {
+    const { container } = render(<Harness />);
+    const late = document.createElement("div");
+    try {
+      fireEvent.click(screen.getByText("Trigger"));
+      await screen.findByRole("alertdialog");
+
+      // Other code inerts the page itself (already inert by us) and an
+      // element added while the dialog is open.
+      container.setAttribute("inert", "");
+      document.body.appendChild(late);
+      late.setAttribute("inert", "");
+
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+      expect(container.hasAttribute("inert")).toBe(true);
+      expect(late.hasAttribute("inert")).toBe(true);
+    } finally {
+      container.removeAttribute("inert");
+      late.remove();
+    }
   });
 
   it("keeps only the top dialog interactive when two are open", async () => {
@@ -359,6 +417,30 @@ describe("useConfirm inert", () => {
     }
   });
 });
+
+/** A trigger that disappears, or is disabled, while its dialog is open --
+ * e.g. a row removed by a refresh, or the bundle import's busy file input. */
+function VanishingTrigger({ mode }: { mode: "removed" | "disabled" }) {
+  const { confirm, dialog } = useConfirm();
+  const [busy, setBusy] = useState(false);
+  return (
+    <main>
+      <h1>Bundles</h1>
+      {dialog}
+      {!(mode === "removed" && busy) && (
+        <button
+          disabled={mode === "disabled" && busy}
+          onClick={async () => {
+            setBusy(true);
+            await confirm({ title: "Go?", message: "Really." });
+          }}
+        >
+          Trigger
+        </button>
+      )}
+    </main>
+  );
+}
 
 describe("useConfirm focus return", () => {
   for (const [how, close] of [
@@ -410,6 +492,53 @@ describe("useConfirm focus return", () => {
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByLabelText("Elsewhere")),
     );
+  });
+
+  for (const mode of ["removed", "disabled"] as const) {
+    it(`falls back to the page heading when the trigger was ${mode}`, async () => {
+      render(<VanishingTrigger mode={mode} />);
+      const trigger = screen.getByText("Trigger");
+      trigger.focus();
+      fireEvent.click(trigger);
+      await screen.findByRole("alertdialog");
+
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+      const heading = screen.getByRole("heading", { name: "Bundles" });
+      expect(document.activeElement).toBe(heading);
+      expect(heading.getAttribute("tabindex")).toBe("-1");
+    });
+  }
+
+  it("returns focus to the pressed button when the click didn't focus it (Safari)", async () => {
+    render(<Harness />);
+    const trigger = screen.getByText("Trigger");
+    const inner = document.createElement("span");
+    trigger.appendChild(inner);
+    // Safari / macOS Firefox: pointerdown + click, but the button never takes
+    // focus, so activeElement is <body> when confirm() runs.
+    fireEvent.pointerDown(inner);
+    fireEvent.click(trigger);
+    expect(document.activeElement).not.toBe(trigger);
+    await screen.findByRole("alertdialog");
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("installs one pair of tracking listeners for any number of dialogs and removes them", () => {
+    const add = vi.spyOn(document, "addEventListener");
+    const remove = vi.spyOn(document, "removeEventListener");
+    const count = (spy: typeof add) =>
+      spy.mock.calls.filter(([type]) => type === "pointerdown" || type === "focusin").length;
+
+    const { unmount } = render(<TwoDialogs />);
+    expect(count(add)).toBe(2);
+    expect(count(remove)).toBe(0);
+
+    unmount();
+    expect(count(remove)).toBe(2);
   });
 
   it("does not move focus when the owner unmounts with the dialog open", async () => {
