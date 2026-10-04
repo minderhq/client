@@ -715,6 +715,12 @@ export function AvailablePluginsPage() {
   // loaded ones. Null when no source is selected (or one the server can't
   // filter, which then falls back to the client-side pass below).
   const originParam = serverOriginFilter(source);
+  // The `origin` each loaded row was requested with. After a filter change the
+  // previous (unfiltered) rows stay in state until the new first page lands;
+  // only rows fetched WITH the current origin can show that the server ignored
+  // it. Keyed by the row object, so a superseded response can't mislabel the
+  // rows that are actually shown.
+  const requestedOriginRef = useRef(new WeakMap<CatalogPlugin, string | null>());
   const fetchPluginsPage = useCallback(
     async (nextOffset: number) => {
       let path: string;
@@ -730,6 +736,7 @@ export function AvailablePluginsPage() {
       }
       if (originParam) path += `&origin=${encodeURIComponent(originParam)}`;
       const res = await apiFetch<CatalogPluginListResponse>(path);
+      for (const row of res.plugins) requestedOriginRef.current.set(row, originParam);
       return { items: res.plugins, total: res.total };
     },
     [query, pricingModel, originParam],
@@ -831,11 +838,17 @@ export function AvailablePluginsPage() {
     matchesSourceFilter(resolveCatalogSource(plugin), source),
   );
   // The source filter only covers the loaded pages when the server couldn't
-  // apply it: the source has no `origin` mapping, or a row of another origin
-  // came back (an older marketplace that ignores the param).
+  // apply it: the source has no `origin` mapping, or a row requested with this
+  // origin came back with another one (an older marketplace that ignores the
+  // param). Rows still left from the previous request don't count.
   const sourceLoadedPagesOnly =
     source !== null &&
-    (originParam === null || plugins.some((plugin) => plugin.origin !== originParam));
+    (originParam === null ||
+      plugins.some(
+        (plugin) =>
+          requestedOriginRef.current.get(plugin) === originParam &&
+          plugin.origin !== originParam,
+      ));
   const filtersActive = !!(pricingModel || source);
   // A failed first page (or a failed new search/filter) leaves the previous
   // results in state; they no longer answer the current query, so the error

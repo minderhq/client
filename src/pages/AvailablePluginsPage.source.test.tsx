@@ -235,8 +235,11 @@ describe("Browse source filter", () => {
     await waitFor(() => expect(catalogPaths().at(-1)).not.toContain("origin="));
   });
 
-  it.each(["bogus", "private", "manifest"])(
-    "treats ?source=%s as All (old Private git links included)",
+  // Regression: #2193 shared Private git links as ?source=private. Nothing
+  // can match it on Discover since #2219, so it must open on All sources (no
+  // origin param), not on an empty list.
+  it.each(["private", "bogus", "manifest"])(
+    "opens ?source=%s on All sources",
     async (value) => {
       mockCatalog([FIRST, THIRD_PARTY_REPO]);
       renderAt(`/plugins/available?source=${value}`);
@@ -255,6 +258,37 @@ describe("Browse source filter", () => {
     expect(await screen.findByText("No plugins match the selected filters.")).toBeTruthy();
     expect(screen.queryByText("Featured First")).toBeNull();
     expect(screen.queryByText("Weather")).toBeNull();
+  });
+
+  it("doesn't flash the 'can't filter' caveat while the filtered page is in flight", async () => {
+    // A #2219 backend: the filtered page will only hold submitted rows, but
+    // until it lands the previous unfiltered rows (every origin) are still in
+    // state. They weren't requested with origin=submitted, so they prove
+    // nothing about the server.
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const all = [FIRST, THIRD_PARTY_REPO, SUBMITTED];
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path.startsWith("/v1/marketplace/plugins/featured")) return { plugins: [], total: 0 };
+      const origin = new URL(path, "http://x").searchParams.get("origin");
+      if (!origin) return { plugins: all, total: all.length };
+      await gate;
+      const rows = all.filter((p) => p.origin === origin);
+      return { plugins: rows, total: rows.length };
+    });
+    renderAt("/plugins/available");
+    await screen.findByText("Weather");
+
+    fireEvent.change(screen.getByLabelText("Filter by source"), {
+      target: { value: "submitted" },
+    });
+    await waitFor(() => expect(catalogPaths().at(-1)).toContain("origin=submitted"));
+    expect(screen.queryByText(/can't filter by source/)).toBeNull();
+    expect(screen.getByLabelText("Filter by source").getAttribute("aria-describedby")).toBeNull();
+
+    release();
+    await waitFor(() => expect(headings()).toEqual(["Jokes"]));
+    expect(screen.queryByText(/can't filter by source/)).toBeNull();
   });
 
   describe("on a marketplace without the origin filter (older backend)", () => {
