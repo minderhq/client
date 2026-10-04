@@ -95,8 +95,9 @@ function renderAt(url: string) {
   );
 }
 
+/** Plugin card titles: cards are h3s under the page's h2 sections (#2195). */
 function headings() {
-  return screen.queryAllByRole("heading", { level: 2 }).map((h) => h.textContent?.trim());
+  return screen.queryAllByRole("heading", { level: 3 }).map((h) => h.textContent?.trim());
 }
 
 afterEach(() => {

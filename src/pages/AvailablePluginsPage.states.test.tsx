@@ -1,0 +1,580 @@
+// Loading / empty / error states, recoverable secondary failures, accessible
+// names and recommendation links on Discover plugins (#2195), against a real
+// router so ?q= deep links are exercised end to end.
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import {
+  BrowserRouter,
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import type { CatalogPlugin } from "../lib/marketplace";
+import type { Installation } from "../lib/types";
+import { AvailablePluginsPage } from "./AvailablePluginsPage";
+
+const apiFetch = vi.fn();
+vi.mock("../lib/api", () => ({
+  apiFetch: (...args: unknown[]) => apiFetch(...args),
+  friendlyErrorMessage: (e: unknown) => (e instanceof Error ? e.message : "error"),
+}));
+let mockAuth = { token: "", isAuthenticated: false, role: null as string | null, sessionKey: 0 };
+vi.mock("../lib/auth", () => ({ useAuth: () => mockAuth }));
+vi.mock("../components/ConfirmDialog", () => ({
+  useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true), dialog: null }),
+}));
+
+function plugin(overrides: Partial<CatalogPlugin>): CatalogPlugin {
+  return {
+    id: "p",
+    name: "p",
+    display_name: "P",
+    description: null,
+    author: "Someone",
+    repository_url: null,
+    distribution_type: "git",
+    docker_image: null,
+    current_version: "1.0.0",
+    pricing_model: "free",
+    base_tier: "community",
+    status: "approved",
+    featured: false,
+    download_count: 0,
+    rating_average: null,
+    rating_count: 0,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+    published_at: null,
+    developer_id: null,
+    category_id: null,
+    requires_services: [],
+    screenshots: [],
+    origin: "first_party",
+    ...overrides,
+  };
+}
+
+function installation(pluginId: string, enabled = true): Installation {
+  return {
+    installation_id: `i-${pluginId}`,
+    plugin_id: pluginId,
+    version: "1.0.0",
+    status: "active",
+    enabled,
+    installed_at: "2026-01-01T00:00:00Z",
+    last_updated_at: "2026-01-01T00:00:00Z",
+    name: pluginId,
+    display_name: pluginId,
+    description: null,
+    current_version: "1.0.0",
+    pricing_model: "free",
+    base_tier: "community",
+    category_id: null,
+    author: null,
+    requires_services: [],
+  };
+}
+
+const WEATHER = plugin({ id: "w", name: "weather", display_name: "Weather" });
+const NEWS = plugin({ id: "n", name: "news", display_name: "News" });
+
+function deferred<T>() {
+  let resolve!: (v: T) => void;
+  let reject!: (e: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+type Handler = (path: string, opts?: { method?: string }) => unknown;
+
+/** Routes apiFetch by path. Each handler may return a value, a promise, or
+ * throw; unknown paths resolve to an empty catalog page. */
+function routeApi(handlers: {
+  featured?: Handler;
+  catalog?: Handler;
+  search?: Handler;
+  installations?: Handler;
+  recommendations?: Handler;
+}) {
+  apiFetch.mockImplementation(async (path: string, opts?: { method?: string }) => {
+    if (path.startsWith("/v1/marketplace/plugins/featured"))
+      return handlers.featured ? handlers.featured(path, opts) : { plugins: [], total: 0 };
+    if (path.startsWith("/v1/marketplace/plugins/search"))
+      return handlers.search ? handlers.search(path, opts) : { plugins: [], total: 0 };
+    if (path.startsWith("/v1/marketplace/plugins"))
+      return handlers.catalog ? handlers.catalog(path, opts) : { plugins: [], total: 0 };
+    if (path.startsWith("/v1/marketplace/installations/me"))
+      return handlers.installations
+        ? handlers.installations(path, opts)
+        : { installations: [], count: 0 };
+    if (path.startsWith("/v1/graph/recommendations"))
+      return handlers.recommendations
+        ? handlers.recommendations(path, opts)
+        : { recommendations: [] };
+    return {};
+  });
+}
+
+let location = "";
+let navigate: ReturnType<typeof useNavigate> | null = null;
+function LocationProbe() {
+  location = useLocation().search;
+  navigate = useNavigate();
+  return null;
+}
+
+function renderAt(url = "/discover") {
+  return render(
+    <MemoryRouter initialEntries={[url]}>
+      <Routes>
+        <Route
+          path="/discover"
+          element={
+            <>
+              <AvailablePluginsPage />
+              <LocationProbe />
+            </>
+          }
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+const EMPTY_COPY = "No plugins in the catalog yet.";
+
+afterEach(() => {
+  cleanup();
+  apiFetch.mockReset();
+  location = "";
+  mockAuth = { token: "", isAuthenticated: false, role: null, sessionKey: 0 };
+});
+
+describe("Discover plugins: catalog states", () => {
+  it("shows a skeleton, not the empty state, while the first page is loading", async () => {
+    const page = deferred<unknown>();
+    routeApi({ catalog: () => page.promise });
+    renderAt();
+
+    expect(screen.getByTestId("card-list-skeleton")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("Loading plugins…");
+    expect(screen.queryByText(EMPTY_COPY)).toBeNull();
+
+    await act(async () => page.resolve({ plugins: [WEATHER], total: 1 }));
+    expect(screen.queryByTestId("card-list-skeleton")).toBeNull();
+    expect(screen.getByRole("heading", { level: 3, name: "Weather" })).toBeTruthy();
+    expect(screen.queryByText(EMPTY_COPY)).toBeNull();
+  });
+
+  it("shows the empty state only after a successful empty load", async () => {
+    routeApi({ catalog: () => ({ plugins: [], total: 0 }) });
+    renderAt();
+
+    expect(await screen.findByText(EMPTY_COPY)).toBeTruthy();
+    expect(screen.queryByTestId("card-list-skeleton")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("shows a distinct error with Retry on failure -- never the empty state -- and recovers", async () => {
+    let fail = true;
+    routeApi({
+      catalog: () => {
+        if (fail) throw new Error("Marketplace is unavailable");
+        return { plugins: [WEATHER], total: 1 };
+      },
+    });
+    renderAt();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't load the plugin catalog.");
+    expect(alert.textContent).toContain("Marketplace is unavailable");
+    expect(screen.queryByText(EMPTY_COPY)).toBeNull();
+    expect(screen.queryByTestId("card-list-skeleton")).toBeNull();
+
+    fail = false;
+    fireEvent.click(screen.getByRole("button", { name: "Retry loading the plugin catalog" }));
+
+    expect(await screen.findByRole("heading", { level: 3, name: "Weather" })).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("replaces stale results with the error when a new search fails", async () => {
+    routeApi({
+      catalog: () => ({ plugins: [WEATHER], total: 1 }),
+      search: () => {
+        throw new Error("Search is down");
+      },
+    });
+    renderAt();
+    await screen.findByRole("heading", { level: 3, name: "Weather" });
+
+    fireEvent.change(screen.getByLabelText("Search plugins"), { target: { value: "news" } });
+
+    const alert = await screen.findByRole("alert", undefined, { timeout: 1500 });
+    expect(alert.textContent).toContain("Couldn't search the plugin catalog.");
+    // Weather answered the previous query, not this one.
+    expect(screen.queryByRole("heading", { level: 3, name: "Weather" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Retry loading search results" })).toBeTruthy();
+  });
+
+  it("shows a skeleton -- not the previous query's cards -- while retrying a failed search", async () => {
+    let searchCalls = 0;
+    const retry = deferred<unknown>();
+    routeApi({
+      catalog: () => ({ plugins: [WEATHER], total: 1 }),
+      search: () => {
+        searchCalls += 1;
+        if (searchCalls === 1) throw new Error("Search is down");
+        return retry.promise;
+      },
+    });
+    renderAt();
+    await screen.findByRole("heading", { level: 3, name: "Weather" });
+
+    fireEvent.change(screen.getByLabelText("Search plugins"), { target: { value: "news" } });
+    await screen.findByRole("alert", undefined, { timeout: 1500 });
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry loading search results" }));
+
+    // Retry in flight: the error is gone, but Weather answered the old query.
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByRole("heading", { level: 3, name: "Weather" })).toBeNull();
+    expect(screen.getByTestId("card-list-skeleton")).toBeTruthy();
+
+    await act(async () => retry.resolve({ plugins: [NEWS], total: 1 }));
+    expect(screen.getByRole("heading", { level: 3, name: "News" })).toBeTruthy();
+    expect(screen.queryByTestId("card-list-skeleton")).toBeNull();
+  });
+
+  it("keeps loaded plugins when Load more fails, and Retry appends the missing page", async () => {
+    let failMore = true;
+    routeApi({
+      catalog: (path) => {
+        const offset = Number(new URL(path, "http://x").searchParams.get("offset"));
+        if (offset === 0) return { plugins: [WEATHER], total: 2 };
+        if (failMore) throw new Error("Timed out");
+        return { plugins: [NEWS], total: 2 };
+      },
+    });
+    renderAt();
+    await screen.findByRole("heading", { level: 3, name: "Weather" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't load more plugins.");
+    expect(screen.getByRole("heading", { level: 3, name: "Weather" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Load more" })).toBeNull();
+
+    failMore = false;
+    fireEvent.click(screen.getByRole("button", { name: "Retry loading more plugins" }));
+    expect(await screen.findByRole("heading", { level: 3, name: "News" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 3, name: "Weather" })).toBeTruthy();
+  });
+});
+
+describe("Discover plugins: secondary failures stay quiet and recoverable", () => {
+  it("a featured failure shows a quiet notice with Retry and leaves the catalog usable", async () => {
+    let failFeatured = true;
+    routeApi({
+      featured: () => {
+        if (failFeatured) throw new Error("Featured service down");
+        return { plugins: [NEWS], total: 1 };
+      },
+      catalog: () => ({ plugins: [WEATHER, NEWS], total: 2 }),
+    });
+    renderAt();
+
+    await screen.findByRole("heading", { level: 3, name: "Weather" });
+    const notice = await screen.findByText(/Featured plugins couldn't be loaded/);
+    expect(notice.closest("[role='status']")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull(); // not a blocking error
+    expect(notice.closest("[role='status']")!.textContent).toContain("Featured service down");
+
+    failFeatured = false;
+    fireEvent.click(screen.getByRole("button", { name: "Retry loading featured plugins" }));
+
+    expect(await screen.findByRole("heading", { level: 2, name: "Featured" })).toBeTruthy();
+    expect(screen.queryByText(/Featured plugins couldn't be loaded/)).toBeNull();
+  });
+
+  it("a recommendations failure shows a quiet notice with Retry", async () => {
+    mockAuth = { token: "tok", isAuthenticated: true, role: "user", sessionKey: 1 };
+    let failRecs = true;
+    routeApi({
+      catalog: () => ({ plugins: [WEATHER], total: 1 }),
+      installations: () => ({ installations: [installation("w")], count: 1 }),
+      recommendations: () => {
+        if (failRecs) throw new Error("Graph unavailable");
+        return { recommendations: [{ plugin_id: "n", name: "News", score: 1 }] };
+      },
+    });
+    renderAt();
+
+    const notice = await screen.findByText(/Recommendations couldn't be loaded/);
+    expect(notice.closest("[role='status']")!.textContent).toContain("Graph unavailable");
+    expect(screen.getByRole("heading", { level: 3, name: "Weather" })).toBeTruthy();
+
+    failRecs = false;
+    fireEvent.click(screen.getByRole("button", { name: "Retry loading recommendations" }));
+
+    expect(await screen.findByRole("link", { name: "News" })).toBeTruthy();
+    expect(screen.queryByText(/Recommendations couldn't be loaded/)).toBeNull();
+  });
+
+  it("an installations failure says install state may be stale, with Retry", async () => {
+    mockAuth = { token: "tok", isAuthenticated: true, role: "user", sessionKey: 1 };
+    let failInstalls = true;
+    routeApi({
+      catalog: () => ({ plugins: [WEATHER], total: 1 }),
+      installations: () => {
+        if (failInstalls) throw new Error("Unauthorized");
+        return { installations: [installation("w")], count: 1 };
+      },
+    });
+    renderAt();
+
+    expect(await screen.findByText(/install state on these cards may be out of date/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Install Weather" })).toBeTruthy();
+
+    failInstalls = false;
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retry loading your installed plugins" }),
+    );
+    expect(await screen.findByRole("button", { name: "Disable Weather" })).toBeTruthy();
+    expect(screen.queryByText(/may be out of date/)).toBeNull();
+  });
+});
+
+describe("Discover plugins: accessible names, badges and headings", () => {
+  it("names every card action after its plugin", async () => {
+    mockAuth = { token: "tok", isAuthenticated: true, role: "admin", sessionKey: 1 };
+    routeApi({
+      catalog: () => ({
+        plugins: [WEATHER, { ...NEWS, repository_url: "https://example.com/news" }],
+        total: 2,
+      }),
+      installations: () => ({ installations: [installation("n", false)], count: 1 }),
+    });
+    renderAt();
+    await screen.findByRole("button", { name: "Enable News" });
+
+    const weather = screen.getByRole("heading", { name: "Weather" }).closest("section")!;
+    expect(within(weather).getByRole("button", { name: "Install Weather" })).toBeTruthy();
+    const depsSummary = within(weather).getByText("Dependencies & conflicts", { selector: "summary" });
+    expect(depsSummary.getAttribute("aria-label")).toBe("Dependencies & conflicts for Weather");
+    expect(
+      within(weather).getByText("Ratings & reviews", { selector: "summary", exact: false })
+        .textContent,
+    ).toBe("Ratings & reviews for Weather");
+
+    const news = screen.getByRole("heading", { name: "News" }).closest("section")!;
+    expect(within(news).getByRole("button", { name: "Enable News" })).toBeTruthy();
+    expect(within(news).getByRole("button", { name: "Uninstall News" })).toBeTruthy();
+    expect(within(news).getByRole("link", { name: /^Repository/ }).getAttribute("aria-label")).toBe(
+      "Repository for News (opens in a new tab)",
+    );
+    const repoSummary = within(news).getByText("Install from this repo", { selector: "summary" });
+    expect(repoSummary.getAttribute("aria-label")).toBe("Install from this repo: News");
+    // The disclosure and its submit button must not share a name.
+    expect(
+      within(news).getByRole("button", { name: "Install News from this repo" }).textContent,
+    ).toBe("Install from this repo");
+
+    // No action button on the page is left with a bare, ambiguous verb.
+    const bare = screen
+      .getAllByRole("button")
+      .map((b) => b.getAttribute("aria-label") ?? b.textContent ?? "")
+      .filter((name) => /^(Install|Enable|Disable|Uninstall)$/.test(name.trim()));
+    expect(bare).toEqual([]);
+  });
+
+  it("uses text + icon badges for featured and install state, not emoji", async () => {
+    mockAuth = { token: "tok", isAuthenticated: true, role: "user", sessionKey: 1 };
+    routeApi({
+      catalog: () => ({ plugins: [{ ...WEATHER, featured: true }], total: 1 }),
+      installations: () => ({ installations: [installation("w", true)], count: 1 }),
+    });
+    const { container } = renderAt();
+    const card = (await screen.findByRole("heading", { name: "Weather" })).closest("section")!;
+    await within(card).findByRole("button", { name: "Disable Weather" });
+
+    const featured = card.querySelector("[data-status-badge='Featured']")!;
+    expect(featured.textContent).toBe("Featured");
+    expect(featured.querySelector("svg")).toBeTruthy();
+    const installState = card.querySelector("[data-status-badge='Your install: Enabled']")!;
+    expect(installState.textContent).toBe("Your install: Enabled");
+    // The badge sits beside the title, so the heading's name is just the plugin.
+    expect(screen.getByRole("heading", { level: 3, name: "Weather" })).toBeTruthy();
+    expect(container.textContent).not.toMatch(/[⭐✓✅]/u);
+  });
+
+  it("nests plugin cards (h3) under the page's h2 sections", async () => {
+    routeApi({
+      featured: () => ({ plugins: [NEWS], total: 1 }),
+      catalog: () => ({ plugins: [WEATHER, NEWS], total: 2 }),
+    });
+    renderAt();
+    await screen.findByRole("heading", { level: 2, name: "Featured" });
+    await screen.findByRole("heading", { level: 3, name: "Weather" });
+
+    const levels = screen
+      .getAllByRole("heading")
+      .map((h) => `${h.tagName}:${h.textContent?.trim()}`);
+    expect(levels).toEqual([
+      "H1:Discover plugins",
+      "H2:Featured",
+      "H3:News",
+      "H2:All plugins",
+      "H3:Weather",
+    ]);
+  });
+});
+
+describe("Discover plugins: aria-describedby targets", () => {
+  it("gives every card its own description id -- unique, resolvable, inside that card", async () => {
+    const cards = [WEATHER, NEWS, plugin({ id: "c", name: "crm", display_name: "CRM" })];
+    routeApi({ catalog: () => ({ plugins: cards, total: 3 }) }); // logged out
+    const { container } = renderAt();
+    await screen.findByRole("heading", { level: 3, name: "CRM" });
+
+    // No id appears twice anywhere on the page.
+    const ids = Array.from(container.querySelectorAll("[id]")).map((el) => el.id);
+    expect(new Set(ids).size).toBe(ids.length);
+
+    const describedIds = cards.map((p) => {
+      const button = screen.getByRole("button", { name: `Install ${p.display_name}` });
+      const id = button.getAttribute("aria-describedby")!;
+      const target = document.getElementById(id)!;
+      expect(target.textContent).toBe("Log in to install");
+      // The hint described for a card's button is that card's own hint.
+      expect(button.closest("section")!.contains(target)).toBe(true);
+      return id;
+    });
+    expect(new Set(describedIds).size).toBe(cards.length);
+  });
+});
+
+describe("Discover plugins: recommendation links", () => {
+  it("links each recommendation to Discover searched for it, and runs that search", async () => {
+    mockAuth = { token: "tok", isAuthenticated: true, role: "user", sessionKey: 1 };
+    routeApi({
+      catalog: () => ({ plugins: [WEATHER], total: 1 }),
+      search: (path) =>
+        new URL(path, "http://x").searchParams.get("q") === "News Digest"
+          ? { plugins: [{ ...NEWS, display_name: "News Digest" }], total: 1 }
+          : { plugins: [], total: 0 },
+      installations: () => ({ installations: [installation("w")], count: 1 }),
+      recommendations: () => ({
+        recommendations: [{ plugin_id: "n", name: "News Digest", score: 1 }],
+      }),
+    });
+    renderAt("/discover?source=first-party");
+
+    const link = await screen.findByRole("link", { name: "News Digest" });
+    expect(link.getAttribute("href")).toBe("/discover?q=News+Digest");
+    expect(within(link.closest("div")!).getByRole("list")).toBeTruthy();
+
+    fireEvent.click(link);
+
+    await waitFor(() => expect(location).toBe("?q=News+Digest"));
+    expect((screen.getByLabelText("Search plugins") as HTMLInputElement).value).toBe(
+      "News Digest",
+    );
+    expect(
+      await screen.findByRole("heading", { level: 3, name: "News Digest" }, { timeout: 1500 }),
+    ).toBeTruthy();
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/v1/marketplace/plugins/search?q=News%20Digest&limit=20&offset=0",
+    );
+  });
+
+  it("mirrors the search into ?q= once typing settles, so a shared link reopens it", async () => {
+    routeApi({ catalog: () => ({ plugins: [WEATHER], total: 1 }) });
+    renderAt("/discover?source=first-party");
+    await screen.findByRole("heading", { level: 3, name: "Weather" });
+
+    fireEvent.change(screen.getByLabelText("Search plugins"), { target: { value: "wea" } });
+    // Not on the keystroke itself -- the write waits for the debounce.
+    expect(location).toBe("?source=first-party");
+    expect((screen.getByLabelText("Search plugins") as HTMLInputElement).value).toBe("wea");
+    await waitFor(() => expect(location).toBe("?source=first-party&q=wea"));
+
+    fireEvent.change(screen.getByLabelText("Search plugins"), { target: { value: "" } });
+    await waitFor(() => expect(location).toBe("?source=first-party"));
+  });
+
+  it("keeps an incoming ?q= -- the debounced mirror never writes a stale query back", async () => {
+    routeApi({
+      catalog: () => ({ plugins: [WEATHER], total: 1 }),
+      search: () => ({ plugins: [NEWS], total: 1 }),
+    });
+    renderAt("/discover");
+    await screen.findByRole("heading", { level: 3, name: "Weather" });
+
+    // A ?source= rewrite, then a push with a new ?q= (what a palette result
+    // or recommendation link on this page does).
+    fireEvent.change(screen.getByLabelText("Filter by source"), { target: { value: "first-party" } });
+    await waitFor(() => expect(location).toBe("?source=first-party"));
+    act(() => navigate!("/discover?source=first-party&q=news"));
+
+    // Straight away, not only after the debounce: a stale write would drop q
+    // for a moment and only restore it once the new query settles.
+    await act(async () => {});
+    expect(location).toBe("?source=first-party&q=news");
+    expect((screen.getByLabelText("Search plugins") as HTMLInputElement).value).toBe("news");
+    await new Promise((r) => setTimeout(r, 400)); // and still after it
+    expect(location).toBe("?source=first-party&q=news");
+  });
+
+  it("writes ?q= once per pause, replacing the entry: typing never grows the history", async () => {
+    routeApi({ catalog: () => ({ plugins: [WEATHER], total: 1 }) });
+    window.history.replaceState(null, "", "/discover");
+    const searches: string[] = [];
+    function SearchProbe() {
+      const { search } = useLocation();
+      if (searches[searches.length - 1] !== search) searches.push(search);
+      return null;
+    }
+    render(
+      <BrowserRouter>
+        <Routes>
+          <Route
+            path="/discover"
+            element={
+              <>
+                <AvailablePluginsPage />
+                <SearchProbe />
+              </>
+            }
+          />
+        </Routes>
+      </BrowserRouter>,
+    );
+    await screen.findByRole("heading", { level: 3, name: "Weather" });
+    const historyLength = window.history.length;
+
+    const input = screen.getByLabelText("Search plugins");
+    for (const value of ["w", "we", "wea", "weat", "weath"]) {
+      fireEvent.change(input, { target: { value } });
+    }
+    await waitFor(() => expect(window.location.search).toBe("?q=weath"));
+
+    expect(window.history.length).toBe(historyLength);
+    // One URL write for the burst of keystrokes, not one per character.
+    expect(searches).toEqual(["", "?q=weath"]);
+  });
+});

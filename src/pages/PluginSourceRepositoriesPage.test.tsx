@@ -240,6 +240,13 @@ describe("PluginSourceRepositoriesPage", () => {
     expect(screen.getByText("Plugins from this repository")).toBeTruthy();
     expect(await screen.findByText("Weather")).toBeTruthy();
     expect(screen.getByText("1 plugin")).toBeTruthy();
+    // The plugin cards (h3) nest under the "Plugins from this repository" h2.
+    const headings = screen
+      .getAllByRole("heading")
+      .map((h) => `${h.tagName}:${h.textContent?.trim()}`);
+    const section = headings.indexOf("H2:Plugins from this repository");
+    expect(section).toBeGreaterThan(-1);
+    expect(headings.indexOf("H3:Weather")).toBeGreaterThan(section);
   });
 
   it("treats a repository with zero linked plugins as empty, not an error (legacy/ungrouped case)", async () => {

@@ -1,13 +1,16 @@
+import { useId } from "react";
 import { Link } from "react-router-dom";
 
-import { BundleCard } from "../components/BundleCard";
+import { BundleAdminNote, BundleCard } from "../components/BundleCard";
+import { CardListSkeleton } from "../components/CardListSkeleton";
 import { EmptyState } from "../components/EmptyState";
 import { InfoCallout } from "../components/InfoCallout";
+import { LoadError } from "../components/LoadError";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { type BundlesResponse } from "../lib/bundles";
+import { BUNDLE_TOGGLE_ACTION, type BundlesResponse, bundleAdminReason } from "../lib/bundles";
 import { ROUTES } from "../lib/routes";
 import { useAsyncResource } from "../lib/useAsyncResource";
 
@@ -17,6 +20,8 @@ import { useAsyncResource } from "../lib/useAsyncResource";
 export function AvailableBundlesPage() {
   const { token, role } = useAuth();
   const isAdmin = role === "admin";
+  const adminNoteId = useId();
+  const adminReason = bundleAdminReason(isAdmin, !!token, BUNDLE_TOGGLE_ACTION);
   // Single whole-object read -> useAsyncResource (cancels on unmount, drops a
   // stale response). Enabling a bundle refreshes via reload(). #502
   const bundlesRes = useAsyncResource((signal) =>
@@ -37,11 +42,19 @@ export function AvailableBundlesPage() {
         shows as needing a host converge — run <code>./setup.sh start</code>{" "}
         or <code>./setup.sh restart</code> on the host to actually create it.
       </InfoCallout>
-      <StatusLine isError={!!bundlesRes.error}>
-        {bundlesRes.error ?? (bundlesRes.loading ? "Loading…" : "")}
-      </StatusLine>
+      <StatusLine>{bundlesRes.loading ? "Loading service bundles…" : ""}</StatusLine>
+      {bundlesRes.error && (
+        <LoadError
+          title="Couldn't load the service bundles."
+          message={bundlesRes.error}
+          what="service bundles"
+          onRetry={bundlesRes.reload}
+        />
+      )}
 
-      {bundlesRes.data && available.length === 0 && (
+      <h2 className="sr-only">Bundles you can enable</h2>
+      {bundlesRes.loading && !bundlesRes.data && <CardListSkeleton />}
+      {bundlesRes.data && !bundlesRes.error && available.length === 0 && (
         <EmptyState>
           Every service bundle is already enabled — see{" "}
           <Link to={ROUTES.installedServiceBundles} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
@@ -50,6 +63,9 @@ export function AvailableBundlesPage() {
           .
         </EmptyState>
       )}
+      {adminReason && available.length > 0 && (
+        <BundleAdminNote id={adminNoteId} reason={adminReason} />
+      )}
       {available.map((b) => (
         <BundleCard
           key={b.name}
@@ -57,6 +73,7 @@ export function AvailableBundlesPage() {
           token={token}
           isAdmin={isAdmin}
           onChanged={bundlesRes.reload}
+          adminNoteId={adminReason ? adminNoteId : undefined}
         />
       ))}
     </>

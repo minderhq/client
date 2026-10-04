@@ -1,13 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
+import { CardListSkeleton } from "../components/CardListSkeleton";
 import { Icon } from "../components/Icon";
 import { useConfirm } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
+import { LoadError } from "../components/LoadError";
 import { PageHeader } from "../components/PageHeader";
 import { PluginRatings } from "../components/PluginRatings";
 import { ListedVersion } from "../components/PluginVersion";
 import { SourceBadge, SourceLegend } from "../components/SourceBadge";
+import { InstallStateBadge, StatusBadge } from "../components/StatusBadge";
 import { StatusLine } from "../components/StatusLine";
 import { apiFetch, friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -34,6 +37,7 @@ import {
   badgeClass,
   cardClass,
   destructiveButtonClass,
+  fieldHintClass,
   inputClass,
   primaryButtonClass,
   secondaryButtonClass,
@@ -100,6 +104,7 @@ function PluginMetaRow({
           href={plugin.repository_url}
           target="_blank"
           rel="noopener noreferrer"
+          aria-label={`Repository for ${plugin.display_name} (opens in a new tab)`}
           className="underline hover:text-indigo-600 dark:hover:text-indigo-400"
         >
           Repository ↗
@@ -143,7 +148,7 @@ function PluginScreenshotGallery({ plugin }: { plugin: Plugin }) {
   );
 }
 
-function DependencyPanel({ pluginId }: { pluginId: string }) {
+function DependencyPanel({ pluginId, pluginName }: { pluginId: string; pluginName: string }) {
   const [loaded, setLoaded] = useState(false);
   const [deps, setDeps] = useState<DependencyEntry[]>([]);
   const [conflicts, setConflicts] = useState<ConflictEntry[]>([]);
@@ -173,7 +178,10 @@ function DependencyPanel({ pluginId }: { pluginId: string }) {
 
   return (
     <details className="mt-2" onToggle={handleToggle}>
-      <summary className="cursor-pointer text-xs font-medium text-indigo-600 dark:text-indigo-400">
+      <summary
+        aria-label={`Dependencies & conflicts for ${pluginName}`}
+        className="cursor-pointer text-xs font-medium text-indigo-600 dark:text-indigo-400"
+      >
         Dependencies &amp; conflicts
       </summary>
       <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
@@ -222,9 +230,15 @@ function DependencyPanel({ pluginId }: { pluginId: string }) {
  * for the single fetch (the backend never logs or persists it). */
 function InstallFromRepoPanel({
   repositoryUrl,
+  pluginName,
   token,
 }: {
   repositoryUrl: string;
+  /** Completes the summary's and the button's accessible names, since every
+   * card with a repository carries the same "Install from this repo". The two
+   * get different names ("Install from this repo: X" opens the form, "Install
+   * X from this repo" submits it) so they can't be confused. */
+  pluginName: string;
   token: string;
 }) {
   const [ref, setRef] = useState("");
@@ -267,7 +281,10 @@ function InstallFromRepoPanel({
 
   return (
     <details className="mt-2">
-      <summary className="cursor-pointer text-xs font-medium text-indigo-600 dark:text-indigo-400">
+      <summary
+        aria-label={`Install from this repo: ${pluginName}`}
+        className="cursor-pointer text-xs font-medium text-indigo-600 dark:text-indigo-400"
+      >
         Install from this repo
       </summary>
       <form
@@ -313,7 +330,12 @@ function InstallFromRepoPanel({
             />
           </label>
         </div>
-        <button type="submit" disabled={busy} className={primaryButtonClass}>
+        <button
+          type="submit"
+          disabled={busy}
+          aria-label={`Install ${pluginName} from this repo`}
+          className={primaryButtonClass}
+        >
           Install from this repo
         </button>
         {status && (
@@ -350,6 +372,7 @@ export function PluginCard({
   confirm: ReturnType<typeof useConfirm>["confirm"];
 }) {
   const [justInstalled, setJustInstalled] = useState(false);
+  const loginHintId = useId();
   const scheduleTimeout = useAutoClearTimeout();
   const { status, isError, busy, install, uninstall, toggleEnabled } = usePluginLifecycle({
     pluginId: plugin.id,
@@ -381,10 +404,9 @@ export function PluginCard({
     <section className={`mb-4 ${cardClass}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
+          <h3 className="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
             <Icon name="plugins" size={16} className="shrink-0 text-indigo-500 dark:text-indigo-400" /> {plugin.display_name}
-            {plugin.featured && <span className={badgeClass}>⭐ featured</span>}
-          </h2>
+          </h3>
           {plugin.description && (
             <p className="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
               {plugin.description}
@@ -399,23 +421,28 @@ export function PluginCard({
             {plugin.download_count} install{plugin.download_count === 1 ? "" : "s"}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
+            {plugin.featured && (
+              <StatusBadge icon="star" label="Featured" tone="warn" />
+            )}
             <SourceBadge source={resolveSource(plugin)} />
             <PricingBadge plugin={plugin} />
-            {plugin.category_id && (
-              <span className={badgeClass}>{plugin.category_id}</span>
-            )}
+            {/* No category badge: the catalog only carries an opaque
+                category_id and no endpoint resolves it to a name, so a badge
+                could only show a raw UUID (#2195). */}
           </div>
           <PluginMetaRow plugin={plugin} installation={installation} />
           <PluginScreenshotGallery plugin={plugin} />
           {plugin.repository_url && isAdmin && (
             <InstallFromRepoPanel
               repositoryUrl={plugin.repository_url}
+              pluginName={plugin.display_name}
               token={token}
             />
           )}
-          <DependencyPanel pluginId={plugin.id} />
+          <DependencyPanel pluginId={plugin.id} pluginName={plugin.display_name} />
           <PluginRatings
             pluginId={plugin.id}
+            pluginName={plugin.display_name}
             token={token}
             isAuthenticated={isAuthenticated}
             isInstalled={!!installation}
@@ -426,6 +453,8 @@ export function PluginCard({
             <button
               onClick={handleInstall}
               disabled={!isAuthenticated || busy}
+              aria-label={`Install ${plugin.display_name}`}
+              aria-describedby={!isAuthenticated ? loginHintId : undefined}
               className={primaryButtonClass}
             >
               Install
@@ -435,6 +464,7 @@ export function PluginCard({
               <button
                 onClick={handleToggleEnabled}
                 disabled={busy}
+                aria-label={`${installation.enabled ? "Disable" : "Enable"} ${plugin.display_name}`}
                 className={secondaryButtonClass}
               >
                 {installation.enabled ? "Disable" : "Enable"}
@@ -442,26 +472,26 @@ export function PluginCard({
               <button
                 onClick={handleUninstall}
                 disabled={busy}
+                aria-label={`Uninstall ${plugin.display_name}`}
                 className={destructiveButtonClass}
               >
                 <Icon name="delete" size={15} /> Uninstall
               </button>
-              <span className={badgeClass}>
-                {installation.enabled ? "✓ enabled" : "disabled"}
-              </span>
+              <InstallStateBadge enabled={installation.enabled} />
             </>
           )}
           {!isAuthenticated && (
-            <span className="text-xs text-gray-500 dark:text-gray-400">
+            <p id={loginHintId} className={`${fieldHintClass} text-right`}>
               Log in to install
-            </span>
+            </p>
           )}
         </div>
       </div>
       {status && <StatusLine isError={isError} className="mt-2">{status}</StatusLine>}
       {justInstalled && (
         <p className="mt-2 rounded-lg bg-green-50 p-2 text-xs text-green-900 dark:bg-green-950 dark:text-green-100">
-          ✅ Installed. If this plugin exposes an AI tool,{" "}
+          <Icon name="check" size={13} className="mr-1 inline-block align-[-2px]" />
+          Installed. If this plugin exposes an AI tool,{" "}
           <Link
             to={ROUTES.installedAiTools}
             className="underline hover:text-green-700 dark:hover:text-green-300"
@@ -476,7 +506,10 @@ export function PluginCard({
 }
 
 // Pricing model is a fixed, known enum (models/plugin.py's `PricingModel`) --
-// safe to hard-code here, unlike category (see `categories` prop below).
+// safe to hard-code here. There is deliberately no category filter: the
+// catalog only carries an opaque category_id and the marketplace exposes no
+// categories endpoint to name it, so the options could only be raw UUIDs
+// (#2195; the filter #1519 wired returns once names can be resolved).
 const PRICING_MODEL_OPTIONS = [
   { value: "", label: "All pricing" },
   { value: "free", label: "Free" },
@@ -489,9 +522,6 @@ function SearchAndFilters({
   onQueryChange,
   pricingModel,
   onPricingModelChange,
-  category,
-  onCategoryChange,
-  categories,
   source,
   onSourceChange,
 }: {
@@ -499,9 +529,6 @@ function SearchAndFilters({
   onQueryChange: (q: string) => void;
   pricingModel: string;
   onPricingModelChange: (v: string) => void;
-  category: string;
-  onCategoryChange: (v: string) => void;
-  categories: string[];
   source: SourceKind | null;
   onSourceChange: (v: SourceKind | null) => void;
 }) {
@@ -545,21 +572,34 @@ function SearchAndFilters({
           </option>
         ))}
       </select>
-      {categories.length > 0 && (
-        <select
-          className={`${inputClass} w-auto`}
-          aria-label="Filter by category"
-          value={category}
-          onChange={(e) => onCategoryChange(e.target.value)}
-        >
-          <option value="">All categories</option>
-          {categories.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-      )}
+    </div>
+  );
+}
+
+/** "Recommended based on what you've installed", each name a link to that
+ * plugin in Discover. There is no per-plugin route, so a recommendation opens
+ * Discover searched for its name (`?q=`) -- the same deep link the ⌘K palette
+ * uses (#1210). Unlike scrolling to a card, that works for a plugin that isn't
+ * on the loaded page, survives a reload and can be shared. The search matches
+ * on display name, which is what the recommendation carries. */
+function Recommendations({ recommendations }: { recommendations: Recommendation[] }) {
+  const labelId = useId();
+  return (
+    <div className="mb-6 text-xs text-gray-500 dark:text-gray-400">
+      <span id={labelId}>Recommended based on what you've installed:</span>{" "}
+      <ul aria-labelledby={labelId} className="inline">
+        {recommendations.map((r, i) => (
+          <li key={r.plugin_id} className="inline">
+            <Link
+              to={{ search: `?${new URLSearchParams({ q: r.name })}` }}
+              className="font-medium text-indigo-600 underline hover:text-indigo-500 dark:text-indigo-400"
+            >
+              {r.name}
+            </Link>
+            {i < recommendations.length - 1 && ", "}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -571,6 +611,8 @@ export function AvailablePluginsPage() {
   // the same way nav.ts hides admin-only destinations (the backend 403s others).
   const isAdmin = role === "admin";
   const { confirm, dialog } = useConfirm();
+  const featuredHeadingId = useId();
+  const allPluginsHeadingId = useId();
   // Seed from ?q= so the ⌘K palette can deep-link to a specific plugin (#1210).
   const [searchParams, setSearchParams] = useSearchParams();
   // The source filter lives in ?source= and is derived from the URL on every
@@ -591,21 +633,62 @@ export function AvailablePluginsPage() {
     },
     [setSearchParams],
   );
-  const [queryInput, setQueryInput] = useState(() => searchParams.get("q") ?? "");
+  // The search box is local state (typing must never wait on navigation). It
+  // is mirrored into ?q= once typing settles -- the same 300 ms debounce the
+  // search request uses, written with `replace` -- so the URL says what's
+  // being searched without a history write per keystroke. A ?q= that arrives
+  // from elsewhere (a recommendation link, the ⌘K palette while already on
+  // this page) is copied back into the box. `lastUrlQueryRef` remembers what
+  // this page last wrote, so its own mirror never echoes back over newer
+  // keystrokes.
+  const urlQuery = searchParams.get("q") ?? "";
+  const [queryInput, setQueryInput] = useState(urlQuery);
+  const lastUrlQueryRef = useRef(urlQuery);
+  useEffect(() => {
+    if (urlQuery === lastUrlQueryRef.current) return;
+    lastUrlQueryRef.current = urlQuery;
+    setQueryInput(urlQuery);
+  }, [urlQuery]);
   const query = useDebouncedValue(queryInput, 300);
+  // Write only when the debounced value itself changes. setSearchParams gets
+  // a new identity on every navigation, so without this an incoming ?q= would
+  // re-run the effect while `query` still holds the previous value -- and
+  // write that stale value back over the new one.
+  const lastDebouncedQueryRef = useRef(query);
+  useEffect(() => {
+    if (query === lastDebouncedQueryRef.current) return;
+    lastDebouncedQueryRef.current = query;
+    if (query === lastUrlQueryRef.current) return;
+    lastUrlQueryRef.current = query;
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        if (query) params.set("q", query);
+        else params.delete("q");
+        return params;
+      },
+      { replace: true },
+    );
+  }, [query, setSearchParams]);
   const [pricingModel, setPricingModel] = useState("");
-  const [category, setCategory] = useState("");
   const [myInstallations, setMyInstallations] = useState<Installation[]>([]);
+  const [installationsError, setInstallationsError] = useState<string | null>(null);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [recommendationsError, setRecommendationsError] = useState<string | null>(null);
   const [featured, setFeatured] = useState<Plugin[]>([]);
+  const [featuredError, setFeaturedError] = useState<string | null>(null);
 
+  // Featured, installations and recommendations are secondary to the catalog:
+  // a failure shows a quiet notice with Retry (#2195) and never blocks the
+  // main list -- the full catalog below still shows featured plugins (with a
+  // badge), just not curated to the top.
   const loadFeatured = useCallback(async () => {
+    setFeaturedError(null);
     try {
       const res = await apiFetch<CatalogPluginListResponse>("/v1/marketplace/plugins/featured?limit=6");
       setFeatured(res.plugins);
-    } catch {
-      // best-effort -- the full catalog below still shows featured plugins
-      // (with a badge), just not curated to the top
+    } catch (e) {
+      setFeaturedError(friendlyErrorMessage(e));
     }
   }, []);
 
@@ -617,33 +700,62 @@ export function AvailablePluginsPage() {
     async (nextOffset: number) => {
       let path: string;
       if (query.trim()) {
-        // /plugins/search has no category/pricing_model params of its own
-        // (search-by-text only) -- the client-side filter on `visiblePlugins`
-        // below covers this path; only the plain browse endpoint gets these
-        // as real server-side query params.
+        // /plugins/search has no pricing_model param of its own (search-by-text
+        // only) -- the client-side filter on `visiblePlugins` below covers this
+        // path; only the plain browse endpoint gets it as a real server-side
+        // query param.
         path = `/v1/marketplace/plugins/search?q=${encodeURIComponent(query.trim())}&limit=20&offset=${nextOffset}`;
       } else {
         path = `/v1/marketplace/plugins?limit=20&offset=${nextOffset}`;
-        if (category) path += `&category=${encodeURIComponent(category)}`;
         if (pricingModel) path += `&pricing_model=${encodeURIComponent(pricingModel)}`;
       }
       const res = await apiFetch<CatalogPluginListResponse>(path);
       return { items: res.plugins, total: res.total };
     },
-    [query, category, pricingModel],
+    [query, pricingModel],
   );
   const {
     items: plugins,
-    status,
-    isError: isStatusError,
+    loading: pluginsLoading,
+    loaded: pluginsLoaded,
+    error: pluginsError,
+    errorOnMore: pluginsErrorOnMore,
+    retry: retryPlugins,
     reload: reloadPlugins,
     loadMore: loadMorePlugins,
     hasMore: hasMorePlugins,
   } = usePaginatedList(fetchPluginsPage);
 
+  const loadRecommendations = useCallback(
+    async (installed: Installation[]) => {
+      setRecommendationsError(null);
+      if (installed.length === 0) {
+        setRecommendations([]);
+        return;
+      }
+      try {
+        const rec = await apiFetch<{ recommendations: Recommendation[] }>(
+          "/v1/graph/recommendations?limit=5",
+          { method: "POST", body: installed.map((i) => i.plugin_id), token: tokenRef.current },
+        );
+        // `?? []`: a response missing `recommendations` would otherwise set
+        // state to `undefined` (no throw happens) and crash later on
+        // `recommendations.length` -- the same failure shape HealthStrip.tsx
+        // hit for its own optional `services` key.
+        setRecommendations(rec.recommendations ?? []);
+      } catch (e) {
+        setRecommendationsError(friendlyErrorMessage(e));
+      }
+    },
+    [tokenRef],
+  );
+
   const loadMyInstallations = useCallback(async () => {
+    setInstallationsError(null);
     if (!isAuthenticated) {
       setMyInstallations([]);
+      setRecommendations([]);
+      setRecommendationsError(null);
       return;
     }
     try {
@@ -652,28 +764,13 @@ export function AvailablePluginsPage() {
         { token: tokenRef.current },
       );
       setMyInstallations(res.installations);
-      if (res.installations.length > 0) {
-        const ids = res.installations.map((i) => i.plugin_id);
-        try {
-          const rec = await apiFetch<{ recommendations: Recommendation[] }>(
-            "/v1/graph/recommendations?limit=5",
-            { method: "POST", body: ids, token: tokenRef.current },
-          );
-          // `?? []`: a response missing `recommendations` would otherwise set
-          // state to `undefined`, past this try/catch (no throw happens) and
-          // crashing later on `recommendations.length` -- the same failure
-          // shape HealthStrip.tsx hit for its own optional `services` key.
-          setRecommendations(rec.recommendations ?? []);
-        } catch {
-          // recommendations are a nice-to-have; ignore failures quietly
-        }
-      } else {
-        setRecommendations([]);
-      }
-    } catch {
-      // best-effort -- an install action will surface its own error
+      await loadRecommendations(res.installations);
+    } catch (e) {
+      // Without the caller's installs, every card offers "Install" -- say so
+      // rather than look like nothing is installed.
+      setInstallationsError(friendlyErrorMessage(e));
     }
-  }, [isAuthenticated, tokenRef]);
+  }, [isAuthenticated, tokenRef, loadRecommendations]);
 
   useEffect(() => {
     // query changes trigger a fresh search from offset 0 (reloadPlugins'
@@ -686,19 +783,6 @@ export function AvailablePluginsPage() {
   }, [loadMyInstallations, sessionKey]);
 
   const featuredIds = useMemo(() => new Set(featured.map((p) => p.id)), [featured]);
-  // No categories-by-name endpoint exists yet (#1519) -- categories are only
-  // ever seen as a raw category_id UUID (same rough edge PluginCard's own
-  // badge already has, `{plugin.category_id}` below). Derive the filter's
-  // option list from whatever category_ids are present on the currently
-  // loaded page, rather than blocking this filter entirely on a backend
-  // change that's out of this fix's scope.
-  const availableCategories = useMemo(
-    () =>
-      Array.from(
-        new Set(plugins.map((p) => p.category_id).filter((c): c is string => !!c)),
-      ).sort(),
-    [plugins],
-  );
   // Featured is curated separately from the paginated catalog below, so the
   // same plugin can appear in both -- drop it from the catalog list once
   // it's already shown above. Search results skip this: a query is asking
@@ -710,18 +794,29 @@ export function AvailablePluginsPage() {
   ).filter(
     (plugin) =>
       // Redundant-but-harmless for the plain-browse path (the server already
-      // filtered by these params there) -- the ONLY path that actually needs
-      // this is search (/plugins/search has no category/pricing_model params
-      // of its own), so this filter has to apply uniformly to both rather
-      // than just the search branch.
+      // filtered by pricing there) -- the ONLY path that actually needs this
+      // is search (/plugins/search has no pricing_model param of its own),
+      // so this filter has to apply uniformly to both rather than just the
+      // search branch.
       (!pricingModel || plugin.pricing_model === pricingModel) &&
-      (!category || plugin.category_id === category) &&
       matchesSourceFilter(resolveSource(plugin), source),
   );
   const visibleFeatured = featured.filter((plugin) =>
     matchesSourceFilter(resolveSource(plugin), source),
   );
-  const filtersActive = !!(category || pricingModel || source);
+  const filtersActive = !!(pricingModel || source);
+  // A failed first page (or a failed new search/filter) leaves the previous
+  // results in state; they no longer answer the current query, so the error
+  // replaces the list. A failed Load more keeps what already loaded.
+  const listFailed = !!pluginsError && !pluginsErrorOnMore;
+  // Cards only while they answer the current request: not after a failed
+  // search, and not while its retry is in flight (`loaded` is cleared then).
+  const showList = pluginsLoaded && !listFailed;
+  // Only a successful load can prove the catalog is empty: never while the
+  // first page (or a new search) is in flight, and never after a failure.
+  const showSkeleton = !pluginsLoaded && !pluginsError;
+  const catalogEmpty =
+    pluginsLoaded && !pluginsLoading && !pluginsError && plugins.length === 0;
 
   function installationFor(pluginId: string) {
     return myInstallations.find((i) => i.plugin_id === pluginId);
@@ -745,11 +840,23 @@ export function AvailablePluginsPage() {
         title="Discover plugins"
         subtitle="Browse and install Minder plugins. Browsing is open for everyone; log in to install, enable, disable, or uninstall."
       />
-      <StatusLine isError={isStatusError}>{status}</StatusLine>
+      <StatusLine>{pluginsLoading ? "Loading plugins…" : ""}</StatusLine>
 
+      {featuredError && !query.trim() && (
+        <LoadError
+          quiet
+          title="Featured plugins couldn't be loaded — they still appear in the full list below."
+          message={featuredError}
+          what="featured plugins"
+          onRetry={loadFeatured}
+        />
+      )}
       {visibleFeatured.length > 0 && !query.trim() && (
-        <section className="mb-6">
-          <h2 className="mb-2 flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
+        <section className="mb-6" aria-labelledby={featuredHeadingId}>
+          <h2
+            id={featuredHeadingId}
+            className="mb-2 flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100"
+          >
             <Icon name="star" size={16} className="shrink-0 text-indigo-500 dark:text-indigo-400" />
             Featured
           </h2>
@@ -770,11 +877,26 @@ export function AvailablePluginsPage() {
         </section>
       )}
 
+      {isAuthenticated && installationsError && (
+        <LoadError
+          quiet
+          title="Your installed plugins couldn't be loaded, so install state on these cards may be out of date."
+          message={installationsError}
+          what="your installed plugins"
+          onRetry={loadMyInstallations}
+        />
+      )}
+      {isAuthenticated && myInstallations.length > 0 && recommendationsError && (
+        <LoadError
+          quiet
+          title="Recommendations couldn't be loaded."
+          message={recommendationsError}
+          what="recommendations"
+          onRetry={() => loadRecommendations(myInstallations)}
+        />
+      )}
       {isAuthenticated && myInstallations.length > 0 && recommendations.length > 0 && (
-        <p className="mb-6 text-xs text-gray-500 dark:text-gray-400">
-          Recommended based on what you've installed:{" "}
-          {recommendations.map((r) => r.name).join(", ")}
-        </p>
+        <Recommendations recommendations={recommendations} />
       )}
       {isAuthenticated && myInstallations.length > 0 && (
         <p className="mb-6 text-xs text-gray-500 dark:text-gray-400">
@@ -787,54 +909,81 @@ export function AvailablePluginsPage() {
         </p>
       )}
 
-      <SearchAndFilters
-        query={queryInput}
-        onQueryChange={setQueryInput}
-        pricingModel={pricingModel}
-        onPricingModelChange={setPricingModel}
-        category={category}
-        onCategoryChange={setCategory}
-        categories={availableCategories}
-        source={source}
-        onSourceChange={setSource}
-      />
-      <SourceLegend className="mb-4" />
-
-      {plugins.length === 0 && (
-        <EmptyState>
-          {query
-            ? "No plugins match your search."
-            : category || pricingModel
-              ? "No plugins match the selected filters."
-              : "No plugins in the catalog yet."}
-        </EmptyState>
-      )}
-      {plugins.length > 0 && visiblePlugins.length === 0 && (
-        <EmptyState>
-          {filtersActive
-            ? "No plugins on this page match the selected filters."
-            : "Every plugin on this page is already shown above in Featured."}
-        </EmptyState>
-      )}
-      {visiblePlugins.map((plugin) => (
-        <PluginCard
-          key={plugin.id}
-          plugin={plugin}
-          installation={installationFor(plugin.id)}
-          token={token}
-          isAuthenticated={isAuthenticated}
-          isAdmin={isAdmin}
-          onInstalled={loadMyInstallations}
-          onUninstalled={handleUninstalled}
-          onToggleEnabled={handleToggleEnabled}
-          confirm={confirm}
+      <section aria-labelledby={allPluginsHeadingId}>
+        <h2
+          id={allPluginsHeadingId}
+          className="mb-2 text-base font-semibold text-gray-900 dark:text-gray-100"
+        >
+          All plugins
+        </h2>
+        <SearchAndFilters
+          query={queryInput}
+          onQueryChange={setQueryInput}
+          pricingModel={pricingModel}
+          onPricingModelChange={setPricingModel}
+          source={source}
+          onSourceChange={setSource}
         />
-      ))}
-      {hasMorePlugins && (
-        <button onClick={loadMorePlugins} className={secondaryButtonClass}>
-          Load more
-        </button>
-      )}
+        <SourceLegend className="mb-4" />
+
+        {showSkeleton && <CardListSkeleton count={3} />}
+        {listFailed && (
+          <LoadError
+            title={
+              query.trim()
+                ? "Couldn't search the plugin catalog."
+                : "Couldn't load the plugin catalog."
+            }
+            message={pluginsError}
+            what={query.trim() ? "search results" : "the plugin catalog"}
+            onRetry={retryPlugins}
+          />
+        )}
+        {catalogEmpty && (
+          <EmptyState>
+            {query
+              ? "No plugins match your search."
+              : pricingModel
+                ? "No plugins match the selected filters."
+                : "No plugins in the catalog yet."}
+          </EmptyState>
+        )}
+        {showList && !pluginsLoading && plugins.length > 0 && visiblePlugins.length === 0 && (
+          <EmptyState>
+            {filtersActive
+              ? "No plugins on this page match the selected filters."
+              : "Every plugin on this page is already shown above in Featured."}
+          </EmptyState>
+        )}
+        {showList &&
+          visiblePlugins.map((plugin) => (
+            <PluginCard
+              key={plugin.id}
+              plugin={plugin}
+              installation={installationFor(plugin.id)}
+              token={token}
+              isAuthenticated={isAuthenticated}
+              isAdmin={isAdmin}
+              onInstalled={loadMyInstallations}
+              onUninstalled={handleUninstalled}
+              onToggleEnabled={handleToggleEnabled}
+              confirm={confirm}
+            />
+          ))}
+        {pluginsError && pluginsErrorOnMore && (
+          <LoadError
+            title="Couldn't load more plugins."
+            message={pluginsError}
+            what="more plugins"
+            onRetry={retryPlugins}
+          />
+        )}
+        {hasMorePlugins && showList && !pluginsError && (
+          <button onClick={loadMorePlugins} disabled={pluginsLoading} className={secondaryButtonClass}>
+            Load more
+          </button>
+        )}
+      </section>
     </>
   );
 }

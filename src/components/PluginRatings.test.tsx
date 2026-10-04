@@ -104,6 +104,23 @@ describe("PluginRatings", () => {
     expect(screen.getByText("Solid plugin")).toBeTruthy();
   });
 
+  it("names the disclosure with the full visible text first, then the plugin (#2195)", async () => {
+    apiFetch.mockResolvedValue(
+      ratingsResponse({ rating_average: 4.5, rating_count: 2, ratings: [rating()] }),
+    );
+    const { container } = render(
+      <PluginRatings pluginId="p1" pluginName="Weather" token="" isAuthenticated={false} isInstalled={false} />,
+    );
+    const summary = container.querySelector("summary")!;
+    expect(summary.textContent).toBe("Ratings & reviews for Weather");
+
+    await openPanel(container);
+    await screen.findByText(/average across 2 reviews/);
+    // The visible label stays one unbroken run; the plugin name follows it.
+    expect(summary.textContent).toBe("Ratings & reviews · 4.5★ (2) for Weather");
+    expect(summary.querySelector(".sr-only")?.textContent).toBe(" for Weather");
+  });
+
   it("shows an empty-aggregate message and no-reviews state when there are none", async () => {
     apiFetch.mockResolvedValue(
       ratingsResponse({ rating_average: null, rating_count: 0, ratings: [] }),

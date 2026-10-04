@@ -113,7 +113,7 @@ describe("SubmissionsPage", () => {
 
     await screen.findByText(/Fix the docker image tag/);
     expect(
-      screen.getByRole("button", { name: "Resubmit for review" }),
+      screen.getByRole("button", { name: "Resubmit for review: Weather Plus" }),
     ).toBeTruthy();
   });
 
@@ -126,7 +126,7 @@ describe("SubmissionsPage", () => {
     render(<SubmissionsPage />);
     await screen.findByText("Weather Plus");
 
-    fireEvent.click(screen.getByRole("button", { name: "Submit for review" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit for review: Weather Plus" }));
 
     await vi.waitFor(() =>
       expect(apiFetch).toHaveBeenCalledWith(
@@ -143,9 +143,44 @@ describe("SubmissionsPage", () => {
     render(<SubmissionsPage />);
 
     await screen.findByText("Weather Plus");
-    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Edit/ })).toBeNull();
     expect(
       screen.queryByRole("button", { name: /submit for review/i }),
     ).toBeNull();
+  });
+  it("shows a skeleton, not 'nothing submitted', while loading; an error offers Retry (#2195)", async () => {
+    mockAuth = { token: "tok", isAuthenticated: true };
+    let reject!: (e: unknown) => void;
+    apiFetch.mockReturnValueOnce(new Promise((_, r) => (reject = r)));
+    render(<SubmissionsPage />);
+
+    expect(screen.getByTestId("card-list-skeleton")).toBeTruthy();
+    expect(screen.queryByText("You haven't submitted any plugins yet.")).toBeNull();
+
+    reject(new Error("marketplace down"));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't load your submissions.");
+    expect(screen.queryByText("You haven't submitted any plugins yet.")).toBeNull();
+
+    apiFetch.mockResolvedValueOnce({ plugins: [] });
+    fireEvent.click(screen.getByRole("button", { name: "Retry loading your submissions" }));
+    expect(await screen.findByText("You haven't submitted any plugins yet.")).toBeTruthy();
+  });
+
+  it("names each submission's Edit and Submit buttons after it", async () => {
+    mockAuth = { token: "tok", isAuthenticated: true };
+    apiFetch.mockResolvedValue({ plugins: [submission()] });
+    render(<SubmissionsPage />);
+
+    expect(await screen.findByRole("button", { name: "Edit Weather Plus" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Submit for review: Weather Plus" })).toBeTruthy();
+  });
+  it("shows an in-review submission's status in its amber tone, not the neutral grey", async () => {
+    mockAuth = { token: "tok", isAuthenticated: true };
+    apiFetch.mockResolvedValue({ plugins: [submission({ status: "submitted" })] });
+    render(<SubmissionsPage />);
+
+    const badge = await screen.findByText("submitted");
+    expect(badge.className.split(/\s+/).filter((c) => /^bg-/.test(c))).toEqual(["bg-amber-100"]);
   });
 });

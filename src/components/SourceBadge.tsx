@@ -1,5 +1,5 @@
 import { type SourceKind, SOURCE_META } from "../lib/pluginSource";
-import { badgeClass } from "../lib/ui";
+import { badgeBaseClass } from "../lib/ui";
 import { Icon } from "./Icon";
 
 /** Where a plugin came from -- First-party, Private git, Submitted on this
@@ -23,7 +23,7 @@ export function SourceBadge({
   const meta = SOURCE_META[source];
   return (
     <span
-      className={`${badgeClass} ${meta.toneClass}${className ? ` ${className}` : ""}`}
+      className={`${badgeBaseClass} ${meta.toneClass}${className ? ` ${className}` : ""}`}
       title={meta.description}
       data-source={source}
     >

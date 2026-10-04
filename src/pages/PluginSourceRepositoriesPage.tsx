@@ -316,9 +316,10 @@ function RepositoryDetail({ repositoryId }: { repositoryId: string }) {
 
       {repo && (
         <>
-          <h3 className={`mb-2 ${mutedTextClass} font-semibold uppercase tracking-wide`}>
+          {/* h2, so the plugin cards' h3s nest under it (#2195). */}
+          <h2 className={`mb-2 ${mutedTextClass} font-semibold uppercase tracking-wide`}>
             Plugins from this repository
-          </h3>
+          </h2>
           <RepositoryPluginList repositoryId={repositoryId} />
         </>
       )}

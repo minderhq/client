@@ -103,11 +103,15 @@ function StarInput({
  * 403 handler on submit. */
 export function PluginRatings({
   pluginId,
+  pluginName,
   token,
   isAuthenticated,
   isInstalled,
 }: {
   pluginId: string;
+  /** Completes the disclosure's accessible name ("Ratings & reviews for
+   * Weather") -- every catalog card has one. */
+  pluginName?: string;
   token: string;
   isAuthenticated: boolean;
   isInstalled: boolean;
@@ -215,6 +219,9 @@ export function PluginRatings({
       <summary className="cursor-pointer text-xs font-medium text-indigo-600 dark:text-indigo-400">
         Ratings &amp; reviews
         {count > 0 && average != null && ` · ${average.toFixed(1)}★ (${count})`}
+        {/* After the rating, so the visible text stays one unbroken run at
+            the start of the accessible name (WCAG 2.5.3). */}
+        {pluginName && <span className="sr-only">{` for ${pluginName}`}</span>}
       </summary>
       <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
         {loadStatus && <StatusLine isError={loadIsError}>{loadStatus}</StatusLine>}

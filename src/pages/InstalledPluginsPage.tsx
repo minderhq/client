@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { CardListSkeleton } from "../components/CardListSkeleton";
 import { Icon } from "../components/Icon";
 import { PluginLogo } from "../components/PluginLogo";
 import { useConfirm } from "../components/ConfirmDialog";
@@ -8,8 +9,8 @@ import { EmptyState } from "../components/EmptyState";
 import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
 import { PluginVersion } from "../components/PluginVersion";
-import { Skeleton } from "../components/Skeleton";
 import { SourceBadge, SourceLegend } from "../components/SourceBadge";
+import { InstallStateBadge } from "../components/StatusBadge";
 import { StatusLine } from "../components/StatusLine";
 import { apiFetch, friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -257,7 +258,17 @@ function FieldInput({
  * "configurable" flag -- so whether a plugin has settings is only known once
  * this panel asks. Runtime-loaded plugins with no per-user install (first-party
  * plugins that just run) are listed too since #2193, keyed by the same name. */
-export function ConfigurePanel({ name, token }: { name: string; token: string }) {
+export function ConfigurePanel({
+  name,
+  displayName = name,
+  token,
+}: {
+  name: string;
+  /** Names the "Configure" control for assistive tech ("Configure Weather");
+   * every installed card has one. Defaults to the registry name. */
+  displayName?: string;
+  token: string;
+}) {
   const baseId = useId();
   const [loaded, setLoaded] = useState(false);
   const [configurable, setConfigurable] = useState(false);
@@ -352,7 +363,10 @@ export function ConfigurePanel({ name, token }: { name: string; token: string })
 
   return (
     <details className="group mt-3 border-t border-gray-100 pt-3 dark:border-gray-800" onToggle={handleToggle}>
-      <summary className="flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-indigo-600 dark:text-indigo-400">
+      <summary
+        aria-label={`Configure ${displayName}`}
+        className="flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-indigo-600 dark:text-indigo-400"
+      >
         <Icon name="chevron-right" size={14} className="shrink-0 transition group-open:rotate-90" />
         <Icon name="settings" size={15} className="shrink-0" />
         Configure
@@ -512,12 +526,15 @@ function HealthCheckedAt({ runtime }: { runtime: RuntimePlugin }) {
  * marketplace endpoints to act on). */
 function InstallationActions({
   installation,
+  displayName,
   token,
   onUninstalled,
   onToggleEnabled,
   confirm,
 }: {
   installation: Installation;
+  /** The card's title, so each action is named after it ("Disable Weather"). */
+  displayName: string;
   token: string;
   onUninstalled: (pluginId: string) => void;
   onToggleEnabled: (pluginId: string, enabled: boolean) => void;
@@ -543,10 +560,20 @@ function InstallationActions({
   return (
     <>
       <div className="flex flex-shrink-0 items-center gap-2">
-        <button onClick={handleToggle} disabled={busy} className={secondaryButtonClass}>
+        <button
+          onClick={handleToggle}
+          disabled={busy}
+          aria-label={`${installation.enabled ? "Disable" : "Enable"} ${displayName}`}
+          className={secondaryButtonClass}
+        >
           {installation.enabled ? "Disable" : "Enable"}
         </button>
-        <button onClick={handleUninstall} disabled={busy} className={destructiveButtonClass}>
+        <button
+          onClick={handleUninstall}
+          disabled={busy}
+          aria-label={`Uninstall ${displayName}`}
+          className={destructiveButtonClass}
+        >
           <Icon name="delete" size={15} /> Uninstall
         </button>
       </div>
@@ -584,16 +611,14 @@ export function InstalledPluginCard({
     <section className={`mb-4 ${cardClass}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
+          <h3 className="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
             <Icon name="plugins" size={16} className="shrink-0 text-indigo-500 dark:text-indigo-400" /> {entry.displayName}
-          </h2>
+          </h3>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <SourceBadge source={entry.source} />
             <RuntimeState runtime={runtime} runtimeKnown={runtimeKnown} />
             {installation && (
-              <span className={badgeClass}>
-                {installation.enabled ? "✓ Your install: enabled" : "Your install: disabled"}
-              </span>
+              <InstallStateBadge enabled={installation.enabled} />
             )}
           </div>
           {(hasVersion || hasNeeds || runtime) && (
@@ -615,6 +640,7 @@ export function InstalledPluginCard({
         {installation && (
           <InstallationActions
             installation={installation}
+            displayName={entry.displayName}
             token={token}
             onUninstalled={onUninstalled}
             onToggleEnabled={onToggleEnabled}
@@ -622,26 +648,8 @@ export function InstalledPluginCard({
           />
         )}
       </div>
-      <ConfigurePanel name={entry.name} token={token} />
+      <ConfigurePanel name={entry.name} displayName={entry.displayName} token={token} />
     </section>
-  );
-}
-
-/** Placeholder cards while the first load is in flight -- the page never shows
- * its "nothing installed" state before it actually knows (#2195). */
-function InstalledSkeleton() {
-  return (
-    <div aria-hidden="true">
-      {[0, 1].map((i) => (
-        <div key={i} className={`mb-4 ${cardClass}`}>
-          <Skeleton className="h-5 w-48" />
-          <div className="mt-2 flex gap-1.5">
-            <Skeleton className="h-5 w-24" />
-            <Skeleton className="h-5 w-40" />
-          </div>
-        </div>
-      ))}
-    </div>
   );
 }
 
@@ -712,7 +720,7 @@ export function InstalledPluginsPage() {
                   : "Only part of the catalog could be loaded, so some source badges and listed versions may be missing."}
             </p>
           )}
-          {firstLoad && <InstalledSkeleton />}
+          {firstLoad && <CardListSkeleton />}
           {isEmpty && (
             <EmptyState>
               No plugins installed yet —{" "}
@@ -722,6 +730,7 @@ export function InstalledPluginsPage() {
               .
             </EmptyState>
           )}
+          <h2 className="sr-only">Plugins on this installation</h2>
           {entries.length > 0 && <SourceLegend className="mb-3" />}
           {entries.length > 0 && (
             <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">

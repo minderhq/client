@@ -84,7 +84,12 @@ describe("AvailableToolsPage", () => {
 
     await screen.findByText("get_weather");
     expect(screen.getByText("send_email")).toBeTruthy();
-    expect(screen.getByText("inactive")).toBeTruthy();
+    const badge = screen.getByText("Inactive");
+    expect(badge.getAttribute("data-status-badge")).toBe("Inactive");
+    expect(badge.querySelector("svg")).toBeTruthy();
+    // Badges sit beside the title (h3 under the catalog's h2), not inside it.
+    expect(screen.getByRole("heading", { level: 3, name: "send_email" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "AI tool catalog" })).toBeTruthy();
   });
 
   it("falls back to a placeholder when a tool has no description", async () => {
@@ -140,12 +145,33 @@ describe("AvailableToolsPage", () => {
     expect(screen.queryByText("Load more")).toBeNull();
   });
 
-  it("shows a friendly status message when the fetch fails", async () => {
-    apiFetch.mockRejectedValue(new Error("network down"));
+  it("shows a skeleton, not the empty state, while the first page is loading", async () => {
+    let resolve!: (v: unknown) => void;
+    apiFetch.mockReturnValue(new Promise((r) => (resolve = r)));
     renderPage();
 
-    await waitFor(() =>
-      expect(screen.queryByText("Loading…")).toBeNull(),
-    );
+    expect(screen.getByTestId("card-list-skeleton")).toBeTruthy();
+    expect(screen.getByText("Loading AI tools…")).toBeTruthy();
+    expect(screen.queryByText("No AI tools in the catalog yet.")).toBeNull();
+
+    resolve({ tools: [], count: 0, total: 0, limit: 20, offset: 0 });
+    await screen.findByText("No AI tools in the catalog yet.");
+    expect(screen.queryByTestId("card-list-skeleton")).toBeNull();
+  });
+
+  it("shows an error with Retry on failure -- not the empty state -- and recovers", async () => {
+    apiFetch.mockRejectedValueOnce(new Error("network down"));
+    renderPage();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't load the AI tool catalog.");
+    expect(alert.textContent).toContain("network down");
+    expect(screen.queryByText("No AI tools in the catalog yet.")).toBeNull();
+
+    apiFetch.mockResolvedValueOnce({ tools: [tool()], count: 1, total: 1, limit: 20, offset: 0 });
+    fireEvent.click(screen.getByRole("button", { name: "Retry loading the AI tool catalog" }));
+
+    await screen.findByText("get_weather");
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
   });
 });
