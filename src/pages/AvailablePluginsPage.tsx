@@ -633,12 +633,14 @@ export function AvailablePluginsPage() {
     },
     [setSearchParams],
   );
-  // The search box is local state (typing must never wait on navigation), and
-  // mirrored into ?q= so the URL always says what's being searched. A ?q= that
-  // arrives from elsewhere -- a recommendation link, the ⌘K palette while
-  // already on this page -- is copied back into the box. `lastUrlQueryRef`
-  // remembers what this page last wrote, so its own mirror never echoes back
-  // over newer keystrokes.
+  // The search box is local state (typing must never wait on navigation). It
+  // is mirrored into ?q= once typing settles -- the same 300 ms debounce the
+  // search request uses, written with `replace` -- so the URL says what's
+  // being searched without a history write per keystroke. A ?q= that arrives
+  // from elsewhere (a recommendation link, the ⌘K palette while already on
+  // this page) is copied back into the box. `lastUrlQueryRef` remembers what
+  // this page last wrote, so its own mirror never echoes back over newer
+  // keystrokes.
   const urlQuery = searchParams.get("q") ?? "";
   const [queryInput, setQueryInput] = useState(urlQuery);
   const lastUrlQueryRef = useRef(urlQuery);
@@ -647,23 +649,20 @@ export function AvailablePluginsPage() {
     lastUrlQueryRef.current = urlQuery;
     setQueryInput(urlQuery);
   }, [urlQuery]);
-  const handleQueryChange = useCallback(
-    (next: string) => {
-      setQueryInput(next);
-      lastUrlQueryRef.current = next;
-      setSearchParams(
-        (prev) => {
-          const params = new URLSearchParams(prev);
-          if (next) params.set("q", next);
-          else params.delete("q");
-          return params;
-        },
-        { replace: true },
-      );
-    },
-    [setSearchParams],
-  );
   const query = useDebouncedValue(queryInput, 300);
+  useEffect(() => {
+    if (query === lastUrlQueryRef.current) return;
+    lastUrlQueryRef.current = query;
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        if (query) params.set("q", query);
+        else params.delete("q");
+        return params;
+      },
+      { replace: true },
+    );
+  }, [query, setSearchParams]);
   const [pricingModel, setPricingModel] = useState("");
   const [myInstallations, setMyInstallations] = useState<Installation[]>([]);
   const [installationsError, setInstallationsError] = useState<string | null>(null);
@@ -912,7 +911,7 @@ export function AvailablePluginsPage() {
         </h2>
         <SearchAndFilters
           query={queryInput}
-          onQueryChange={handleQueryChange}
+          onQueryChange={setQueryInput}
           pricingModel={pricingModel}
           onPricingModelChange={setPricingModel}
           source={source}

@@ -10,7 +10,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { CatalogPlugin } from "../lib/marketplace";
@@ -469,16 +469,56 @@ describe("Discover plugins: recommendation links", () => {
     );
   });
 
-  it("mirrors typing into ?q= so a shared link reopens the same search", async () => {
+  it("mirrors the search into ?q= once typing settles, so a shared link reopens it", async () => {
     routeApi({ catalog: () => ({ plugins: [WEATHER], total: 1 }) });
     renderAt("/discover?source=first-party");
     await screen.findByRole("heading", { level: 3, name: "Weather" });
 
     fireEvent.change(screen.getByLabelText("Search plugins"), { target: { value: "wea" } });
-    await waitFor(() => expect(location).toBe("?source=first-party&q=wea"));
+    // Not on the keystroke itself -- the write waits for the debounce.
+    expect(location).toBe("?source=first-party");
     expect((screen.getByLabelText("Search plugins") as HTMLInputElement).value).toBe("wea");
+    await waitFor(() => expect(location).toBe("?source=first-party&q=wea"));
 
     fireEvent.change(screen.getByLabelText("Search plugins"), { target: { value: "" } });
     await waitFor(() => expect(location).toBe("?source=first-party"));
+  });
+
+  it("writes ?q= once per pause, replacing the entry: typing never grows the history", async () => {
+    routeApi({ catalog: () => ({ plugins: [WEATHER], total: 1 }) });
+    window.history.replaceState(null, "", "/discover");
+    const searches: string[] = [];
+    function SearchProbe() {
+      const { search } = useLocation();
+      if (searches[searches.length - 1] !== search) searches.push(search);
+      return null;
+    }
+    render(
+      <BrowserRouter>
+        <Routes>
+          <Route
+            path="/discover"
+            element={
+              <>
+                <AvailablePluginsPage />
+                <SearchProbe />
+              </>
+            }
+          />
+        </Routes>
+      </BrowserRouter>,
+    );
+    await screen.findByRole("heading", { level: 3, name: "Weather" });
+    const historyLength = window.history.length;
+
+    const input = screen.getByLabelText("Search plugins");
+    for (const value of ["w", "we", "wea", "weat", "weath"]) {
+      fireEvent.change(input, { target: { value } });
+    }
+    await waitFor(() => expect(window.location.search).toBe("?q=weath"));
+
+    expect(window.history.length).toBe(historyLength);
+    // One URL write for the burst of keystrokes, not one per character.
+    expect(searches).toEqual(["", "?q=weath"]);
   });
 });
