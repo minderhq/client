@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { friendlyErrorMessage } from "../lib/api";
 import { type RegisterLanding, useAuth } from "../lib/auth";
@@ -59,6 +59,12 @@ export function InviteSignUpForm({
   const [emailTaken, setEmailTaken] = useState(false);
   // The API refused the address for this invite: mark the field itself.
   const [emailMismatch, setEmailMismatch] = useState(false);
+  // The submit button was disabled while busy, which drops focus: put it on
+  // the field to fix.
+  const emailRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (emailMismatch) emailRef.current?.focus();
+  }, [emailMismatch]);
 
   const emailLocked = !!lockedEmail;
   const email = emailLocked ? lockedEmail : emailInput;
@@ -139,6 +145,7 @@ export function InviteSignUpForm({
         </label>
         <input
           id="invite-email"
+          ref={emailRef}
           className={inputClass}
           type="email"
           autoComplete="email"

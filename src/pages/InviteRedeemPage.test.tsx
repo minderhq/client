@@ -381,6 +381,7 @@ describe("InviteRedeemPage", () => {
       // The field itself is marked and points at the message.
       const field = screen.getByLabelText("Email");
       expect(field.getAttribute("aria-invalid")).toBe("true");
+      await vi.waitFor(() => expect(document.activeElement).toBe(field));
       const describedBy = (field.getAttribute("aria-describedby") ?? "").split(" ");
       expect(describedBy).toContain("invite-email-hint");
       const errorId = describedBy.find((id) => id !== "invite-email-hint") ?? "";
