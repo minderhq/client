@@ -27,9 +27,16 @@ describe("parseRegistrationMode", () => {
     },
   );
 
+  it("treats a present but empty mode as invite, not unknown", () => {
+    expect(parseRegistrationMode("")).toBe("invite");
+    expect(registrationModeFrom({ password_reset_email: false, registration_mode: "" })).toBe(
+      "invite",
+    );
+  });
+
   it("is unknown when the API doesn't report a mode", () => {
     expect(parseRegistrationMode(undefined)).toBeNull();
-    expect(parseRegistrationMode("")).toBeNull();
+    expect(parseRegistrationMode(null)).toBeNull();
     expect(parseRegistrationMode(42)).toBeNull();
   });
 });

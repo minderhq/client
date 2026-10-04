@@ -25,13 +25,21 @@ export interface AuthCapabilitiesState {
 
 /** The public auth capabilities, fetched once per mount. A page that needs
  * several of them (the sign-in page: password reset and registration mode)
- * calls this once and derives each from the result, so it makes one request. */
-export function useAuthCapabilities(): AuthCapabilitiesState {
+ * calls this once and derives each from the result, so it makes one request.
+ * `enabled: false` skips the request (not loading, no capabilities). */
+export function useAuthCapabilities(
+  { enabled = true }: { enabled?: boolean } = {},
+): AuthCapabilitiesState {
   const [state, setState] = useState<AuthCapabilitiesState>({
-    loading: true,
+    loading: enabled,
     capabilities: null,
   });
   useEffect(() => {
+    if (!enabled) {
+      setState({ loading: false, capabilities: null });
+      return;
+    }
+    setState((s) => (s.loading ? s : { ...s, loading: true }));
     const controller = new AbortController();
     fetchAuthCapabilities(controller.signal)
       .then((caps) => {
@@ -43,7 +51,7 @@ export function useAuthCapabilities(): AuthCapabilitiesState {
         if (!controller.signal.aborted) setState({ loading: false, capabilities: null });
       });
     return () => controller.abort();
-  }, []);
+  }, [enabled]);
   return state;
 }
 

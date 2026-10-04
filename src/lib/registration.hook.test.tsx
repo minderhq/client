@@ -25,4 +25,11 @@ describe("useRegistrationMode", () => {
     const { result } = renderHook(() => useRegistrationMode());
     await waitFor(() => expect(result.current).toEqual({ mode: null, loading: false }));
   });
+
+  it("fetches nothing when disabled", async () => {
+    const { result } = renderHook(() => useRegistrationMode({ enabled: false }));
+    expect(result.current).toEqual({ mode: null, loading: false });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
 });

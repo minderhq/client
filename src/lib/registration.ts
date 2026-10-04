@@ -13,11 +13,12 @@ export type RegistrationMode = "open" | "invite" | "sso_only";
 /** Reads the mode the API reports. Missing (an API that predates the field)
  * is `null` = unknown, and callers fall back to today's open behaviour (the
  * API still refuses with a 403 code we explain). `closed` and `sso_only` are
- * the same mode. Any other value is treated as `invite`, never as `open`:
- * that is how an API without startup validation treats it, and it never
- * offers a sign-up form the API would refuse. */
+ * the same mode. Any other string -- an empty one included, which an API
+ * without startup validation reports for an empty setting and treats as
+ * `invite` -- is `invite`, never `open`, so the page never offers a sign-up
+ * form the API would refuse. */
 export function parseRegistrationMode(value: unknown): RegistrationMode | null {
-  if (typeof value !== "string" || !value) return null;
+  if (typeof value !== "string") return null;
   if (value === "open") return "open";
   if (value === "sso_only" || value === "closed") return "sso_only";
   return "invite";
@@ -40,9 +41,12 @@ export interface RegistrationModeState {
 /** The instance's registration mode, from the public capabilities endpoint.
  * A failed lookup resolves to `mode: null` (unknown), never to an error the
  * page would have to show. `loading` is true from the first render, so a page
- * never flashes a sign-up form it is about to hide. */
-export function useRegistrationMode(): RegistrationModeState {
-  const { loading, capabilities } = useAuthCapabilities();
+ * never flashes a sign-up form it is about to hide. With `enabled: false`
+ * nothing is fetched and the mode is unknown (`null`, not loading). */
+export function useRegistrationMode(
+  { enabled = true }: { enabled?: boolean } = {},
+): RegistrationModeState {
+  const { loading, capabilities } = useAuthCapabilities({ enabled });
   return { mode: registrationModeFrom(capabilities), loading };
 }
 

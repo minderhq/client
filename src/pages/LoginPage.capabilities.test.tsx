@@ -32,6 +32,7 @@ describe("LoginPage capabilities", () => {
     ["closed", /Sign-up is turned off/],
     ["sso_only", /Sign-up is turned off/],
     ["something-new", /created by invitation/],
+    ["", /created by invitation/],
   ])("makes one request and follows registration_mode %j", async (mode, text) => {
     apiFetch.mockResolvedValue({
       password_reset_email: true,
