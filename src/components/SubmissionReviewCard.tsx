@@ -178,8 +178,8 @@ export function SubmissionReviewCard({
     }
   }
 
-  /** Approve/archive: ask first; on cancel, return focus to the button that
-   * opened the dialog (the dialog itself doesn't restore it). */
+  /** Approve/archive: ask first; on cancel, make sure focus is back on the
+   * button that opened the dialog. */
   async function confirmThenRun(
     action: "approve" | "archive",
     event: MouseEvent<HTMLButtonElement>,

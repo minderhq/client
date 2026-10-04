@@ -148,12 +148,15 @@ export function ExportImportPanel({
       return;
     }
 
-    setStatus("Review the changes to apply…");
+    // The page behind the dialog is inert, so a status set here would never be
+    // announced: the "review first" guidance lives in the dialog's own
+    // description instead, and the stale "Reading file…" is cleared.
+    setStatus("");
     const count = plan.changes.length;
     const ok = await confirm({
       title: `Apply ${count} bundle change${count === 1 ? "" : "s"}?`,
       message:
-        "Importing this file will make these changes. Bundles the file doesn't mention are left as they are.",
+        "Review the changes importing this file will make before you apply them. Bundles the file doesn't mention are left as they are.",
       details: <ImportPreview plan={plan} />,
       confirmLabel: `Apply ${count} change${count === 1 ? "" : "s"}`,
       danger: plan.changes.some((c) => !c.enabled),

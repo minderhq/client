@@ -29,12 +29,17 @@ export function useRouteFocus(container: RefObject<HTMLElement | null>): void {
     if (navigationType === "REPLACE") return;
     // After paint, so the new page (and its heading) is in the DOM.
     const id = requestAnimationFrame(() => {
-      const root = container.current;
-      if (!root) return;
-      const target = root.querySelector<HTMLElement>("h1") ?? root;
-      if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
-      target.focus({ preventScroll: true });
+      if (container.current) focusPageStart(container.current);
     });
     return () => cancelAnimationFrame(id);
   }, [pathname, navigationType, container]);
+}
+
+/** Focus the page's <h1> inside `container` (made programmatically
+ * focusable), or `container` itself if there is none. Also the fallback when
+ * focus can't go back where it came from (e.g. after a dialog closes). */
+export function focusPageStart(container: HTMLElement): void {
+  const target = container.querySelector<HTMLElement>("h1") ?? container;
+  if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+  target.focus({ preventScroll: true });
 }

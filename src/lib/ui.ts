@@ -113,5 +113,11 @@ export const sectionLabelClass =
 
 /** Standard page entrance — a gentle rise+fade applied to each route's root so
  * navigation feels intentional rather than a hard swap. Pair with the
- * `animate-rise` keyframe from index.css. */
-export const pageEnterClass = "animate-[rise_0.3s_cubic-bezier(0.22,1,0.36,1)_both]";
+ * `animate-rise` keyframe from index.css.
+ *
+ * Fill mode is `backwards`, not `both`: `both` keeps the keyframe's final
+ * `transform` applied after the animation ends, and an element with any
+ * transform becomes the containing block for its `position: fixed`
+ * descendants -- so an overlay rendered inside the page would cover only the
+ * content column, not the sidebar or header (#86). */
+export const pageEnterClass = "animate-[rise_0.3s_cubic-bezier(0.22,1,0.36,1)_backwards]";
