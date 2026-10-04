@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { mergeInstalledPlugins, needsCatalogFallback } from "./installedPlugins";
+import { configurableOf, mergeInstalledPlugins, needsCatalogFallback } from "./installedPlugins";
 import type { CatalogPlugin, RuntimePlugin } from "./marketplace";
 import type { Installation } from "./types";
 
@@ -401,5 +401,22 @@ describe("needsCatalogFallback", () => {
     const partial = rtNew();
     delete partial.marketplace_plugin_id;
     expect(needsCatalogFallback(null, [partial])).toBe(true);
+  });
+});
+
+describe("configurableOf", () => {
+  it("uses the running plugin's flag when the registry sends it", () => {
+    expect(configurableOf(rtNew({ configurable: true }), true)).toBe(true);
+    expect(configurableOf(rtNew({ configurable: false }), true)).toBe(false);
+    expect(configurableOf(rtNew({ configurable: false }), false)).toBe(false);
+  });
+
+  it("is unknown for a registry without the flag, so the panel asks as before", () => {
+    expect(configurableOf(rt(), true)).toBeUndefined();
+  });
+
+  it("is false for a plugin the complete runtime list doesn't include, unknown otherwise", () => {
+    expect(configurableOf(null, true)).toBe(false);
+    expect(configurableOf(null, false)).toBeUndefined();
   });
 });

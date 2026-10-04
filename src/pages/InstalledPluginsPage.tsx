@@ -15,7 +15,7 @@ import { StatusLine } from "../components/StatusLine";
 import { apiFetch, friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useAutoClearTimeout } from "../lib/browser";
-import type { InstalledEntry } from "../lib/installedPlugins";
+import { configurableOf, type InstalledEntry } from "../lib/installedPlugins";
 import { isPluginNotRunningError, type RuntimePlugin } from "../lib/marketplace";
 import type { Installation } from "../lib/types";
 import { useInstalledPlugins } from "../lib/useInstalledPlugins";
@@ -248,26 +248,33 @@ function FieldInput({
   );
 }
 
+/** The quiet line shown instead of Configure when the backend already says
+ * there's nothing to configure -- no disclosure to open, no request. */
+const NO_SETTINGS_TEXT = "No settings available for this plugin.";
+
 /** Lazily fetches this plugin's config schema on first expand -- merged in
  * from the old standalone "Plugin Configuration" page, which made a user
  * pick the same plugin twice (once to install it here, once to find it
- * again in a completely separate page to configure it). "configurable"
- * isn't implied by being listed: plugin-registry's config schema and
- * marketplace's installation record are two independent systems linked only
- * by a name match, and plugin-registry's `GET /v1/plugins` carries no
- * "configurable" flag -- so whether a plugin has settings is only known once
- * this panel asks. Runtime-loaded plugins with no per-user install (first-party
- * plugins that just run) are listed too since #2193, keyed by the same name. */
+ * again in a completely separate page to configure it). Since #2219 the
+ * runtime list says up front whether a plugin has settings (`configurable`):
+ * when it's false the card shows a quiet "No settings available" line instead,
+ * without a round trip. Against an older registry (`configurable` unknown)
+ * the panel still asks on expand and treats its 404 "not running" as "no
+ * settings". */
 export function ConfigurePanel({
   name,
   displayName = name,
   token,
+  configurable: knownConfigurable,
 }: {
   name: string;
   /** Names the "Configure" control for assistive tech ("Configure Weather");
    * every installed card has one. Defaults to the registry name. */
   displayName?: string;
   token: string;
+  /** See `configurableOf` (lib/installedPlugins). `false` renders the quiet line and never
+   * requests the config; `true` or `undefined` render the panel. */
+  configurable?: boolean;
 }) {
   const baseId = useId();
   const [loaded, setLoaded] = useState(false);
@@ -361,6 +368,15 @@ export function ConfigurePanel({
     }
   }
 
+  if (knownConfigurable === false) {
+    return (
+      <p className="mt-3 flex items-center gap-1.5 border-t border-gray-100 pt-3 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
+        <Icon name="settings" size={13} className="shrink-0" />
+        {NO_SETTINGS_TEXT}
+      </p>
+    );
+  }
+
   return (
     <details className="group mt-3 border-t border-gray-100 pt-3 dark:border-gray-800" onToggle={handleToggle}>
       <summary
@@ -406,9 +422,7 @@ export function ConfigurePanel({
         {status && <StatusLine isError={isError} className="mb-2">{status}</StatusLine>}
         {loaded && !configurable && (
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            {noInstance
-              ? "No settings available for this plugin."
-              : "This plugin has no configurable settings."}
+            {noInstance ? NO_SETTINGS_TEXT : "This plugin has no configurable settings."}
           </p>
         )}
         {loaded && configurable && (
@@ -648,7 +662,12 @@ export function InstalledPluginCard({
           />
         )}
       </div>
-      <ConfigurePanel name={entry.name} displayName={entry.displayName} token={token} />
+      <ConfigurePanel
+        name={entry.name}
+        displayName={entry.displayName}
+        token={token}
+        configurable={configurableOf(runtime, runtimeKnown)}
+      />
     </section>
   );
 }

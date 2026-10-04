@@ -707,6 +707,111 @@ describe("InstalledPluginCard — uninstall", () => {
   });
 });
 
+describe("ConfigurePanel with a known configurable flag (#2219)", () => {
+  it("shows a quiet 'No settings available' line -- no disclosure, no request -- when false", () => {
+    render(<ConfigurePanel name="my-plugin" displayName="My Plugin" token="tok" configurable={false} />);
+
+    expect(screen.getByText("No settings available for this plugin.")).toBeTruthy();
+    expect(screen.queryByText("Configure")).toBeNull();
+    expect(document.querySelector("details")).toBeNull();
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it("offers Configure and loads the schema on expand when true", async () => {
+    apiFetch.mockResolvedValue({
+      configurable: true,
+      schema: [{ key: "greeting", type: "string" }],
+      values: { greeting: "hello" },
+    });
+    render(<ConfigurePanel name="my-plugin" displayName="My Plugin" token="tok" configurable />);
+    expect(apiFetch).not.toHaveBeenCalled();
+
+    const summary = screen.getByText("Configure", { selector: "summary" });
+    expect(summary.getAttribute("aria-label")).toBe("Configure My Plugin");
+    fireEvent.click(summary);
+
+    expect(await screen.findByLabelText("greeting")).toBeTruthy();
+    expect(apiFetch).toHaveBeenCalledWith("/v1/plugins/my-plugin/config", { token: "tok" });
+  });
+
+  it("still treats a 404 'not running' as no settings when true (a plugin that stopped since the list)", async () => {
+    apiFetch.mockRejectedValue(
+      Object.assign(new Error("Plugin 'my-plugin' is not running"), { status: 404 }),
+    );
+    render(<ConfigurePanel name="my-plugin" token="tok" configurable />);
+
+    fireEvent.click(screen.getByText("Configure"));
+    expect(await screen.findByText("No settings available for this plugin.")).toBeTruthy();
+  });
+});
+
+describe("InstalledPluginsPage — Configure from the runtime list", () => {
+  function configCalls() {
+    return apiFetch.mock.calls.filter(([p]) => String(p).endsWith("/config"));
+  }
+
+  it("offers Configure only for plugins the registry says are configurable", async () => {
+    mockApi({
+      runtime: [
+        runtimeNew({ name: "weather", configurable: true }),
+        runtimeNew({ name: "jokes", configurable: false, marketplace_plugin_id: null }),
+      ],
+    });
+    render(<InstalledPluginsPage />);
+
+    await screen.findByRole("heading", { name: "weather" });
+    expect(within(cardFor("weather")).getByText("Configure", { selector: "summary" })).toBeTruthy();
+    const jokes = cardFor("jokes");
+    expect(within(jokes).queryByText("Configure")).toBeNull();
+    expect(within(jokes).getByText("No settings available for this plugin.")).toBeTruthy();
+    expect(configCalls()).toEqual([]);
+  });
+
+  it("shows no settings, without a request, for an install that isn't running", async () => {
+    // The submission named like the running git plugin: asking
+    // /v1/plugins/jokes/config would have read the OTHER plugin's settings.
+    mockApi({
+      installations: [
+        installationNew({ plugin_id: "cat-jokes", name: "jokes", display_name: "Jokes (submitted)", origin: "submitted" }),
+      ],
+      runtime: [runtimeNew({ name: "jokes", install_source: "git", marketplace_plugin_id: null })],
+    });
+    render(<InstalledPluginsPage />);
+
+    await screen.findByRole("heading", { name: "Jokes (submitted)" });
+    expect(
+      within(cardFor("Jokes (submitted)")).getByText("No settings available for this plugin."),
+    ).toBeTruthy();
+    expect(configCalls()).toEqual([]);
+  });
+
+  it("asks lazily, as before, when the registry predates the flag", async () => {
+    apiFetch.mockImplementation((path: string) => {
+      if (path.startsWith("/v1/plugins?"))
+        return Promise.resolve({ plugins: [runtimePlugin()], total: 1 });
+      if (path.startsWith("/v1/marketplace/plugins?"))
+        return Promise.resolve({ plugins: [catalogRow()], total: 1 });
+      if (path.endsWith("/config"))
+        return Promise.reject(Object.assign(new Error("Plugin 'weather' is not running"), { status: 404 }));
+      return Promise.resolve({ installations: [], count: 0 });
+    });
+    render(<InstalledPluginsPage />);
+
+    await screen.findByRole("heading", { name: "Weather" });
+    fireEvent.click(within(cardFor("Weather")).getByText("Configure"));
+    expect(await screen.findByText("No settings available for this plugin.")).toBeTruthy();
+    expect(configCalls().map(([p]) => p)).toEqual(["/v1/plugins/weather/config"]);
+  });
+
+  it("keeps Configure for an install when the runtime list couldn't load", async () => {
+    mockApi({ installations: [installationNew()], runtime: new Error("registry down") });
+    render(<InstalledPluginsPage />);
+
+    await screen.findByRole("heading", { name: "My Plugin" });
+    expect(within(cardFor("My Plugin")).getByText("Configure", { selector: "summary" })).toBeTruthy();
+  });
+});
+
 describe("ConfigurePanel", () => {
   it("loads the schema on first expand and shows 'no configurable settings' when not configurable", async () => {
     apiFetch.mockResolvedValue({ configurable: false, schema: [], values: {} });

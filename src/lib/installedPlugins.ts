@@ -42,6 +42,21 @@ export interface InstalledEntry {
   requiresServices: string[];
 }
 
+/** Whether the card should offer Configure, from what the backend already
+ * told us: `true`/`false` from the running plugin's `configurable` (#2219,
+ * the same predicate `GET /v1/plugins/{name}/config` uses); `false` when the
+ * complete runtime list doesn't include the plugin (nothing is running to
+ * ask -- the config endpoint would 404 "not running"); `undefined` when
+ * unknown (a registry older than #2219, or the runtime list didn't load), in
+ * which case the panel asks lazily as before. */
+export function configurableOf(
+  runtime: RuntimePlugin | null,
+  runtimeKnown: boolean,
+): boolean | undefined {
+  if (runtime) return typeof runtime.configurable === "boolean" ? runtime.configurable : undefined;
+  return runtimeKnown ? false : undefined;
+}
+
 /** Whether the Installed view must fall back to fetching the whole catalog:
  * true only when a payload comes from a backend older than #2219 -- a runtime
  * entry without `install_source`/`marketplace_plugin_id`, or an installation
