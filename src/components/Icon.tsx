@@ -19,6 +19,7 @@ import {
   Copy,
   CornerDownLeft,
   ExternalLink,
+  FileCode,
   FileText,
   Filter,
   FolderGit2,
@@ -112,6 +113,7 @@ export const ICONS = {
   // Plugin source badges / version + health hints (#2193)
   "source-first-party": BadgeCheck,
   "source-git": GitBranch,
+  "source-manifest": FileCode,
   "version-up": CircleArrowUp,
   health: HeartPulse,
   // AI tools

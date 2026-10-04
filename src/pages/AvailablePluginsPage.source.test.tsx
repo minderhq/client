@@ -1,4 +1,4 @@
-// Browse's source badge + source filter (#2193), against a real router so the
+// Browse's source badge + source filter (#2193, #2223), against a real router so the
 // ?source= URL state is exercised end to end (AvailablePluginsPage.test.tsx
 // stubs react-router-dom, which can't observe the URL).
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -51,7 +51,9 @@ function plugin(overrides: Partial<CatalogPlugin>): CatalogPlugin {
 }
 
 const FIRST = plugin({ id: "1", name: "weather", display_name: "Weather" });
-const PRIVATE = plugin({
+// A first-party row whose manifest names a repo outside minderhq/plugins: the
+// #2193 URL heuristic called this "Private git"; its origin says First-party.
+const THIRD_PARTY_REPO = plugin({
   id: "2",
   name: "crm",
   display_name: "Internal CRM",
@@ -60,12 +62,30 @@ const PRIVATE = plugin({
 const SUBMITTED = plugin({ id: "3", name: "jokes", display_name: "Jokes", origin: "submitted" });
 const UNKNOWN = plugin({ id: "4", name: "legacy", display_name: "Legacy", origin: undefined });
 
-function mockCatalog(plugins: CatalogPlugin[], featured: CatalogPlugin[] = []) {
+/** Catalog paths requested so far (list + search, not Featured). */
+function catalogPaths(): string[] {
+  return apiFetch.mock.calls
+    .map(([path]) => String(path))
+    .filter((path) => path.startsWith("/v1/marketplace/plugins") && !path.includes("/featured"));
+}
+
+/** A catalog backend. `honoursOrigin` (default): one with #2219, applying the
+ * `origin` filter server-side. `false`: an older marketplace, which ignores
+ * the unknown param and returns every origin. */
+function mockCatalog(
+  plugins: CatalogPlugin[],
+  featured: CatalogPlugin[] = [],
+  { honoursOrigin = true }: { honoursOrigin?: boolean } = {},
+) {
   apiFetch.mockImplementation((path: string) => {
     if (path.startsWith("/v1/marketplace/plugins/featured"))
       return Promise.resolve({ plugins: featured, total: featured.length });
-    if (path.startsWith("/v1/marketplace/plugins"))
-      return Promise.resolve({ plugins, total: plugins.length });
+    if (path.startsWith("/v1/marketplace/plugins")) {
+      const origin = new URL(path, "http://x").searchParams.get("origin");
+      const rows =
+        honoursOrigin && origin ? plugins.filter((p) => p.origin === origin) : plugins;
+      return Promise.resolve({ plugins: rows, total: rows.length });
+    }
     return Promise.resolve({});
   });
 }
@@ -107,8 +127,8 @@ afterEach(() => {
 });
 
 describe("Browse source badges", () => {
-  it("puts exactly one source badge on each classifiable card", async () => {
-    mockCatalog([FIRST, PRIVATE, SUBMITTED, UNKNOWN]);
+  it("badges each card from its catalog origin, never from its repository URL", async () => {
+    mockCatalog([FIRST, THIRD_PARTY_REPO, SUBMITTED, UNKNOWN]);
     renderAt("/plugins/available");
 
     await screen.findByText("Weather");
@@ -119,21 +139,25 @@ describe("Browse source badges", () => {
       );
     };
     expect(badgeOf("Weather")).toEqual(["first_party"]);
-    expect(badgeOf("Internal CRM")).toEqual(["private_git"]);
+    expect(badgeOf("Internal CRM")).toEqual(["first_party"]);
     expect(badgeOf("Jokes")).toEqual(["submitted"]);
     const firstParty = screen
       .getByRole("heading", { name: "Weather" })
       .closest("section")!
       .querySelector("[data-source]")!;
     expect(firstParty.textContent).toMatch(/^Source: First-party \(/);
-    // no origin, no repository: nothing to go on, so no badge rather than a guess
+    // no origin: nothing to go on, so no badge rather than a guess
     expect(badgeOf("Legacy")).toEqual([]);
   });
 
-  it("offers the source legend next to the filters", async () => {
+  it("offers a source legend explaining only the sources a listing can have", async () => {
     mockCatalog([FIRST]);
     renderAt("/plugins/available");
-    expect(await screen.findByText("What do the source badges mean?")).toBeTruthy();
+    const summary = await screen.findByText("What do the source badges mean?");
+    const terms = Array.from(summary.closest("details")!.querySelectorAll("dt")).map(
+      (dt) => dt.textContent,
+    );
+    expect(terms).toEqual(["First-party", "Submitted on this instance"]);
   });
 
   it("shows the listed version on Browse cards", async () => {
@@ -146,7 +170,7 @@ describe("Browse source badges", () => {
 });
 
 describe("Browse source filter", () => {
-  it("offers All / First-party / Private git / Submitted", async () => {
+  it("offers All / First-party / Submitted", async () => {
     mockCatalog([FIRST]);
     renderAt("/plugins/available");
 
@@ -154,63 +178,108 @@ describe("Browse source filter", () => {
     expect(Array.from(select.options).map((o) => o.text)).toEqual([
       "All sources",
       "First-party",
-      "Private git",
       "Submitted on this instance",
     ]);
     expect(select.value).toBe("");
   });
 
-  it("filters the loaded list client-side and records the choice in ?source=", async () => {
-    mockCatalog([FIRST, PRIVATE, SUBMITTED]);
+  it("filters server-side with the origin param and records the choice in ?source=", async () => {
+    mockCatalog([FIRST, THIRD_PARTY_REPO, SUBMITTED]);
     renderAt("/plugins/available");
     await screen.findByText("Weather");
-    const catalogCalls = apiFetch.mock.calls.length;
+    expect(catalogPaths().every((p) => !p.includes("origin="))).toBe(true);
 
-    fireEvent.change(screen.getByLabelText("Filter by source"), { target: { value: "private" } });
+    fireEvent.change(screen.getByLabelText("Filter by source"), {
+      target: { value: "submitted" },
+    });
 
-    await waitFor(() => expect(headings()).toEqual(["Internal CRM"]));
-    expect(location).toBe("?source=private");
-    // client-side: no new catalog request for a source change
-    expect(apiFetch.mock.calls.length).toBe(catalogCalls);
+    await waitFor(() => expect(headings()).toEqual(["Jokes"]));
+    expect(location).toBe("?source=submitted");
+    // A fresh first page, asked for by origin (so it covers every page).
+    expect(catalogPaths().at(-1)).toBe(
+      "/v1/marketplace/plugins?limit=20&offset=0&origin=submitted",
+    );
+    // The server applied it, so there's no "loaded pages only" caveat.
+    expect(screen.queryByText(/can't filter by source/)).toBeNull();
+    expect(screen.getByLabelText("Filter by source").getAttribute("aria-describedby")).toBeNull();
+  });
+
+  it("sends the origin param with a search too", async () => {
+    mockCatalog([FIRST, SUBMITTED]);
+    renderAt("/plugins/available?q=we&source=first-party");
+
+    await screen.findByText("Weather");
+    expect(catalogPaths().at(-1)).toBe(
+      "/v1/marketplace/plugins/search?q=we&limit=20&offset=0&origin=first_party",
+    );
   });
 
   it("restores the filter from a shared URL", async () => {
-    mockCatalog([FIRST, PRIVATE, SUBMITTED]);
+    mockCatalog([FIRST, THIRD_PARTY_REPO, SUBMITTED]);
     renderAt("/plugins/available?source=submitted");
 
     await screen.findByText("Jokes");
     expect(headings()).toEqual(["Jokes"]);
     expect((screen.getByLabelText("Filter by source") as HTMLSelectElement).value).toBe("submitted");
+    expect(catalogPaths().every((p) => p.endsWith("&origin=submitted"))).toBe(true);
   });
 
   it("clears ?source= on All, keeping other params", async () => {
-    mockCatalog([FIRST, PRIVATE]);
-    renderAt("/plugins/available?q=crm&source=private");
-    await screen.findByText("Internal CRM");
+    mockCatalog([FIRST, SUBMITTED]);
+    renderAt("/plugins/available?q=crm&source=submitted");
+    await screen.findByText("Jokes");
 
     fireEvent.change(screen.getByLabelText("Filter by source"), { target: { value: "" } });
 
     await waitFor(() => expect(location).toBe("?q=crm"));
+    await waitFor(() => expect(catalogPaths().at(-1)).not.toContain("origin="));
   });
 
-  it("treats an unknown ?source= value as All", async () => {
-    mockCatalog([FIRST, PRIVATE]);
-    renderAt("/plugins/available?source=bogus");
+  it.each(["bogus", "private", "manifest"])(
+    "treats ?source=%s as All (old Private git links included)",
+    async (value) => {
+      mockCatalog([FIRST, THIRD_PARTY_REPO]);
+      renderAt(`/plugins/available?source=${value}`);
 
-    await screen.findByText("Weather");
-    expect(headings()).toEqual(["Weather", "Internal CRM"]);
-    expect((screen.getByLabelText("Filter by source") as HTMLSelectElement).value).toBe("");
-  });
+      await screen.findByText("Weather");
+      expect(headings()).toEqual(["Weather", "Internal CRM"]);
+      expect((screen.getByLabelText("Filter by source") as HTMLSelectElement).value).toBe("");
+      expect(catalogPaths().every((p) => !p.includes("origin="))).toBe(true);
+    },
+  );
 
-  it("applies to Featured too, and explains an empty filtered page", async () => {
+  it("applies to Featured too, and says when nothing matches", async () => {
     mockCatalog([FIRST], [plugin({ id: "9", display_name: "Featured First", featured: true })]);
-    renderAt("/plugins/available?source=private");
+    renderAt("/plugins/available?source=submitted");
 
-    expect(
-      await screen.findByText("No plugins on this page match the selected filters."),
-    ).toBeTruthy();
+    expect(await screen.findByText("No plugins match the selected filters.")).toBeTruthy();
     expect(screen.queryByText("Featured First")).toBeNull();
     expect(screen.queryByText("Weather")).toBeNull();
+  });
+
+  describe("on a marketplace without the origin filter (older backend)", () => {
+    it("still filters the loaded pages client-side and says that's all it covers", async () => {
+      mockCatalog([FIRST, THIRD_PARTY_REPO, SUBMITTED], [], { honoursOrigin: false });
+      renderAt("/plugins/available?source=submitted");
+
+      await waitFor(() => expect(headings()).toEqual(["Jokes"]));
+      const hint = screen.getByText(/This server can't filter by source/);
+      expect(hint.textContent).toContain("only covers the plugins loaded so far");
+      // The select points at the caveat, so a screen reader hears it on focus.
+      expect(screen.getByLabelText("Filter by source").getAttribute("aria-describedby")).toBe(
+        hint.id,
+      );
+    });
+
+    it("explains an empty filtered page instead of claiming the catalog has none", async () => {
+      mockCatalog([FIRST], [], { honoursOrigin: false });
+      renderAt("/plugins/available?source=submitted");
+
+      expect(
+        await screen.findByText("No plugins on this page match the selected filters."),
+      ).toBeTruthy();
+      expect(screen.getByText(/This server can't filter by source/)).toBeTruthy();
+    });
   });
 });
 

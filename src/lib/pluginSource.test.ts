@@ -1,86 +1,93 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  isFirstPartyCatalogUrl,
+  CATALOG_SOURCE_KINDS,
+  INSTALLED_SOURCE_KINDS,
   matchesSourceFilter,
   parseSourceFilter,
-  resolveSource,
+  resolveCatalogSource,
+  serverOriginFilter,
   SOURCE_FILTER_KINDS,
   SOURCE_META,
+  sourceFromInstallSource,
+  sourceFromOrigin,
   type SourceKind,
 } from "./pluginSource";
 
-describe("isFirstPartyCatalogUrl", () => {
+describe("sourceFromInstallSource", () => {
   it.each([
-    "https://github.com/minderhq/plugins",
-    "https://github.com/minderhq/plugins/",
-    "https://github.com/minderhq/plugins.git",
-    "https://www.github.com/MinderHQ/Plugins",
-    "https://github.com/minderhq/plugins/tree/main/weather",
-    "  https://github.com/minderhq/plugins  ",
-  ])("recognises %s as the first-party catalog", (url) => {
-    expect(isFirstPartyCatalogUrl(url)).toBe(true);
+    ["vendored", "first_party"],
+    ["git", "private_git"],
+    ["manifest", "manifest"],
+  ] as const)("maps install_source=%s to %s", (value, kind) => {
+    expect(sourceFromInstallSource(value)).toBe(kind);
   });
 
-  it.each([
-    "https://github.com/acme/plugins",
-    "https://github.com/minderhq/plugins-extra",
-    "https://gitlab.com/minderhq/plugins",
-    "https://github.com.evil.example/minderhq/plugins",
-    "https://github.com/minderhq",
-    "not a url",
-    "",
-  ])("does not treat %s as the first-party catalog", (url) => {
-    expect(isFirstPartyCatalogUrl(url)).toBe(false);
-  });
+  it.each([null, undefined, "", "mindhub", "Vendored", "constructor", "__proto__", 1, {}])(
+    "gives no badge for %s (null, unknown, reserved or not a string)",
+    (value) => {
+      expect(sourceFromInstallSource(value)).toBeNull();
+    },
+  );
 });
 
-describe("resolveSource", () => {
-  it("maps origin=first_party with no repository to First-party", () => {
-    expect(resolveSource({ origin: "first_party", repository_url: null })).toBe("first_party");
+describe("sourceFromOrigin / resolveCatalogSource", () => {
+  it("maps origin first_party → First-party and submitted → Submitted", () => {
+    expect(sourceFromOrigin("first_party")).toBe("first_party");
+    expect(sourceFromOrigin("submitted")).toBe("submitted");
+    expect(resolveCatalogSource({ origin: "first_party" })).toBe("first_party");
+    expect(resolveCatalogSource({ origin: "submitted" })).toBe("submitted");
   });
 
-  it("keeps a first-party row that links the first-party catalog repo First-party", () => {
-    expect(
-      resolveSource({
-        origin: "first_party",
-        repository_url: "https://github.com/minderhq/plugins/tree/main/weather",
-      }),
-    ).toBe("first_party");
+  it("ignores repository_url entirely (no URL heuristic)", () => {
+    const rows = [
+      { origin: "first_party", repository_url: "https://git.example.com/team/plugin" },
+      { origin: "submitted", repository_url: "https://github.com/minderhq/plugins" },
+    ];
+    expect(rows.map(resolveCatalogSource)).toEqual(["first_party", "submitted"]);
+    expect(resolveCatalogSource({ repository_url: "https://github.com/acme/plugin" } as never)).toBeNull();
   });
 
-  it("maps a repository outside the first-party catalog to Private git", () => {
-    expect(
-      resolveSource({ origin: "first_party", repository_url: "https://git.example.com/team/plugin" }),
-    ).toBe("private_git");
-    // even with no origin at all
-    expect(resolveSource({ repository_url: "https://github.com/acme/plugin" })).toBe("private_git");
-  });
-
-  it("maps origin=submitted to Submitted, whatever repository it links", () => {
-    expect(resolveSource({ origin: "submitted", repository_url: null })).toBe("submitted");
-    expect(
-      resolveSource({ origin: "submitted", repository_url: "https://github.com/someone/plugin" }),
-    ).toBe("submitted");
-  });
-
-  it("returns null (no badge) when there's nothing to classify by", () => {
-    expect(resolveSource(null)).toBeNull();
-    expect(resolveSource(undefined)).toBeNull();
-    expect(resolveSource({})).toBeNull();
-    expect(resolveSource({ origin: "something_new", repository_url: "  " })).toBeNull();
+  it("returns null (no badge) for a missing, null or unknown origin", () => {
+    expect(resolveCatalogSource(null)).toBeNull();
+    expect(resolveCatalogSource(undefined)).toBeNull();
+    expect(resolveCatalogSource({})).toBeNull();
+    expect(resolveCatalogSource({ origin: null })).toBeNull();
+    expect(resolveCatalogSource({ origin: "something_new" })).toBeNull();
+    expect(sourceFromOrigin("hasOwnProperty")).toBeNull();
   });
 
   it("never resolves to the reserved MindHub source (Phase 2)", () => {
-    for (const origin of ["first_party", "submitted", "mindhub", undefined]) {
-      expect(resolveSource({ origin, repository_url: null })).not.toBe("mindhub");
+    for (const v of ["first_party", "submitted", "mindhub", "vendored", "git", "manifest", undefined]) {
+      expect(resolveCatalogSource({ origin: v })).not.toBe("mindhub");
+      expect(sourceFromInstallSource(v)).not.toBe("mindhub");
     }
   });
 });
 
+describe("source kinds per view", () => {
+  it("explains on Installed every kind an install can have, MindHub still reserved", () => {
+    expect(INSTALLED_SOURCE_KINDS).toEqual(["first_party", "private_git", "manifest", "submitted"]);
+  });
+
+  it("limits Discover to the kinds a catalog row can have", () => {
+    expect(CATALOG_SOURCE_KINDS).toEqual(["first_party", "submitted"]);
+  });
+});
+
 describe("source filter", () => {
-  it("offers All + First-party / Private git / Submitted, not MindHub yet", () => {
-    expect(SOURCE_FILTER_KINDS).toEqual(["first_party", "private_git", "submitted"]);
+  it("offers All + First-party / Submitted (what a catalog row can be), not MindHub yet", () => {
+    expect(SOURCE_FILTER_KINDS).toEqual(["first_party", "submitted"]);
+  });
+
+  it("maps each offered filter to the server-side origin param", () => {
+    expect(serverOriginFilter("first_party")).toBe("first_party");
+    expect(serverOriginFilter("submitted")).toBe("submitted");
+    expect(serverOriginFilter(null)).toBeNull();
+    // Install-only kinds have no catalog origin to filter by.
+    expect(serverOriginFilter("private_git")).toBeNull();
+    expect(serverOriginFilter("manifest")).toBeNull();
+    expect(serverOriginFilter("mindhub")).toBeNull();
   });
 
   it("round-trips each filter through its URL value", () => {
@@ -89,7 +96,6 @@ describe("source filter", () => {
     }
     expect(SOURCE_FILTER_KINDS.map((k) => SOURCE_META[k].param)).toEqual([
       "first-party",
-      "private",
       "submitted",
     ]);
   });
@@ -100,10 +106,14 @@ describe("source filter", () => {
     expect(parseSourceFilter("bogus")).toBeNull();
     expect(parseSourceFilter("first_party")).toBeNull(); // the kind, not the URL value
     expect(parseSourceFilter("mindhub")).toBeNull();
+    // Old #2193 links: a catalog row is never a git/manifest install (#2219),
+    // so these open on All sources instead of an always-empty list.
+    expect(parseSourceFilter("private")).toBeNull();
+    expect(parseSourceFilter("manifest")).toBeNull();
   });
 
   it("matches everything under All, and only the selected source otherwise", () => {
-    const kinds: (SourceKind | null)[] = ["first_party", "private_git", "submitted", null];
+    const kinds: (SourceKind | null)[] = ["first_party", "private_git", "manifest", "submitted", null];
     for (const k of kinds) expect(matchesSourceFilter(k, null)).toBe(true);
     expect(matchesSourceFilter("first_party", "first_party")).toBe(true);
     expect(matchesSourceFilter("submitted", "first_party")).toBe(false);

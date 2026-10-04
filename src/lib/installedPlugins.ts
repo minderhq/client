@@ -5,7 +5,8 @@
 // install row at all -- until decision (B) on #2091 unifies them.
 
 import type { CatalogPlugin, RuntimePlugin } from "./marketplace";
-import { resolveSource, type SourceKind } from "./pluginSource";
+import type { SourceKind } from "./pluginSource";
+import { legacyCatalogRowSource } from "./pluginSourceLegacy";
 import { normalizeVersion } from "./pluginVersion";
 import type { Installation } from "./types";
 
@@ -87,7 +88,7 @@ export function mergeInstalledPlugins(
       installation,
       runtime: rt,
       catalog: row,
-      source: resolveSource(row),
+      source: legacyCatalogRowSource(row),
       installedVersion:
         normalizeVersion(rt?.version) ?? normalizeVersion(installation?.version),
       listedVersion:
