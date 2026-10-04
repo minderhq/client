@@ -263,6 +263,11 @@ describe("ExportImportPanel import: preview, confirm, cancel (#2195)", () => {
     expect(text).toContain("Skipped (2)core-services (core can't be disabled)no-such-bundle (unknown bundle)");
     // The preview is part of the dialog's description, read with the question.
     expect(describedBy(dialog)).toContain("Will be enabled (1)monitoring");
+    // So is the "review first" guidance: the page behind the dialog is inert,
+    // so it can't come from the page's status line, which is left empty.
+    expect(describedBy(dialog)).toMatch(/^Review the changes importing this file will make/);
+    expect(screen.queryByText(/Review the changes to apply/)).toBeNull();
+    expect(screen.queryByText("Reading file…")).toBeNull();
     expect(apiFetch).not.toHaveBeenCalled();
 
     // Disabling stops services, so the confirm button carries the danger style.
@@ -299,6 +304,32 @@ describe("ExportImportPanel import: preview, confirm, cancel (#2195)", () => {
     expect(
       (screen.getByLabelText("Import bundle state from a JSON file") as HTMLInputElement).value,
     ).toBe("");
+  });
+
+  it("puts focus on the page heading after Cancel, since the busy file input is disabled", async () => {
+    render(
+      <main>
+        <h1>Installed service bundles</h1>
+        <ExportImportPanel
+          bundles={[bundle({ name: "monitoring", enabled: false })]}
+          token="tok"
+          isAdmin
+          onChanged={onChanged}
+        />
+      </main>,
+    );
+    const input = screen.getByLabelText("Import bundle state from a JSON file");
+    input.focus();
+
+    importFile({ monitoring: { enabled: true } });
+    const dialog = await previewDialog();
+    expect(input.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    await screen.findByText("Import cancelled — nothing was changed.");
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", { name: "Installed service bundles" }),
+    );
   });
 
   it("Escape cancels too, without a request", async () => {
