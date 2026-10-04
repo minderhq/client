@@ -105,9 +105,14 @@ src/
 - **`marketplace.ts`** — typed marketplace / plugin-registry calls and shapes
   (catalog, runtime-loaded plugins, `installations/me`); the start of #2198's
   single typed module. **`installedPlugins.ts`** + **`useInstalledPlugins.ts`**
-  merge the runtime list with your installs for Installed › Plugins;
-  **`pluginSource.ts`** classifies a plugin's source (First-party / Private git /
-  Submitted, MindHub reserved) for `SourceBadge` and Discover's `?source=` filter;
+  merge the runtime list with your installs for Installed › Plugins, joined by
+  the backend's `marketplace_plugin_id` (the whole catalog is fetched only from
+  a backend that predates those fields); **`pluginSource.ts`** maps the
+  backend's `install_source` / `origin` to a source (First-party / Private git /
+  Manifest upload / Submitted, MindHub reserved) for `SourceBadge` and
+  Discover's `?source=` filter (sent as the catalog's `origin` param).
+  **`pluginSourceLegacy.ts`** holds the old repository-URL heuristic, used only
+  for those older backends;
   **`pluginVersion.ts`** compares installed vs listed versions.
   **`submissionReview.ts`** holds the submission review queue's shapes, status
   vocabulary, reviewer transitions (mirroring the backend state machine) and
