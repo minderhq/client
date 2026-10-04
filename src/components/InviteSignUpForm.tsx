@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { friendlyErrorMessage } from "../lib/api";
-import { useAuth } from "../lib/auth";
+import { type RegisterLanding, useAuth } from "../lib/auth";
 import {
   isExistingEmail,
   registrationErrorMessage,
@@ -19,7 +19,7 @@ export type SignUpOutcome =
   /** The API refused the account (invite unusable, or existing users only). */
   | { kind: "refused"; refusal: RegistrationRefusal; message: string }
   /** The account was created and the invite accepted, but signing in failed. */
-  | { kind: "created-not-signed-in"; message: string };
+  | { kind: "created-not-signed-in"; message: string; landing: RegisterLanding };
 
 /** "Create account" for someone opening an invite link without an account.
  *
@@ -45,7 +45,8 @@ export function InviteSignUpForm({
   lockedEmail: string;
   /** The masked invited address, shown as a hint; "" for none. */
   maskedEmail: string;
-  onSignedIn: () => void;
+  /** Signed in; `landing` is the API's hint for where the account belongs. */
+  onSignedIn: (landing: RegisterLanding) => void;
   onStopped: (outcome: SignUpOutcome) => void;
   onSignInInstead: () => void;
 }) {
@@ -56,18 +57,26 @@ export function InviteSignUpForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [emailTaken, setEmailTaken] = useState(false);
+  // The API refused the address for this invite: mark the field itself.
+  const [emailMismatch, setEmailMismatch] = useState(false);
 
   const emailLocked = !!lockedEmail;
   const email = emailLocked ? lockedEmail : emailInput;
   const emailHintId = emailLocked || maskedEmail ? "invite-email-hint" : undefined;
+  const emailDescribedBy =
+    [emailHintId, emailMismatch ? "invite-signup-error" : undefined]
+      .filter(Boolean)
+      .join(" ") || undefined;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError("");
     setEmailTaken(false);
+    setEmailMismatch(false);
+    let landing: RegisterLanding;
     try {
-      await register(username, email, password, inviteToken);
+      landing = await register(username, email, password, inviteToken);
     } catch (err) {
       const refusal = registrationRefusal(err);
       // These leave nothing to fix in the form: hand the next step to the page.
@@ -76,6 +85,7 @@ export function InviteSignUpForm({
         return;
       }
       setEmailTaken(isExistingEmail(err));
+      setEmailMismatch(refusal === "invite_email_mismatch");
       setError(registrationErrorMessage(err));
       setBusy(false);
       return;
@@ -86,11 +96,12 @@ export function InviteSignUpForm({
     } catch (err) {
       onStopped({
         kind: "created-not-signed-in",
+        landing,
         message: `Your account was created and the invite accepted, but signing in failed (${friendlyErrorMessage(err)}). Sign in to continue.`,
       });
       return;
     }
-    onSignedIn();
+    onSignedIn(landing);
   }
 
   return (
@@ -132,9 +143,13 @@ export function InviteSignUpForm({
           type="email"
           autoComplete="email"
           value={email}
-          onChange={(e) => setEmailInput(e.target.value)}
+          onChange={(e) => {
+            setEmailInput(e.target.value);
+            setEmailMismatch(false);
+          }}
           readOnly={emailLocked}
-          aria-describedby={emailHintId}
+          aria-invalid={emailMismatch || undefined}
+          aria-describedby={emailDescribedBy}
           required
         />
         {emailLocked && (
@@ -174,7 +189,7 @@ export function InviteSignUpForm({
         {busy ? "Creating your account…" : "Create account & join"}
       </button>
 
-      <StatusLine isError>
+      <StatusLine isError id="invite-signup-error">
         {error}
         {emailTaken && (
           <>

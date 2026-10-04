@@ -16,14 +16,18 @@ export function StatusLine({
   isError = false,
   children,
   className,
+  id,
 }: {
   isError?: boolean;
   children: ReactNode;
   className?: string;
+  /** For a field's `aria-describedby` to point at this message. */
+  id?: string;
 }) {
   const base = statusClass(isError);
   return (
     <div
+      id={id}
       className={className ? `${base} ${className}` : base}
       role={isError ? "alert" : "status"}
       aria-live={isError ? "assertive" : "polite"}

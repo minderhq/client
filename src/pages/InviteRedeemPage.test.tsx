@@ -27,11 +27,14 @@ vi.mock("react-router-dom", async () => {
 });
 
 let registrationState: RegistrationModeState = { mode: "invite", loading: false };
+const useRegistrationMode = vi.fn(
+  (opts?: { enabled?: boolean }): RegistrationModeState => (void opts, registrationState),
+);
 vi.mock("../lib/registration", async () => ({
   ...(await vi.importActual<typeof import("../lib/registration")>(
     "../lib/registration",
   )),
-  useRegistrationMode: () => registrationState,
+  useRegistrationMode: (opts?: { enabled?: boolean }) => useRegistrationMode(opts),
 }));
 
 const loginWithToken = vi.fn();
@@ -93,6 +96,7 @@ describe("InviteRedeemPage", () => {
     register.mockReset();
     mockAuth = signedOut();
     registrationState = { mode: "invite", loading: false };
+    useRegistrationMode.mockClear();
     oidcLoginUrl = "";
   });
 
@@ -160,6 +164,86 @@ describe("InviteRedeemPage", () => {
           "tok123",
         ),
       );
+    });
+
+    it("decides from email_bound, not the look of the address", async () => {
+      // A bound invite whose masked form has no "***" is still only a hint.
+      await openAsNewcomer({
+        email: "invitee@example.com",
+        email_bound: true,
+        can_create_account: true,
+      });
+      const email = screen.getByLabelText("Email") as HTMLInputElement;
+      expect(email.value).toBe("");
+      expect(email.readOnly).toBe(false);
+      expect(screen.getByText(/This invite is for/).textContent).toContain(
+        "invitee@example.com",
+      );
+    });
+
+    it("prefills read-only only for an older API without email_bound", async () => {
+      await openAsNewcomer({ email: "invitee@example.com", email_bound: null });
+      const email = screen.getByLabelText("Email") as HTMLInputElement;
+      expect(email.value).toBe("invitee@example.com");
+      expect(email.readOnly).toBe(true);
+    });
+
+    it("sets no-referrer while the page is shown", async () => {
+      await openAsNewcomer();
+      expect(document.querySelector('meta[name="referrer"]')?.getAttribute("content")).toBe(
+        "no-referrer",
+      );
+      cleanup();
+      expect(document.querySelector('meta[name="referrer"]')).toBeNull();
+    });
+
+    it("lands where the register response says", async () => {
+      register.mockResolvedValue({ organization_id: 5, team_id: null });
+      login.mockResolvedValue(undefined);
+      // A team invite, but the API says the account belongs to org 5.
+      await openAsNewcomer();
+      fillSignUp();
+      await vi.waitFor(() =>
+        expect(navigate).toHaveBeenCalledWith("/organization", { replace: true }),
+      );
+    });
+
+    it("lands a team hint on Teams", async () => {
+      register.mockResolvedValue({ organization_id: 5, team_id: 9 });
+      login.mockResolvedValue(undefined);
+      await openAsNewcomer({ organization_id: 5, org_name: "Acme", org_role: "member" });
+      fillSignUp();
+      await vi.waitFor(() =>
+        expect(navigate).toHaveBeenCalledWith("/platform/teams", { replace: true }),
+      );
+    });
+
+    it("falls back to the invite's target without a hint (older API)", async () => {
+      register.mockResolvedValue({ organization_id: null, team_id: null });
+      login.mockResolvedValue(undefined);
+      await openAsNewcomer({
+        team_id: null,
+        team_name: null,
+        team_role: null,
+        organization_id: 5,
+        org_name: "Acme",
+        org_role: "member",
+      });
+      fillSignUp();
+      await vi.waitFor(() =>
+        expect(navigate).toHaveBeenCalledWith("/organization", { replace: true }),
+      );
+    });
+
+    it("fetches the registration mode only for a signed-out visitor", async () => {
+      await openAsNewcomer();
+      expect(useRegistrationMode).toHaveBeenLastCalledWith({ enabled: true });
+      cleanup();
+      mockAuth = signedIn();
+      apiFetch.mockResolvedValue(inviteInfo());
+      renderAt("/invite/tok123");
+      await screen.findByText(/You've been invited to join/);
+      expect(useRegistrationMode).toHaveBeenLastCalledWith({ enabled: false });
     });
 
     it("leaves an unbound invite's empty address editable with no hint", async () => {
@@ -246,7 +330,9 @@ describe("InviteRedeemPage", () => {
       oidcLoginUrl = "https://sso.example.com/authorize";
       await openAsNewcomer();
       expect(screen.queryByRole("button", { name: "Create account & join" })).toBeNull();
-      expect(screen.getByText(/Sign in with SSO to accept/)).toBeTruthy();
+      // There is no SSO button on this page: the copy points to the real path.
+      expect(screen.getByText(/Choose “Sign in to accept” above, then sign in with SSO/)).toBeTruthy();
+      expect(screen.queryByRole("link", { name: /SSO/ })).toBeNull();
       expect(screen.getByRole("button", { name: "Sign in to accept" })).toBeTruthy();
     });
 
@@ -264,6 +350,16 @@ describe("InviteRedeemPage", () => {
   });
 
   describe("sign-up errors", () => {
+    it("moves focus to the message when it replaces the form with no next step", async () => {
+      register.mockRejectedValue(new ApiError("invite_invalid", 403));
+      await openAsNewcomer();
+      fillSignUp();
+      const message = await screen.findByText(/can't be used any more/);
+      await vi.waitFor(() =>
+        expect(document.activeElement).toBe(message.closest('[role="alert"]')),
+      );
+    });
+
     it("explains an unusable invite and drops the form", async () => {
       register.mockRejectedValue(new ApiError("invite_invalid", 403));
       await openAsNewcomer();
@@ -282,6 +378,18 @@ describe("InviteRedeemPage", () => {
       fillSignUp();
       await screen.findByText(/sent to a different email address/);
       expect(screen.getByRole("button", { name: "Create account & join" })).toBeTruthy();
+      // The field itself is marked and points at the message.
+      const field = screen.getByLabelText("Email");
+      expect(field.getAttribute("aria-invalid")).toBe("true");
+      const describedBy = (field.getAttribute("aria-describedby") ?? "").split(" ");
+      expect(describedBy).toContain("invite-email-hint");
+      const errorId = describedBy.find((id) => id !== "invite-email-hint") ?? "";
+      expect(document.getElementById(errorId)?.textContent).toMatch(
+        /sent to a different email address/,
+      );
+      // Editing the address clears the mark.
+      fireEvent.change(field, { target: { value: "invitee@example.com" } });
+      expect(field.getAttribute("aria-invalid")).toBeNull();
       expect(login).not.toHaveBeenCalled();
     });
 
@@ -291,6 +399,12 @@ describe("InviteRedeemPage", () => {
       fillSignUp();
       await screen.findByText(/only be used by someone who already has an account/);
       expect(screen.queryByRole("button", { name: "Create account & join" })).toBeNull();
+      // Focus moves to the next step, which replaced the form.
+      await vi.waitFor(() =>
+        expect(document.activeElement).toBe(
+          screen.getByRole("button", { name: "Sign in to accept" }),
+        ),
+      );
       fireEvent.click(screen.getByRole("button", { name: "Sign in to accept" }));
       expect(navigate).toHaveBeenCalledWith("/login", {
         state: { from: "/invite/tok123" },
@@ -325,6 +439,9 @@ describe("InviteRedeemPage", () => {
       await openAsNewcomer();
       fillSignUp();
       await screen.findByText(/Your account was created and the invite accepted/);
+      await vi.waitFor(() =>
+        expect(document.activeElement).toBe(screen.getByRole("button", { name: "Sign in" })),
+      );
       fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
       expect(navigate).toHaveBeenCalledWith("/login", {
         state: { from: "/platform/teams" },
@@ -375,6 +492,42 @@ describe("InviteRedeemPage", () => {
         expect(navigate).toHaveBeenCalledWith("/platform/teams", { replace: true }),
       );
       expect(register).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["revoked", /This invite was withdrawn/],
+      ["accepted", /This invite has already been used/],
+    ])(
+      "on a 'no longer available' 409, re-reads the invite and says it was %s",
+      async (status, text) => {
+        mockAuth = signedIn();
+        let lookups = 0;
+        apiFetch.mockImplementation((_path: string, opts?: { method?: string }) => {
+          if (opts?.method === "POST")
+            return Promise.reject(new ApiError("Invite is no longer available", 409));
+          lookups += 1;
+          return Promise.resolve(inviteInfo(lookups === 1 ? {} : { status }));
+        });
+        renderAt("/invite/tok123");
+        await screen.findByText(/You've been invited to join/);
+        fireEvent.click(screen.getByRole("button", { name: "Join Engineering" }));
+        await screen.findByText(text);
+        expect(lookups).toBe(2);
+        expect(screen.queryByRole("button", { name: "Join Engineering" })).toBeNull();
+      },
+    );
+
+    it("says 'no longer available' while the invite still reads as pending", async () => {
+      mockAuth = signedIn();
+      apiFetch.mockImplementation((_path: string, opts?: { method?: string }) => {
+        if (opts?.method === "POST")
+          return Promise.reject(new ApiError("Invite is no longer available", 409));
+        return Promise.resolve(inviteInfo());
+      });
+      renderAt("/invite/tok123");
+      await screen.findByText(/You've been invited to join/);
+      fireEvent.click(screen.getByRole("button", { name: "Join Engineering" }));
+      await screen.findByText(/This invite is no longer available: it was withdrawn, or it has/);
     });
 
     it("explains a redeem refused for another account's email", async () => {
