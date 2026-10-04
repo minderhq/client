@@ -572,9 +572,11 @@ describe("Discover plugins: recommendation links", () => {
       fireEvent.change(input, { target: { value } });
     }
     await waitFor(() => expect(window.location.search).toBe("?q=weath"));
+    // The router re-renders after window.location changes; on a slow runner the
+    // probe can lag behind it, so wait for the probe too instead of asserting at once.
+    // One URL write for the burst of keystrokes, not one per character.
+    await waitFor(() => expect(searches).toEqual(["", "?q=weath"]));
 
     expect(window.history.length).toBe(historyLength);
-    // One URL write for the burst of keystrokes, not one per character.
-    expect(searches).toEqual(["", "?q=weath"]);
   });
 });
