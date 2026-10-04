@@ -380,6 +380,84 @@ describe("mergeInstalledPlugins with #2219's fields", () => {
   });
 });
 
+describe("mergeInstalledPlugins on a mixed deploy", () => {
+  describe("new registry, marketplace older than #2219 (installations without origin)", () => {
+    it("joins a vendored plugin with a null id to its own record via the catalog row's origin", () => {
+      const entries = mergeInstalledPlugins(
+        [inst()], // no origin
+        [rtNew({ marketplace_plugin_id: null })],
+        [cat()], // id-weather, first_party
+      );
+      expect(entries).toHaveLength(1);
+      expect(entries[0].installation?.plugin_id).toBe("id-weather");
+      expect(entries[0].source).toBe("first_party");
+    });
+
+    it("keeps a same-named submission apart, since its catalog row says submitted", () => {
+      const entries = mergeInstalledPlugins(
+        [inst({ plugin_id: "id-jokes", name: "jokes", display_name: "Jokes (submitted)" })],
+        [rtNew({ name: "jokes", marketplace_plugin_id: null })],
+        [cat({ id: "id-jokes", name: "jokes", origin: "submitted" })],
+      );
+      expect(entries).toHaveLength(2);
+      expect(entries.find((e) => e.runtime)!.source).toBe("first_party");
+      expect(entries.find((e) => e.installation)!.source).toBe("submitted");
+    });
+
+    it("doesn't join by name when the catalog couldn't tell (no row)", () => {
+      const entries = mergeInstalledPlugins([inst()], [rtNew({ marketplace_plugin_id: null })], null);
+      expect(entries).toHaveLength(2);
+    });
+
+    it("badges runtime from install_source and installs from the legacy catalog row", () => {
+      const entries = mergeInstalledPlugins(
+        [inst({ plugin_id: "id-crm", name: "crm-listing", display_name: "CRM listing" })],
+        [rtNew({ name: "hook", install_source: "manifest", marketplace_plugin_id: null })],
+        [cat({ id: "id-crm", name: "crm-listing", repository_url: "https://git.example.com/crm" })],
+      );
+      const byName = Object.fromEntries(entries.map((e) => [e.name, e.source]));
+      // the record's badge is exactly what it was before #2223 (URL heuristic)
+      expect(byName).toEqual({ hook: "manifest", "crm-listing": "private_git" });
+    });
+  });
+
+  describe("registry older than #2219, new marketplace (installations with origin)", () => {
+    it("joins by name and badges from the catalog row, an install-only plugin from its origin", () => {
+      const entries = mergeInstalledPlugins(
+        [
+          instNew(), // weather, first_party
+          instNew({ plugin_id: "id-news", name: "news", display_name: "News", origin: "submitted" }),
+        ],
+        [rt({ name: "weather" }), rt({ name: "calendar" })], // no #2219 fields
+        [cat(), cat({ id: "id-cal", name: "calendar", display_name: "Calendar" })],
+      );
+      const byName = Object.fromEntries(entries.map((e) => [e.name, e]));
+      expect(byName.weather.installation?.plugin_id).toBe("id-weather");
+      expect(byName.weather.source).toBe("first_party");
+      expect(byName.calendar.source).toBe("first_party");
+      expect(byName.calendar.displayName).toBe("Calendar");
+      expect(byName.news.runtime).toBeNull();
+      expect(byName.news.source).toBe("submitted");
+    });
+  });
+});
+
+describe("mergeInstalledPlugins with several records of one name", () => {
+  it("joins a vendored plugin with a null id to the first-party record, whatever the order", () => {
+    const submitted = instNew({ plugin_id: "id-sub", name: "weather", display_name: "Weather (submitted)", origin: "submitted" });
+    const firstParty = instNew({ plugin_id: "id-weather", name: "weather", display_name: "Weather" });
+    for (const order of [
+      [submitted, firstParty],
+      [firstParty, submitted],
+    ]) {
+      const entries = mergeInstalledPlugins(order, [rtNew({ marketplace_plugin_id: null })], null);
+      expect(entries).toHaveLength(2);
+      expect(entries.find((e) => e.runtime)!.installation?.plugin_id).toBe("id-weather");
+      expect(entries.find((e) => !e.runtime)!.installation?.plugin_id).toBe("id-sub");
+    }
+  });
+});
+
 describe("needsCatalogFallback", () => {
   it("is false for #2219 payloads, and when nothing loaded", () => {
     expect(needsCatalogFallback(null, null)).toBe(false);

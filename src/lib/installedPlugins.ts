@@ -129,20 +129,34 @@ export function mergeInstalledPlugins(
     if (!catalogByName.has(row.name)) catalogByName.set(row.name, row);
   }
 
-  // One record per catalog id (the first wins).
+  /** An installation's catalog origin: its own `origin`, or -- from a
+   * marketplace older than #2219, which doesn't send it -- its catalog row's
+   * (the fallback fetches the catalog exactly in that case). */
+  function originOf(inst: Installation): string | null | undefined {
+    return hasBackendField(inst, "origin")
+      ? inst.origin
+      : catalogById.get(inst.plugin_id)?.origin;
+  }
+
+  // One record per catalog id (the first wins). By name, a first-party record
+  // wins over any other of the same name: it's the only one a running
+  // vendored plugin can be (see installationFor).
   const instById = new Map<string, Installation>();
   const instByName = new Map<string, Installation>();
   for (const inst of installations ?? []) {
     if (instById.has(inst.plugin_id)) continue;
     instById.set(inst.plugin_id, inst);
-    if (!instByName.has(inst.name)) instByName.set(inst.name, inst);
+    const held = instByName.get(inst.name);
+    if (!held || (originOf(held) !== "first_party" && originOf(inst) === "first_party")) {
+      instByName.set(inst.name, inst);
+    }
   }
 
   function installationFor(rt: RuntimePlugin): Installation | null {
     if (!hasBackendField(rt, "marketplace_plugin_id")) return instByName.get(rt.name) ?? null;
     if (rt.marketplace_plugin_id) return instById.get(rt.marketplace_plugin_id) ?? null;
     const sameName = instByName.get(rt.name);
-    return sameName && rt.install_source === "vendored" && sameName.origin === "first_party"
+    return sameName && rt.install_source === "vendored" && originOf(sameName) === "first_party"
       ? sameName
       : null;
   }

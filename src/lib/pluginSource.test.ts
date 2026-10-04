@@ -106,10 +106,15 @@ describe("source filter", () => {
     expect(parseSourceFilter("bogus")).toBeNull();
     expect(parseSourceFilter("first_party")).toBeNull(); // the kind, not the URL value
     expect(parseSourceFilter("mindhub")).toBeNull();
-    // Old #2193 links: a catalog row is never a git/manifest install (#2219),
-    // so these open on All sources instead of an always-empty list.
-    expect(parseSourceFilter("private")).toBeNull();
     expect(parseSourceFilter("manifest")).toBeNull();
+  });
+
+  it("opens an old #2193 ?source=private link on All (regression)", () => {
+    // A catalog row is never a git install (#2219), so Private git is no
+    // longer a Discover filter; its old value must not select anything.
+    expect(SOURCE_META.private_git.param).toBe("private");
+    expect(parseSourceFilter("private")).toBeNull();
+    expect(serverOriginFilter(parseSourceFilter("private"))).toBeNull();
   });
 
   it("matches everything under All, and only the selected source otherwise", () => {
