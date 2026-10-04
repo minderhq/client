@@ -68,7 +68,8 @@ export function needsCatalogFallback(
 ): boolean {
   return (
     (runtime ?? []).some(
-      (rt) => !hasBackendField(rt, "install_source") || !hasBackendField(rt, "marketplace_plugin_id"),
+      (rt) =>
+        !hasBackendField(rt, "install_source") || !hasBackendField(rt, "marketplace_plugin_id"),
     ) || (installations ?? []).some((inst) => !hasBackendField(inst, "origin"))
   );
 }
@@ -146,7 +147,10 @@ export function mergeInstalledPlugins(
       : null;
   }
 
-  function catalogRowFor(rt: RuntimePlugin | null, inst: Installation | null): CatalogPlugin | null {
+  function catalogRowFor(
+    rt: RuntimePlugin | null,
+    inst: Installation | null,
+  ): CatalogPlugin | null {
     if (inst) {
       const row = catalogById.get(inst.plugin_id);
       if (row) return row;
@@ -190,7 +194,8 @@ export function mergeInstalledPlugins(
     entries.push(entry(`runtime:${rt.name}`, rt.name, rt, inst));
   }
   for (const inst of instById.values()) {
-    if (!claimed.has(inst)) entries.push(entry(`installation:${inst.plugin_id}`, inst.name, null, inst));
+    if (claimed.has(inst)) continue;
+    entries.push(entry(`installation:${inst.plugin_id}`, inst.name, null, inst));
   }
 
   return entries.sort(

@@ -129,7 +129,10 @@ export interface RuntimePlugin {
  * predates a field (key absent) from one that sends it as null. FastAPI
  * serialises every declared field, nulls included, so an absent key reliably
  * means an older deploy. */
-export function hasBackendField<T extends object>(obj: T | null | undefined, key: keyof T): boolean {
+export function hasBackendField<T extends object>(
+  obj: T | null | undefined,
+  key: keyof T,
+): boolean {
   return obj != null && Object.prototype.hasOwnProperty.call(obj, key);
 }
 

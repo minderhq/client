@@ -272,8 +272,9 @@ export function ConfigurePanel({
    * every installed card has one. Defaults to the registry name. */
   displayName?: string;
   token: string;
-  /** See `configurableOf` (lib/installedPlugins). `false` renders the quiet line and never
-   * requests the config; `true` or `undefined` render the panel. */
+  /** See `configurableOf` (lib/installedPlugins). `false` renders the quiet
+   * line and never requests the config; `true` or `undefined` render the
+   * panel. */
   configurable?: boolean;
 }) {
   const baseId = useId();

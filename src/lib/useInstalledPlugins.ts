@@ -56,7 +56,7 @@ function settledValue<T>(r: PromiseSettledResult<T>): T | null {
 const NOT_FETCHED: PromiseSettledResult<null> = { status: "fulfilled", value: null };
 
 export interface InstalledPluginsResource extends LoadState {
-  /** The merged Installed list (runtime ∪ installations, joined to the catalog). */
+  /** The merged Installed list (runtime ∪ installations; see mergeInstalledPlugins). */
   entries: InstalledEntry[];
   reload: () => void;
   /** Local update after a successful uninstall (no re-fetch). The plugin stays
@@ -70,8 +70,9 @@ export interface InstalledPluginsResource extends LoadState {
  * installations and plugin-registry's runtime list, in parallel, each failing
  * independently so one unreachable service doesn't blank the page. Both carry
  * their source and catalog id since #2219, so the catalog is fetched (all of
- * it, paged) only when one of them comes from an older backend that doesn't. `loading` starts true when
- * enabled, so the page never flashes its empty state before the first answer.
+ * it, paged) only when one of them comes from an older backend that doesn't.
+ * `loading` starts true when enabled, so the page never flashes its empty
+ * state before the first answer.
  * Re-runs on `sessionKey` (a new login), cancels superseded runs and ignores
  * their late responses. */
 export function useInstalledPlugins({
