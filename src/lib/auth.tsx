@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import {
+  ApiError,
   apiBaseUrl,
   clearStoredToken,
   handleUnauthorized,
@@ -62,12 +63,32 @@ interface AuthContextValue {
    * active_tenant_id + org_role) and adopts it, so every subsequent request
    * reads/writes in that org's tenant context. */
   switchOrg: (organizationId: number) => Promise<void>;
+  /** Create a local account. `inviteToken` (from an `/invite/:token` link)
+   * admits it on an invite-only instance and joins the invite's team/org in
+   * the same step. Resolves to the landing hint the API returns (if any);
+   * rejects with an ApiError (status + the API's `detail`). */
   register: (
     username: string,
     email: string,
     password: string,
-  ) => Promise<void>;
+    inviteToken?: string,
+  ) => Promise<RegisterLanding>;
   logout: () => void;
+}
+
+/** Where a new account belongs, from the register response: the org it
+ * joined (its home) and, for a team invite, the team. Each is null or absent
+ * when not applicable, and both are absent from an API that predates them. */
+export interface RegisterLanding {
+  organization_id: number | null;
+  team_id: number | null;
+}
+
+/** The landing hint in a register response body, tolerating its absence. */
+function registerLanding(body: unknown): RegisterLanding {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const id = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  return { organization_id: id(b.organization_id), team_id: id(b.team_id) };
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -154,13 +175,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const register = useCallback(
-    async (user: string, email: string, password: string) => {
+    async (user: string, email: string, password: string, inviteToken?: string) => {
       const res = await fetch(`${apiBaseUrl}/v1/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: user, email, password }),
+        body: JSON.stringify(
+          inviteToken
+            ? { username: user, email, password, invite_token: inviteToken }
+            : { username: user, email, password },
+        ),
       });
-      if (!res.ok) throw new Error(await parseError(res));
+      // ApiError keeps the status, so callers can tell a refusal code (403)
+      // or an existing account (409) from other failures.
+      if (!res.ok) throw new ApiError(await parseError(res), res.status);
+      // The account exists from here on: an unreadable body only loses the hint.
+      return registerLanding(await res.json().catch(() => null));
     },
     [],
   );

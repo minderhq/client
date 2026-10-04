@@ -1,15 +1,22 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "../lib/api";
 import { LoginPage } from "./LoginPage";
 
 const login = vi.fn();
 const register = vi.fn();
 const navigate = vi.fn();
 let isAuthenticated = false;
-let locationState: { oidcError?: string; notice?: string; username?: string } | null = null;
+let locationState:
+  | { oidcError?: string; notice?: string; username?: string; from?: string }
+  | null = null;
 let passwordResetAvailable = false;
 let capabilitiesLoading = false;
+// What GET /v1/auth/capabilities reports as registration_mode (undefined = an
+// older API without the field); `capabilitiesFailed` = the lookup failed.
+let registrationMode: string | undefined = "open";
+let capabilitiesFailed = false;
 
 vi.mock("../lib/auth", () => ({
   useAuth: () => ({ isAuthenticated, login, register }),
@@ -26,17 +33,29 @@ vi.mock("react-router-dom", () => ({
     <div data-testid="navigate" data-to={to} data-replace={String(replace)} />
   ),
 }));
-vi.mock("../lib/passwordReset", () => ({
-  usePasswordResetAvailable: () => ({
-    loading: capabilitiesLoading,
-    available: passwordResetAvailable,
-  }),
+const useAuthCapabilities = vi.fn(() => ({
+  loading: capabilitiesLoading,
+  capabilities:
+    capabilitiesLoading || capabilitiesFailed
+      ? null
+      : {
+          password_reset_email: passwordResetAvailable,
+          email_verification: false,
+          ...(registrationMode === undefined ? {} : { registration_mode: registrationMode }),
+        },
+}));
+vi.mock("../lib/passwordReset", async () => ({
+  ...(await vi.importActual<typeof import("../lib/passwordReset")>(
+    "../lib/passwordReset",
+  )),
+  useAuthCapabilities: () => useAuthCapabilities(),
 }));
 const redirectTo = vi.fn();
 vi.mock("../lib/redirect", () => ({
   redirectTo: (url: string) => redirectTo(url),
 }));
-vi.mock("../lib/api", () => ({
+vi.mock("../lib/api", async () => ({
+  ...(await vi.importActual<typeof import("../lib/api")>("../lib/api")),
   friendlyErrorMessage: (e: unknown) => (e instanceof Error ? e.message : "error"),
   oidcLoginUrl: "https://sso.example.com/authorize",
 }));
@@ -68,6 +87,8 @@ describe("LoginPage", () => {
     locationState = null;
     passwordResetAvailable = false;
     capabilitiesLoading = false;
+    registrationMode = "open";
+    capabilitiesFailed = false;
   });
   afterEach(() => cleanup());
 
@@ -224,5 +245,135 @@ describe("LoginPage", () => {
   it("leaves the history entry alone on a plain visit", () => {
     render(<LoginPage />);
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  describe("registration mode", () => {
+    it("offers sign-up in open mode", () => {
+      render(<LoginPage />);
+      expect(screen.getByRole("button", { name: "Create one" })).toBeTruthy();
+    });
+
+    it("offers sign-up when the API doesn't report a mode (older API)", () => {
+      registrationMode = undefined;
+      render(<LoginPage />);
+      expect(screen.getByRole("button", { name: "Create one" })).toBeTruthy();
+    });
+
+    it("offers nothing while the mode is still loading", () => {
+      capabilitiesLoading = true;
+      render(<LoginPage />);
+      expect(screen.queryByRole("button", { name: "Create one" })).toBeNull();
+      expect(screen.queryByText(/by invitation/)).toBeNull();
+    });
+
+    it("explains invitation-only sign-up instead of the form in invite mode", () => {
+      registrationMode = "invite";
+      render(<LoginPage />);
+      expect(screen.queryByRole("button", { name: "Create one" })).toBeNull();
+      expect(screen.getByText(/created by invitation/)).toBeTruthy();
+      expect(screen.getByText(/ask\s+an administrator/)).toBeTruthy();
+      // Signing in still works.
+      expect(screen.getByRole("button", { name: "Log in" })).toBeTruthy();
+    });
+
+    it.each(["sso_only", "closed"])("points to SSO instead of the form in %s mode", (value) => {
+      registrationMode = value;
+      render(<LoginPage />);
+      expect(screen.queryByRole("button", { name: "Create one" })).toBeNull();
+      expect(screen.getByText(/Sign-up is turned off/)).toBeTruthy();
+      expect(screen.getByText(/Sign in with SSO below/)).toBeTruthy();
+    });
+
+    it("treats an unknown mode as invite-only, never as open", () => {
+      registrationMode = "approval";
+      render(<LoginPage />);
+      expect(screen.queryByRole("button", { name: "Create one" })).toBeNull();
+      expect(screen.getByText(/created by invitation/)).toBeTruthy();
+    });
+
+    it("falls back to sign-up when the capabilities lookup fails", () => {
+      capabilitiesFailed = true;
+      render(<LoginPage />);
+      expect(screen.getByRole("button", { name: "Create one" })).toBeTruthy();
+      // ... and offers no reset link it can't vouch for.
+      expect(screen.queryByRole("link", { name: "Forgot password?" })).toBeNull();
+    });
+
+    it("stops offering sign-up when the API says invites are required", async () => {
+      register.mockRejectedValue(new ApiError("invite_required", 403));
+      render(<LoginPage />);
+      fireEvent.click(screen.getByRole("button", { name: "Create one" }));
+      fillAndSubmit("Create account & log in", { email: "alice@example.com" });
+      await screen.findByText(/created by invitation only/);
+      expect(login).not.toHaveBeenCalled();
+      expect(screen.queryByRole("button", { name: "Create one" })).toBeNull();
+      expect(screen.getByRole("heading", { name: "Log in" })).toBeTruthy();
+    });
+
+    it("suggests signing in when the email already has an account", async () => {
+      register.mockRejectedValue(new ApiError("Email already exists", 409));
+      render(<LoginPage />);
+      fireEvent.click(screen.getByRole("button", { name: "Create one" }));
+      fillAndSubmit("Create account & log in", { email: "alice@example.com" });
+      await screen.findByText(/already exists\. Sign in instead/);
+    });
+  });
+
+  describe("return path", () => {
+    it("returns to state.from after logging in", async () => {
+      locationState = { from: "/invite/tok123" };
+      login.mockResolvedValue(undefined);
+      render(<LoginPage />);
+      fillAndSubmit("Log in");
+      await vi.waitFor(() =>
+        expect(navigate).toHaveBeenCalledWith("/invite/tok123", { replace: true }),
+      );
+    });
+
+    it("sends an already-signed-in visitor to state.from", () => {
+      isAuthenticated = true;
+      locationState = { from: "/invite/tok123" };
+      render(<LoginPage />);
+      expect(screen.getByTestId("navigate").dataset.to).toBe("/invite/tok123");
+    });
+
+    it("ignores a return path that leaves the app", async () => {
+      locationState = { from: "//evil.example.com/x" };
+      login.mockResolvedValue(undefined);
+      render(<LoginPage />);
+      fillAndSubmit("Log in");
+      await vi.waitFor(() =>
+        expect(navigate).toHaveBeenCalledWith("/", { replace: true }),
+      );
+    });
+
+    it("keeps the return path when it consumes a failed-SSO error", async () => {
+      locationState = { oidcError: "Access denied", from: "/invite/tok123" };
+      login.mockResolvedValue(undefined);
+      render(<LoginPage />);
+      expect(navigate).toHaveBeenCalledWith(
+        { pathname: "/login", search: "" },
+        { replace: true, state: { from: "/invite/tok123" } },
+      );
+      fillAndSubmit("Log in");
+      await vi.waitFor(() =>
+        expect(navigate).toHaveBeenCalledWith("/invite/tok123", { replace: true }),
+      );
+    });
+
+    it("drops a return path left by an abandoned SSO attempt on arrival", () => {
+      sessionStorage.setItem("minder_return_path", "/invite/old-token");
+      render(<LoginPage />);
+      expect(sessionStorage.getItem("minder_return_path")).toBeNull();
+    });
+
+    it("keeps the return path across the SSO round trip", () => {
+      sessionStorage.clear();
+      locationState = { from: "/invite/tok123" };
+      render(<LoginPage />);
+      fireEvent.click(screen.getByRole("link", { name: /Sign in with SSO/i }));
+      expect(sessionStorage.getItem("minder_return_path")).toBe("/invite/tok123");
+      sessionStorage.clear();
+    });
   });
 });

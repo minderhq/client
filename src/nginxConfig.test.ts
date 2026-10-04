@@ -1,7 +1,8 @@
 // Checks nginx.conf (the config the Docker image serves the client with): the
-// password reset page reads a one-time token from its URL fragment, so every
-// URL React Router renders it for must get `Referrer-Policy: no-referrer` and
-// `Cache-Control: no-store`.
+// password reset page reads a one-time token from its URL fragment, and the
+// invite page carries its token in the path and hosts a password form, so
+// every URL React Router renders either for must get
+// `Referrer-Policy: no-referrer` and `Cache-Control: no-store`.
 import { describe, expect, it } from "vitest";
 import nginxConf from "../nginx.conf?raw";
 
@@ -47,16 +48,12 @@ function directives(body: string, name: string): string[] {
   );
 }
 
-describe("nginx.conf reset-password route", () => {
-  const all = locations(nginxConf);
+const all = locations(nginxConf);
 
-  it("parses the config's location blocks", () => {
-    expect(all.map((l) => l.pattern)).toEqual(expect.arrayContaining(["/", "/health"]));
-  });
-
-  // React Router matches routes case-insensitively and ignores a trailing
-  // slash, so all of these render ResetPasswordPage.
-  for (const path of ["/reset-password", "/reset-password/", "/RESET-PASSWORD", "/Reset-Password/"]) {
+/** The no-referrer / no-store checks for every path that renders a page
+ * whose URL carries a secret. */
+function expectProtected(paths: string[]) {
+  for (const path of paths) {
     describe(path, () => {
       const loc = locationFor(all, path);
 
@@ -78,6 +75,16 @@ describe("nginx.conf reset-password route", () => {
       });
     });
   }
+}
+
+describe("nginx.conf reset-password route", () => {
+  it("parses the config's location blocks", () => {
+    expect(all.map((l) => l.pattern)).toEqual(expect.arrayContaining(["/", "/health"]));
+  });
+
+  // React Router matches routes case-insensitively and ignores a trailing
+  // slash, so all of these render ResetPasswordPage.
+  expectProtected(["/reset-password", "/reset-password/", "/RESET-PASSWORD", "/Reset-Password/"]);
 
   it("leaves other routes on the SPA fallback without these headers", () => {
     const login = locationFor(all, "/login");
@@ -85,5 +92,18 @@ describe("nginx.conf reset-password route", () => {
     expect(directives(login!.body, "add_header")).toEqual([]);
     expect(locationFor(all, "/reset-password-extra")?.pattern).toBe("/");
     expect(locationFor(all, "/Reset-Password/extra")?.pattern).toBe("/");
+  });
+});
+
+describe("nginx.conf invite route", () => {
+  // Every URL React Router renders InviteRedeemPage (/invite/:token) for, as
+  // nginx sees it: decoded, so a token with an encoded slash (/invite/a%2Fb)
+  // is matched as /invite/a/b.
+  expectProtected(["/invite/tok123", "/invite/tok123/", "/INVITE/Tok-123_x", "/Invite/a/b"]);
+
+  it("leaves other paths on the SPA fallback", () => {
+    expect(locationFor(all, "/invite")?.pattern).toBe("/");
+    expect(locationFor(all, "/invite/")?.pattern).toBe("/");
+    expect(locationFor(all, "/invites/tok")?.pattern).toBe("/");
   });
 });

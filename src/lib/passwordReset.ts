@@ -14,26 +14,62 @@ export function fetchAuthCapabilities(signal?: AbortSignal): Promise<AuthCapabil
   return apiFetch<AuthCapabilities>("/v1/auth/capabilities", { signal });
 }
 
+export interface AuthCapabilitiesState {
+  /** True until the capabilities answer (or fail). */
+  loading: boolean;
+  /** What the server reported; `null` when the lookup failed (an older
+   * gateway without the endpoint, a network error). Partial, because an
+   * older gateway may not report every field. */
+  capabilities: Partial<AuthCapabilities> | null;
+}
+
+/** The public auth capabilities, fetched once per mount. A page that needs
+ * several of them (the sign-in page: password reset and registration mode)
+ * calls this once and derives each from the result, so it makes one request.
+ * `enabled: false` skips the request (not loading, no capabilities). */
+export function useAuthCapabilities(
+  { enabled = true }: { enabled?: boolean } = {},
+): AuthCapabilitiesState {
+  const [state, setState] = useState<AuthCapabilitiesState>({
+    loading: enabled,
+    capabilities: null,
+  });
+  useEffect(() => {
+    if (!enabled) {
+      setState({ loading: false, capabilities: null });
+      return;
+    }
+    setState((s) => (s.loading ? s : { ...s, loading: true }));
+    const controller = new AbortController();
+    fetchAuthCapabilities(controller.signal)
+      .then((caps) => {
+        if (!controller.signal.aborted) {
+          setState({ loading: false, capabilities: caps ?? null });
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setState({ loading: false, capabilities: null });
+      });
+    return () => controller.abort();
+  }, [enabled]);
+  return state;
+}
+
+/** Whether `capabilities` offer password reset by email. Unknown reads as
+ * "not offered", so no link is shown that would lead to a dead end. */
+export function passwordResetOffered(
+  capabilities: Partial<AuthCapabilities> | null | undefined,
+): boolean {
+  return capabilities?.password_reset_email === true;
+}
+
 /** Whether this server offers password reset by email. `loading` is true
  * until the capabilities answer; any failure (an older gateway without the
  * endpoint, a network error) reads as "not offered", so no link is shown
  * that would lead to a dead end. */
 export function usePasswordResetAvailable(): { loading: boolean; available: boolean } {
-  const [state, setState] = useState({ loading: true, available: false });
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchAuthCapabilities(controller.signal)
-      .then((caps) => {
-        if (!controller.signal.aborted) {
-          setState({ loading: false, available: caps?.password_reset_email === true });
-        }
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setState({ loading: false, available: false });
-      });
-    return () => controller.abort();
-  }, []);
-  return state;
+  const { loading, capabilities } = useAuthCapabilities();
+  return { loading, available: passwordResetOffered(capabilities) };
 }
 
 /** Ask for a reset link. The gateway answers every well-formed request with

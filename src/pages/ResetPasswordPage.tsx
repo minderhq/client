@@ -25,6 +25,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from "../lib/ui";
+import { useNoReferrer } from "../lib/useNoReferrer";
 
 export const PASSWORD_RESET_DONE =
   "Your password has been reset. Log in with your new password.";
@@ -32,24 +33,6 @@ export const PASSWORD_RESET_DONE =
 const PASSWORD_HINT = `Use at least ${MIN_PASSWORD_LENGTH} characters. The limit is ${MAX_PASSWORD_BYTES} bytes: that's ${MAX_PASSWORD_BYTES} plain letters or digits, fewer with accents or emoji.`;
 
 const TOO_LONG = `This password is too long. Keep it under ${MAX_PASSWORD_BYTES} bytes: accented letters, other scripts and emoji count as 2 to 4 each.`;
-
-/** Fallback for the `Referrer-Policy: no-referrer` header the static server
- * sets on this route: a `<meta name="referrer">` for as long as the page is
- * shown, restoring whatever was there before on the way out. */
-function useNoReferrer() {
-  useEffect(() => {
-    const existing = document.querySelector<HTMLMetaElement>('meta[name="referrer"]');
-    const meta = existing ?? document.createElement("meta");
-    const previous = existing?.content;
-    meta.name = "referrer";
-    meta.content = "no-referrer";
-    if (!existing) document.head.appendChild(meta);
-    return () => {
-      if (existing) existing.content = previous ?? "";
-      else meta.remove();
-    };
-  }, []);
-}
 
 function confirmErrorMessage(e: unknown): string {
   if (e instanceof ApiError) {

@@ -2,6 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  ApiError,
   REFRESH_TIMEOUT_MS,
   SESSION_EXPIRED_EVENT,
   TOKEN_REFRESHED_EVENT,
@@ -209,6 +210,84 @@ describe("AuthProvider / useAuth", () => {
           await result.current.register("ada", "ada@example.com", "hunter2");
         }),
       ).rejects.toThrow("Username already taken");
+    });
+
+    it("sends invite_token when given one", async () => {
+      vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({}) } as Response);
+
+      const { result } = renderAuth();
+      await act(async () => {
+        await result.current.register("ada", "ada@example.com", "hunter22", "tok123");
+      });
+
+      expect(fetch).toHaveBeenCalledWith(
+        "http://localhost:8000/v1/auth/register",
+        expect.objectContaining({
+          body: JSON.stringify({
+            username: "ada",
+            email: "ada@example.com",
+            password: "hunter22",
+            invite_token: "tok123",
+          }),
+        }),
+      );
+    });
+
+    it("returns the landing hint from the register response", async () => {
+      vi.mocked(fetch).mockResolvedValue({
+        ok: true,
+        json: async () => ({ user: { id: 7 }, organization_id: 5, team_id: 9 }),
+      } as Response);
+      const { result } = renderAuth();
+      let landing: unknown;
+      await act(async () => {
+        landing = await result.current.register("ada", "ada@example.com", "hunter22", "tok");
+      });
+      expect(landing).toEqual({ organization_id: 5, team_id: 9 });
+    });
+
+    it("returns an empty hint from an API without one, or an unreadable body", async () => {
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ user: { id: 7 } }),
+      } as Response);
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => {
+          throw new SyntaxError("not json");
+        },
+      } as unknown as Response);
+      const { result } = renderAuth();
+      const landings: unknown[] = [];
+      await act(async () => {
+        landings.push(await result.current.register("ada", "a@example.com", "hunter22"));
+        landings.push(await result.current.register("bob", "b@example.com", "hunter22"));
+      });
+      expect(landings).toEqual([
+        { organization_id: null, team_id: null },
+        { organization_id: null, team_id: null },
+      ]);
+    });
+
+    it("keeps the status and refusal code on a 403", async () => {
+      vi.mocked(fetch).mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => ({ detail: "invite_required" }),
+      } as Response);
+
+      const { result } = renderAuth();
+      let caught: unknown;
+      await act(async () => {
+        try {
+          await result.current.register("ada", "ada@example.com", "hunter22");
+        } catch (e) {
+          caught = e;
+        }
+      });
+      expect(caught).toBeInstanceOf(ApiError);
+      expect((caught as ApiError).status).toBe(403);
+      expect((caught as ApiError).message).toBe("invite_required");
     });
   });
 

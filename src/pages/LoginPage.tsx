@@ -4,8 +4,14 @@ import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { StatusLine } from "../components/StatusLine";
 import { friendlyErrorMessage, oidcLoginUrl } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { usePasswordResetAvailable } from "../lib/passwordReset";
+import { passwordResetOffered, useAuthCapabilities } from "../lib/passwordReset";
 import { redirectTo } from "../lib/redirect";
+import {
+  registrationErrorMessage,
+  registrationModeFrom,
+  registrationRefusal,
+} from "../lib/registration";
+import { forgetReturnPath, rememberReturnPath, safeReturnPath } from "../lib/returnPath";
 import { beginSsoLogin } from "../lib/ssoLogin";
 import {
   cardClass,
@@ -22,15 +28,33 @@ import {
  * reachable on the same `apiBaseUrl` the rest of the client already uses, so this
  * form works over plain localhost. The SSO button below is shown only when
  * VITE_OIDC_LOGIN_URL is configured (a Traefik + real-domain deployment) — no
- * dead-end button over localhost. */
+ * dead-end button over localhost.
+ *
+ * The "Create one" form follows the instance's registration mode: shown in
+ * `open` mode (or when the API doesn't report a mode), replaced by an
+ * "accounts are by invitation" note in `invite` mode, and by an SSO/admin
+ * pointer in `sso_only` mode (reported as `closed`). A page that sends the user here can pass
+ * `state.from` (an in-app path) to come back to after signing in. */
 export function LoginPage() {
   const { isAuthenticated, login, register } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const routeState = location.state as
-    | { oidcError?: string; notice?: string; username?: string }
+    | { oidcError?: string; notice?: string; username?: string; from?: string }
     | null;
+  // Where to go after signing in, when another page (e.g. an invite link)
+  // sent the user here. Read once: the state is cleared below.
+  const [returnPath] = useState(() => safeReturnPath(routeState?.from));
+  // One capabilities request feeds both the forgot-password link and the
+  // registration mode.
+  const capabilities = useAuthCapabilities();
+  const registrationMode = registrationModeFrom(capabilities.capabilities);
+  // Set when the API refuses a sign-up with `invite_required` although the
+  // mode looked open (stale or unknown mode): stop offering the form.
+  const [inviteOnly, setInviteOnly] = useState(false);
+  const signUpMode = inviteOnly ? "invite" : registrationMode;
+
   const [mode, setMode] = useState<"login" | "register">("login");
   // Prefilled when a password reset knew who was resetting.
   const [username, setUsername] = useState(routeState?.username ?? "");
@@ -45,8 +69,8 @@ export function LoginPage() {
   // signs the user in).
   const [notice, setNotice] = useState(routeState?.notice ?? "");
   // "Forgot password?" is offered only when the server can send reset emails.
-  const { loading: capabilitiesLoading, available: passwordResetAvailable } =
-    usePasswordResetAvailable();
+  const capabilitiesLoading = capabilities.loading;
+  const passwordResetAvailable = passwordResetOffered(capabilities.capabilities);
 
   // Back from a password reset: put the cursor where the user continues.
   const [focusAfterReset] = useState(() =>
@@ -56,31 +80,45 @@ export function LoginPage() {
   // The reset notice, prefill and SSO error are read into state above. Drop
   // them from the history entry (React Router keeps navigation state in
   // history.state), so a reload or Back/Forward doesn't show them again.
+  // The return path stays, so a reload still comes back to the invite.
   useEffect(() => {
+    // A path left by an SSO attempt abandoned at the identity provider (it may
+    // be an invite token): drop it. The SSO button stores a fresh one.
+    forgetReturnPath();
     if (routeState?.notice || routeState?.oidcError) {
       navigate(
         { pathname: location.pathname, search: location.search },
-        { replace: true, state: null },
+        { replace: true, state: returnPath ? { from: returnPath } : null },
       );
     }
     // Once, on arrival.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (isAuthenticated) return <Navigate to="/" replace />;
+  if (isAuthenticated) return <Navigate to={returnPath ?? "/"} replace />;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError("");
     setNotice("");
-    try {
-      if (mode === "register") {
+    if (mode === "register") {
+      try {
         await register(username, email, password);
+      } catch (err) {
+        if (registrationRefusal(err) === "invite_required") {
+          setInviteOnly(true);
+          setMode("login");
+        }
+        setError(registrationErrorMessage(err));
+        setBusy(false);
+        return;
       }
+    }
+    try {
       // register() only creates the account (no token), so log in either way.
       await login(username, password);
-      navigate("/", { replace: true });
+      navigate(returnPath ?? "/", { replace: true });
     } catch (err) {
       setError(friendlyErrorMessage(err));
       setBusy(false);
@@ -186,37 +224,61 @@ export function LoginPage() {
         <StatusLine isError>{error}</StatusLine>
       </form>
 
-      <p className="mt-3 text-center text-sm text-gray-600 dark:text-gray-400">
-        {mode === "login" ? (
-          <>
-            No account yet?{" "}
-            <button
-              type="button"
-              onClick={() => {
-                setMode("register");
-                setError("");
-              }}
-              className="underline hover:text-indigo-600 dark:hover:text-indigo-400"
-            >
-              Create one
-            </button>
-          </>
-        ) : (
-          <>
-            Already have an account?{" "}
-            <button
-              type="button"
-              onClick={() => {
-                setMode("login");
-                setError("");
-              }}
-              className="underline hover:text-indigo-600 dark:hover:text-indigo-400"
-            >
-              Log in
-            </button>
-          </>
-        )}
-      </p>
+      {mode === "login" && signUpMode === "invite" && (
+        <p className="mt-3 text-center text-sm text-gray-600 dark:text-gray-400">
+          No account yet? Accounts on this instance are created by invitation.
+          If you were invited, open the link in your invitation. Otherwise, ask
+          an administrator of your organization to invite you.
+        </p>
+      )}
+
+      {mode === "login" && signUpMode === "sso_only" && (
+        <p className="mt-3 text-center text-sm text-gray-600 dark:text-gray-400">
+          No account yet? Sign-up is turned off on this instance.{" "}
+          {oidcLoginUrl
+            ? "Sign in with SSO below; your account is set up the first time you do."
+            : "Ask an administrator to create an account for you."}
+        </p>
+      )}
+
+      {/* While the mode is still loading, offer nothing rather than a form
+          that may turn out not to work. */}
+      {(mode === "register" ||
+        (!capabilitiesLoading &&
+          signUpMode !== "invite" &&
+          signUpMode !== "sso_only")) && (
+        <p className="mt-3 text-center text-sm text-gray-600 dark:text-gray-400">
+          {mode === "login" ? (
+            <>
+              No account yet?{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("register");
+                  setError("");
+                }}
+                className="underline hover:text-indigo-600 dark:hover:text-indigo-400"
+              >
+                Create one
+              </button>
+            </>
+          ) : (
+            <>
+              Already have an account?{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("login");
+                  setError("");
+                }}
+                className="underline hover:text-indigo-600 dark:hover:text-indigo-400"
+              >
+                Log in
+              </button>
+            </>
+          )}
+        </p>
+      )}
 
       {/* Only offer SSO when it's actually configured (VITE_OIDC_LOGIN_URL set
           to a real Traefik hostname). Otherwise the button dead-ends: the old
@@ -237,6 +299,7 @@ export function LoginPage() {
               // Record this browser's pending login before leaving, so the
               // callback only accepts the sign-in it started.
               e.preventDefault();
+              rememberReturnPath(returnPath);
               redirectTo(beginSsoLogin(oidcLoginUrl));
             }}
             className={`block text-center ${secondaryButtonClass}`}
