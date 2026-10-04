@@ -361,6 +361,12 @@ describe("LoginPage", () => {
       );
     });
 
+    it("drops a return path left by an abandoned SSO attempt on arrival", () => {
+      sessionStorage.setItem("minder_return_path", "/invite/old-token");
+      render(<LoginPage />);
+      expect(sessionStorage.getItem("minder_return_path")).toBeNull();
+    });
+
     it("keeps the return path across the SSO round trip", () => {
       sessionStorage.clear();
       locationState = { from: "/invite/tok123" };

@@ -11,7 +11,7 @@ import {
   registrationModeFrom,
   registrationRefusal,
 } from "../lib/registration";
-import { rememberReturnPath, safeReturnPath } from "../lib/returnPath";
+import { forgetReturnPath, rememberReturnPath, safeReturnPath } from "../lib/returnPath";
 import { beginSsoLogin } from "../lib/ssoLogin";
 import {
   cardClass,
@@ -82,6 +82,9 @@ export function LoginPage() {
   // history.state), so a reload or Back/Forward doesn't show them again.
   // The return path stays, so a reload still comes back to the invite.
   useEffect(() => {
+    // A path left by an SSO attempt abandoned at the identity provider (it may
+    // be an invite token): drop it. The SSO button stores a fresh one.
+    forgetReturnPath();
     if (routeState?.notice || routeState?.oidcError) {
       navigate(
         { pathname: location.pathname, search: location.search },

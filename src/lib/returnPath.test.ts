@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { consumeReturnPath, rememberReturnPath, safeReturnPath } from "./returnPath";
+import {
+  consumeReturnPath,
+  forgetReturnPath,
+  rememberReturnPath,
+  safeReturnPath,
+} from "./returnPath";
 
 describe("returnPath", () => {
   afterEach(() => sessionStorage.clear());
@@ -22,6 +27,13 @@ describe("returnPath", () => {
   it("clears any old path when there's nothing to remember", () => {
     rememberReturnPath("/invite/abc");
     rememberReturnPath(null);
+    expect(consumeReturnPath()).toBeNull();
+  });
+
+  it("forgets a remembered path without returning it", () => {
+    rememberReturnPath("/invite/abc");
+    forgetReturnPath();
+    expect(sessionStorage.length).toBe(0);
     expect(consumeReturnPath()).toBeNull();
   });
 });
