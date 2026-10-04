@@ -27,32 +27,39 @@ export type SignUpOutcome =
  * AND accepts the invite in one step on the server, then signs in and calls
  * `onSignedIn`. It never redeems the invite afterwards: it is already used.
  *
- * A bound invite email is prefilled and read-only (the API refuses any other
- * address for such an invite). */
+ * For an email-bound invite the API refuses any other address. The invite
+ * lookup returns that address masked (`j***@example.com`, #2190), so the
+ * visitor types it in full, with the masked form as a hint (`maskedEmail`).
+ * An older API returned it in full: then it is prefilled and read-only
+ * (`lockedEmail`). */
 export function InviteSignUpForm({
   inviteToken,
-  inviteEmail,
-  emailLocked,
+  lockedEmail,
+  maskedEmail,
   onSignedIn,
   onStopped,
   onSignInInstead,
 }: {
   inviteToken: string;
-  inviteEmail: string;
-  emailLocked: boolean;
+  /** The full invited address, to prefill read-only; "" for none. */
+  lockedEmail: string;
+  /** The masked invited address, shown as a hint; "" for none. */
+  maskedEmail: string;
   onSignedIn: () => void;
   onStopped: (outcome: SignUpOutcome) => void;
   onSignInInstead: () => void;
 }) {
   const { register, login } = useAuth();
   const [username, setUsername] = useState("");
-  const [emailInput, setEmailInput] = useState(inviteEmail);
+  const [emailInput, setEmailInput] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [emailTaken, setEmailTaken] = useState(false);
 
-  const email = emailLocked ? inviteEmail : emailInput;
+  const emailLocked = !!lockedEmail;
+  const email = emailLocked ? lockedEmail : emailInput;
+  const emailHintId = emailLocked || maskedEmail ? "invite-email-hint" : undefined;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -127,12 +134,18 @@ export function InviteSignUpForm({
           value={email}
           onChange={(e) => setEmailInput(e.target.value)}
           readOnly={emailLocked}
-          aria-describedby={emailLocked ? "invite-email-hint" : undefined}
+          aria-describedby={emailHintId}
           required
         />
         {emailLocked && (
           <p id="invite-email-hint" className={fieldHintClass}>
             The invite was sent to this address, so your account uses it.
+          </p>
+        )}
+        {!emailLocked && maskedEmail && (
+          <p id="invite-email-hint" className={fieldHintClass}>
+            This invite is for <span className="break-all">{maskedEmail}</span>. Enter
+            that address in full; your account uses it.
           </p>
         )}
       </div>

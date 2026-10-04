@@ -132,6 +132,67 @@ describe("InviteRedeemPage", () => {
       );
     });
 
+    it("asks for the full address of a masked bound invite, with the mask as a hint", async () => {
+      // The API since #2190: masked address, email_bound, can_create_account.
+      await openAsNewcomer({
+        email: "i***@example.com",
+        email_bound: true,
+        can_create_account: true,
+        invited_by_name: "Grace",
+      });
+      const email = screen.getByLabelText("Email") as HTMLInputElement;
+      expect(email.value).toBe("");
+      expect(email.readOnly).toBe(false);
+      const hintId = email.getAttribute("aria-describedby") ?? "";
+      expect(document.getElementById(hintId)?.textContent).toMatch(
+        /This invite is for i\*\*\*@example\.com\. Enter\s+that address in full/,
+      );
+      fireEvent.change(email, { target: { value: "invitee@example.com" } });
+      register.mockResolvedValue(undefined);
+      login.mockResolvedValue(undefined);
+      fillSignUp();
+      // Never the masked form.
+      await vi.waitFor(() =>
+        expect(register).toHaveBeenCalledWith(
+          "ada",
+          "invitee@example.com",
+          "hunter22",
+          "tok123",
+        ),
+      );
+    });
+
+    it("leaves an unbound invite's empty address editable with no hint", async () => {
+      await openAsNewcomer({ email: "", email_bound: false, can_create_account: true });
+      const email = screen.getByLabelText("Email") as HTMLInputElement;
+      expect(email.readOnly).toBe(false);
+      expect(email.getAttribute("aria-describedby")).toBeNull();
+    });
+
+    it("offers only sign-in for an invite that can't create accounts", async () => {
+      await openAsNewcomer({
+        email: "i***@example.com",
+        email_bound: true,
+        can_create_account: false,
+      });
+      expect(screen.queryByRole("button", { name: "Create account & join" })).toBeNull();
+      expect(screen.queryByLabelText("Password")).toBeNull();
+      expect(
+        screen.getByText(/can only be accepted by someone who already has an\s+account/),
+      ).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Sign in to accept" }));
+      expect(navigate).toHaveBeenCalledWith("/login", {
+        state: { from: "/invite/tok123" },
+      });
+    });
+
+    it("says the same on an SSO-only instance, without the SSO note", async () => {
+      registrationState = { mode: "sso_only", loading: false };
+      await openAsNewcomer({ can_create_account: false });
+      expect(screen.getByText(/can only be accepted by someone/)).toBeTruthy();
+      expect(screen.queryByText(/can't be created here/)).toBeNull();
+    });
+
     it("creates the account with the invite token, signs in, lands in the team -- never redeems", async () => {
       register.mockResolvedValue(undefined);
       login.mockResolvedValue(undefined);
@@ -214,7 +275,10 @@ describe("InviteRedeemPage", () => {
 
     it("explains an email mismatch and keeps the form", async () => {
       register.mockRejectedValue(new ApiError("invite_email_mismatch", 403));
-      await openAsNewcomer({ email_bound: false });
+      await openAsNewcomer({ email: "i***@example.com", email_bound: true });
+      fireEvent.change(screen.getByLabelText("Email"), {
+        target: { value: "someone@example.com" },
+      });
       fillSignUp();
       await screen.findByText(/sent to a different email address/);
       expect(screen.getByRole("button", { name: "Create account & join" })).toBeTruthy();

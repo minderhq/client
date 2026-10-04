@@ -23,12 +23,21 @@ export interface InviteInfo {
   org_name?: string | null;
   org_role?: string | null;
   status: "pending" | "accepted" | "revoked" | "expired";
-  // Optional, used when the API provides them: who sent the invite, and
-  // whether it only works for `email` (false = a shareable link). Without
-  // `email_bound` the address is treated as bound, which is what a default
-  // single-use invite is.
+  // Optional, used when the API provides them (#2190): who sent the invite;
+  // whether it only works for `email` (false = a shareable link, and `email`
+  // is ""); and whether it may create a new account or only be accepted by an
+  // existing one. A bound `email` is then masked (`j***@example.com`). An
+  // older API sends none of them and the address in full: it is treated as
+  // bound (a default single-use invite) and as able to create an account
+  // (the API still refuses with a code the page explains).
   invited_by_name?: string | null;
   email_bound?: boolean | null;
+  can_create_account?: boolean | null;
+}
+
+/** The masked form `mask_email` produces: `j***@example.com`, or `***`. */
+function isMaskedEmail(email: string): boolean {
+  return email.includes("***");
 }
 
 const INVALID_LINK =
@@ -83,7 +92,8 @@ const UNAVAILABLE: Record<Exclude<InviteInfo["status"], "pending">, [string, str
  *   comes back here afterwards;
  * - signed out, no account: "Create account" registers WITH the invite token,
  *   which accepts the invite in the same step, then signs in and lands in the
- *   team/org. (Not offered where the instance has sign-up turned off.) */
+ *   team/org. (Not offered where the instance has sign-up turned off, or when
+ *   the invite can't create accounts: `can_create_account: false`.) */
 export function InviteRedeemPage() {
   const { token: invitedTokenParam } = useParams<{ token: string }>();
   const inviteToken = invitedTokenParam ?? "";
@@ -137,6 +147,13 @@ export function InviteRedeemPage() {
   const targetName = isOrg ? info?.org_name : info?.team_name;
   const targetRole = isOrg ? info?.org_role : info?.team_role;
   const signUpAllowed = !registration.loading && registration.mode !== "sso_only";
+  // Only an existing account can accept this invite (its issuer may not admit
+  // new accounts, #2186): offer sign-in, not a form the API would refuse.
+  const existingAccountsOnly = info?.can_create_account === false;
+  const inviteEmail = info?.email ?? "";
+  const maskedEmail = isMaskedEmail(inviteEmail) ? inviteEmail : "";
+  const lockedEmail =
+    inviteEmail && !maskedEmail && info?.email_bound !== false ? inviteEmail : "";
 
   return (
     <div className="mx-auto max-w-md">
@@ -253,24 +270,37 @@ export function InviteRedeemPage() {
                 <button
                   type="button"
                   onClick={() => signIn()}
-                  className={`w-full sm:w-auto ${secondaryButtonClass}`}
+                  className={`w-full sm:w-auto ${
+                    existingAccountsOnly ? primaryButtonClass : secondaryButtonClass
+                  }`}
                 >
                   Sign in to accept
                 </button>
               </section>
 
-              {signUpAllowed && (
+              {existingAccountsOnly && (
+                <InfoCallout icon="lock">
+                  This invite can only be accepted by someone who already has an
+                  account: sign in to accept it. If you don't have an account yet,
+                  ask an administrator of {targetName ?? "the organization"} for an
+                  invite that creates one.
+                </InfoCallout>
+              )}
+
+              {signUpAllowed && !existingAccountsOnly && (
                 <InviteSignUpForm
                   inviteToken={inviteToken}
-                  inviteEmail={info.email ?? ""}
-                  emailLocked={!!info.email && info.email_bound !== false}
+                  lockedEmail={lockedEmail}
+                  maskedEmail={maskedEmail}
                   onSignedIn={() => navigate(landingPath(info), { replace: true })}
                   onStopped={setSignUpOutcome}
                   onSignInInstead={() => signIn()}
                 />
               )}
 
-              {!registration.loading && registration.mode === "sso_only" && (
+              {!existingAccountsOnly &&
+                !registration.loading &&
+                registration.mode === "sso_only" && (
                 <InfoCallout icon="lock">
                   New accounts can't be created here on this instance.{" "}
                   {oidcLoginUrl
