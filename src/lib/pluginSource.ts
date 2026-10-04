@@ -25,7 +25,9 @@ export interface SourceMeta {
   filterLabel: string;
   /** Tooltip: what this source means, in one sentence. */
   description: string;
-  /** Stable value used in the `?source=` query param (shareable URLs). */
+  /** Stable value used in the `?source=` query param (shareable URLs). Only
+   * the kinds in SOURCE_FILTER_KINDS are parsed; the others hold their value
+   * reserved. */
   param: string;
   icon: IconName;
   /** Tint only -- the text + icon carry the meaning, never colour alone. */
@@ -45,6 +47,10 @@ export const SOURCE_META: Record<SourceKind, SourceMeta> = {
     label: "Private git",
     filterLabel: "Private git",
     description: "Installed on this installation from a git repository.",
+    // Not offered as a Discover filter any more (a catalog row is never a git
+    // install, #2219), so parseSourceFilter never returns this. Kept, not
+    // dropped, so #2193's shared ?source=private links stay reserved: no other
+    // source may reuse the value and silently change what an old link means.
     param: "private",
     icon: "source-git",
     toneClass: "bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-200",
