@@ -233,6 +233,42 @@ describe("AuthProvider / useAuth", () => {
       );
     });
 
+    it("returns the landing hint from the register response", async () => {
+      vi.mocked(fetch).mockResolvedValue({
+        ok: true,
+        json: async () => ({ user: { id: 7 }, organization_id: 5, team_id: 9 }),
+      } as Response);
+      const { result } = renderAuth();
+      let landing: unknown;
+      await act(async () => {
+        landing = await result.current.register("ada", "ada@example.com", "hunter22", "tok");
+      });
+      expect(landing).toEqual({ organization_id: 5, team_id: 9 });
+    });
+
+    it("returns an empty hint from an API without one, or an unreadable body", async () => {
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ user: { id: 7 } }),
+      } as Response);
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => {
+          throw new SyntaxError("not json");
+        },
+      } as unknown as Response);
+      const { result } = renderAuth();
+      const landings: unknown[] = [];
+      await act(async () => {
+        landings.push(await result.current.register("ada", "a@example.com", "hunter22"));
+        landings.push(await result.current.register("bob", "b@example.com", "hunter22"));
+      });
+      expect(landings).toEqual([
+        { organization_id: null, team_id: null },
+        { organization_id: null, team_id: null },
+      ]);
+    });
+
     it("keeps the status and refusal code on a 403", async () => {
       vi.mocked(fetch).mockResolvedValue({
         ok: false,
