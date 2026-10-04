@@ -1,17 +1,18 @@
-import { type SourceKind, SOURCE_META } from "../lib/pluginSource";
+import { INSTALLED_SOURCE_KINDS, type SourceKind, SOURCE_META } from "../lib/pluginSource";
 import { badgeBaseClass } from "../lib/ui";
 import { Icon } from "./Icon";
 
-/** Where a plugin came from -- First-party, Private git, Submitted on this
- * instance (and, from Phase 2, MindHub). The one badge Browse cards, Installed
- * cards and the source-repository view all use (#2193).
+/** Where a plugin came from -- First-party, Private git, Manifest upload,
+ * Submitted on this instance (and, from Phase 2, MindHub). The one badge the
+ * Discover and Installed cards use (#2193), resolved from the backend's
+ * `install_source` / `origin` (#2223).
  *
  * Text + icon, never colour alone. A visually-hidden "Source:" prefix gives the
  * badge a self-explanatory name ("Source: First-party"), and the meaning of the
  * source follows as visually-hidden text, so a screen reader announces it in
  * place. `title` is only a mouse convenience on top; keyboard and touch users
  * get the same explanations from {@link SourceLegend}. Renders nothing for an
- * unclassified plugin (see `resolveSource`) rather than guessing. */
+ * unclassified plugin (null/unknown source) rather than guessing. */
 export function SourceBadge({
   source,
   className,
@@ -39,9 +40,10 @@ export function SourceBadge({
 
 /** "What do the source badges mean?" -- a native disclosure (keyboard- and
  * touch-operable, no hover needed) listing each source's badge and meaning.
- * `kinds` defaults to every source a plugin can currently resolve to. */
+ * `kinds` defaults to every source an installed plugin can resolve to; pass
+ * the narrower set a view can actually show (Discover: `CATALOG_SOURCE_KINDS`). */
 export function SourceLegend({
-  kinds = ["first_party", "private_git", "submitted"],
+  kinds = INSTALLED_SOURCE_KINDS,
   className,
 }: {
   kinds?: readonly SourceKind[];

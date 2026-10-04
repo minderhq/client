@@ -1,22 +1,33 @@
 // Where a plugin came from (#2193): one classification shared by the source
-// badge (Browse + Installed cards) and Browse's source filter. Source is a
+// badge (Discover + Installed cards) and Discover's source filter. Source is a
 // filter and a badge on ONE catalog, never a separate store (epic #2192).
+//
+// Since #2223 every badge comes from a field the backend returns (#2219) --
+// nothing is inferred from URLs or names here:
+//  - a running plugin's `install_source` (`GET /v1/plugins`) says how it got
+//    onto this installation;
+//  - a catalog row's (or installation record's) `origin` says who listed it.
+// An older backend that lacks those fields is handled, in isolation, by
+// `pluginSourceLegacy.ts`.
 
 import type { IconName } from "../components/Icon";
 
-/** Every source a catalog item can have. `mindhub` is reserved for Phase 2
- * (#2202): nothing resolves to it yet, but the badge and filter already know how
- * to render it so adding it later is a data change, not a UI redesign. */
-export type SourceKind = "first_party" | "private_git" | "submitted" | "mindhub";
+/** Every source a plugin can have. `mindhub` is reserved for Phase 2 (#2202):
+ * nothing resolves to it yet (the backend reserves the value but doesn't emit
+ * it), but the badge and filter already know how to render it so adding it
+ * later is a data change, not a UI redesign. */
+export type SourceKind = "first_party" | "private_git" | "manifest" | "submitted" | "mindhub";
 
 export interface SourceMeta {
   /** Badge text. */
   label: string;
-  /** Option text in Browse's source filter. */
+  /** Option text in Discover's source filter. */
   filterLabel: string;
   /** Tooltip: what this source means, in one sentence. */
   description: string;
-  /** Stable value used in the `?source=` query param (shareable URLs). */
+  /** Stable value used in the `?source=` query param (shareable URLs). Only
+   * the kinds in SOURCE_FILTER_KINDS are parsed; the others hold their value
+   * reserved. */
   param: string;
   icon: IconName;
   /** Tint only -- the text + icon carry the meaning, never colour alone. */
@@ -35,10 +46,22 @@ export const SOURCE_META: Record<SourceKind, SourceMeta> = {
   private_git: {
     label: "Private git",
     filterLabel: "Private git",
-    description: "Added to this installation from a git repository outside the first-party catalog.",
+    description: "Installed on this installation from a git repository.",
+    // Not offered as a Discover filter any more (a catalog row is never a git
+    // install, #2219), so parseSourceFilter never returns this. Kept, not
+    // dropped, so #2193's shared ?source=private links stay reserved: no other
+    // source may reuse the value and silently change what an old link means.
     param: "private",
     icon: "source-git",
     toneClass: "bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-200",
+  },
+  manifest: {
+    label: "Manifest upload",
+    filterLabel: "Manifest upload",
+    description: "Installed on this installation by uploading its plugin manifest.",
+    param: "manifest",
+    icon: "source-manifest",
+    toneClass: "bg-violet-50 text-violet-900 dark:bg-violet-950 dark:text-violet-200",
   },
   submitted: {
     label: "Submitted on this instance",
@@ -58,60 +81,84 @@ export const SOURCE_META: Record<SourceKind, SourceMeta> = {
   },
 };
 
-/** The sources Browse's filter offers, in display order. Phase 2 adds
- * `"mindhub"` here once MindHub items can appear in the catalog. */
-export const SOURCE_FILTER_KINDS: readonly SourceKind[] = [
+/** Own-key lookup, so a value such as `"constructor"` or `"__proto__"` can't
+ * resolve through the prototype chain. */
+function lookup(map: Readonly<Record<string, SourceKind>>, value: unknown): SourceKind | null {
+  return typeof value === "string" && Object.prototype.hasOwnProperty.call(map, value)
+    ? map[value]
+    : null;
+}
+
+/** plugin-registry's `InstallSource` (#2219) → badge. */
+const INSTALL_SOURCE_KIND: Readonly<Record<string, SourceKind>> = {
+  vendored: "first_party",
+  git: "private_git",
+  manifest: "manifest",
+};
+
+/** The marketplace's `PluginOrigin` (#2219) → badge. */
+const ORIGIN_KIND: Readonly<Record<string, SourceKind>> = {
+  first_party: "first_party",
+  submitted: "submitted",
+};
+
+/** The badge for a running plugin's `install_source` (`vendored` → First-party,
+ * `git` → Private git, `manifest` → Manifest upload). Null -- no badge -- for
+ * null, absent or any value this client doesn't know (including the reserved
+ * `mindhub`, until Phase 2 defines what it means for an install). */
+export function sourceFromInstallSource(installSource: unknown): SourceKind | null {
+  return lookup(INSTALL_SOURCE_KIND, installSource);
+}
+
+/** The badge for a catalog `origin` (`first_party` → First-party, `submitted`
+ * → Submitted on this instance). Null for anything else. */
+export function sourceFromOrigin(origin: unknown): SourceKind | null {
+  return lookup(ORIGIN_KIND, origin);
+}
+
+/** The badge for a marketplace catalog row (Discover): its `origin`. A catalog
+ * row is never a git or manifest install -- those are registered by
+ * plugin-registry without a catalog listing -- so Private git and Manifest
+ * upload only appear on Installed, where `install_source` says so. */
+export function resolveCatalogSource(
+  row: { origin?: string | null } | null | undefined,
+): SourceKind | null {
+  return sourceFromOrigin(row?.origin);
+}
+
+/** Sources a catalog row can resolve to: what Discover's legend explains. */
+export const CATALOG_SOURCE_KINDS: readonly SourceKind[] = ["first_party", "submitted"];
+
+/** Sources an installed plugin can resolve to: what Installed's legend
+ * explains. */
+export const INSTALLED_SOURCE_KINDS: readonly SourceKind[] = [
   "first_party",
   "private_git",
+  "manifest",
   "submitted",
 ];
 
-/** Name of the Browse query param carrying the source filter. */
+/** The sources Discover's filter offers, in display order -- the ones a catalog
+ * row can have. Phase 2 adds `"mindhub"` here once MindHub items can appear in
+ * the catalog. */
+export const SOURCE_FILTER_KINDS: readonly SourceKind[] = CATALOG_SOURCE_KINDS;
+
+/** The catalog list/search `origin` query value that filters a source
+ * server-side, across every page (#2219). A source without one can only be
+ * filtered client-side, over the pages already loaded. */
+const SERVER_ORIGIN_FILTER: Partial<Record<SourceKind, string>> = {
+  first_party: "first_party",
+  submitted: "submitted",
+};
+
+/** The `origin` param for `filter`, or null when the server can't filter it
+ * (or no filter is selected). */
+export function serverOriginFilter(filter: SourceKind | null): string | null {
+  return (filter && SERVER_ORIGIN_FILTER[filter]) ?? null;
+}
+
+/** Name of the Discover query param carrying the source filter. */
 export const SOURCE_PARAM = "source";
-
-/** The repository the vendored first-party plugin catalog lives in. A catalog
- * row pointing here is first-party, not "private git". */
-export const FIRST_PARTY_CATALOG_REPO = { host: "github.com", owner: "minderhq", repo: "plugins" };
-
-/** Whether `url` points at the first-party plugin catalog repository (any
- * path inside it, with or without `.git`, `www.`, or a trailing slash). */
-export function isFirstPartyCatalogUrl(url: string): boolean {
-  let parsed: URL;
-  try {
-    parsed = new URL(url.trim());
-  } catch {
-    return false;
-  }
-  const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
-  if (host !== FIRST_PARTY_CATALOG_REPO.host) return false;
-  const [owner = "", repo = ""] = parsed.pathname.split("/").filter(Boolean);
-  return (
-    owner.toLowerCase() === FIRST_PARTY_CATALOG_REPO.owner &&
-    repo.toLowerCase().replace(/\.git$/, "") === FIRST_PARTY_CATALOG_REPO.repo
-  );
-}
-
-/** Classifies a catalog row from the fields the backend actually returns:
- *
- *  - `origin: "submitted"` → Submitted on this instance (a reviewed developer
- *    submission, whatever repository it links to);
- *  - a `repository_url` outside the first-party catalog → Private git;
- *  - `origin: "first_party"` → First-party.
- *
- * Returns null -- the badge then renders nothing -- when there's no catalog
- * data to go on (an unknown/absent `origin` and no repository URL). Never
- * guesses: in particular a plugin plugin-registry runs with no catalog row at
- * all can't be classified, because `GET /v1/plugins` carries no source field. */
-export function resolveSource(
-  row: { origin?: string | null; repository_url?: string | null } | null | undefined,
-): SourceKind | null {
-  if (!row) return null;
-  if (row.origin === "submitted") return "submitted";
-  const repo = row.repository_url?.trim();
-  if (repo && !isFirstPartyCatalogUrl(repo)) return "private_git";
-  if (row.origin === "first_party") return "first_party";
-  return null;
-}
 
 /** The filter selected by a `?source=` value, or null (= all sources) when it's
  * absent or not one of the offered filters. */

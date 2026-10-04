@@ -373,17 +373,17 @@ describe("App — focus after navigation", () => {
     // The source filter rewrites ?source= (a REPLACE)…
     const filter = screen.getByRole("combobox", { name: "Filter by source" });
     filter.focus();
-    fireEvent.change(filter, { target: { value: "private" } });
+    fireEvent.change(filter, { target: { value: "submitted" } });
     await nextFrames();
-    expect(currentLocation?.search).toBe("?source=private");
+    expect(currentLocation?.search).toBe("?source=submitted");
     expect(document.activeElement).toBe(filter);
 
     // …then a PUSH to the same pathname with a new query (what a palette
     // result on the current page does): the navigation type changes, the
     // pathname doesn't, so focus must stay put.
-    act(() => currentNavigate!(`${ROUTES.discoverPlugins}?source=private&q=crm`));
+    act(() => currentNavigate!(`${ROUTES.discoverPlugins}?source=submitted&q=crm`));
     await nextFrames();
-    expect(currentLocation?.search).toBe("?source=private&q=crm");
+    expect(currentLocation?.search).toBe("?source=submitted&q=crm");
     expect(document.activeElement).toBe(filter);
   });
 

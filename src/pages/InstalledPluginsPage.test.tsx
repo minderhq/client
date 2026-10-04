@@ -140,6 +140,22 @@ function catalogRow(overrides: Partial<CatalogPlugin> = {}): CatalogPlugin {
   };
 }
 
+// The fixtures above are pre-#2219 shapes (an older backend). These are the
+// same payloads from a backend with #2219's fields.
+function runtimeNew(overrides: Partial<RuntimePlugin> = {}): RuntimePlugin {
+  return runtimePlugin({
+    install_source: "vendored",
+    repository_url: null,
+    marketplace_plugin_id: "cat-weather",
+    configurable: true,
+    ...overrides,
+  });
+}
+
+function installationNew(overrides: Partial<Installation> = {}): Installation {
+  return installation({ origin: "first_party", repository_url: null, ...overrides });
+}
+
 function deferred<T>() {
   let resolve!: (v: T) => void;
   const promise = new Promise<T>((r) => (resolve = r));
@@ -161,19 +177,44 @@ describe("InstalledPluginsPage", () => {
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
-  it("fetches installations, the runtime list and the catalog in parallel", async () => {
+  it("fetches installations and the runtime list in parallel -- never the catalog -- from a #2219 backend", async () => {
+    mockApi({ installations: [installationNew()], runtime: [runtimeNew()] });
+    render(<InstalledPluginsPage />);
+
+    await screen.findByRole("heading", { name: "My Plugin" });
+    const paths = apiFetch.mock.calls.map((c) => c[0]);
+    expect(paths).toEqual(["/v1/marketplace/installations/me", "/v1/plugins?limit=500&offset=0"]);
+    for (const call of apiFetch.mock.calls) expect(call[1]).toMatchObject({ token: "tok" });
+  });
+
+  it("doesn't fetch the catalog when nothing is installed or running", async () => {
     mockApi({});
     render(<InstalledPluginsPage />);
 
     await screen.findByText("find one in Discover plugins");
-    const paths = apiFetch.mock.calls.map((c) => c[0]);
-    expect(paths).toEqual([
+    expect(apiFetch.mock.calls.map((c) => c[0])).toEqual([
       "/v1/marketplace/installations/me",
       "/v1/plugins?limit=500&offset=0",
-      "/v1/marketplace/plugins?limit=100&offset=0",
     ]);
-    for (const call of apiFetch.mock.calls) expect(call[1]).toMatchObject({ token: "tok" });
   });
+
+  it.each([
+    ["registry", { installations: [installationNew()], runtime: [runtimePlugin()] }],
+    ["marketplace", { installations: [installation()], runtime: [runtimeNew()] }],
+  ])(
+    "falls back to the catalog when the %s predates #2219",
+    async (_service, api) => {
+      mockApi({ ...api, catalog: [catalogRow()] });
+      render(<InstalledPluginsPage />);
+
+      await screen.findByRole("heading", { name: "Weather" });
+      expect(apiFetch.mock.calls.map((c) => c[0])).toEqual([
+        "/v1/marketplace/installations/me",
+        "/v1/plugins?limit=500&offset=0",
+        "/v1/marketplace/plugins?limit=100&offset=0",
+      ]);
+    },
+  );
 
   it("shows an empty state with a link to Discover plugins when nothing is installed or running", async () => {
     mockApi({});
@@ -188,8 +229,8 @@ describe("InstalledPluginsPage", () => {
     render(<InstalledPluginsPage />);
 
     expect(screen.getByText("Loading installed plugins…")).toBeTruthy();
-    // installations + catalog have answered (empty); runtime hasn't yet.
-    await waitFor(() => expect(apiFetch).toHaveBeenCalledTimes(3));
+    // installations have answered (empty); runtime hasn't yet.
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledTimes(2));
     await Promise.resolve();
     expect(screen.queryByText("find one in Discover plugins")).toBeNull();
 
@@ -408,6 +449,124 @@ describe("InstalledPluginsPage", () => {
   });
 });
 
+describe("InstalledPluginsPage with #2219's fields", () => {
+  function badgeOf(card: HTMLElement) {
+    return Array.from(card.querySelectorAll("[data-source]")).map((b) => b.getAttribute("data-source"));
+  }
+
+  it("badges each running plugin by how it was installed", async () => {
+    mockApi({
+      runtime: [
+        runtimeNew({ name: "weather" }),
+        runtimeNew({
+          name: "crm",
+          install_source: "git",
+          repository_url: "https://git.example.com/team/crm",
+          marketplace_plugin_id: null,
+        }),
+        runtimeNew({ name: "hook", install_source: "manifest", marketplace_plugin_id: null }),
+        runtimeNew({ name: "fresh", install_source: null, marketplace_plugin_id: null }),
+      ],
+    });
+    render(<InstalledPluginsPage />);
+
+    await screen.findByRole("heading", { name: "weather" });
+    expect(badgeOf(cardFor("weather"))).toEqual(["first_party"]);
+    expect(badgeOf(cardFor("crm"))).toEqual(["private_git"]);
+    expect(badgeOf(cardFor("hook"))).toEqual(["manifest"]);
+    expect(badgeOf(cardFor("fresh"))).toEqual([]); // null: no badge, no guess
+    // The new variant's accessible name and in-place explanation.
+    expect(cardFor("hook").querySelector("[data-source]")!.textContent).toBe(
+      "Source: Manifest upload (Installed on this installation by uploading its plugin manifest.)",
+    );
+    // No catalog: no catalog notices either.
+    expect(screen.queryByText(/Source and listed-version details/)).toBeNull();
+    expect(screen.queryByText(/Only part of the catalog/)).toBeNull();
+  });
+
+  it("explains the Manifest upload badge in the source legend", async () => {
+    mockApi({ runtime: [runtimeNew()] });
+    render(<InstalledPluginsPage />);
+
+    const summary = await screen.findByText("What do the source badges mean?");
+    const terms = Array.from(summary.closest("details")!.querySelectorAll("dt")).map(
+      (dt) => dt.textContent,
+    );
+    expect(terms).toContain("Manifest upload");
+  });
+
+  it("badges an installation-only plugin from its origin", async () => {
+    mockApi({ installations: [installationNew({ origin: "submitted" })], runtime: [] });
+    render(<InstalledPluginsPage />);
+
+    await screen.findByRole("heading", { name: "My Plugin" });
+    expect(badgeOf(cardFor("My Plugin"))).toEqual(["submitted"]);
+  });
+
+  it("merges a runtime plugin with the caller's install of its catalog row by id", async () => {
+    mockApi({
+      installations: [
+        installationNew({ plugin_id: "cat-weather", name: "weather-renamed", display_name: "Weather" }),
+      ],
+      runtime: [runtimeNew()],
+    });
+    render(<InstalledPluginsPage />);
+
+    await screen.findByRole("heading", { name: "Weather" });
+    expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(1);
+    const card = cardFor("Weather");
+    expect(within(card).getByText("Enabled on this installation")).toBeTruthy();
+    expect(within(card).getByText("Your install: Enabled")).toBeTruthy();
+  });
+
+  it("keeps a git install and a same-named submission apart (the #2193 collision)", async () => {
+    mockApi({
+      installations: [
+        installationNew({
+          plugin_id: "cat-jokes",
+          name: "jokes",
+          display_name: "Jokes (submitted)",
+          origin: "submitted",
+          current_version: "9.0.0",
+          version: "9.0.0",
+        }),
+      ],
+      runtime: [
+        runtimeNew({ name: "jokes", version: "0.1.0", install_source: "git", marketplace_plugin_id: null }),
+      ],
+    });
+    render(<InstalledPluginsPage />);
+
+    await screen.findByRole("heading", { name: "jokes" });
+    const running = cardFor("jokes");
+    expect(badgeOf(running)).toEqual(["private_git"]);
+    expect(within(running).getByText("v0.1.0")).toBeTruthy();
+    expect(within(running).queryByText(/Newer version listed/)).toBeNull();
+    expect(within(running).queryByRole("button", { name: /Uninstall/ })).toBeNull();
+
+    const submitted = cardFor("Jokes (submitted)");
+    expect(badgeOf(submitted)).toEqual(["submitted"]);
+    expect(within(submitted).getByText("Not running on this installation")).toBeTruthy();
+    expect(within(submitted).getByRole("button", { name: "Uninstall Jokes (submitted)" })).toBeTruthy();
+  });
+
+  it("keeps the runtime paging-cap notice (that list still pages)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    apiFetch.mockImplementation((path: string) => {
+      if (path.startsWith("/v1/plugins?"))
+        return Promise.resolve({ plugins: Array(500).fill(runtimeNew()), total: 1_000_000 });
+      return Promise.resolve({ installations: [], count: 0 });
+    });
+    render(<InstalledPluginsPage />);
+
+    expect(
+      await screen.findByText(/Only part of the runtime plugin list could be loaded/),
+    ).toBeTruthy();
+    expect(apiFetch.mock.calls.some(([p]) => String(p).startsWith("/v1/marketplace/plugins?"))).toBe(false);
+    warn.mockRestore();
+  });
+});
+
 describe("InstalledPluginCard — accessibility (#2195)", () => {
   it("names every action after the plugin and uses a text + icon install badge", () => {
     render(
@@ -545,6 +704,111 @@ describe("InstalledPluginCard — uninstall", () => {
       "/v1/marketplace/plugins/plugin-1/uninstall",
       { method: "DELETE", token: "tok" },
     );
+  });
+});
+
+describe("ConfigurePanel with a known configurable flag (#2219)", () => {
+  it("shows a quiet 'No settings available' line -- no disclosure, no request -- when false", () => {
+    render(<ConfigurePanel name="my-plugin" displayName="My Plugin" token="tok" configurable={false} />);
+
+    expect(screen.getByText("No settings available for this plugin.")).toBeTruthy();
+    expect(screen.queryByText("Configure")).toBeNull();
+    expect(document.querySelector("details")).toBeNull();
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it("offers Configure and loads the schema on expand when true", async () => {
+    apiFetch.mockResolvedValue({
+      configurable: true,
+      schema: [{ key: "greeting", type: "string" }],
+      values: { greeting: "hello" },
+    });
+    render(<ConfigurePanel name="my-plugin" displayName="My Plugin" token="tok" configurable />);
+    expect(apiFetch).not.toHaveBeenCalled();
+
+    const summary = screen.getByText("Configure", { selector: "summary" });
+    expect(summary.getAttribute("aria-label")).toBe("Configure My Plugin");
+    fireEvent.click(summary);
+
+    expect(await screen.findByLabelText("greeting")).toBeTruthy();
+    expect(apiFetch).toHaveBeenCalledWith("/v1/plugins/my-plugin/config", { token: "tok" });
+  });
+
+  it("still treats a 404 'not running' as no settings when true (a plugin that stopped since the list)", async () => {
+    apiFetch.mockRejectedValue(
+      Object.assign(new Error("Plugin 'my-plugin' is not running"), { status: 404 }),
+    );
+    render(<ConfigurePanel name="my-plugin" token="tok" configurable />);
+
+    fireEvent.click(screen.getByText("Configure"));
+    expect(await screen.findByText("No settings available for this plugin.")).toBeTruthy();
+  });
+});
+
+describe("InstalledPluginsPage — Configure from the runtime list", () => {
+  function configCalls() {
+    return apiFetch.mock.calls.filter(([p]) => String(p).endsWith("/config"));
+  }
+
+  it("offers Configure only for plugins the registry says are configurable", async () => {
+    mockApi({
+      runtime: [
+        runtimeNew({ name: "weather", configurable: true }),
+        runtimeNew({ name: "jokes", configurable: false, marketplace_plugin_id: null }),
+      ],
+    });
+    render(<InstalledPluginsPage />);
+
+    await screen.findByRole("heading", { name: "weather" });
+    expect(within(cardFor("weather")).getByText("Configure", { selector: "summary" })).toBeTruthy();
+    const jokes = cardFor("jokes");
+    expect(within(jokes).queryByText("Configure")).toBeNull();
+    expect(within(jokes).getByText("No settings available for this plugin.")).toBeTruthy();
+    expect(configCalls()).toEqual([]);
+  });
+
+  it("shows no settings, without a request, for an install that isn't running", async () => {
+    // The submission named like the running git plugin: asking
+    // /v1/plugins/jokes/config would have read the OTHER plugin's settings.
+    mockApi({
+      installations: [
+        installationNew({ plugin_id: "cat-jokes", name: "jokes", display_name: "Jokes (submitted)", origin: "submitted" }),
+      ],
+      runtime: [runtimeNew({ name: "jokes", install_source: "git", marketplace_plugin_id: null })],
+    });
+    render(<InstalledPluginsPage />);
+
+    await screen.findByRole("heading", { name: "Jokes (submitted)" });
+    expect(
+      within(cardFor("Jokes (submitted)")).getByText("No settings available for this plugin."),
+    ).toBeTruthy();
+    expect(configCalls()).toEqual([]);
+  });
+
+  it("asks lazily, as before, when the registry predates the flag", async () => {
+    apiFetch.mockImplementation((path: string) => {
+      if (path.startsWith("/v1/plugins?"))
+        return Promise.resolve({ plugins: [runtimePlugin()], total: 1 });
+      if (path.startsWith("/v1/marketplace/plugins?"))
+        return Promise.resolve({ plugins: [catalogRow()], total: 1 });
+      if (path.endsWith("/config"))
+        return Promise.reject(Object.assign(new Error("Plugin 'weather' is not running"), { status: 404 }));
+      return Promise.resolve({ installations: [], count: 0 });
+    });
+    render(<InstalledPluginsPage />);
+
+    await screen.findByRole("heading", { name: "Weather" });
+    fireEvent.click(within(cardFor("Weather")).getByText("Configure"));
+    expect(await screen.findByText("No settings available for this plugin.")).toBeTruthy();
+    expect(configCalls().map(([p]) => p)).toEqual(["/v1/plugins/weather/config"]);
+  });
+
+  it("keeps Configure for an install when the runtime list couldn't load", async () => {
+    mockApi({ installations: [installationNew()], runtime: new Error("registry down") });
+    render(<InstalledPluginsPage />);
+
+    await screen.findByRole("heading", { name: "My Plugin" });
+    expect(within(cardFor("My Plugin")).getByText("Configure", { selector: "summary" })).toBeTruthy();
   });
 });
 

@@ -4,6 +4,7 @@ import {
   fetchCatalogPlugins,
   fetchMyInstallations,
   fetchRuntimePlugins,
+  hasBackendField,
   isPluginNotRunningError,
   MAX_PAGES,
 } from "./marketplace";
@@ -139,5 +140,20 @@ describe("fetchMyInstallations", () => {
 
     apiFetch.mockResolvedValueOnce({ count: 0 });
     expect(await fetchMyInstallations("tok")).toEqual([]);
+  });
+});
+
+describe("hasBackendField", () => {
+  it("tells a field sent as null (a #2219 backend) from one never sent (an older one)", () => {
+    expect(hasBackendField({ install_source: null }, "install_source")).toBe(true);
+    expect(hasBackendField({ install_source: "git" }, "install_source")).toBe(true);
+    expect(hasBackendField({ name: "x" } as { name: string; install_source?: string }, "install_source")).toBe(false);
+  });
+
+  it("ignores inherited keys and tolerates a missing object", () => {
+    const inherited = Object.create({ origin: "first_party" }) as { origin?: string };
+    expect(hasBackendField(inherited, "origin")).toBe(false);
+    expect(hasBackendField(null as { origin?: string } | null, "origin")).toBe(false);
+    expect(hasBackendField(undefined as { origin?: string } | undefined, "origin")).toBe(false);
   });
 });

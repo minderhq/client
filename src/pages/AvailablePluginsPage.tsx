@@ -23,7 +23,9 @@ import type {
 import {
   matchesSourceFilter,
   parseSourceFilter,
-  resolveSource,
+  CATALOG_SOURCE_KINDS,
+  resolveCatalogSource,
+  serverOriginFilter,
   SOURCE_FILTER_KINDS,
   SOURCE_META,
   SOURCE_PARAM,
@@ -424,7 +426,7 @@ export function PluginCard({
             {plugin.featured && (
               <StatusBadge icon="star" label="Featured" tone="warn" />
             )}
-            <SourceBadge source={resolveSource(plugin)} />
+            <SourceBadge source={resolveCatalogSource(plugin)} />
             <PricingBadge plugin={plugin} />
             {/* No category badge: the catalog only carries an opaque
                 category_id and no endpoint resolves it to a name, so a badge
@@ -524,6 +526,7 @@ function SearchAndFilters({
   onPricingModelChange,
   source,
   onSourceChange,
+  sourceLoadedPagesOnly,
 }: {
   query: string;
   onQueryChange: (q: string) => void;
@@ -531,7 +534,11 @@ function SearchAndFilters({
   onPricingModelChange: (v: string) => void;
   source: SourceKind | null;
   onSourceChange: (v: SourceKind | null) => void;
+  /** The selected source could only be applied to the pages loaded so far
+   * (the server didn't filter it), so the UI must say so. */
+  sourceLoadedPagesOnly: boolean;
 }) {
+  const sourceHintId = useId();
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3">
       <input
@@ -555,13 +562,14 @@ function SearchAndFilters({
         ))}
       </select>
       {/* Source is a filter over the one catalog, not a separate store (epic
-          #2192). Client-side over the loaded pages -- the catalog API has no
-          source param -- and mirrored in ?source= so a filtered view is
-          shareable. Options come from SOURCE_FILTER_KINDS, so MindHub joins
+          #2192). Sent to the server as the catalog's `origin` param (#2219),
+          so it covers every page, and mirrored in ?source= so a filtered view
+          is shareable. Options come from SOURCE_FILTER_KINDS, so MindHub joins
           by adding one entry there (Phase 2). */}
       <select
         className={`${inputClass} w-auto`}
         aria-label="Filter by source"
+        aria-describedby={sourceLoadedPagesOnly ? sourceHintId : undefined}
         value={source ? SOURCE_META[source].param : ""}
         onChange={(e) => onSourceChange(parseSourceFilter(e.target.value))}
       >
@@ -572,6 +580,12 @@ function SearchAndFilters({
           </option>
         ))}
       </select>
+      {sourceLoadedPagesOnly && (
+        <p id={sourceHintId} className={`${fieldHintClass} basis-full`}>
+          This server can't filter by source, so the source filter only covers the
+          plugins loaded so far — use Load more to check the rest.
+        </p>
+      )}
     </div>
   );
 }
@@ -696,6 +710,17 @@ export function AvailablePluginsPage() {
     loadFeatured();
   }, [loadFeatured]);
 
+  // The catalog `origin` the source filter maps to (#2219), sent on both the
+  // list and the search endpoint so the filter covers every page, not just the
+  // loaded ones. Null when no source is selected (or one the server can't
+  // filter, which then falls back to the client-side pass below).
+  const originParam = serverOriginFilter(source);
+  // The `origin` each loaded row was requested with. After a filter change the
+  // previous (unfiltered) rows stay in state until the new first page lands;
+  // only rows fetched WITH the current origin can show that the server ignored
+  // it. Keyed by the row object, so a superseded response can't mislabel the
+  // rows that are actually shown.
+  const requestedOriginRef = useRef(new WeakMap<CatalogPlugin, string | null>());
   const fetchPluginsPage = useCallback(
     async (nextOffset: number) => {
       let path: string;
@@ -709,10 +734,12 @@ export function AvailablePluginsPage() {
         path = `/v1/marketplace/plugins?limit=20&offset=${nextOffset}`;
         if (pricingModel) path += `&pricing_model=${encodeURIComponent(pricingModel)}`;
       }
+      if (originParam) path += `&origin=${encodeURIComponent(originParam)}`;
       const res = await apiFetch<CatalogPluginListResponse>(path);
+      for (const row of res.plugins) requestedOriginRef.current.set(row, originParam);
       return { items: res.plugins, total: res.total };
     },
-    [query, pricingModel],
+    [query, pricingModel, originParam],
   );
   const {
     items: plugins,
@@ -799,11 +826,29 @@ export function AvailablePluginsPage() {
       // so this filter has to apply uniformly to both rather than just the
       // search branch.
       (!pricingModel || plugin.pricing_model === pricingModel) &&
-      matchesSourceFilter(resolveSource(plugin), source),
+      // Also a no-op when the server applied `origin`. It matters when it
+      // didn't: a marketplace older than #2219 ignores the unknown param and
+      // returns every origin, so this keeps the filter correct on the pages
+      // loaded so far (and the notice below says that's all it covers).
+      matchesSourceFilter(resolveCatalogSource(plugin), source),
   );
+  // Featured has no origin param; it's one short list, so filtering it here
+  // covers all of it.
   const visibleFeatured = featured.filter((plugin) =>
-    matchesSourceFilter(resolveSource(plugin), source),
+    matchesSourceFilter(resolveCatalogSource(plugin), source),
   );
+  // The source filter only covers the loaded pages when the server couldn't
+  // apply it: the source has no `origin` mapping, or a row requested with this
+  // origin came back with another one (an older marketplace that ignores the
+  // param). Rows still left from the previous request don't count.
+  const sourceLoadedPagesOnly =
+    source !== null &&
+    (originParam === null ||
+      plugins.some(
+        (plugin) =>
+          requestedOriginRef.current.get(plugin) === originParam &&
+          plugin.origin !== originParam,
+      ));
   const filtersActive = !!(pricingModel || source);
   // A failed first page (or a failed new search/filter) leaves the previous
   // results in state; they no longer answer the current query, so the error
@@ -923,8 +968,9 @@ export function AvailablePluginsPage() {
           onPricingModelChange={setPricingModel}
           source={source}
           onSourceChange={setSource}
+          sourceLoadedPagesOnly={sourceLoadedPagesOnly}
         />
-        <SourceLegend className="mb-4" />
+        <SourceLegend kinds={CATALOG_SOURCE_KINDS} className="mb-4" />
 
         {showSkeleton && <CardListSkeleton count={3} />}
         {listFailed && (
@@ -943,7 +989,7 @@ export function AvailablePluginsPage() {
           <EmptyState>
             {query
               ? "No plugins match your search."
-              : pricingModel
+              : filtersActive
                 ? "No plugins match the selected filters."
                 : "No plugins in the catalog yet."}
           </EmptyState>

@@ -9,6 +9,7 @@ afterEach(cleanup);
 const CASES: [SourceKind, string][] = [
   ["first_party", "First-party"],
   ["private_git", "Private git"],
+  ["manifest", "Manifest upload"],
   ["submitted", "Submitted on this instance"],
   ["mindhub", "MindHub"],
 ];
@@ -72,12 +73,26 @@ describe("SourceLegend", () => {
     expect(details.open).toBe(true);
 
     const terms = Array.from(details.querySelectorAll("dt")).map((dt) => dt.textContent);
-    expect(terms).toEqual(["First-party", "Private git", "Submitted on this instance"]);
-    for (const kind of ["first_party", "private_git", "submitted"] as const) {
+    expect(terms).toEqual([
+      "First-party",
+      "Private git",
+      "Manifest upload",
+      "Submitted on this instance",
+    ]);
+    for (const kind of ["first_party", "private_git", "manifest", "submitted"] as const) {
       expect(screen.getByText(SOURCE_META[kind].description)).toBeTruthy();
     }
     // MindHub is reserved for Phase 2 and not explained until it can appear.
     expect(screen.queryByText("MindHub")).toBeNull();
+  });
+
+  it("explains the new Manifest upload badge in words, with its icon", () => {
+    render(<SourceLegend />);
+    const term = screen.getByText("Manifest upload").closest("dt")!;
+    expect(term.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+    expect(term.nextElementSibling?.textContent).toBe(
+      "Installed on this installation by uploading its plugin manifest.",
+    );
   });
 
   it("can list a custom set of sources", () => {
