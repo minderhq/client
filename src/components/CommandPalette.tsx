@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../lib/api";
 import { useBillingAccess } from "../lib/useBillingAccess";
 import { useAuth } from "../lib/auth";
-import { NAV_DESTINATIONS } from "../lib/nav";
+import { leafVisible, NAV_DESTINATIONS } from "../lib/nav";
+import { ROUTES } from "../lib/routes";
 import { getTheme, setTheme, type Theme } from "../lib/theme";
 import { kbdClass } from "../lib/ui";
 import { useDebouncedValue } from "../lib/useDebouncedValue";
@@ -45,8 +46,8 @@ export function CommandPalette({
   const listboxId = useId();
 
   const commands = useMemo<Command[]>(() => {
-    const nav: Command[] = NAV_DESTINATIONS.filter(
-      (dest) => (!dest.adminOnly || isAdmin) && (!dest.requiresBilling || billing),
+    const nav: Command[] = NAV_DESTINATIONS.filter((dest) =>
+      leafVisible(dest, { isAdmin, billing }),
     ).map((dest) => ({
       id: `nav:${dest.to}:${dest.label}`,
       label: dest.label,
@@ -151,11 +152,11 @@ export function CommandPalette({
           out.push({
             id: `plugin:${pl.name}`,
             label: name,
-            sublabel: "Open in Plugins",
+            sublabel: "Open in Discover plugins",
             icon: "plugins",
             group: "Plugin",
             keywords: "",
-            to: `/plugins/available?q=${encodeURIComponent(name)}`,
+            to: `${ROUTES.discoverPlugins}?q=${encodeURIComponent(name)}`,
           });
         }
       }

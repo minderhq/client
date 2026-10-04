@@ -1,8 +1,10 @@
 import { useCallback, useId, useState } from "react";
 
+import { CardListSkeleton } from "../components/CardListSkeleton";
 import { Icon } from "../components/Icon";
 import { EmptyState } from "../components/EmptyState";
 import { InfoCallout } from "../components/InfoCallout";
+import { LoadError } from "../components/LoadError";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
 import { apiFetch, friendlyErrorMessage } from "../lib/api";
@@ -10,7 +12,8 @@ import { DEFAULT_SUBMISSION_TIER } from "../lib/billing";
 import { useAsyncResource } from "../lib/useAsyncResource";
 import { useAuth } from "../lib/auth";
 import {
-  badgeClass,
+  badgeBaseClass,
+  badgeNeutralToneClass,
   badgeTone,
   cardClass,
   fieldHintClass,
@@ -65,7 +68,7 @@ export function submissionStatusBadgeColor(status: SubmissionStatus): string {
   if (status === "approved") return badgeTone.success;
   if (status === "rejected") return badgeTone.danger;
   if (status === "submitted" || status === "in_review") return badgeTone.warn;
-  return ""; // draft/archived/pending -- neutral badgeClass alone
+  return ""; // draft/archived/pending -- the neutral tone
 }
 
 function NewSubmissionForm({ onCreated }: { onCreated: () => void }) {
@@ -500,7 +503,9 @@ function SubmissionCard({
           </p>
         </div>
         <span
-          className={`${badgeClass} ${submissionStatusBadgeColor(submission.status)} flex-shrink-0`}
+          // Base + one colour set: appended to badgeClass, the amber "submitted"
+          // / "in review" tone lost to its grey (Tailwind orders by stylesheet).
+          className={`${badgeBaseClass} ${submissionStatusBadgeColor(submission.status) || badgeNeutralToneClass} flex-shrink-0`}
         >
           {submission.status.replace("_", " ")}
         </span>
@@ -514,12 +519,17 @@ function SubmissionCard({
 
       {editable && !editing && (
         <div className="mt-3 flex gap-2">
-          <button onClick={() => setEditing(true)} className={secondaryButtonClass}>
+          <button
+            onClick={() => setEditing(true)}
+            aria-label={`Edit ${submission.display_name}`}
+            className={secondaryButtonClass}
+          >
             Edit
           </button>
           <button
             onClick={handleSubmitForReview}
             disabled={busy}
+            aria-label={`${submission.status === "rejected" ? "Resubmit for review" : "Submit for review"}: ${submission.display_name}`}
             className={primaryButtonClass}
           >
             {submission.status === "rejected" ? "Resubmit for review" : "Submit for review"}
@@ -564,7 +574,7 @@ export function SubmissionsPage() {
     <>
       <PageHeader
         icon="submit"
-        title="Submit a Plugin"
+        title="Plugin submissions"
         subtitle="Publish your own plugin to the Minder marketplace. Every submission starts as a private draft and goes through an admin review before anyone else can see or install it."
       />
 
@@ -573,20 +583,28 @@ export function SubmissionsPage() {
       ) : (
         <>
           <NewSubmissionForm onCreated={loadMine} />
-          <StatusLine isError={!!error}>
-            {error ?? (loading ? "Loading your submissions…" : "")}
-          </StatusLine>
+          <StatusLine>{loading ? "Loading your submissions…" : ""}</StatusLine>
 
           <h2 className="mb-2 text-base font-semibold text-gray-900 dark:text-gray-100">
             Your submissions
           </h2>
-          {submissions.length === 0 ? (
-            <EmptyState>You haven't submitted any plugins yet.</EmptyState>
-          ) : (
-            submissions.map((s) => (
-              <SubmissionCard key={s.id} submission={s} onChanged={loadMine} />
-            ))
+          {/* "Nothing submitted" only once a load has succeeded (#2195) --
+              never while the first one is in flight, never after a failure. */}
+          {loading && !data && <CardListSkeleton />}
+          {error && (
+            <LoadError
+              title="Couldn't load your submissions."
+              message={error}
+              what="your submissions"
+              onRetry={loadMine}
+            />
           )}
+          {data && !error && submissions.length === 0 && (
+            <EmptyState>You haven't submitted any plugins yet.</EmptyState>
+          )}
+          {submissions.map((s) => (
+            <SubmissionCard key={s.id} submission={s} onChanged={loadMine} />
+          ))}
         </>
       )}
     </>

@@ -6,6 +6,7 @@ import {
   otherClaimants,
   outcomeSummary,
   parseBundleStateExport,
+  planBundleImport,
 } from "./bundles";
 
 describe("otherClaimants", () => {
@@ -135,5 +136,47 @@ describe("bundlesToStateExport / parseBundleStateExport round-trip", () => {
     expect(() => parseBundleStateExport({ core: {} })).toThrow('"core"');
     expect(() => parseBundleStateExport({ core: { enabled: "yes" } })).toThrow('"core"');
     expect(() => parseBundleStateExport({ core: null })).toThrow('"core"');
+  });
+});
+
+describe("planBundleImport", () => {
+  const b = (name: string, enabled: boolean, core = false): Bundle => ({
+    name,
+    core,
+    enabled,
+    claims: [],
+    services: [],
+  });
+
+  it("sorts each entry into a change, unchanged, or skipped with a reason, in file order", () => {
+    const current = [b("core", true, true), b("rag", false), b("voice", true), b("chat", true)];
+
+    expect(
+      planBundleImport(current, {
+        voice: { enabled: false },
+        rag: { enabled: true },
+        chat: { enabled: true },
+        core: { enabled: false },
+        ghost: { enabled: true },
+      }),
+    ).toEqual({
+      changes: [
+        { name: "voice", enabled: false },
+        { name: "rag", enabled: true },
+      ],
+      unchanged: ["chat"],
+      skipped: [
+        { name: "core", reason: "core can't be disabled" },
+        { name: "ghost", reason: "unknown bundle" },
+      ],
+    });
+  });
+
+  it("ignores bundles the file doesn't mention", () => {
+    expect(planBundleImport([b("rag", false)], {})).toEqual({
+      changes: [],
+      unchanged: [],
+      skipped: [],
+    });
   });
 });

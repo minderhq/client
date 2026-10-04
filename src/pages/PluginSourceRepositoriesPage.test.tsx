@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -14,7 +14,10 @@ vi.mock("../lib/api", () => ({
   friendlyErrorMessage: (e: unknown) => (e instanceof Error ? e.message : String(e)),
 }));
 
-let mockAuth = { token: "", isAuthenticated: false, role: "" };
+// The page is operator-only (#2197): tests run as an admin unless they say
+// otherwise.
+const ADMIN = { token: "", isAuthenticated: true, role: "admin" };
+let mockAuth = { ...ADMIN };
 vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
 }));
@@ -120,9 +123,9 @@ function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/plugins/sources" element={<PluginSourceRepositoriesPage />} />
+        <Route path="/settings/sources" element={<PluginSourceRepositoriesPage />} />
         <Route
-          path="/plugins/sources/:repositoryId"
+          path="/settings/sources/:repositoryId"
           element={<PluginSourceRepositoriesPage />}
         />
       </Routes>
@@ -134,7 +137,47 @@ describe("PluginSourceRepositoriesPage", () => {
   afterEach(() => {
     cleanup();
     apiFetch.mockReset();
+    mockAuth = { ...ADMIN };
+  });
+
+  it("shows a non-admin an operators-only notice and loads nothing", () => {
+    mockAuth = { token: "t", isAuthenticated: true, role: "member" };
+    installApi({ repositories: [repository({ name: "Weather Tools" })] });
+    renderAt("/settings/sources");
+
+    expect(screen.getByRole("heading", { level: 1, name: "MindHub & sources" })).toBeTruthy();
+    expect(screen.getByText(/Only a Platform Admin/)).toBeTruthy();
+    expect(screen.queryByText("MindHub connection")).toBeNull();
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it("gates a repository's detail view the same way", () => {
     mockAuth = { token: "", isAuthenticated: false, role: "" };
+    renderAt("/settings/sources/r1");
+
+    expect(screen.getByText(/Only a Platform Admin/)).toBeTruthy();
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it("shows the MindHub connection as an informational placeholder with no controls", async () => {
+    installApi({ repositories: [] });
+    renderAt("/settings/sources");
+
+    const panel = screen.getByRole("region", { name: "MindHub connection" });
+    expect(panel.textContent).toContain("Not available yet");
+    expect(within(panel).queryByRole("button")).toBeNull();
+    expect(within(panel).queryByRole("link")).toBeNull();
+    expect(within(panel).queryByRole("textbox")).toBeNull();
+    expect(await screen.findByText(/No plugin source repositories yet/)).toBeTruthy();
+  });
+
+  it("links each repository to its detail view under Settings", async () => {
+    installApi({ repositories: [repository({ id: "r1", name: "Weather Tools" })] });
+    renderAt("/settings/sources");
+
+    expect(
+      (await screen.findByRole("link", { name: "Weather Tools" })).getAttribute("href"),
+    ).toBe("/settings/sources/r1");
   });
 
   it("lists repositories with their plugin_count and source link", async () => {
@@ -144,7 +187,7 @@ describe("PluginSourceRepositoriesPage", () => {
         repository({ id: "r2", name: "Finance Tools", plugin_count: 0, source_url: null }),
       ],
     });
-    renderAt("/plugins/sources");
+    renderAt("/settings/sources");
 
     expect(await screen.findByText("Weather Tools")).toBeTruthy();
     expect(screen.getByText("Finance Tools")).toBeTruthy();
@@ -155,7 +198,7 @@ describe("PluginSourceRepositoriesPage", () => {
 
   it("shows an empty state when there are no source repositories, without treating it as an error", async () => {
     installApi({ repositories: [] });
-    renderAt("/plugins/sources");
+    renderAt("/settings/sources");
 
     expect(
       await screen.findByText(/No plugin source repositories yet/),
@@ -168,7 +211,7 @@ describe("PluginSourceRepositoriesPage", () => {
       repository({ id: `r-${i}`, name: `Repo ${i}` }),
     );
     installApi({ repositories: first, reposTotal: 21 });
-    renderAt("/plugins/sources");
+    renderAt("/settings/sources");
 
     const loadMore = await screen.findByText("Load more");
     apiFetch.mockImplementationOnce(() =>
@@ -191,12 +234,19 @@ describe("PluginSourceRepositoriesPage", () => {
       detail: repository({ id: "r1", name: "Weather Tools", plugin_count: 1 }),
       plugins: [plugin({ id: "p1", display_name: "Weather" })],
     });
-    renderAt("/plugins/sources/r1");
+    renderAt("/settings/sources/r1");
 
     expect(await screen.findByText("Weather Tools")).toBeTruthy();
     expect(screen.getByText("Plugins from this repository")).toBeTruthy();
     expect(await screen.findByText("Weather")).toBeTruthy();
     expect(screen.getByText("1 plugin")).toBeTruthy();
+    // The plugin cards (h3) nest under the "Plugins from this repository" h2.
+    const headings = screen
+      .getAllByRole("heading")
+      .map((h) => `${h.tagName}:${h.textContent?.trim()}`);
+    const section = headings.indexOf("H2:Plugins from this repository");
+    expect(section).toBeGreaterThan(-1);
+    expect(headings.indexOf("H3:Weather")).toBeGreaterThan(section);
   });
 
   it("treats a repository with zero linked plugins as empty, not an error (legacy/ungrouped case)", async () => {
@@ -204,7 +254,7 @@ describe("PluginSourceRepositoriesPage", () => {
       detail: repository({ id: "r2", name: "Empty Repo", plugin_count: 0 }),
       plugins: [],
     });
-    renderAt("/plugins/sources/r2");
+    renderAt("/settings/sources/r2");
 
     expect(await screen.findByText("Empty Repo")).toBeTruthy();
     expect(
@@ -215,7 +265,7 @@ describe("PluginSourceRepositoriesPage", () => {
 
   it("shows the backend's 404 message for an unknown repository id", async () => {
     installApi({ detailError: new Error("Repository not found") });
-    renderAt("/plugins/sources/does-not-exist");
+    renderAt("/settings/sources/does-not-exist");
 
     expect(await screen.findByText("Repository not found")).toBeTruthy();
   });
@@ -225,9 +275,9 @@ describe("PluginSourceRepositoriesPage", () => {
       detail: repository({ id: "r1" }),
       plugins: [],
     });
-    renderAt("/plugins/sources/r1");
+    renderAt("/settings/sources/r1");
 
     const back = await screen.findByText("All sources");
-    expect(back.closest("a")?.getAttribute("href")).toBe("/plugins/sources");
+    expect(back.closest("a")?.getAttribute("href")).toBe("/settings/sources");
   });
 });

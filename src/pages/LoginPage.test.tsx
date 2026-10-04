@@ -2,25 +2,53 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../lib/api";
-import type { RegistrationModeState } from "../lib/registration";
 import { LoginPage } from "./LoginPage";
 
 const login = vi.fn();
 const register = vi.fn();
 const navigate = vi.fn();
 let isAuthenticated = false;
-let locationState: { oidcError?: string; from?: string } | null = null;
-let registrationState: RegistrationModeState = { mode: "open", loading: false };
+let locationState:
+  | { oidcError?: string; notice?: string; username?: string; from?: string }
+  | null = null;
+let passwordResetAvailable = false;
+let capabilitiesLoading = false;
+// What GET /v1/auth/capabilities reports as registration_mode (undefined = an
+// older API without the field); `capabilitiesFailed` = the lookup failed.
+let registrationMode: string | undefined = "open";
+let capabilitiesFailed = false;
 
 vi.mock("../lib/auth", () => ({
   useAuth: () => ({ isAuthenticated, login, register }),
 }));
 vi.mock("react-router-dom", () => ({
+  Link: ({ to, children, className }: { to: string; children: React.ReactNode; className?: string }) => (
+    <a href={to} className={className}>
+      {children}
+    </a>
+  ),
   useNavigate: () => navigate,
-  useLocation: () => ({ state: locationState }),
+  useLocation: () => ({ pathname: "/login", search: "", state: locationState }),
   Navigate: ({ to, replace }: { to: string; replace?: boolean }) => (
     <div data-testid="navigate" data-to={to} data-replace={String(replace)} />
   ),
+}));
+const useAuthCapabilities = vi.fn(() => ({
+  loading: capabilitiesLoading,
+  capabilities:
+    capabilitiesLoading || capabilitiesFailed
+      ? null
+      : {
+          password_reset_email: passwordResetAvailable,
+          email_verification: false,
+          ...(registrationMode === undefined ? {} : { registration_mode: registrationMode }),
+        },
+}));
+vi.mock("../lib/passwordReset", async () => ({
+  ...(await vi.importActual<typeof import("../lib/passwordReset")>(
+    "../lib/passwordReset",
+  )),
+  useAuthCapabilities: () => useAuthCapabilities(),
 }));
 const redirectTo = vi.fn();
 vi.mock("../lib/redirect", () => ({
@@ -30,12 +58,6 @@ vi.mock("../lib/api", async () => ({
   ...(await vi.importActual<typeof import("../lib/api")>("../lib/api")),
   friendlyErrorMessage: (e: unknown) => (e instanceof Error ? e.message : "error"),
   oidcLoginUrl: "https://sso.example.com/authorize",
-}));
-vi.mock("../lib/registration", async () => ({
-  ...(await vi.importActual<typeof import("../lib/registration")>(
-    "../lib/registration",
-  )),
-  useRegistrationMode: () => registrationState,
 }));
 
 function fillAndSubmit(
@@ -63,7 +85,10 @@ describe("LoginPage", () => {
     navigate.mockClear();
     isAuthenticated = false;
     locationState = null;
-    registrationState = { mode: "open", loading: false };
+    passwordResetAvailable = false;
+    capabilitiesLoading = false;
+    registrationMode = "open";
+    capabilitiesFailed = false;
   });
   afterEach(() => cleanup());
 
@@ -150,6 +175,78 @@ describe("LoginPage", () => {
     sessionStorage.clear();
   });
 
+  it("offers 'Forgot password?' only when the server can send reset emails", () => {
+    passwordResetAvailable = true;
+    render(<LoginPage />);
+    const link = screen.getByRole("link", { name: "Forgot password?" });
+    expect(link.getAttribute("href")).toBe("/forgot-password");
+    expect(screen.queryByText(/Ask your administrator/)).toBeNull();
+    // Not offered while creating an account.
+    fireEvent.click(screen.getByRole("button", { name: "Create one" }));
+    expect(screen.queryByRole("link", { name: "Forgot password?" })).toBeNull();
+  });
+
+  it("without email reset, shows an ask-your-administrator hint instead of a link", () => {
+    render(<LoginPage />);
+    expect(screen.queryByRole("link", { name: "Forgot password?" })).toBeNull();
+    expect(screen.getByText(/Ask your administrator to reset it/)).toBeTruthy();
+  });
+
+  it("shows neither while the capabilities are loading", () => {
+    capabilitiesLoading = true;
+    render(<LoginPage />);
+    expect(screen.queryByRole("link", { name: "Forgot password?" })).toBeNull();
+    expect(screen.queryByText(/Ask your administrator/)).toBeNull();
+  });
+
+  it("tells SSO users where their password is reset", () => {
+    render(<LoginPage />);
+    expect(screen.getByText(/SSO accounts reset their password at their identity provider/)).toBeTruthy();
+  });
+
+  it("after a reset shows the notice and focuses the username field", () => {
+    locationState = { notice: "Your password has been reset." };
+    render(<LoginPage />);
+    expect(screen.getByRole("status").textContent).toBe("Your password has been reset.");
+    expect(document.activeElement).toBe(screen.getByLabelText("Username"));
+  });
+
+  it("after a reset prefills a known username and focuses the password", () => {
+    locationState = { notice: "Your password has been reset.", username: "alice" };
+    render(<LoginPage />);
+    expect((screen.getByLabelText("Username") as HTMLInputElement).value).toBe("alice");
+    expect(document.activeElement).toBe(screen.getByLabelText("Password"));
+  });
+
+  it("consumes the reset notice from the history entry, so a reload doesn't repeat it", () => {
+    locationState = { notice: "Your password has been reset.", username: "alice" };
+    render(<LoginPage />);
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith(
+      { pathname: "/login", search: "" },
+      { replace: true, state: null },
+    );
+    // Still shown for this visit.
+    expect(screen.getByRole("status").textContent).toBe("Your password has been reset.");
+  });
+
+  it("consumes a failed-SSO error from the history entry, so a reload doesn't repeat it", () => {
+    locationState = { oidcError: "Access denied" };
+    render(<LoginPage />);
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith(
+      { pathname: "/login", search: "" },
+      { replace: true, state: null },
+    );
+    // Still shown for this visit.
+    expect(screen.getByText("Access denied")).toBeTruthy();
+  });
+
+  it("leaves the history entry alone on a plain visit", () => {
+    render(<LoginPage />);
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
   describe("registration mode", () => {
     it("offers sign-up in open mode", () => {
       render(<LoginPage />);
@@ -157,20 +254,20 @@ describe("LoginPage", () => {
     });
 
     it("offers sign-up when the API doesn't report a mode (older API)", () => {
-      registrationState = { mode: null, loading: false };
+      registrationMode = undefined;
       render(<LoginPage />);
       expect(screen.getByRole("button", { name: "Create one" })).toBeTruthy();
     });
 
     it("offers nothing while the mode is still loading", () => {
-      registrationState = { mode: null, loading: true };
+      capabilitiesLoading = true;
       render(<LoginPage />);
       expect(screen.queryByRole("button", { name: "Create one" })).toBeNull();
       expect(screen.queryByText(/by invitation/)).toBeNull();
     });
 
     it("explains invitation-only sign-up instead of the form in invite mode", () => {
-      registrationState = { mode: "invite", loading: false };
+      registrationMode = "invite";
       render(<LoginPage />);
       expect(screen.queryByRole("button", { name: "Create one" })).toBeNull();
       expect(screen.getByText(/created by invitation/)).toBeTruthy();
@@ -180,11 +277,19 @@ describe("LoginPage", () => {
     });
 
     it("points to SSO instead of the form in closed mode", () => {
-      registrationState = { mode: "closed", loading: false };
+      registrationMode = "closed";
       render(<LoginPage />);
       expect(screen.queryByRole("button", { name: "Create one" })).toBeNull();
       expect(screen.getByText(/Sign-up is turned off/)).toBeTruthy();
       expect(screen.getByText(/Sign in with SSO below/)).toBeTruthy();
+    });
+
+    it("falls back to sign-up when the capabilities lookup fails", () => {
+      capabilitiesFailed = true;
+      render(<LoginPage />);
+      expect(screen.getByRole("button", { name: "Create one" })).toBeTruthy();
+      // ... and offers no reset link it can't vouch for.
+      expect(screen.queryByRole("link", { name: "Forgot password?" })).toBeNull();
     });
 
     it("stops offering sign-up when the API says invites are required", async () => {
@@ -232,6 +337,20 @@ describe("LoginPage", () => {
       fillAndSubmit("Log in");
       await vi.waitFor(() =>
         expect(navigate).toHaveBeenCalledWith("/", { replace: true }),
+      );
+    });
+
+    it("keeps the return path when it consumes a failed-SSO error", async () => {
+      locationState = { oidcError: "Access denied", from: "/invite/tok123" };
+      login.mockResolvedValue(undefined);
+      render(<LoginPage />);
+      expect(navigate).toHaveBeenCalledWith(
+        { pathname: "/login", search: "" },
+        { replace: true, state: { from: "/invite/tok123" } },
+      );
+      fillAndSubmit("Log in");
+      await vi.waitFor(() =>
+        expect(navigate).toHaveBeenCalledWith("/invite/tok123", { replace: true }),
       );
     });
 

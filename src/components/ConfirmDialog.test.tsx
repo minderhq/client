@@ -148,4 +148,36 @@ describe("useConfirm", () => {
 
     expect(document.activeElement).toBe(confirmButton);
   });
+  it("renders structured details and describes the dialog with message + details", async () => {
+    function DetailsHarness() {
+      const { confirm, dialog } = useConfirm();
+      return (
+        <>
+          {dialog}
+          <button
+            onClick={() =>
+              confirm({
+                title: "Apply import?",
+                message: "These changes will be applied.",
+                details: (
+                  <ul>
+                    <li>Enable rag</li>
+                  </ul>
+                ),
+              })
+            }
+          >
+            Open
+          </button>
+        </>
+      );
+    }
+    render(<DetailsHarness />);
+    fireEvent.click(screen.getByText("Open"));
+
+    const dialog = await screen.findByRole("alertdialog");
+    const description = document.getElementById(dialog.getAttribute("aria-describedby")!)!;
+    expect(description.textContent).toBe("These changes will be applied.Enable rag");
+    expect(screen.getByRole("listitem").textContent).toBe("Enable rag");
+  });
 });

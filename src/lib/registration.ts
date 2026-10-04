@@ -1,6 +1,5 @@
-import { ApiError, apiFetch, friendlyErrorMessage } from "./api";
-import type { components } from "./api-types.gen";
-import { useAsyncResource } from "./useAsyncResource";
+import { ApiError, friendlyErrorMessage } from "./api";
+import { type AuthCapabilities, useAuthCapabilities } from "./passwordReset";
 
 /** How this instance admits new local accounts (`registration_mode` from the
  * public `GET /v1/auth/capabilities`):
@@ -19,6 +18,14 @@ export function parseRegistrationMode(value: unknown): RegistrationMode | null {
   return "invite";
 }
 
+/** The registration mode in a capabilities answer (see
+ * {@link parseRegistrationMode}); `null` when the lookup failed. */
+export function registrationModeFrom(
+  capabilities: Partial<AuthCapabilities> | null | undefined,
+): RegistrationMode | null {
+  return parseRegistrationMode(capabilities?.registration_mode);
+}
+
 export interface RegistrationModeState {
   /** `null` while loading, or when the API couldn't tell us. */
   mode: RegistrationMode | null;
@@ -27,19 +34,11 @@ export interface RegistrationModeState {
 
 /** The instance's registration mode, from the public capabilities endpoint.
  * A failed lookup resolves to `mode: null` (unknown), never to an error the
- * sign-in page would have to show. */
+ * page would have to show. `loading` is true from the first render, so a page
+ * never flashes a sign-up form it is about to hide. */
 export function useRegistrationMode(): RegistrationModeState {
-  // Partial: an older API may not report every field.
-  type Capabilities = Partial<components["schemas"]["CapabilitiesResponse"]>;
-  const res = useAsyncResource((signal) =>
-    apiFetch<Capabilities>("/v1/auth/capabilities", { signal }),
-  );
-  return {
-    mode: parseRegistrationMode(res.data?.registration_mode),
-    // Also loading before the first fetch has started (the very first render),
-    // so a page never flashes a sign-up form it is about to hide.
-    loading: res.loading || (res.data === null && res.error === null),
-  };
+  const { loading, capabilities } = useAuthCapabilities();
+  return { mode: registrationModeFrom(capabilities), loading };
 }
 
 /** Stable `detail` codes the API returns (403) when it refuses to create an

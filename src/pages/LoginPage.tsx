@@ -1,14 +1,15 @@
-import { useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import { StatusLine } from "../components/StatusLine";
 import { friendlyErrorMessage, oidcLoginUrl } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { passwordResetOffered, useAuthCapabilities } from "../lib/passwordReset";
 import { redirectTo } from "../lib/redirect";
 import {
   registrationErrorMessage,
+  registrationModeFrom,
   registrationRefusal,
-  useRegistrationMode,
 } from "../lib/registration";
 import { rememberReturnPath, safeReturnPath } from "../lib/returnPath";
 import { beginSsoLogin } from "../lib/ssoLogin";
@@ -39,28 +40,57 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const locationState = location.state as {
-    oidcError?: string;
-    from?: string;
-  } | null;
-  const returnPath = safeReturnPath(locationState?.from);
-  const registration = useRegistrationMode();
+  const routeState = location.state as
+    | { oidcError?: string; notice?: string; username?: string; from?: string }
+    | null;
+  // Where to go after signing in, when another page (e.g. an invite link)
+  // sent the user here. Read once: the state is cleared below.
+  const [returnPath] = useState(() => safeReturnPath(routeState?.from));
+  // One capabilities request feeds both the forgot-password link and the
+  // registration mode.
+  const capabilities = useAuthCapabilities();
+  const registrationMode = registrationModeFrom(capabilities.capabilities);
   // Set when the API refuses a sign-up with `invite_required` although the
   // mode looked open (stale or unknown mode): stop offering the form.
   const [inviteOnly, setInviteOnly] = useState(false);
-  const signUpMode = inviteOnly ? "invite" : registration.mode;
+  const signUpMode = inviteOnly ? "invite" : registrationMode;
 
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [username, setUsername] = useState("");
+  // Prefilled when a password reset knew who was resetting.
+  const [username, setUsername] = useState(routeState?.username ?? "");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   // A failed OIDC/SSO redirect (denied consent, expired code, ...) lands here
   // via AuthCallbackPage's navigate("/login", {state: {oidcError}}) -- surface
   // it instead of silently landing on a blank login form.
-  const [error, setError] = useState(
-    locationState?.oidcError ?? "",
+  const [error, setError] = useState(routeState?.oidcError ?? "");
+  // A completed password reset lands here with a success notice (it never
+  // signs the user in).
+  const [notice, setNotice] = useState(routeState?.notice ?? "");
+  // "Forgot password?" is offered only when the server can send reset emails.
+  const capabilitiesLoading = capabilities.loading;
+  const passwordResetAvailable = passwordResetOffered(capabilities.capabilities);
+
+  // Back from a password reset: put the cursor where the user continues.
+  const [focusAfterReset] = useState(() =>
+    routeState?.notice ? (routeState.username ? "password" : "username") : null,
   );
+
+  // The reset notice, prefill and SSO error are read into state above. Drop
+  // them from the history entry (React Router keeps navigation state in
+  // history.state), so a reload or Back/Forward doesn't show them again.
+  // The return path stays, so a reload still comes back to the invite.
+  useEffect(() => {
+    if (routeState?.notice || routeState?.oidcError) {
+      navigate(
+        { pathname: location.pathname, search: location.search },
+        { replace: true, state: returnPath ? { from: returnPath } : null },
+      );
+    }
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (isAuthenticated) return <Navigate to={returnPath ?? "/"} replace />;
 
@@ -68,6 +98,7 @@ export function LoginPage() {
     e.preventDefault();
     setBusy(true);
     setError("");
+    setNotice("");
     if (mode === "register") {
       try {
         await register(username, email, password);
@@ -117,6 +148,7 @@ export function LoginPage() {
             autoComplete="username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
+            autoFocus={focusAfterReset === "username"}
             required
           />
         </div>
@@ -155,8 +187,26 @@ export function LoginPage() {
             autoComplete={mode === "login" ? "current-password" : "new-password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            autoFocus={focusAfterReset === "password"}
             required
           />
+          {mode === "login" && passwordResetAvailable && (
+            <p className="mt-1 text-right text-sm">
+              <Link
+                to="/forgot-password"
+                className="text-gray-600 underline hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400"
+              >
+                Forgot password?
+              </Link>
+            </p>
+          )}
+          {/* No email reset on this server (e.g. no mail configured): no
+              dead-end link, just who can help. */}
+          {mode === "login" && !capabilitiesLoading && !passwordResetAvailable && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Forgot your password? Ask your administrator to reset it.
+            </p>
+          )}
         </div>
 
         <button type="submit" disabled={busy} className={primaryButtonClass}>
@@ -167,6 +217,7 @@ export function LoginPage() {
               : "Create account & log in"}
         </button>
 
+        <StatusLine>{notice}</StatusLine>
         <StatusLine isError>{error}</StatusLine>
       </form>
 
@@ -190,40 +241,40 @@ export function LoginPage() {
       {/* While the mode is still loading, offer nothing rather than a form
           that may turn out not to work. */}
       {(mode === "register" ||
-        (!registration.loading &&
+        (!capabilitiesLoading &&
           signUpMode !== "invite" &&
           signUpMode !== "closed")) && (
-      <p className="mt-3 text-center text-sm text-gray-600 dark:text-gray-400">
-        {mode === "login" ? (
-          <>
-            No account yet?{" "}
-            <button
-              type="button"
-              onClick={() => {
-                setMode("register");
-                setError("");
-              }}
-              className="underline hover:text-indigo-600 dark:hover:text-indigo-400"
-            >
-              Create one
-            </button>
-          </>
-        ) : (
-          <>
-            Already have an account?{" "}
-            <button
-              type="button"
-              onClick={() => {
-                setMode("login");
-                setError("");
-              }}
-              className="underline hover:text-indigo-600 dark:hover:text-indigo-400"
-            >
-              Log in
-            </button>
-          </>
-        )}
-      </p>
+        <p className="mt-3 text-center text-sm text-gray-600 dark:text-gray-400">
+          {mode === "login" ? (
+            <>
+              No account yet?{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("register");
+                  setError("");
+                }}
+                className="underline hover:text-indigo-600 dark:hover:text-indigo-400"
+              >
+                Create one
+              </button>
+            </>
+          ) : (
+            <>
+              Already have an account?{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("login");
+                  setError("");
+                }}
+                className="underline hover:text-indigo-600 dark:hover:text-indigo-400"
+              >
+                Log in
+              </button>
+            </>
+          )}
+        </p>
       )}
 
       {/* Only offer SSO when it's actually configured (VITE_OIDC_LOGIN_URL set
@@ -255,6 +306,9 @@ export function LoginPage() {
           <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
             SSO requires reaching Minder through its Traefik hostname with a real
             domain + TLS.
+          </p>
+          <p className="mt-1 text-center text-xs text-gray-500 dark:text-gray-400">
+            SSO accounts reset their password at their identity provider.
           </p>
         </>
       )}

@@ -5,10 +5,12 @@ import { useConfirm } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 import { Icon } from "../components/Icon";
 import { InfoCallout } from "../components/InfoCallout";
+import { MindHubConnectionPlaceholder } from "../components/MindHubConnectionPlaceholder";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { ROUTES, sourceRepositoryRoute } from "../lib/routes";
 import type { Installation } from "../lib/types";
 import { useAsyncResource } from "../lib/useAsyncResource";
 import { usePaginatedList } from "../lib/usePaginatedList";
@@ -73,15 +75,15 @@ function RepositoryCard({ repository }: { repository: PluginSourceRepository }) 
     <div className={`mb-4 ${cardClass} ${cardHoverClass}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
+          <h3 className="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
             <Icon name="sources" size={16} className="shrink-0 text-indigo-500 dark:text-indigo-400" />
             <Link
-              to={`/plugins/sources/${repository.id}`}
+              to={sourceRepositoryRoute(repository.id)}
               className="hover:underline"
             >
               {repository.name}
             </Link>
-          </h2>
+          </h3>
           {repository.description && (
             <p className="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
               {repository.description}
@@ -254,7 +256,7 @@ function RepositoryDetail({ repositoryId }: { repositoryId: string }) {
   );
 
   const backLink = (
-    <Link to="/plugins/sources" className={secondaryButtonClass}>
+    <Link to={ROUTES.sources} className={secondaryButtonClass}>
       <Icon name="arrow" size={14} /> All sources
     </Link>
   );
@@ -314,9 +316,10 @@ function RepositoryDetail({ repositoryId }: { repositoryId: string }) {
 
       {repo && (
         <>
-          <h3 className={`mb-2 ${mutedTextClass} font-semibold uppercase tracking-wide`}>
+          {/* h2, so the plugin cards' h3s nest under it (#2195). */}
+          <h2 className={`mb-2 ${mutedTextClass} font-semibold uppercase tracking-wide`}>
             Plugins from this repository
-          </h3>
+          </h2>
           <RepositoryPluginList repositoryId={repositoryId} />
         </>
       )}
@@ -324,25 +327,47 @@ function RepositoryDetail({ repositoryId }: { repositoryId: string }) {
   );
 }
 
+/** Installation settings › MindHub & sources (#2197): where this installation's plugins
+ * come from. Operator-only per epic #2192 decision A, gated on the same
+ * role === "admin" check as every other operator item until #2200 refines the
+ * roles. Holds the MindHub connection placeholder (#2201) above the read-only
+ * plugin source repositories that used to be Marketplace › Plugins › Sources. */
 export function PluginSourceRepositoriesPage() {
   const { repositoryId } = useParams();
+  const { role } = useAuth();
 
   return (
     <>
       <PageHeader
         icon="sources"
-        title="Plugin Sources"
+        title="MindHub & sources"
         subtitle={
           repositoryId
             ? "One source repository's metadata and the plugins it contributed, read-only."
-            : "Source repositories that group the marketplace's plugins by where they come from, read-only. Plugins published without a linked repository still appear in the regular catalog."
+            : "Where this installation's plugins come from: the MindHub connection and the source repositories that contribute plugins, read-only."
         }
       />
 
-      {repositoryId ? (
+      {role !== "admin" ? (
+        <InfoCallout icon="lock">
+          Only a Platform Admin can see this installation's MindHub connection
+          and plugin sources. Log in with a Platform Admin account to view them.
+        </InfoCallout>
+      ) : repositoryId ? (
         <RepositoryDetail repositoryId={repositoryId} />
       ) : (
-        <RepositoryList />
+        <>
+          <MindHubConnectionPlaceholder />
+          <h2 className="mb-1 text-base font-semibold text-gray-900 dark:text-gray-100">
+            Plugin source repositories
+          </h2>
+          <p className={`mb-4 ${mutedTextClass}`}>
+            Repositories that group the catalog's plugins by where they come
+            from. Plugins published without a linked repository still appear in
+            Discover.
+          </p>
+          <RepositoryList />
+        </>
       )}
     </>
   );

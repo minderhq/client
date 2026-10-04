@@ -1,7 +1,8 @@
+import { useId } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import { useAuth } from "../lib/auth";
-import { entryIsActive, NAV_SECTIONS } from "../lib/nav";
+import { entryIsActive, NAV_SECTIONS, visibleEntry, type NavEntry } from "../lib/nav";
 import { useBillingAccess } from "../lib/useBillingAccess";
 import { sectionLabelClass } from "../lib/ui";
 import { BrandMark } from "./BrandMark";
@@ -15,8 +16,8 @@ const inactiveItemClass =
 
 /** The platform's persistent nav — a single always-visible tree, grouped by
  * what the user is trying to DO (Knowledge / Marketplace / Platform /
- * Organization) rather than by backend service. Renders from the shared
- * NAV_SECTIONS model (lib/nav.ts) the ⌘K palette also uses. The repetitive
+ * Organization / Installation settings) rather than by backend service. Renders from the
+ * shared NAV_SECTIONS model (lib/nav.ts) the ⌘K palette also uses. The repetitive
  * Available/Installed pages collapse into one entry each (their siblings are
  * in-page tabs), and every row carries a plain-language tooltip so "what does
  * this do" is answerable without clicking. */
@@ -28,9 +29,9 @@ export function Sidebar({
   onNavigate: () => void;
 }) {
   const { role } = useAuth();
-  const isAdmin = role === "admin";
-  const billing = useBillingAccess();
+  const access = { isAdmin: role === "admin", billing: useBillingAccess() };
   const { pathname } = useLocation();
+  const sectionIdPrefix = useId();
 
   return (
     <aside
@@ -61,27 +62,40 @@ export function Sidebar({
         <OrgSwitcher />
       </div>
 
-      <nav className="flex flex-1 flex-col gap-5 px-3 pb-6">
+      <nav aria-label="Main" className="flex flex-1 flex-col gap-5 px-3 pb-6">
         {NAV_SECTIONS.map((section, i) => {
-          const items = section.items.filter(
-            (item) => (!item.adminOnly || isAdmin) && (!item.requiresBilling || billing),
-          );
+          const items = section.items
+            .map((item) => visibleEntry(item, access))
+            .filter((item): item is NavEntry => item !== null);
           if (items.length === 0) return null;
           return (
-            <div key={section.label ?? `top-${i}`}>
+            <div
+              key={section.label ?? `top-${i}`}
+              role={section.label ? "group" : undefined}
+              aria-labelledby={section.label ? `${sectionIdPrefix}-${i}` : undefined}
+            >
               {section.label && (
-                <p className={`mb-1.5 px-3 ${sectionLabelClass}`}>{section.label}</p>
+                <p id={`${sectionIdPrefix}-${i}`} className={`mb-1.5 px-3 ${sectionLabelClass}`}>
+                  {section.label}
+                </p>
               )}
               <div className="flex flex-col gap-0.5">
                 {items.map((item) => {
                   const active = entryIsActive(item, pathname);
+                  // aria-current="page" only when this row IS the current page.
+                  // When the caller sees a tab strip for this entry, the active
+                  // tab is the page and this row is its parent section, so
+                  // "true" (likewise on a nested route like a repository detail).
+                  const ownsPage =
+                    (item.tabs?.length ?? 0) <= 1 && pathname === item.to;
+                  const current = active ? (ownsPage ? "page" : "true") : undefined;
                   return (
                     <Link
                       key={item.to}
                       to={item.to}
                       onClick={onNavigate}
                       title={item.description}
-                      aria-current={active ? "page" : undefined}
+                      aria-current={current}
                       className={`group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition ${
                         active ? activeItemClass : inactiveItemClass
                       }`}

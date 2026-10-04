@@ -122,7 +122,7 @@ describe("PluginCard", () => {
     apiFetch.mockResolvedValue({});
     const { onInstalled } = renderCard({ installation: undefined });
 
-    fireEvent.click(screen.getByRole("button", { name: "Install" }));
+    fireEvent.click(screen.getByRole("button", { name: "Install Weather" }));
 
     await screen.findByText(/Installed\. If this plugin exposes an AI tool/);
     expect(apiFetch).toHaveBeenCalledWith("/v1/marketplace/plugins/p1/install", {
@@ -136,7 +136,7 @@ describe("PluginCard", () => {
     apiFetch.mockRejectedValue(new Error("Plugin already installed"));
     renderCard({ installation: undefined });
 
-    fireEvent.click(screen.getByRole("button", { name: "Install" }));
+    fireEvent.click(screen.getByRole("button", { name: "Install Weather" }));
 
     await screen.findByText("Plugin already installed");
     expect(
@@ -150,7 +150,7 @@ describe("PluginCard", () => {
       confirm: vi.fn().mockResolvedValue(false),
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Uninstall" }));
+    fireEvent.click(screen.getByRole("button", { name: "Uninstall Weather" }));
 
     await vi.waitFor(() => {}); // let the confirm() promise settle
     expect(apiFetch).not.toHaveBeenCalled();
@@ -161,7 +161,7 @@ describe("PluginCard", () => {
     apiFetch.mockResolvedValue({});
     const { onUninstalled } = renderCard({ installation: installation() });
 
-    fireEvent.click(screen.getByRole("button", { name: "Uninstall" }));
+    fireEvent.click(screen.getByRole("button", { name: "Uninstall Weather" }));
 
     await vi.waitFor(() =>
       expect(apiFetch).toHaveBeenCalledWith(
@@ -178,7 +178,7 @@ describe("PluginCard", () => {
       installation: installation({ enabled: true }),
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Disable" }));
+    fireEvent.click(screen.getByRole("button", { name: "Disable Weather" }));
 
     await vi.waitFor(() =>
       expect(apiFetch).toHaveBeenCalledWith(
@@ -195,7 +195,7 @@ describe("PluginCard", () => {
       installation: installation({ enabled: false }),
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Enable" }));
+    fireEvent.click(screen.getByRole("button", { name: "Enable Weather" }));
 
     await vi.waitFor(() =>
       expect(apiFetch).toHaveBeenCalledWith(
@@ -233,9 +233,13 @@ describe("PluginCard", () => {
     renderCard({ installation: undefined, isAuthenticated: false });
 
     expect(
-      screen.getByRole("button", { name: "Install" }).hasAttribute("disabled"),
+      screen.getByRole("button", { name: "Install Weather" }).hasAttribute("disabled"),
     ).toBe(true);
-    expect(screen.getByText("Log in to install")).toBeTruthy();
+    // The reason is visible text, and associated with the button for AT.
+    const hint = screen.getByText("Log in to install");
+    expect(
+      screen.getByRole("button", { name: "Install Weather" }).getAttribute("aria-describedby"),
+    ).toBe(hint.id);
   });
 
   it("hides the 'Install from this repo' affordance for non-admins", () => {
@@ -274,7 +278,7 @@ describe("PluginCard", () => {
       target: { value: "plugins/weather" },
     });
     fireEvent.click(
-      screen.getByRole("button", { name: "Install from this repo" }),
+      screen.getByRole("button", { name: "Install Weather from this repo" }),
     );
 
     await screen.findByText(/installed successfully/);
@@ -304,7 +308,7 @@ describe("PluginCard", () => {
       screen.getByText("Install from this repo", { selector: "summary" }),
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Install from this repo" }),
+      screen.getByRole("button", { name: "Install Weather from this repo" }),
     );
 
     await screen.findByText(/installed successfully/);
@@ -326,7 +330,7 @@ describe("PluginCard", () => {
       screen.getByText("Install from this repo", { selector: "summary" }),
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Install from this repo" }),
+      screen.getByRole("button", { name: "Install Weather from this repo" }),
     );
 
     await screen.findByText("Repository URL is not allowed");
@@ -460,13 +464,16 @@ describe("AvailablePluginsPage", () => {
       catalog: () => ({ items: [plugin({ id: "p1", display_name: "Weather" })], total: 1 }),
       installations: [installation({ plugin_id: "p1", enabled: true })],
     });
-    render(<AvailablePluginsPage />);
-    await screen.findByText("✓ enabled");
+    const { container } = render(<AvailablePluginsPage />);
+    const statusBadge = () =>
+      container.querySelector("[data-status-badge^='Your install:']");
+    await screen.findByRole("button", { name: "Disable Weather" });
+    expect(statusBadge()?.textContent).toBe("Your install: Enabled");
 
-    fireEvent.click(screen.getByRole("button", { name: "Disable" }));
+    fireEvent.click(screen.getByRole("button", { name: "Disable Weather" }));
 
-    await screen.findByText("disabled");
-    expect(screen.getByRole("button", { name: "Enable" })).toBeTruthy();
+    await screen.findByRole("button", { name: "Enable Weather" });
+    expect(statusBadge()?.textContent).toBe("Your install: Disabled");
   });
 
   it("shows recommendations and an installed count once logged in with installs", async () => {
@@ -528,7 +535,7 @@ describe("AvailablePluginsPage", () => {
     );
   });
 
-  it("does not add category/pricing_model params when no filter is set (unchanged default request)", async () => {
+  it("does not add a pricing_model param when no filter is set (unchanged default request)", async () => {
     routeApiFetch({ catalog: () => ({ items: [plugin()], total: 1 }) });
     render(<AvailablePluginsPage />);
     await screen.findByText("Weather");
@@ -536,33 +543,19 @@ describe("AvailablePluginsPage", () => {
     expect(apiFetch).toHaveBeenCalledWith("/v1/marketplace/plugins?limit=20&offset=0");
   });
 
-  it("shows a category filter option derived from the loaded plugins, and filters client-side by it", async () => {
+  it("never shows a raw category UUID -- not on a card, not as a filter option (#2195)", async () => {
+    // The catalog only carries an opaque category_id and no endpoint resolves
+    // it to a name, so neither a badge nor a filter option may render it.
+    const uuid = "6f1c2b9e-3d4a-4c5b-8e7f-0a1b2c3d4e5f";
     routeApiFetch({
-      catalog: () => ({
-        items: [
-          plugin({ id: "p1", display_name: "Weather", category_id: "cat-a" }),
-          plugin({ id: "p2", display_name: "Translate", name: "translate", category_id: "cat-b" }),
-        ],
-        total: 2,
-      }),
+      catalog: () => ({ items: [plugin({ category_id: uuid })], total: 1 }),
+      featured: [plugin({ id: "f1", display_name: "Featured One", category_id: uuid })],
     });
-    render(<AvailablePluginsPage />);
-    await screen.findByText("Weather");
-    expect(screen.getByText("Translate")).toBeTruthy();
-
-    fireEvent.change(screen.getByLabelText("Filter by category"), {
-      target: { value: "cat-a" },
-    });
-
-    expect(screen.getByText("Weather")).toBeTruthy();
-    expect(screen.queryByText("Translate")).toBeNull();
-  });
-
-  it("hides the category filter entirely when no plugin on the page has a category_id", async () => {
-    routeApiFetch({ catalog: () => ({ items: [plugin({ category_id: null })], total: 1 }) });
-    render(<AvailablePluginsPage />);
+    const { container } = render(<AvailablePluginsPage />);
     await screen.findByText("Weather");
 
+    expect(container.textContent).not.toContain(uuid);
+    expect(container.innerHTML).not.toContain(uuid);
     expect(screen.queryByLabelText("Filter by category")).toBeNull();
   });
 

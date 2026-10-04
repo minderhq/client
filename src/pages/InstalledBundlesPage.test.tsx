@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Bundle } from "../lib/bundles";
@@ -34,11 +35,21 @@ function fakeFile(text: string) {
   return { text: () => Promise.resolve(text) };
 }
 
-async function importFile(content: unknown) {
+function importFile(content: unknown) {
   const file = fakeFile(JSON.stringify(content));
   const input = screen.getByLabelText("Import bundle state from a JSON file");
   fireEvent.change(input, { target: { files: [file] } });
-  await vi.waitFor(() => expect(onChanged).toHaveBeenCalled());
+}
+
+/** The import's confirm dialog, once the file has been read and previewed. */
+async function previewDialog() {
+  return screen.findByRole("alertdialog");
+}
+
+/** The visible reason text a disabled control points to. */
+function describedBy(el: HTMLElement) {
+  const id = el.getAttribute("aria-describedby");
+  return id ? document.getElementById(id)?.textContent : null;
 }
 
 describe("InstalledBundlesPage", () => {
@@ -57,7 +68,7 @@ describe("InstalledBundlesPage", () => {
       ],
       count: 3,
     });
-    render(<InstalledBundlesPage />);
+    render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
 
     expect(await screen.findByText("core")).toBeTruthy();
     expect(screen.getByText("voice")).toBeTruthy();
@@ -69,11 +80,12 @@ describe("InstalledBundlesPage", () => {
       bundles: [bundle({ name: "monitoring", enabled: false })],
       count: 1,
     });
-    render(<InstalledBundlesPage />);
+    render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
 
+    expect(await screen.findByText(/No service bundles are enabled yet/)).toBeTruthy();
     expect(
-      await screen.findByText("No bundles are enabled yet — see Available Bundles."),
-    ).toBeTruthy();
+      screen.getByRole("link", { name: "Discover service bundles" }).getAttribute("href"),
+    ).toBe("/marketplace/discover/service-bundles");
   });
 
   it("shows an orphaned-services warning banner listing every orphan", async () => {
@@ -82,7 +94,7 @@ describe("InstalledBundlesPage", () => {
       count: 1,
       orphaned: ["old-worker", "stale-cache"],
     });
-    render(<InstalledBundlesPage />);
+    render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
 
     const banner = await screen.findByText(/Orphaned services/);
     expect(banner.textContent).toContain("old-worker, stale-cache");
@@ -100,7 +112,7 @@ describe("InstalledBundlesPage", () => {
         errors: [],
       })
       .mockResolvedValueOnce({ bundles: [bundle({ name: "core", enabled: true })], count: 1 });
-    render(<InstalledBundlesPage />);
+    render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
 
     fireEvent.click(await screen.findByRole("button", { name: /Reconcile/ }));
 
@@ -117,7 +129,7 @@ describe("InstalledBundlesPage", () => {
     apiFetch
       .mockResolvedValueOnce({ bundles: [bundle({ name: "core", enabled: true })], count: 1 })
       .mockRejectedValueOnce(new Error("plugin-registry unreachable"));
-    render(<InstalledBundlesPage />);
+    render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
 
     fireEvent.click(await screen.findByRole("button", { name: /Reconcile/ }));
 
@@ -129,103 +141,197 @@ describe("InstalledBundlesPage", () => {
   it("disables Reconcile with a login hint when logged out", async () => {
     mockAuth = { token: "", role: "" };
     apiFetch.mockResolvedValue({ bundles: [bundle({ name: "core", enabled: true })], count: 1 });
-    render(<InstalledBundlesPage />);
+    render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
 
     const btn = await screen.findByRole("button", { name: /Reconcile/ });
     expect(btn.hasAttribute("disabled")).toBe(true);
-    expect(btn.getAttribute("title")).toBe("Log in as an admin to reconcile");
+    // Visible text associated with the button -- not a hover-only title.
+    expect(screen.getByText("Log in as an admin to reconcile.")).toBeTruthy();
+    expect(describedBy(btn)).toBe("Log in as an admin to reconcile.");
+    expect(btn.getAttribute("title")).toBeNull();
   });
 
   it("disables Reconcile with an admin-role hint when logged in but not admin", async () => {
     mockAuth = { token: "tok", role: "member" };
     apiFetch.mockResolvedValue({ bundles: [bundle({ name: "core", enabled: true })], count: 1 });
-    render(<InstalledBundlesPage />);
+    render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
 
     const btn = await screen.findByRole("button", { name: /Reconcile/ });
     expect(btn.hasAttribute("disabled")).toBe(true);
-    expect(btn.getAttribute("title")).toBe("Admin role required");
+    expect(describedBy(btn)).toBe("Only an admin can reconcile.");
+    expect(btn.getAttribute("title")).toBeNull();
+    // The import is admin-only too, with its reason shown the same way.
+    const input = screen.getByLabelText("Import bundle state from a JSON file");
+    expect(input.hasAttribute("disabled")).toBe(true);
+    expect(describedBy(input)).toBe("Only an admin can import bundle state.");
+  });
+
+  it("keeps aria-describedby targets unique and resolvable across several cards", async () => {
+    mockAuth = { token: "tok", role: "member" };
+    apiFetch.mockResolvedValue({
+      bundles: ["voice", "rag", "chat"].map((name) => bundle({ name, enabled: true })),
+      count: 3,
+    });
+    const { container } = render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
+    await screen.findByRole("heading", { level: 3, name: "chat" });
+
+    const ids = Array.from(container.querySelectorAll("[id]")).map((el) => el.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const el of Array.from(container.querySelectorAll("[aria-describedby]"))) {
+      expect(document.getElementById(el.getAttribute("aria-describedby")!)).not.toBeNull();
+    }
+    // The three cards share the one page-level admin note (by design); the
+    // import and Reconcile notes are distinct from it and from each other.
+    const cardTargets = ["voice", "rag", "chat"].map((n) =>
+      screen.getByRole("button", { name: `Disable ${n}` }).getAttribute("aria-describedby"),
+    );
+    expect(new Set(cardTargets).size).toBe(1);
+    const reconcile = screen.getByRole("button", { name: /Reconcile/ }).getAttribute("aria-describedby");
+    const importNote = screen
+      .getByLabelText("Import bundle state from a JSON file")
+      .getAttribute("aria-describedby");
+    expect(new Set([cardTargets[0], reconcile, importNote]).size).toBe(3);
+  });
+
+  it("shows a skeleton, not the empty state, while loading; an error offers Retry (#2195)", async () => {
+    let reject!: (e: unknown) => void;
+    apiFetch.mockReturnValueOnce(new Promise((_, r) => (reject = r)));
+    render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
+
+    expect(screen.getByTestId("card-list-skeleton")).toBeTruthy();
+    expect(screen.queryByText(/No service bundles are enabled yet/)).toBeNull();
+
+    reject(new Error("bundle reconciler down"));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Couldn't load the service bundles.");
+    expect(screen.queryByText(/No service bundles are enabled yet/)).toBeNull();
+
+    apiFetch.mockResolvedValueOnce({ bundles: [bundle({ name: "voice", enabled: true })], count: 1 });
+    fireEvent.click(screen.getByRole("button", { name: "Retry loading service bundles" }));
+    expect(await screen.findByRole("heading", { level: 3, name: "voice" })).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("nests bundle cards (h3) under an 'Enabled bundles' h2", async () => {
+    apiFetch.mockResolvedValue({ bundles: [bundle({ name: "voice", enabled: true })], count: 1 });
+    render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
+
+    await screen.findByRole("heading", { level: 3, name: "voice" });
+    expect(
+      screen.getAllByRole("heading").map((h) => `${h.tagName}:${h.textContent?.trim()}`),
+    ).toEqual(["H1:Installed service bundles", "H2:Export / Import", "H2:Enabled bundles", "H3:voice"]);
   });
 });
 
-describe("ExportImportPanel import logic", () => {
+describe("ExportImportPanel import: preview, confirm, cancel (#2195)", () => {
   afterEach(() => {
     cleanup();
     apiFetch.mockReset();
     onChanged.mockReset();
   });
 
-  it("skips an unknown bundle name without calling the API", async () => {
-    const bundles = [bundle({ name: "monitoring", enabled: false })];
+  function renderPanel(bundles: Bundle[], isAdmin = true) {
     render(
-      <ExportImportPanel
-        bundles={bundles}
-        token="tok"
-        isAdmin
-        onChanged={onChanged}
-      />,
+      <ExportImportPanel bundles={bundles} token="tok" isAdmin={isAdmin} onChanged={onChanged} />,
     );
+  }
 
-    await importFile({ "no-such-bundle": { enabled: true } });
-
-    expect(apiFetch).not.toHaveBeenCalled();
-    await screen.findByText(/skipped: no-such-bundle \(unknown bundle\)/);
-  });
-
-  it("skips a bundle whose state already matches, without calling the API", async () => {
-    const bundles = [bundle({ name: "monitoring", enabled: true })];
-    render(
-      <ExportImportPanel
-        bundles={bundles}
-        token="tok"
-        isAdmin
-        onChanged={onChanged}
-      />,
-    );
-
-    await importFile({ monitoring: { enabled: true } });
-
-    expect(apiFetch).not.toHaveBeenCalled();
-    await screen.findByText("Nothing to change.");
-  });
-
-  it("refuses to disable a core bundle, without calling the API", async () => {
-    const bundles = [
-      bundle({ name: "core-services", core: true, enabled: true }),
-    ];
-    render(
-      <ExportImportPanel
-        bundles={bundles}
-        token="tok"
-        isAdmin
-        onChanged={onChanged}
-      />,
-    );
-
-    await importFile({ "core-services": { enabled: false } });
-
-    expect(apiFetch).not.toHaveBeenCalled();
-    await screen.findByText(/skipped: core-services \(core can't be disabled\)/);
-  });
-
-  it("enables a bundle whose desired state differs from current", async () => {
+  it("previews the changes and makes no request until confirmed", async () => {
     apiFetch.mockResolvedValue({});
-    const bundles = [bundle({ name: "monitoring", enabled: false })];
-    render(
-      <ExportImportPanel
-        bundles={bundles}
-        token="tok"
-        isAdmin
-        onChanged={onChanged}
-      />,
-    );
+    renderPanel([
+      bundle({ name: "monitoring", enabled: false }),
+      bundle({ name: "voice", enabled: true }),
+      bundle({ name: "chat", enabled: true }),
+      bundle({ name: "core-services", core: true, enabled: true }),
+    ]);
 
-    await importFile({ monitoring: { enabled: true } });
-
-    expect(apiFetch).toHaveBeenCalledWith("/v1/bundles/monitoring/enable", {
-      method: "POST",
-      token: "tok",
+    importFile({
+      monitoring: { enabled: true },
+      voice: { enabled: false },
+      chat: { enabled: true },
+      "core-services": { enabled: false },
+      "no-such-bundle": { enabled: true },
     });
-    await screen.findByText(/applied: monitoring/);
+
+    const dialog = await previewDialog();
+    expect(within(dialog).getByRole("heading", { name: "Apply 2 bundle changes?" })).toBeTruthy();
+    const text = dialog.textContent!;
+    expect(text).toContain("Will be enabled (1)monitoring");
+    expect(text).toContain("Will be disabled");
+    expect(text).toContain("Will be disabled (1)Services no other enabled bundle claims will stop.voice");
+    expect(text).toContain("Already as requested (1)chat");
+    expect(text).toContain("Skipped (2)core-services (core can't be disabled)no-such-bundle (unknown bundle)");
+    // The preview is part of the dialog's description, read with the question.
+    expect(describedBy(dialog)).toContain("Will be enabled (1)monitoring");
+    expect(apiFetch).not.toHaveBeenCalled();
+
+    // Disabling stops services, so the confirm button carries the danger style.
+    const apply = within(dialog).getByRole("button", { name: "Apply 2 changes" });
+    expect(apply.className).toContain("bg-red-600");
+    fireEvent.click(apply);
+
+    await screen.findByText(
+      "applied: monitoring, voice — skipped: core-services (core can't be disabled), no-such-bundle (unknown bundle)",
+    );
+    expect(apiFetch.mock.calls).toEqual([
+      ["/v1/bundles/monitoring/enable", { method: "POST", token: "tok" }],
+      ["/v1/bundles/voice/disable", { method: "POST", token: "tok" }],
+    ]);
+    expect(onChanged).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("Cancel makes no request and says nothing changed", async () => {
+    renderPanel([bundle({ name: "monitoring", enabled: false })]);
+
+    importFile({ monitoring: { enabled: true } });
+    const dialog = await previewDialog();
+    expect(within(dialog).getByRole("button", { name: "Apply 1 change" }).className).not.toContain(
+      "bg-red-600",
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    await screen.findByText("Import cancelled — nothing was changed.");
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(apiFetch).not.toHaveBeenCalled();
+    expect(onChanged).not.toHaveBeenCalled();
+    // The same file can be picked again straight away.
+    expect(
+      (screen.getByLabelText("Import bundle state from a JSON file") as HTMLInputElement).value,
+    ).toBe("");
+  });
+
+  it("Escape cancels too, without a request", async () => {
+    renderPanel([bundle({ name: "monitoring", enabled: false })]);
+
+    importFile({ monitoring: { enabled: true } });
+    fireEvent.keyDown(await previewDialog(), { key: "Escape" });
+
+    await screen.findByText("Import cancelled — nothing was changed.");
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it("needs no confirmation when nothing would change, and makes no request", async () => {
+    renderPanel([bundle({ name: "monitoring", enabled: true })]);
+
+    importFile({ monitoring: { enabled: true } });
+
+    await screen.findByText("Nothing to change.");
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(apiFetch).not.toHaveBeenCalled();
+    expect(onChanged).not.toHaveBeenCalled();
+  });
+
+  it("reports what it skipped when nothing is actionable (unknown bundle, core disable)", async () => {
+    renderPanel([bundle({ name: "core-services", core: true, enabled: true })]);
+
+    importFile({ "no-such-bundle": { enabled: true }, "core-services": { enabled: false } });
+
+    await screen.findByText(
+      "Nothing to change — skipped: no-such-bundle (unknown bundle), core-services (core can't be disabled)",
+    );
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(apiFetch).not.toHaveBeenCalled();
   });
 
   it("records a per-bundle API failure without aborting the rest of the import", async () => {
@@ -234,48 +340,45 @@ describe("ExportImportPanel import logic", () => {
         ? Promise.reject(new Error("plugin-registry unreachable"))
         : Promise.resolve({}),
     );
-    const bundles = [
+    renderPanel([
       bundle({ name: "monitoring", enabled: false }),
       bundle({ name: "voice", enabled: false }),
-    ];
-    render(
-      <ExportImportPanel
-        bundles={bundles}
-        token="tok"
-        isAdmin
-        onChanged={onChanged}
-      />,
+    ]);
+
+    importFile({ monitoring: { enabled: true }, voice: { enabled: true } });
+    fireEvent.click(
+      within(await previewDialog()).getByRole("button", { name: "Apply 2 changes" }),
     );
 
-    await importFile({
-      monitoring: { enabled: true },
-      voice: { enabled: true },
-    });
-
-    await screen.findByText(/applied: voice/);
-    expect(screen.getByText(/errors: monitoring: plugin-registry unreachable/))
-      .toBeTruthy();
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("applied: voice — errors: monitoring: plugin-registry unreachable");
+    expect(onChanged).toHaveBeenCalledTimes(1);
   });
 
   it("surfaces the real parse error for a file that isn't valid JSON", async () => {
-    const bundles = [bundle()];
-    render(
-      <ExportImportPanel
-        bundles={bundles}
-        token="tok"
-        isAdmin
-        onChanged={vi.fn()}
-      />,
-    );
+    renderPanel([bundle()]);
 
-    const file = fakeFile("not json");
     const input = screen.getByLabelText("Import bundle state from a JSON file");
-    fireEvent.change(input, { target: { files: [file] } });
+    fireEvent.change(input, { target: { files: [fakeFile("not json")] } });
 
     // JSON.parse's own SyntaxError message -- it IS an Error instance, so the
     // component's "Could not read that file..." fallback (for a non-Error
     // throw) is never reached on this path; asserting the real message
     // catches a regression that swallowed it into the generic fallback.
     await screen.findByText(/is not valid JSON/);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("is admin-only: a non-admin can't import, and is told why", async () => {
+    renderPanel([bundle({ name: "monitoring", enabled: false })], false);
+
+    const input = screen.getByLabelText("Import bundle state from a JSON file");
+    expect(input.hasAttribute("disabled")).toBe(true);
+    expect(describedBy(input)).toBe("Only an admin can import bundle state.");
+
+    // Even if a change event slips through, nothing is read, previewed or sent.
+    importFile({ monitoring: { enabled: true } });
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(apiFetch).not.toHaveBeenCalled();
   });
 });

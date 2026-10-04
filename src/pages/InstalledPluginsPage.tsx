@@ -1,20 +1,28 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { CardListSkeleton } from "../components/CardListSkeleton";
 import { Icon } from "../components/Icon";
 import { PluginLogo } from "../components/PluginLogo";
 import { useConfirm } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
+import { PluginVersion } from "../components/PluginVersion";
+import { SourceBadge, SourceLegend } from "../components/SourceBadge";
+import { InstallStateBadge } from "../components/StatusBadge";
 import { StatusLine } from "../components/StatusLine";
 import { apiFetch, friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useAutoClearTimeout } from "../lib/browser";
+import { configurableOf, type InstalledEntry } from "../lib/installedPlugins";
+import { isPluginNotRunningError, type RuntimePlugin } from "../lib/marketplace";
 import type { Installation } from "../lib/types";
+import { useInstalledPlugins } from "../lib/useInstalledPlugins";
 import { usePluginLifecycle } from "../lib/usePluginLifecycle";
 import {
   badgeClass,
+  badgeTone,
   cardClass,
   destructiveButtonClass,
   inputClass,
@@ -22,11 +30,7 @@ import {
   secondaryButtonClass,
 } from "../lib/ui";
 import { useTokenRef } from "../lib/useTokenRef";
-
-interface MyInstallationsResponse {
-  installations: Installation[];
-  count: number;
-}
+import { ROUTES } from "../lib/routes";
 
 interface ConfigField {
   key: string;
@@ -244,20 +248,42 @@ function FieldInput({
   );
 }
 
+/** The quiet line shown instead of Configure when the backend already says
+ * there's nothing to configure -- no disclosure to open, no request. */
+const NO_SETTINGS_TEXT = "No settings available for this plugin.";
+
 /** Lazily fetches this plugin's config schema on first expand -- merged in
  * from the old standalone "Plugin Configuration" page, which made a user
  * pick the same plugin twice (once to install it here, once to find it
- * again in a completely separate page to configure it). "configurable"
- * here isn't guaranteed by "installed": plugin-registry's config schema
- * and marketplace's installation record are two independent systems linked
- * only by a name match, so a plugin can be installed with no schema, or
- * (for first-party plugins that just run regardless of any per-user
- * install) have a schema without ever appearing as "installed" for a given
- * user -- this panel only ever claims the former case, honestly. */
-export function ConfigurePanel({ name, token }: { name: string; token: string }) {
+ * again in a completely separate page to configure it). Since #2219 the
+ * runtime list says up front whether a plugin has settings (`configurable`):
+ * when it's false the card shows a quiet "No settings available" line instead,
+ * without a round trip. Against an older registry (`configurable` unknown)
+ * the panel still asks on expand and treats its 404 "not running" as "no
+ * settings". */
+export function ConfigurePanel({
+  name,
+  displayName = name,
+  token,
+  configurable: knownConfigurable,
+}: {
+  name: string;
+  /** Names the "Configure" control for assistive tech ("Configure Weather");
+   * every installed card has one. Defaults to the registry name. */
+  displayName?: string;
+  token: string;
+  /** See `configurableOf` (lib/installedPlugins). `false` renders the quiet
+   * line and never requests the config; `true` or `undefined` render the
+   * panel. */
+  configurable?: boolean;
+}) {
   const baseId = useId();
   const [loaded, setLoaded] = useState(false);
   const [configurable, setConfigurable] = useState(false);
+  // plugin-registry has no in-process instance to read settings from (a
+  // manifest/webhook plugin, or one that isn't loaded) -- see
+  // isPluginNotRunningError. Neutral, not an error.
+  const [noInstance, setNoInstance] = useState(false);
   const [schema, setSchema] = useState<ConfigField[]>([]);
   const [display, setDisplay] = useState<PluginDisplay | null>(null);
   const [requires, setRequires] = useState<PluginRequires | null>(null);
@@ -288,6 +314,13 @@ export function ConfigurePanel({ name, token }: { name: string; token: string })
       setLoaded(true);
       setStatus("");
     } catch (e) {
+      if (isPluginNotRunningError(e)) {
+        setNoInstance(true);
+        setConfigurable(false);
+        setLoaded(true);
+        setStatus("");
+        return;
+      }
       setStatus(friendlyErrorMessage(e));
       setIsError(true);
     }
@@ -336,9 +369,21 @@ export function ConfigurePanel({ name, token }: { name: string; token: string })
     }
   }
 
+  if (knownConfigurable === false) {
+    return (
+      <p className="mt-3 flex items-center gap-1.5 border-t border-gray-100 pt-3 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
+        <Icon name="settings" size={13} className="shrink-0" />
+        {NO_SETTINGS_TEXT}
+      </p>
+    );
+  }
+
   return (
     <details className="group mt-3 border-t border-gray-100 pt-3 dark:border-gray-800" onToggle={handleToggle}>
-      <summary className="flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-indigo-600 dark:text-indigo-400">
+      <summary
+        aria-label={`Configure ${displayName}`}
+        className="flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-indigo-600 dark:text-indigo-400"
+      >
         <Icon name="chevron-right" size={14} className="shrink-0 transition group-open:rotate-90" />
         <Icon name="settings" size={15} className="shrink-0" />
         Configure
@@ -378,7 +423,7 @@ export function ConfigurePanel({ name, token }: { name: string; token: string })
         {status && <StatusLine isError={isError} className="mb-2">{status}</StatusLine>}
         {loaded && !configurable && (
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            This plugin has no configurable settings.
+            {noInstance ? NO_SETTINGS_TEXT : "This plugin has no configurable settings."}
           </p>
         )}
         {loaded && configurable && (
@@ -416,14 +461,95 @@ export function ConfigurePanel({ name, token }: { name: string; token: string })
   );
 }
 
-export function InstalledPluginCard({
+const HEALTH_TONE: Record<string, string> = {
+  healthy: badgeTone.success,
+  degraded: badgeTone.warn,
+  unhealthy: badgeTone.danger,
+  error: badgeTone.danger,
+};
+
+function formatTimestamp(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
+}
+
+/** What plugin-registry reports for this plugin on this installation: whether
+ * it's enabled there, and its health (the last-check time is in the card's
+ * meta line, see HealthCheckedAt). When the runtime list loaded
+ * but doesn't include the plugin, says so -- a marketplace install record
+ * doesn't load a plugin by itself (today's two-plane model, #2091). Shows
+ * nothing when the runtime list couldn't be loaded. */
+function RuntimeState({
+  runtime,
+  runtimeKnown,
+}: {
+  runtime: RuntimePlugin | null;
+  runtimeKnown: boolean;
+}) {
+  if (!runtime) {
+    if (!runtimeKnown) return null;
+    return (
+      <span
+        className={badgeClass}
+        title="plugin-registry doesn't have this plugin loaded, so it isn't running on this installation. A marketplace install is recorded for you, but it doesn't start the plugin on its own."
+      >
+        <Icon name="warning" size={12} className="shrink-0" />
+        Not running on this installation
+      </span>
+    );
+  }
+  const health = runtime.health_status || "unknown";
+  return (
+    <>
+      {runtime.status === "error" ? (
+        <span className={`${badgeClass} ${badgeTone.danger}`}>
+          <Icon name="warning" size={12} className="shrink-0" />
+          Error on this installation
+        </span>
+      ) : (
+        <span className={`${badgeClass} ${runtime.enabled ? badgeTone.success : ""}`}>
+          <Icon name={runtime.enabled ? "check" : "close"} size={12} className="shrink-0" />
+          {runtime.enabled ? "Enabled on this installation" : "Disabled on this installation"}
+        </span>
+      )}
+      <span className={`${badgeClass} ${HEALTH_TONE[health] ?? ""}`}>
+        <Icon name="health" size={12} className="shrink-0" />
+        Health: {health}
+      </span>
+    </>
+  );
+}
+
+/** When plugin-registry last health-checked the plugin, as quiet visible text
+ * (not a hover-only tooltip) so keyboard, touch and screen-reader users get it
+ * too. */
+function HealthCheckedAt({ runtime }: { runtime: RuntimePlugin }) {
+  if (!runtime.last_health_check) return <span>No health check yet</span>;
+  return (
+    <span>
+      Health checked{" "}
+      <time dateTime={runtime.last_health_check}>
+        {formatTimestamp(runtime.last_health_check)}
+      </time>
+    </span>
+  );
+}
+
+/** Enable/disable/uninstall for the caller's marketplace installation record --
+ * the same lifecycle actions as before #2193, now only rendered for entries
+ * that actually have such a record (a runtime-only plugin has nothing for these
+ * marketplace endpoints to act on). */
+function InstallationActions({
   installation,
+  displayName,
   token,
   onUninstalled,
   onToggleEnabled,
   confirm,
 }: {
   installation: Installation;
+  /** The card's title, so each action is named after it ("Disable Weather"). */
+  displayName: string;
   token: string;
   onUninstalled: (pluginId: string) => void;
   onToggleEnabled: (pluginId: string, enabled: boolean) => void;
@@ -447,30 +573,102 @@ export function InstalledPluginCard({
   }
 
   return (
-    <section className={`mb-4 ${cardClass}`}>
-      <div className="flex items-start justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
-          <Icon name="plugins" size={16} className="shrink-0 text-indigo-500 dark:text-indigo-400" /> {installation.display_name}
-          <span className={badgeClass}>
-            {installation.enabled ? "✓ enabled" : "disabled"}
-          </span>
-        </h2>
-        <div className="flex flex-shrink-0 items-center gap-2">
-          <button onClick={handleToggle} disabled={busy} className={secondaryButtonClass}>
-            {installation.enabled ? "Disable" : "Enable"}
-          </button>
-          <button onClick={handleUninstall} disabled={busy} className={destructiveButtonClass}>
-            <Icon name="delete" size={15} /> Uninstall
-          </button>
-        </div>
+    <>
+      <div className="flex flex-shrink-0 items-center gap-2">
+        <button
+          onClick={handleToggle}
+          disabled={busy}
+          aria-label={`${installation.enabled ? "Disable" : "Enable"} ${displayName}`}
+          className={secondaryButtonClass}
+        >
+          {installation.enabled ? "Disable" : "Enable"}
+        </button>
+        <button
+          onClick={handleUninstall}
+          disabled={busy}
+          aria-label={`Uninstall ${displayName}`}
+          className={destructiveButtonClass}
+        >
+          <Icon name="delete" size={15} /> Uninstall
+        </button>
       </div>
-      {installation.requires_services.length > 0 && (
-        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-          Needs: {installation.requires_services.join(", ")}
-        </p>
+      {status && (
+        <StatusLine isError={isError} className="mt-2 basis-full">
+          {status}
+        </StatusLine>
       )}
-      {status && <StatusLine isError={isError} className="mt-2">{status}</StatusLine>}
-      <ConfigurePanel name={installation.name} token={token} />
+    </>
+  );
+}
+
+export function InstalledPluginCard({
+  entry,
+  token,
+  runtimeKnown = false,
+  onUninstalled,
+  onToggleEnabled,
+  confirm,
+}: {
+  entry: InstalledEntry;
+  token: string;
+  /** Whether plugin-registry's runtime list loaded, i.e. whether a missing
+   * `entry.runtime` means "not running" rather than "unknown". */
+  runtimeKnown?: boolean;
+  onUninstalled: (pluginId: string) => void;
+  onToggleEnabled: (pluginId: string, enabled: boolean) => void;
+  confirm: ReturnType<typeof useConfirm>["confirm"];
+}) {
+  const { installation, runtime } = entry;
+  const hasVersion = entry.installedVersion !== null;
+  const hasNeeds = entry.requiresServices.length > 0;
+
+  return (
+    <section className={`mb-4 ${cardClass}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
+            <Icon name="plugins" size={16} className="shrink-0 text-indigo-500 dark:text-indigo-400" /> {entry.displayName}
+          </h3>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <SourceBadge source={entry.source} />
+            <RuntimeState runtime={runtime} runtimeKnown={runtimeKnown} />
+            {installation && (
+              <InstallStateBadge enabled={installation.enabled} />
+            )}
+          </div>
+          {(hasVersion || hasNeeds || runtime) && (
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-3 text-xs text-gray-500 dark:text-gray-400">
+              {hasVersion && (
+                <PluginVersion installed={entry.installedVersion} listed={entry.listedVersion} />
+              )}
+              {runtime && <HealthCheckedAt runtime={runtime} />}
+              {hasNeeds && <span>Needs: {entry.requiresServices.join(", ")}</span>}
+            </p>
+          )}
+          {!installation && runtime && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Loaded by this installation for everyone — there's no marketplace install
+              of yours to enable, disable or uninstall.
+            </p>
+          )}
+        </div>
+        {installation && (
+          <InstallationActions
+            installation={installation}
+            displayName={entry.displayName}
+            token={token}
+            onUninstalled={onUninstalled}
+            onToggleEnabled={onToggleEnabled}
+            confirm={confirm}
+          />
+        )}
+      </div>
+      <ConfigurePanel
+        name={entry.name}
+        displayName={entry.displayName}
+        token={token}
+        configurable={configurableOf(runtime, runtimeKnown)}
+      />
     </section>
   );
 }
@@ -479,86 +677,103 @@ export function InstalledPluginsPage() {
   const { token, sessionKey, isAuthenticated } = useAuth();
   const tokenRef = useTokenRef();
   const { confirm, dialog } = useConfirm();
-  const [installations, setInstallations] = useState<Installation[] | null>(null);
-  const [status, setStatus] = useState("");
-  const [isError, setIsError] = useState(false);
+  const {
+    entries,
+    loading,
+    runtime,
+    installationsError,
+    runtimeError,
+    catalogError,
+    runtimeTruncated,
+    catalogTruncated,
+    reload,
+    removeInstallation,
+    setInstallationEnabled,
+  } = useInstalledPlugins({ enabled: isAuthenticated, tokenRef, sessionKey });
 
-  const setStatusMsg = useCallback((msg: string, err = false) => {
-    setStatus(msg);
-    setIsError(err);
-  }, []);
-
-  const loadInstallations = useCallback(async () => {
-    if (!isAuthenticated) return;
-    setStatusMsg("Loading…");
-    try {
-      const res = await apiFetch<MyInstallationsResponse>(
-        "/v1/marketplace/installations/me",
-        { token: tokenRef.current },
-      );
-      setInstallations(res.installations ?? []);
-      setStatusMsg("");
-    } catch (e) {
-      setStatusMsg(friendlyErrorMessage(e), true);
-    }
-  }, [isAuthenticated, tokenRef, setStatusMsg]);
-
-  useEffect(() => {
-    loadInstallations();
-  }, [loadInstallations, sessionKey]);
-
-  function handleUninstalled(pluginId: string) {
-    setInstallations((prev) => (prev ?? []).filter((i) => i.plugin_id !== pluginId));
-  }
-
-  function handleToggleEnabled(pluginId: string, enabled: boolean) {
-    setInstallations((prev) =>
-      (prev ?? []).map((i) => (i.plugin_id === pluginId ? { ...i, enabled } : i)),
-    );
-  }
+  const hasError = !!installationsError || !!runtimeError;
+  const firstLoad = loading && entries.length === 0;
+  const isEmpty = !loading && !hasError && entries.length === 0;
 
   return (
     <>
       {dialog}
       <PageHeader
         icon="plugins"
-        title="Installed Plugins"
-        subtitle="Manage the plugins you've installed — enable, disable, uninstall, or edit their settings. Requires login: installs are per-user."
+        title="Installed plugins"
+        subtitle="Everything running on this installation, plus the plugins you've installed from the marketplace — check versions and health, enable, disable, uninstall, or edit their settings. Requires login."
       />
-      <StatusLine isError={isError}>{status}</StatusLine>
       {!isAuthenticated && (
         <InfoCallout icon="lock">
           Log in (top right) to see your installed plugins.
         </InfoCallout>
       )}
-      {isAuthenticated && installations !== null && installations.length === 0 && (
-        <EmptyState>
-          No plugins installed yet —{" "}
-          <Link to="/plugins/available" className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
-            browse Available Plugins
-          </Link>
-          .
-        </EmptyState>
+      {isAuthenticated && (
+        <>
+          {loading && <StatusLine>Loading installed plugins…</StatusLine>}
+          {installationsError && (
+            <StatusLine isError>
+              Couldn't load your marketplace installs: {installationsError}
+            </StatusLine>
+          )}
+          {runtimeError && (
+            <StatusLine isError>
+              Couldn't load the plugins running on this installation: {runtimeError}
+            </StatusLine>
+          )}
+          {hasError && !loading && (
+            <button onClick={reload} className={`mb-4 ${secondaryButtonClass}`}>
+              <Icon name="reset" size={15} /> Retry
+            </button>
+          )}
+          {catalogError && !loading && (
+            <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+              Source and listed-version details are unavailable right now ({catalogError}).
+            </p>
+          )}
+          {(runtimeTruncated || catalogTruncated) && !loading && (
+            <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+              {runtimeTruncated && catalogTruncated
+                ? "Only part of the runtime plugin list and the catalog could be loaded, so some plugins, source badges and listed versions may be missing."
+                : runtimeTruncated
+                  ? "Only part of the runtime plugin list could be loaded, so some running plugins may be missing here."
+                  : "Only part of the catalog could be loaded, so some source badges and listed versions may be missing."}
+            </p>
+          )}
+          {firstLoad && <CardListSkeleton />}
+          {isEmpty && (
+            <EmptyState>
+              No plugins installed yet —{" "}
+              <Link to={ROUTES.discoverPlugins} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+                find one in Discover plugins
+              </Link>
+              .
+            </EmptyState>
+          )}
+          <h2 className="sr-only">Plugins on this installation</h2>
+          {entries.length > 0 && <SourceLegend className="mb-3" />}
+          {entries.length > 0 && (
+            <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+              Some of these expose AI tools the assistant can call —{" "}
+              <Link to={ROUTES.installedAiTools} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+                check Installed AI tools
+              </Link>{" "}
+              to see which are live right now.
+            </p>
+          )}
+          {entries.map((entry) => (
+            <InstalledPluginCard
+              key={entry.key}
+              entry={entry}
+              token={token}
+              runtimeKnown={runtime !== null && !runtimeTruncated}
+              onUninstalled={removeInstallation}
+              onToggleEnabled={setInstallationEnabled}
+              confirm={confirm}
+            />
+          ))}
+        </>
       )}
-      {isAuthenticated && installations !== null && installations.length > 0 && (
-        <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
-          Some of these expose AI tools the assistant can call —{" "}
-          <Link to="/ai-tools/installed" className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
-            check Live Tools
-          </Link>{" "}
-          to see which are live right now.
-        </p>
-      )}
-      {installations?.map((i) => (
-        <InstalledPluginCard
-          key={i.plugin_id}
-          installation={i}
-          token={token}
-          onUninstalled={handleUninstalled}
-          onToggleEnabled={handleToggleEnabled}
-          confirm={confirm}
-        />
-      ))}
     </>
   );
 }

@@ -1,3 +1,5 @@
+import type { PluginOrigin } from "./marketplace";
+
 /** Shapes shared across more than one page -- previously each page re-declared
  * its own copy (found drifting: AvailablePluginsPage's `Installation` was
  * missing `requires_services`, RagPipelinesPage's `KnowledgeBase` was a
@@ -21,6 +23,11 @@ export interface Installation {
   category_id: string | null;
   author: string | null;
   requires_services: string[];
+  /** The installed plugin's catalog origin (#2219). Absent on a marketplace
+   * older than #2219, which is why it's optional. */
+  origin?: PluginOrigin;
+  /** The catalog row's source repository URL, when it has one (#2219). */
+  repository_url?: string | null;
 }
 
 export interface KnowledgeBase {
