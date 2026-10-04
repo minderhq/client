@@ -650,7 +650,14 @@ export function AvailablePluginsPage() {
     setQueryInput(urlQuery);
   }, [urlQuery]);
   const query = useDebouncedValue(queryInput, 300);
+  // Write only when the debounced value itself changes. setSearchParams gets
+  // a new identity on every navigation, so without this an incoming ?q= would
+  // re-run the effect while `query` still holds the previous value -- and
+  // write that stale value back over the new one.
+  const lastDebouncedQueryRef = useRef(query);
   useEffect(() => {
+    if (query === lastDebouncedQueryRef.current) return;
+    lastDebouncedQueryRef.current = query;
     if (query === lastUrlQueryRef.current) return;
     lastUrlQueryRef.current = query;
     setSearchParams(

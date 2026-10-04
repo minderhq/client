@@ -10,7 +10,14 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { BrowserRouter, MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import {
+  BrowserRouter,
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { CatalogPlugin } from "../lib/marketplace";
@@ -123,8 +130,10 @@ function routeApi(handlers: {
 }
 
 let location = "";
+let navigate: ReturnType<typeof useNavigate> | null = null;
 function LocationProbe() {
   location = useLocation().search;
+  navigate = useNavigate();
   return null;
 }
 
@@ -506,6 +515,29 @@ describe("Discover plugins: recommendation links", () => {
 
     fireEvent.change(screen.getByLabelText("Search plugins"), { target: { value: "" } });
     await waitFor(() => expect(location).toBe("?source=first-party"));
+  });
+
+  it("keeps an incoming ?q= -- the debounced mirror never writes a stale query back", async () => {
+    routeApi({
+      catalog: () => ({ plugins: [WEATHER], total: 1 }),
+      search: () => ({ plugins: [NEWS], total: 1 }),
+    });
+    renderAt("/discover");
+    await screen.findByRole("heading", { level: 3, name: "Weather" });
+
+    // A ?source= rewrite, then a push with a new ?q= (what a palette result
+    // or recommendation link on this page does).
+    fireEvent.change(screen.getByLabelText("Filter by source"), { target: { value: "first-party" } });
+    await waitFor(() => expect(location).toBe("?source=first-party"));
+    act(() => navigate!("/discover?source=first-party&q=news"));
+
+    // Straight away, not only after the debounce: a stale write would drop q
+    // for a moment and only restore it once the new query settles.
+    await act(async () => {});
+    expect(location).toBe("?source=first-party&q=news");
+    expect((screen.getByLabelText("Search plugins") as HTMLInputElement).value).toBe("news");
+    await new Promise((r) => setTimeout(r, 400)); // and still after it
+    expect(location).toBe("?source=first-party&q=news");
   });
 
   it("writes ?q= once per pause, replacing the entry: typing never grows the history", async () => {
