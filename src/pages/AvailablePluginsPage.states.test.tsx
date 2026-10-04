@@ -435,6 +435,30 @@ describe("Discover plugins: accessible names, badges and headings", () => {
   });
 });
 
+describe("Discover plugins: aria-describedby targets", () => {
+  it("gives every card its own description id -- unique, resolvable, inside that card", async () => {
+    const cards = [WEATHER, NEWS, plugin({ id: "c", name: "crm", display_name: "CRM" })];
+    routeApi({ catalog: () => ({ plugins: cards, total: 3 }) }); // logged out
+    const { container } = renderAt();
+    await screen.findByRole("heading", { level: 3, name: "CRM" });
+
+    // No id appears twice anywhere on the page.
+    const ids = Array.from(container.querySelectorAll("[id]")).map((el) => el.id);
+    expect(new Set(ids).size).toBe(ids.length);
+
+    const describedIds = cards.map((p) => {
+      const button = screen.getByRole("button", { name: `Install ${p.display_name}` });
+      const id = button.getAttribute("aria-describedby")!;
+      const target = document.getElementById(id)!;
+      expect(target.textContent).toBe("Log in to install");
+      // The hint described for a card's button is that card's own hint.
+      expect(button.closest("section")!.contains(target)).toBe(true);
+      return id;
+    });
+    expect(new Set(describedIds).size).toBe(cards.length);
+  });
+});
+
 describe("Discover plugins: recommendation links", () => {
   it("links each recommendation to Discover searched for it, and runs that search", async () => {
     mockAuth = { token: "tok", isAuthenticated: true, role: "user", sessionKey: 1 };

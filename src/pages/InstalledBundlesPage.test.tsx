@@ -166,6 +166,33 @@ describe("InstalledBundlesPage", () => {
     expect(describedBy(input)).toBe("Only an admin can import bundle state.");
   });
 
+  it("keeps aria-describedby targets unique and resolvable across several cards", async () => {
+    mockAuth = { token: "tok", role: "member" };
+    apiFetch.mockResolvedValue({
+      bundles: ["voice", "rag", "chat"].map((name) => bundle({ name, enabled: true })),
+      count: 3,
+    });
+    const { container } = render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
+    await screen.findByRole("heading", { level: 3, name: "chat" });
+
+    const ids = Array.from(container.querySelectorAll("[id]")).map((el) => el.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const el of Array.from(container.querySelectorAll("[aria-describedby]"))) {
+      expect(document.getElementById(el.getAttribute("aria-describedby")!)).not.toBeNull();
+    }
+    // The three cards share the one page-level admin note (by design); the
+    // import and Reconcile notes are distinct from it and from each other.
+    const cardTargets = ["voice", "rag", "chat"].map((n) =>
+      screen.getByRole("button", { name: `Disable ${n}` }).getAttribute("aria-describedby"),
+    );
+    expect(new Set(cardTargets).size).toBe(1);
+    const reconcile = screen.getByRole("button", { name: /Reconcile/ }).getAttribute("aria-describedby");
+    const importNote = screen
+      .getByLabelText("Import bundle state from a JSON file")
+      .getAttribute("aria-describedby");
+    expect(new Set([cardTargets[0], reconcile, importNote]).size).toBe(3);
+  });
+
   it("shows a skeleton, not the empty state, while loading; an error offers Retry (#2195)", async () => {
     let reject!: (e: unknown) => void;
     apiFetch.mockReturnValueOnce(new Promise((_, r) => (reject = r)));
