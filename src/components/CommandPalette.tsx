@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
+import { resolvePath, useLocation, useNavigate } from "react-router-dom";
 
 import { apiFetch } from "../lib/api";
 import { useBillingAccess } from "../lib/useBillingAccess";
@@ -33,7 +33,8 @@ interface Command {
  * A modal on the shared layer (lib/useModal.ts): portalled into <body>, the
  * app is inert behind it, Tab stays inside, and closing it -- Escape, a click
  * outside, ⌘K again, or picking a command -- returns focus to what had it
- * before it opened (the page heading if that is gone). */
+ * before it opened (the page heading if that is gone), except when the
+ * command goes to another page: then focus goes to that page's heading. */
 export function CommandPalette({
   open,
   onClose,
@@ -42,6 +43,7 @@ export function CommandPalette({
   onClose: () => void;
 }) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { role, sessionKey, isPlatformAdmin } = useAuth();
   const tokenRef = useTokenRef();
   const isAdmin = role === "admin";
@@ -201,6 +203,12 @@ export function CommandPalette({
 
   function select(cmd: Command | undefined) {
     if (!cmd) return;
+    // Going to another page: the navigation puts focus on its heading
+    // (lib/useRouteFocus.ts), so don't bounce it to the old trigger first.
+    // Same page (only the query changes): focus goes back as usual.
+    if (cmd.to && resolvePath(cmd.to, pathname).pathname !== pathname) {
+      modal.close({ restoreFocus: false });
+    }
     onClose();
     if (cmd.to) navigate(cmd.to);
     else cmd.run?.();

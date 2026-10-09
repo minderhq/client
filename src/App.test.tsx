@@ -448,6 +448,32 @@ describe("App — ⌘K and the modal layer (#97)", () => {
     expect(document.activeElement).toBe(toggle);
   });
 
+  it("leaves focus on the new page's heading after a palette selection navigates, never on the trigger", async () => {
+    renderAt("/");
+    const trigger = screen.getAllByRole("button", { name: "Open command palette" })[0];
+    trigger.focus();
+    fireEvent.click(trigger);
+    const focusedTrigger = vi.fn();
+    trigger.addEventListener("focus", focusedTrigger);
+
+    const input = screen.getByRole("combobox", { name: "Search pages and actions" });
+    fireEvent.change(input, { target: { value: "discover ai tools" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(palette()).toBeNull();
+    expect(currentLocation?.pathname).toBe(ROUTES.discoverAiTools);
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("heading", { level: 1, name: "Discover AI tools" }),
+      ),
+    );
+    await nextFrames();
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", { level: 1, name: "Discover AI tools" }),
+    );
+    expect(focusedTrigger).not.toHaveBeenCalled();
+  });
+
   it("ignores ⌘K / Ctrl-K while a confirm dialog is open", async () => {
     render(
       <MemoryRouter>

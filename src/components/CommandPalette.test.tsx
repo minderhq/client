@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { useState } from "react";
+import { StrictMode, useState } from "react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -129,12 +129,14 @@ function Page({ onClose }: { onClose?: () => void }) {
   );
 }
 
-function renderPage(onClose?: () => void) {
-  const view = render(
-    <MemoryRouter>
+function renderPage(onClose?: () => void, { path = "/", strict = false } = {}) {
+  const tree = (
+    <MemoryRouter initialEntries={[path]}>
       <Page onClose={onClose} />
-    </MemoryRouter>,
+      <Probe />
+    </MemoryRouter>
   );
+  const view = render(strict ? <StrictMode>{tree}</StrictMode> : tree);
   const trigger = screen.getByRole("button", { name: "Open palette" });
   return { ...view, trigger };
 }
@@ -231,6 +233,54 @@ describe("CommandPalette — shared modal layer (#97)", () => {
       expect(document.activeElement).toBe(trigger);
     });
   }
+
+  it("returns focus to the trigger when a selection stays on the same page", () => {
+    const { trigger } = renderPage(undefined, { path: "/ask" });
+    openFromTrigger(trigger);
+    search("ask a question");
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter" });
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(pathname).toBe("/ask");
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("does not return focus to the trigger when a selection goes to another page", () => {
+    const { container, trigger } = renderPage();
+    openFromTrigger(trigger);
+    const focusedTrigger = vi.fn();
+    trigger.addEventListener("focus", focusedTrigger);
+    search("discover plugins");
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter" });
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(pathname).not.toBe("/");
+    // The new page's heading takes it (lib/useRouteFocus.ts, covered in
+    // App.test.tsx); the palette itself must not bounce it to the trigger.
+    expect(focusedTrigger).not.toHaveBeenCalled();
+    expect(container.hasAttribute("inert")).toBe(false);
+  });
+
+  it("opens and closes cleanly under StrictMode: focus in, focus back, no inert left", () => {
+    const { container, trigger } = renderPage(undefined, { strict: true });
+    const { layer } = openFromTrigger(trigger);
+    expect(document.activeElement).toBe(screen.getByRole("combobox"));
+    expect(container.hasAttribute("inert")).toBe(true);
+    expect(layer.hasAttribute("inert")).toBe(false);
+
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Escape" });
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    expect(document.querySelectorAll("[inert]")).toHaveLength(0);
+
+    // And again: the second session starts from scratch.
+    openFromTrigger(trigger);
+    expect(container.hasAttribute("inert")).toBe(true);
+    fireEvent.mouseDown(screen.getByRole("dialog").parentElement!);
+    expect(document.activeElement).toBe(trigger);
+    expect(document.querySelectorAll("[inert]")).toHaveLength(0);
+  });
 
   it("prevents the closing press from moving focus off the trigger", () => {
     const { trigger } = renderPage();
