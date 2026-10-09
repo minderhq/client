@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { apiFetch, friendlyErrorMessage } from "../lib/api";
 import { MIN_PASSWORD_LENGTH } from "../lib/password";
@@ -9,7 +9,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from "../lib/ui";
-import { useModal } from "../lib/useModal";
+import { tabbableIn, useModal } from "../lib/useModal";
 import { Dialog } from "./Dialog";
 import { Icon } from "./Icon";
 import { StatusLine } from "./StatusLine";
@@ -64,6 +64,19 @@ export function ResetPasswordControl({
     },
   });
 
+  // A failed request leaves focus nowhere: the button that had it was
+  // disabled while the request ran. Once the form is enabled again, put focus
+  // back in the dialog -- on the password being set, else the selected mode --
+  // so Escape and Tab work again. (The error itself is announced: role=alert.)
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const refocusRef = useRef(false);
+  useEffect(() => {
+    if (busy || !refocusRef.current) return;
+    refocusRef.current = false;
+    const panel = modal.panelRef.current;
+    (passwordRef.current ?? (panel && tabbableIn(panel)[0]))?.focus();
+  }, [busy, modal.panelRef]);
+
   function close() {
     // Drop the one-time password from memory as soon as the dialog closes.
     setOpen(false);
@@ -92,6 +105,7 @@ export function ResetPasswordControl({
       setResult(res);
     } catch (err) {
       setError(formatError(err));
+      refocusRef.current = true;
     }
     setBusy(false);
   }
@@ -220,6 +234,7 @@ export function ResetPasswordControl({
                       New password for {username}
                     </label>
                     <input
+                      ref={passwordRef}
                       id={`${ids}-new-password`}
                       type="password"
                       autoComplete="new-password"

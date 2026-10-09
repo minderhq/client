@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { useState } from "react";
+import { StrictMode, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ResetPasswordControl } from "./ResetPasswordControl";
@@ -171,6 +171,77 @@ describe("ResetPasswordControl dialog (#97)", () => {
 
     finish({ user_id: 1, mode: "generate", must_change_password: true, temporary_password: null });
     await within(dialog).findByRole("button", { name: "Done" });
+  });
+
+  for (const mode of ["generate", "set"] as const) {
+    it(`puts focus back in the dialog after a failed reset (${mode})`, async () => {
+      let fail: (e: unknown) => void = () => {};
+      apiFetch.mockReturnValue(new Promise((_, reject) => (fail = reject)));
+      const { trigger, dialog } = openDialog();
+      if (mode === "set") {
+        fireEvent.click(within(dialog).getByLabelText("Set a password"));
+        fireEvent.change(within(dialog).getByPlaceholderText("New password"), {
+          target: { value: "a-long-enough-password" },
+        });
+      }
+      const submit = within(dialog).getByRole("button", { name: "Reset password" });
+      submit.focus();
+      fireEvent.click(submit);
+      await within(dialog).findByRole("button", { name: "Resetting…" });
+      // A browser drops focus from the button it just disabled (jsdom keeps
+      // it there); either way it must end up on a field again.
+
+      fail(new Error("Server said no"));
+
+      expect(await within(dialog).findByRole("alert")).toHaveProperty("textContent", "Server said no");
+      const expected =
+        mode === "set"
+          ? within(dialog).getByPlaceholderText("New password")
+          : within(dialog).getByLabelText("Generate a temporary password");
+      await waitFor(() => expect(document.activeElement).toBe(expected));
+
+      // Escape works again, from where focus now is.
+      fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(document.activeElement).toBe(trigger);
+    });
+  }
+
+  it("leaves focus alone on a validation error (no request, nothing disabled)", () => {
+    const { dialog } = openDialog();
+    fireEvent.click(within(dialog).getByLabelText("Set a password"));
+    const submit = within(dialog).getByRole("button", { name: "Reset password" });
+    submit.focus();
+    fireEvent.click(submit); // too short: rejected before any request
+    expect(within(dialog).getByRole("alert").textContent).toMatch(/at least/);
+    expect(document.activeElement).toBe(submit);
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it("opens and closes cleanly under StrictMode: focus in, focus back, no inert left", () => {
+    const { container } = render(
+      <StrictMode>
+        <Page />
+      </StrictMode>,
+    );
+    const trigger = screen.getByRole("button", { name: "Reset password" });
+    for (const close of [
+      (d: HTMLElement) => fireEvent.keyDown(d, { key: "Escape" }),
+      (d: HTMLElement) => fireEvent.click(within(d).getByRole("button", { name: "Cancel" })),
+    ]) {
+      trigger.focus();
+      fireEvent.click(trigger);
+      const dialog = screen.getByRole("dialog");
+      expect(document.activeElement).toBe(within(dialog).getByLabelText("Generate a temporary password"));
+      expect(container.hasAttribute("inert")).toBe(true);
+      expect(dialog.parentElement!.hasAttribute("inert")).toBe(false);
+
+      close(dialog);
+
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(document.activeElement).toBe(trigger);
+      expect(document.querySelectorAll("[inert]")).toHaveLength(0);
+    }
   });
 
   it("does not close when a press starts in the dialog and ends on the backdrop", () => {
