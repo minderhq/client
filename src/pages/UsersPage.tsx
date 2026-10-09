@@ -203,7 +203,6 @@ function UserRow({
           identity provider; the API refuses with 409). */}
         {!isSelf && !user.is_oidc_linked && (
           <ResetPasswordControl
-            userId={user.id}
             username={user.username}
             endpoint={`/v1/auth/users/${user.id}/reset-password`}
             token={token}
