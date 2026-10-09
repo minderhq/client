@@ -6,7 +6,7 @@
  * `["completion", "embedding", ...]`) via the per-model `/api/show` call, which
  * would mean one extra Ollama round-trip per listed model just to populate a
  * dropdown (see `core/ollama_manager.py`'s `list_models()` vs. `show_model()`
- * in minderhq/minder). Not worth the added latency/load for this UI, so
+ * in the core service). Not worth the added latency/load for this UI, so
  * classification stays name-based on the client -- but widened beyond a bare
  * "embed" substring, which missed real, popular embedding-only families (BGE,
  * E5, GTE, Instructor, Arctic-Embed, MiniLM, sentence-T5, Nomic-Embed,
