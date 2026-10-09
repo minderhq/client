@@ -41,7 +41,14 @@ interface PendingConfirm extends ConfirmOptions {
  */
 export function useConfirm() {
   const [pending, setPending] = useState<PendingConfirm | null>(null);
-  const modal = useModal({ open: pending !== null, onDismiss: () => settle(false) });
+  // Keyed on the request: a confirm() chained straight after another (React
+  // batches the close and the reopen) still gets a session of its own --
+  // inert, focus moved in, focus returned.
+  const modal = useModal({
+    open: pending !== null,
+    onDismiss: () => settle(false),
+    sessionKey: pending,
+  });
 
   const confirm = useCallback(
     (options: ConfirmOptions) =>

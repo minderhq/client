@@ -175,14 +175,33 @@ describe("ResetPasswordControl dialog (#97)", () => {
 
   it("does not close when a press starts in the dialog and ends on the backdrop", () => {
     const { dialog } = openDialog();
+    const backdrop = dialog.parentElement!;
     // E.g. selecting the temporary password by dragging past the panel edge.
     fireEvent.mouseDown(within(dialog).getByText(/signs alice out/));
-    fireEvent.click(dialog.parentElement!);
+    fireEvent.mouseUp(backdrop);
+    fireEvent.click(backdrop);
     expect(screen.getByRole("dialog")).toBe(dialog);
 
-    // A press that starts on the backdrop still closes it.
-    fireEvent.mouseDown(dialog.parentElement!);
-    fireEvent.click(dialog.parentElement!);
+    // A press that starts and ends on the backdrop closes it.
+    fireEvent.mouseDown(backdrop);
+    fireEvent.mouseUp(backdrop);
+    fireEvent.click(backdrop);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("does not close when a press starts on the backdrop and ends in the dialog", () => {
+    const { dialog } = openDialog();
+    const backdrop = dialog.parentElement!;
+    fireEvent.mouseDown(backdrop);
+    fireEvent.mouseUp(within(dialog).getByText(/signs alice out/));
+    // The browser fires the click on the common ancestor: the backdrop.
+    fireEvent.click(backdrop);
+    expect(screen.getByRole("dialog")).toBe(dialog);
+
+    // The next press is judged on its own.
+    fireEvent.mouseDown(backdrop);
+    fireEvent.mouseUp(backdrop);
+    fireEvent.click(backdrop);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
