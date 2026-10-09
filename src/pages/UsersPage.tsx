@@ -221,7 +221,7 @@ function UserRow({
 }
 
 /** The Platform Admin view: every account on the installation, across all
- * organizations (`/v1/auth/users*`, which the API serves to Platform Admins
+ * organizations (the `/v1/auth/users` endpoints, which the API serves to Platform Admins
  * only). Org owners and admins manage their own members on the org-scoped
  * Users page instead. SSO-linked accounts show their role as read-only:
  * Authelia's group membership overwrites it on every login, so editing it here
