@@ -35,7 +35,7 @@ export function CommandPalette({
   onClose: () => void;
 }) {
   const navigate = useNavigate();
-  const { role, sessionKey } = useAuth();
+  const { role, sessionKey, isPlatformAdmin } = useAuth();
   const tokenRef = useTokenRef();
   const isAdmin = role === "admin";
   const billing = useBillingAccess();
@@ -47,7 +47,7 @@ export function CommandPalette({
 
   const commands = useMemo<Command[]>(() => {
     const nav: Command[] = NAV_DESTINATIONS.filter((dest) =>
-      leafVisible(dest, { isAdmin, billing }),
+      leafVisible(dest, { isAdmin, isPlatformAdmin, billing }),
     ).map((dest) => ({
       id: `nav:${dest.to}:${dest.label}`,
       label: dest.label,
@@ -70,7 +70,7 @@ export function CommandPalette({
       { id: "act:theme", label: "Toggle theme", sublabel: "System / light / dark", icon: "theme-dark", group: "Actions", keywords: "dark light mode appearance", run: cycleTheme },
     ];
     return [...actions, ...nav];
-  }, [isAdmin, billing]);
+  }, [isAdmin, isPlatformAdmin, billing]);
 
   const staticResults = useMemo(() => {
     const q = query.trim().toLowerCase();

@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { DirectoryUser, MyOrg, OrgInvite, OrgMember } from "../lib/orgs";
+import type { MyOrg, OrgInvite } from "../lib/orgs";
 import { OrganizationPage } from "./OrganizationPage";
 
 const apiFetch = vi.fn();
@@ -51,17 +51,6 @@ function org(overrides: Partial<MyOrg> = {}): MyOrg {
   };
 }
 
-function member(overrides: Partial<OrgMember> = {}): OrgMember {
-  return {
-    user_id: 1,
-    username: "alice",
-    email: "alice@example.com",
-    org_role: "member",
-    is_home: true,
-    ...overrides,
-  } as OrgMember;
-}
-
 function invite(overrides: Partial<OrgInvite> = {}): OrgInvite {
   return {
     id: 1,
@@ -77,39 +66,25 @@ function invite(overrides: Partial<OrgInvite> = {}): OrgInvite {
   };
 }
 
-function directoryUser(overrides: Partial<DirectoryUser> = {}): DirectoryUser {
-  return { id: 2, username: "bob", email: "bob@example.com", ...overrides };
-}
-
 /** Routes apiFetch by method+path so each test only needs to say what's
- * different from the defaults (one org, one member, no invites, no
- * directory). */
+ * different from the defaults (one org, no invites). */
 function routeApiFetch(opts: {
   orgs?: MyOrg[];
-  members?: OrgMember[];
   invites?: OrgInvite[];
-  users?: DirectoryUser[];
 } = {}) {
-  const { orgs = [org()], members = [member()], invites = [], users = [] } = opts;
+  const { orgs = [org()], invites = [] } = opts;
   apiFetch.mockImplementation((path: string, init?: { method?: string; body?: unknown }) => {
     const method = init?.method ?? "GET";
     if (path === "/v1/organizations/mine")
       return Promise.resolve({ organizations: orgs, active_organization_id: orgs[0]?.id ?? null });
     if (/\/v1\/organizations\/\d+$/.test(path) && method === "PATCH")
       return Promise.resolve({ id: orgs[0]?.id ?? 1, ...(init?.body as object) });
-    if (/\/v1\/organizations\/\d+\/members$/.test(path) && method === "GET")
-      return Promise.resolve({ members, total: members.length });
-    if (/\/v1\/organizations\/\d+\/members$/.test(path) && method === "POST")
-      return Promise.resolve({});
-    if (/\/v1\/organizations\/\d+\/members\/\d+$/.test(path) && method === "DELETE")
-      return Promise.resolve({});
     if (/\/v1\/organizations\/\d+\/invites$/.test(path) && method === "GET")
       return Promise.resolve({ invites, total: invites.length });
     if (/\/v1\/organizations\/\d+\/invites$/.test(path) && method === "POST")
       return Promise.resolve(invite());
     if (/\/v1\/organizations\/\d+\/invites\/\d+\/revoke$/.test(path))
       return Promise.resolve({ ...invite(), status: "revoked" });
-    if (path === "/v1/auth/users") return Promise.resolve({ users });
     return Promise.reject(new Error(`unexpected ${method} ${path}`));
   });
 }
@@ -166,114 +141,21 @@ describe("OrganizationPage", () => {
     expect(screen.getByText(/You belong to 2 organizations/)).toBeTruthy();
   });
 
-  it("shows members read-only (no role select or Remove) for a plain member", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "user", activeTenantId: "1", orgRole: "member" };
-    routeApiFetch({ members: [member(), member({ user_id: 2, username: "bob", org_role: "admin" })] });
-    render(<OrganizationPage />);
-
-    await screen.findByText("alice");
-    expect(screen.getByText("bob")).toBeTruthy();
-    expect(screen.getByText("admin")).toBeTruthy(); // read-only role badge
-    expect(screen.queryByRole("button", { name: /Remove/ })).toBeNull();
-    expect(screen.queryByLabelText(/Role for/)).toBeNull();
-  });
-
-  it("shows an empty state when the active org has no members", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "user", activeTenantId: "1", orgRole: "member" };
-    routeApiFetch({ members: [] });
-    render(<OrganizationPage />);
-
-    await screen.findByText("No members found.");
-  });
-
-  it("gives an org owner management controls over other members, without the admin-only add-member form", async () => {
+  it("links to the org Users page instead of listing members itself", async () => {
     mockAuth = { isAuthenticated: true, token: "tok", role: "user", activeTenantId: "1", orgRole: "owner" };
-    routeApiFetch({ members: [member(), member({ user_id: 2, username: "bob" })] });
+    routeApiFetch({});
     render(<OrganizationPage />);
 
-    await screen.findByText("alice");
-    expect(screen.getByLabelText("Role for alice")).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: /Remove/ }).length).toBe(2);
-    // #1208: org owner/admin manage existing members, but adding a brand-new
-    // member still needs the instance-admin-only directory.
-    expect(screen.queryByText("Add a member")).toBeNull();
-  });
-
-  it("lets an instance admin add an existing user, excluding current members from the picker", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin", activeTenantId: "1", orgRole: "" };
-    routeApiFetch({
-      members: [member()],
-      users: [directoryUser({ id: 1, username: "alice" }), directoryUser({ id: 2, username: "bob" })],
-    });
-    render(<OrganizationPage />);
-    await screen.findByText("alice");
-
-    const picker = screen.getByLabelText("Add a member") as HTMLSelectElement;
-    expect(screen.queryByText("alice (alice@example.com)")).toBeNull(); // already a member
-    fireEvent.change(picker, { target: { value: "2" } });
-    fireEvent.click(screen.getByRole("button", { name: "Add" }));
-
-    await vi.waitFor(() =>
-      expect(apiFetch).toHaveBeenCalledWith(
-        "/v1/organizations/1/members",
-        { method: "POST", body: { user_id: 2, org_role: "member" }, token: "tok" },
-      ),
+    await screen.findByText("Acme Corporation");
+    expect(screen.getByRole("link", { name: /Manage users/ }).getAttribute("href")).toBe(
+      "/organization/users",
     );
-    await screen.findByText("Member added.");
-  });
-
-  it("changes a member's role", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin", activeTenantId: "1", orgRole: "" };
-    routeApiFetch({ members: [member({ user_id: 2, username: "bob", org_role: "member" })] });
-    render(<OrganizationPage />);
-    await screen.findByText("bob");
-
-    fireEvent.change(screen.getByLabelText("Role for bob"), { target: { value: "admin" } });
-
-    await vi.waitFor(() =>
-      expect(apiFetch).toHaveBeenCalledWith(
-        "/v1/organizations/1/members",
-        { method: "POST", body: { user_id: 2, org_role: "admin" }, token: "tok" },
-      ),
-    );
-    await screen.findByText("Role updated.");
-  });
-
-  it("removes a member after confirming", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin", activeTenantId: "1", orgRole: "" };
-    routeApiFetch({ members: [member({ user_id: 2, username: "bob" })] });
-    render(<OrganizationPage />);
-    await screen.findByText("bob");
-
-    fireEvent.click(screen.getByRole("button", { name: /Remove/ }));
-
-    expect(confirmMock).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Remove member?", danger: true }),
-    );
-    await vi.waitFor(() =>
-      expect(apiFetch).toHaveBeenCalledWith(
-        "/v1/organizations/1/members/2",
-        { method: "DELETE", token: "tok" },
-      ),
-    );
-    await screen.findByText("Member removed.");
-  });
-
-  it("does not remove a member when the confirmation is declined", async () => {
-    confirmMock.mockResolvedValue(false);
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin", activeTenantId: "1", orgRole: "" };
-    routeApiFetch({ members: [member({ user_id: 2, username: "bob" })] });
-    render(<OrganizationPage />);
-    await screen.findByText("bob");
-    apiFetch.mockClear();
-
-    fireEvent.click(screen.getByRole("button", { name: /Remove/ }));
-
-    await vi.waitFor(() => expect(confirmMock).toHaveBeenCalled());
+    // The member list, its actions and the Platform Admin directory moved there.
     expect(apiFetch).not.toHaveBeenCalledWith(
-      expect.stringContaining("/members/2"),
-      expect.objectContaining({ method: "DELETE" }),
+      expect.stringMatching(/\/members$/),
+      expect.anything(),
     );
+    expect(apiFetch).not.toHaveBeenCalledWith("/v1/auth/users", expect.anything());
   });
 
   it("sends an org invite by email and lists it as pending", async () => {
@@ -368,8 +250,6 @@ describe("OrganizationPage", () => {
         return Promise.resolve({ organizations: [org()], active_organization_id: 1 });
       if (/\/v1\/organizations\/\d+$/.test(path) && method === "PATCH")
         return Promise.reject(new Error("boom"));
-      if (/\/v1\/organizations\/\d+\/members$/.test(path))
-        return Promise.resolve({ members: [member()], total: 1 });
       if (/\/v1\/organizations\/\d+\/invites$/.test(path))
         return Promise.resolve({ invites: [], total: 0 });
       return Promise.reject(new Error(`unexpected ${method} ${path}`));

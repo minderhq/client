@@ -6,7 +6,7 @@ import { Sidebar } from "./Sidebar";
 
 // Mutable per test (like AvailablePluginsPage.test.tsx's mockAuth) so both
 // the non-admin (default) and admin (Review Queue visible) paths are covered.
-let mockAuth = { role: "" };
+let mockAuth: { role: string; isPlatformAdmin?: boolean } = { role: "" };
 vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
 }));
@@ -247,16 +247,29 @@ describe("Sidebar", () => {
   });
 
 
-  it("hides admin-only Members from a non-admin but shows it to an admin", () => {
+  it("shows All Users to a Platform Admin only, and the org Users page to everyone", () => {
     const { unmount } = render(
       <MemoryRouter>
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
     expect(screen.queryByText("All Users")).toBeNull();
+    expect(
+      screen.getByText("Users", { selector: "a *, a" }).closest("a")?.getAttribute("href"),
+    ).toBe("/organization/users");
     unmount();
 
-    mockAuth = { role: "admin" };
+    // The legacy "admin" role alone is not enough.
+    mockAuth = { role: "admin", isPlatformAdmin: false };
+    const third = render(
+      <MemoryRouter>
+        <Sidebar open={false} onNavigate={() => {}} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByText("All Users")).toBeNull();
+    third.unmount();
+
+    mockAuth = { role: "admin", isPlatformAdmin: true };
     render(
       <MemoryRouter>
         <Sidebar open={false} onNavigate={() => {}} />

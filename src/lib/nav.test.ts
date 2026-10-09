@@ -10,6 +10,7 @@ import {
   type NavAccess,
   type NavEntry,
 } from "./nav";
+import { ORG_USERS_PATH } from "./orgs";
 import { ROUTES } from "./routes";
 
 const graphEntry = NAV_SECTIONS.flatMap((s) => s.items).find(
@@ -61,9 +62,11 @@ describe("nav — Knowledge Graph grouping (#1230)", () => {
   });
 });
 
-const MEMBER: NavAccess = { isAdmin: false, billing: false };
-const BILLING_MEMBER: NavAccess = { isAdmin: false, billing: true };
-const ADMIN: NavAccess = { isAdmin: true, billing: true };
+const MEMBER: NavAccess = { isAdmin: false, isPlatformAdmin: false, billing: false };
+const BILLING_MEMBER: NavAccess = { isAdmin: false, isPlatformAdmin: false, billing: true };
+const ADMIN: NavAccess = { isAdmin: true, isPlatformAdmin: true, billing: true };
+/** The legacy instance "admin" role without the Platform Admin claim. */
+const ORG_ADMIN: NavAccess = { isAdmin: true, isPlatformAdmin: false, billing: true };
 
 function section(label: string) {
   return NAV_SECTIONS.find((s) => s.label === label)!;
@@ -158,15 +161,26 @@ describe("nav — marketplace IA (#2197)", () => {
       ROUTES.publishSubmissionReview,
       "/platform/providers",
       "/organizations",
-      "/platform/users",
       "/audit",
       ROUTES.sources,
     ]);
+    const platformAdminOnly = NAV_SECTIONS.flatMap((s) => s.items)
+      .flatMap((i) => [i, ...(i.tabs ?? [])])
+      .filter((l) => l.platformAdminOnly)
+      .map((l) => l.to);
+    expect(platformAdminOnly).toEqual(["/platform/users"]);
     const billingOnly = NAV_SECTIONS.flatMap((s) => s.items)
       .flatMap((i) => [i, ...(i.tabs ?? [])])
       .filter((l) => l.requiresBilling)
       .map((l) => l.to);
     expect(billingOnly).toEqual([ROUTES.billing]);
+  });
+
+  it("shows the org Users page to everyone and All Users to Platform Admins only", () => {
+    expect(visibleRows("Organization", MEMBER).Users).toBe(ORG_USERS_PATH);
+    expect(visibleRows("Organization", MEMBER)["All Users"]).toBeUndefined();
+    expect(visibleRows("Organization", ORG_ADMIN)["All Users"]).toBeUndefined();
+    expect(visibleRows("Organization", ADMIN)["All Users"]).toBe("/platform/users");
   });
 
   it("titles every tab with a phrase that contains its tab label", () => {

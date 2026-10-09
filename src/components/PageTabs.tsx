@@ -20,10 +20,11 @@ import { Icon } from "./Icon";
  * sets it) is the correct pattern, not role="tab" panels. */
 export function PageTabs() {
   const { pathname } = useLocation();
-  const { role } = useAuth();
+  const { role, isPlatformAdmin } = useAuth();
   const billing = useBillingAccess();
   const entry = tabGroupForPath(pathname);
-  const group = entry && visibleEntry(entry, { isAdmin: role === "admin", billing });
+  const group =
+    entry && visibleEntry(entry, { isAdmin: role === "admin", isPlatformAdmin, billing });
   const tabs = group?.tabs ?? [];
   if (!group || tabs.length <= 1) return null;
 

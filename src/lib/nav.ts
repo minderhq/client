@@ -1,4 +1,5 @@
 import type { IconName } from "../components/Icon";
+import { ORG_USERS_PATH } from "./orgs";
 import { ROUTES } from "./routes";
 
 /** A navigable destination (a real route). */
@@ -15,6 +16,9 @@ export interface NavLeaf {
   title?: string;
   /** Hidden for non-admins (the destination 403s them anyway). */
   adminOnly?: boolean;
+  /** Shown only to a Platform Admin: the installation-wide, cross-org views
+   * the API serves to Platform Admins alone. */
+  platformAdminOnly?: boolean;
   /** Shown only when the caller may view this org's billing (#64). */
   requiresBilling?: boolean;
   /** Extra search terms for the command palette (synonyms not in the label). */
@@ -153,7 +157,8 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     label: "Organization",
     items: [
-      { to: "/organization", label: "Overview", icon: "org", end: true, description: "Your org, its members & switching", keywords: "organization tenant workspace switch members" },
+      { to: "/organization", label: "Overview", icon: "org", end: true, description: "Your org, its invites & switching", keywords: "organization tenant workspace switch invites" },
+      { to: ORG_USERS_PATH, label: "Users", icon: "users", description: "This org's members: roles, suspend, remove, account resets", keywords: "users members people accounts suspend remove reset password deactivate roles" },
       {
         to: ROUTES.billing,
         label: "Billing & licenses",
@@ -170,7 +175,7 @@ export const NAV_SECTIONS: NavSection[] = [
       },
       { to: "/platform/teams", label: "Teams", icon: "teams", description: "Group people & share resources", keywords: "groups members sharing collaborate" },
       { to: "/organizations", label: "All Organizations", icon: "org", adminOnly: true, description: "Every org on the instance + provisioning (admin)", keywords: "organizations tenants provision create admin" },
-      { to: "/platform/users", label: "All Users", icon: "users", adminOnly: true, description: "Instance-wide accounts & roles (admin) — distinct from this org's members above", keywords: "users accounts roles admin people members" },
+      { to: "/platform/users", label: "All Users", icon: "users", platformAdminOnly: true, description: "Every account on the installation, across orgs (Platform Admin)", keywords: "users accounts roles platform admin people members instance" },
       { to: "/audit", label: "Audit Log", icon: "audit", adminOnly: true, description: "Append-only record of privileged actions (admin)", keywords: "audit log security history who did what siem" },
     ],
   },
@@ -189,16 +194,22 @@ export const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
-/** Who is looking: the two gates nav items use today. */
+/** Who is looking: the gates nav items use today. */
 export interface NavAccess {
   isAdmin: boolean;
+  /** A Platform Admin (the `is_platform_admin` token claim). */
+  isPlatformAdmin: boolean;
   /** May view this org's billing (#64, useBillingAccess). */
   billing: boolean;
 }
 
 /** May this caller see this leaf (sidebar row, tab or palette entry)? */
 export function leafVisible(leaf: NavLeaf, access: NavAccess): boolean {
-  return (!leaf.adminOnly || access.isAdmin) && (!leaf.requiresBilling || access.billing);
+  return (
+    (!leaf.adminOnly || access.isAdmin) &&
+    (!leaf.platformAdminOnly || access.isPlatformAdmin) &&
+    (!leaf.requiresBilling || access.billing)
+  );
 }
 
 /** The entry as this caller should see it: its tabs filtered to the visible

@@ -12,6 +12,7 @@ import { Sidebar } from "./components/Sidebar";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { UserMenu } from "./components/UserMenu";
 import { AuthProvider } from "./lib/auth";
+import { ORG_USERS_PATH } from "./lib/orgs";
 import { LEGACY_REDIRECTS, ROUTES, SECTION_REDIRECTS } from "./lib/routes";
 import { iconButtonClass, kbdClass, pageEnterClass } from "./lib/ui";
 import { useRouteFocus } from "./lib/useRouteFocus";
@@ -39,6 +40,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { ModelManagementPage } from "./pages/ModelManagementPage";
 import { MyLicensesPage } from "./pages/MyLicensesPage";
 import { OrganizationPage } from "./pages/OrganizationPage";
+import { OrgUsersPage } from "./pages/OrgUsersPage";
 import { PluginSourceRepositoriesPage } from "./pages/PluginSourceRepositoriesPage";
 import { PublicChatConversationsPage } from "./pages/PublicChatConversationsPage";
 import { PublicChatEndpointsPage } from "./pages/PublicChatEndpointsPage";
@@ -220,6 +222,7 @@ export function App() {
                     <Route path="/platform/users" element={<UsersPage />} />
                     <Route path="/platform/teams" element={<TeamsPage />} />
                     <Route path="/organization" element={<OrganizationPage />} />
+                    <Route path={ORG_USERS_PATH} element={<OrgUsersPage />} />
                     <Route path="/organizations" element={<AllOrganizationsPage />} />
                     <Route path="/audit" element={<AuditLogPage />} />
 
