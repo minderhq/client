@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useConfirm } from "../components/ConfirmDialog";
@@ -12,18 +12,15 @@ import { useAuth } from "../lib/auth";
 import { copyText } from "../lib/browser";
 import {
   createOrgInvite,
-  type DirectoryUser,
-  fetchAllUsers,
   fetchMyOrgs,
   fetchOrgInvites,
-  fetchOrgMembers,
   type MyOrg,
   type OrgInvite,
   ORG_ROLES,
+  ORG_USERS_PATH,
   orgRoleTone,
-  removeOrgMember,
+  pickActiveOrg,
   revokeOrgInvite,
-  setOrgMember,
   updateOrganization,
 } from "../lib/orgs";
 import {
@@ -36,35 +33,29 @@ import {
 } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
 
-/** The Organization home: which org you're acting in, who's in it and their
- * roles, and — for an admin — adding members, changing their org role, and
- * removing them. Together with the topbar OrgSwitcher this is where multi-org
- * membership becomes legible and manageable: a user can be owner of one org and
- * admin of another, and both appear here / in the switcher. Team-level
- * membership stays on the Teams page (linked). */
+/** The Organization home: which org you're acting in, its details, and — for
+ * an owner/admin — inviting people by email. Together with the topbar
+ * OrgSwitcher this is where multi-org membership becomes legible: a user can be
+ * owner of one org and admin of another, and both appear here / in the
+ * switcher. The member list and its actions live on the org's Users page
+ * (linked); team-level membership stays on the Teams page (linked). */
 export function OrganizationPage() {
   const { isAuthenticated, token, sessionKey, role, activeTenantId, orgRole } = useAuth();
   const isAdmin = role === "admin";
-  // #1208: an org owner/admin manages their OWN org's members too — role change
-  // + removal need no user directory. Adding a brand-new member still needs the
-  // instance-admin-only user directory, so that section stays isAdmin-gated.
+  // An org owner/admin manages their OWN org's details and invites.
   const canManage = isAdmin || orgRole === "owner" || orgRole === "admin";
   const { confirm, dialog } = useConfirm();
-  const addUserId = useId();
-  const addRoleId = useId();
 
   const [status, setStatus] = useState("");
   const [isError, setIsError] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [addTarget, setAddTarget] = useState("");
-  const [addRole, setAddRole] = useState("member");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("member");
   const inviteEmailId = useId();
   const inviteRoleId = useId();
 
   // #1503: edit the active org's own name/description. A separate status/busy
-  // pair from the members section above -- two independent forms sharing one
+  // pair from the invite section -- two independent forms sharing one
   // status line would let one's "Working…" clobber the other's result.
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -79,25 +70,8 @@ export function OrganizationPage() {
     { deps: [sessionKey], enabled: isAuthenticated },
   );
 
-  const activeId = activeTenantId ? Number(activeTenantId) : null;
   const orgs = orgsRes.data ?? [];
-  const active =
-    orgs.find((o) => o.id === activeId) ?? orgs.find((o) => o.is_home) ?? orgs[0];
-
-  const membersRes = useAsyncResource(
-    (signal) =>
-      active
-        ? fetchOrgMembers(active.id, token, signal).then((r) => r.members)
-        : Promise.resolve([]),
-    { deps: [sessionKey, active?.id], enabled: isAuthenticated && !!active },
-  );
-
-  // Directory for the add-member picker — admin-only endpoint, so only fetch it
-  // when the caller can actually add members.
-  const usersRes = useAsyncResource<DirectoryUser[]>(
-    (signal) => fetchAllUsers(token, signal).then((r) => r.users),
-    { deps: [sessionKey], enabled: isAuthenticated && isAdmin },
-  );
+  const active = pickActiveOrg(orgs, activeTenantId);
 
   // Pending/spent org invites — owner/admin only (same gate as the endpoint).
   const invitesRes = useAsyncResource<OrgInvite[]>(
@@ -108,40 +82,9 @@ export function OrganizationPage() {
     { deps: [sessionKey, active?.id], enabled: isAuthenticated && canManage && !!active },
   );
 
-  const memberIds = useMemo(
-    () => new Set((membersRes.data ?? []).map((m) => m.user_id)),
-    [membersRes.data],
-  );
-  const addableUsers = (usersRes.data ?? []).filter((u) => !memberIds.has(u.id));
-
   function report(msg: string, err = false) {
     setStatus(msg);
     setIsError(err);
-  }
-
-  async function runMutation(fn: () => Promise<unknown>, okMsg: string) {
-    if (!active) return;
-    setBusy(true);
-    report("Working…");
-    try {
-      await fn();
-      await membersRes.reload();
-      report(okMsg);
-    } catch (e) {
-      report(friendlyErrorMessage(e), true);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleAdd() {
-    if (!active || !addTarget) return;
-    await runMutation(
-      () => setOrgMember(active.id, Number(addTarget), addRole, token),
-      "Member added.",
-    );
-    setAddTarget("");
-    setAddRole("member");
   }
 
   async function handleInvite() {
@@ -186,14 +129,6 @@ export function OrganizationPage() {
     }
   }
 
-  async function handleRoleChange(userId: number, newRole: string) {
-    if (!active) return;
-    await runMutation(
-      () => setOrgMember(active.id, userId, newRole, token),
-      "Role updated.",
-    );
-  }
-
   // Sync the edit form's fields whenever the active org changes (initial load,
   // org switch, or a reload after a successful save) -- but only from the
   // server's own values, never overwriting mid-edit input the user is
@@ -224,20 +159,6 @@ export function OrganizationPage() {
     } finally {
       setEditBusy(false);
     }
-  }
-
-  async function handleRemove(userId: number, username: string) {
-    if (!active) return;
-    const ok = await confirm({
-      title: "Remove member?",
-      message: `Remove ${username} from ${active.name}? They keep their account but lose access to this organization's resources.`,
-      danger: true,
-    });
-    if (!ok) return;
-    await runMutation(
-      () => removeOrgMember(active.id, userId, token),
-      "Member removed.",
-    );
   }
 
   if (!isAuthenticated) {
@@ -358,139 +279,34 @@ export function OrganizationPage() {
             </section>
           )}
 
-          {/* Members of the active org (+ admin management). */}
+          {/* Members live on their own org-scoped Users page, with actions
+            shown per the caller's permissions in this org. */}
           <section className={cardClass}>
-            <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
                 <Icon name="users" size={17} className="text-indigo-500 dark:text-indigo-400" />
                 Members
               </h2>
-              <Link
-                to="/platform/teams"
-                className="flex items-center gap-1 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400"
-              >
-                Manage teams
-                <Icon name="arrow" size={14} />
-              </Link>
-            </div>
-
-            {isAdmin && (
-              <div className="mb-3 flex flex-wrap items-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950/40">
-                <div className="min-w-48 flex-1">
-                  <label htmlFor={addUserId} className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
-                    Add a member
-                  </label>
-                  <select
-                    id={addUserId}
-                    className={inputClass}
-                    value={addTarget}
-                    onChange={(e) => setAddTarget(e.target.value)}
-                    disabled={busy}
-                  >
-                    <option value="">Choose a user…</option>
-                    {addableUsers.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.username} ({u.email})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor={addRoleId} className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
-                    Role
-                  </label>
-                  <select
-                    id={addRoleId}
-                    className={inputClass}
-                    value={addRole}
-                    onChange={(e) => setAddRole(e.target.value)}
-                    disabled={busy}
-                  >
-                    {ORG_ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAdd}
-                  disabled={busy || !addTarget}
-                  className={primaryButtonClass}
+              <div className="flex items-center gap-4">
+                <Link
+                  to={ORG_USERS_PATH}
+                  className="flex items-center gap-1 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400"
                 >
-                  <Icon name="plus" size={16} />
-                  Add
-                </button>
+                  {canManage ? "Manage users" : "View users"}
+                  <Icon name="arrow" size={14} />
+                </Link>
+                <Link
+                  to="/platform/teams"
+                  className="flex items-center gap-1 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                >
+                  Manage teams
+                  <Icon name="arrow" size={14} />
+                </Link>
               </div>
-            )}
-
-            <StatusLine isError={isError}>{status}</StatusLine>
-
-            {membersRes.error ? (
-              <p className="text-sm text-red-600 dark:text-red-400">
-                {friendlyErrorMessage(membersRes.error)}
-              </p>
-            ) : membersRes.loading && !membersRes.data ? (
-              <p className={mutedTextClass}>Loading members…</p>
-            ) : (membersRes.data?.length ?? 0) === 0 ? (
-              <EmptyState>No members found.</EmptyState>
-            ) : (
-              <ul className="flex flex-col divide-y divide-gray-100 dark:divide-gray-800">
-                {membersRes.data?.map((m) => (
-                  <li key={m.user_id} className="flex items-center gap-3 py-2.5">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-                      <Icon name="user" size={16} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-gray-900 dark:text-gray-100">
-                        {m.username}
-                      </span>
-                      <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
-                        {m.email}
-                      </span>
-                    </span>
-                    {m.is_home && <span className={badgeClass}>home</span>}
-                    {canManage ? (
-                      <>
-                        <select
-                          className="w-28 shrink-0 rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 outline-none focus:border-indigo-400 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-                          value={m.org_role}
-                          disabled={busy}
-                          aria-label={`Role for ${m.username}`}
-                          onChange={(e) => handleRoleChange(m.user_id, e.target.value)}
-                        >
-                          {ORG_ROLES.map((r) => (
-                            <option key={r} value={r}>
-                              {r}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => handleRemove(m.user_id, m.username)}
-                          disabled={busy}
-                          className={`${secondaryButtonClass} shrink-0 text-red-600 dark:text-red-400`}
-                          title="Remove from organization"
-                        >
-                          <Icon name="delete" size={15} />
-                          <span className="hidden sm:inline">Remove</span>
-                        </button>
-                      </>
-                    ) : (
-                      <span className={`${badgeClass} ${orgRoleTone(m.org_role)}`}>
-                        {m.org_role}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <p className={`mt-3 ${mutedTextClass}`}>
-              {canManage
-                ? "Changing a member's role takes effect on their next request; they may need to switch orgs or re-log in to see it. To bring in someone new, invite them by email below. Day-to-day sharing is done through Teams."
-                : "Managing members and invites is an owner/admin action. Day-to-day sharing is done through Teams."}
+            </div>
+            <p className={`mt-2 ${mutedTextClass}`}>
+              Who belongs to {active.name}, their roles, and their access are
+              on the Users page. Day-to-day sharing is done through Teams.
             </p>
           </section>
 
@@ -545,6 +361,9 @@ export function OrganizationPage() {
                   Send invite
                 </button>
               </div>
+              <StatusLine isError={isError} className="mb-0 mt-2">
+                {status}
+              </StatusLine>
 
               {(invitesRes.data?.length ?? 0) > 0 && (
                 <ul className="mt-4 flex flex-col divide-y divide-gray-100 dark:divide-gray-800">

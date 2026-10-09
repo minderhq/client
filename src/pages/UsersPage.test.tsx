@@ -5,18 +5,32 @@ import {
   screen,
   within,
 } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { UsersPage, type ManagedUser } from "./UsersPage";
 
 const apiFetch = vi.fn();
 
-vi.mock("../lib/api", () => ({
-  apiFetch: (...args: unknown[]) => apiFetch(...args),
-  friendlyErrorMessage: (e: unknown) => (e instanceof Error ? e.message : "error"),
+vi.mock("../lib/api", async () => {
+  const actual = await vi.importActual<typeof import("../lib/api")>("../lib/api");
+  return {
+    ...actual,
+    apiFetch: (...args: unknown[]) => apiFetch(...args),
+    friendlyErrorMessage: (e: unknown) => (e instanceof Error ? e.message : "error"),
+  };
+});
+
+vi.mock("react-router-dom", () => ({
+  Link: ({ to, children }: { to: string; children: ReactNode }) => <a href={to}>{children}</a>,
 }));
 
-let mockAuth: { token: string; role: string; userId?: string } = {
+let mockAuth: {
+  token: string;
+  role: string;
+  userId?: string;
+  isPlatformAdmin?: boolean;
+} = {
   token: "",
   role: "",
 };
@@ -44,25 +58,33 @@ describe("UsersPage", () => {
     mockAuth = { token: "", role: "" };
   });
 
-  it("shows an admin-required hint and never fetches when logged out", () => {
+  it("shows a Platform-Admin-required hint and never fetches when logged out", () => {
     render(<UsersPage />);
     expect(
-      screen.getByText("Log in as an admin to view or manage users."),
+      screen.getByText("Log in as a Platform Admin to view or manage all users."),
     ).toBeTruthy();
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
-  it("shows an admin-required hint (different copy) when logged in as a non-admin", () => {
+  it("points a non-Platform-Admin to the org Users page and never fetches", () => {
     mockAuth = { token: "tok", role: "user" };
     render(<UsersPage />);
+    expect(screen.getByText(/Only a Platform Admin can view every account/)).toBeTruthy();
     expect(
-      screen.getByText("Admin role required to view or manage users."),
-    ).toBeTruthy();
+      screen.getByRole("link", { name: "Organization › Users" }).getAttribute("href"),
+    ).toBe("/organization/users");
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
-  it("fetches and renders users for an admin", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+  it("is Platform Admin only: the legacy admin role alone doesn't open it", () => {
+    mockAuth = { token: "tok", role: "admin", isPlatformAdmin: false };
+    render(<UsersPage />);
+    expect(screen.getByText(/Only a Platform Admin can view every account/)).toBeTruthy();
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it("fetches and renders users for a Platform Admin", async () => {
+    mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true };
     apiFetch.mockResolvedValue({
       users: [user()],
       total: 1,
@@ -80,7 +102,7 @@ describe("UsersPage", () => {
   });
 
   it("shows an empty state when there are no users", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true };
     apiFetch.mockResolvedValue({ users: [], total: 0, limit: 50, offset: 0 });
     render(<UsersPage />);
 
@@ -88,7 +110,7 @@ describe("UsersPage", () => {
   });
 
   it("shows an SSO-managed badge instead of a role dropdown for OIDC-linked accounts", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true };
     apiFetch.mockResolvedValue({
       users: [user({ is_oidc_linked: true, role: "admin" })],
       total: 1,
@@ -102,7 +124,7 @@ describe("UsersPage", () => {
   });
 
   it("changes a local account's role via PATCH and reloads", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true };
     apiFetch.mockImplementation(
       (_path: string, opts?: { method?: string }) => {
         if (opts?.method === "PATCH") return Promise.resolve(user({ role: "admin" }));
@@ -129,7 +151,7 @@ describe("UsersPage", () => {
   });
 
   it("shows a friendly error when a role change fails (e.g. the 409 for an SSO account)", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true };
     apiFetch.mockImplementation(
       (_path: string, opts?: { method?: string }) => {
         if (opts?.method === "PATCH")
@@ -172,7 +194,7 @@ describe("UsersPage", () => {
     }
 
     it("deactivates after confirming", async () => {
-      mockAuth = { token: "tok", role: "admin", userId: "99" };
+      mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true, userId: "99" };
       listing([user()]);
       render(<UsersPage />);
       await screen.findByText("alice");
@@ -193,7 +215,7 @@ describe("UsersPage", () => {
     });
 
     it("cancelling the confirm dialog does not deactivate", async () => {
-      mockAuth = { token: "tok", role: "admin", userId: "99" };
+      mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true, userId: "99" };
       listing([user()]);
       render(<UsersPage />);
       await screen.findByText("alice");
@@ -206,7 +228,7 @@ describe("UsersPage", () => {
     });
 
     it("reactivates a disabled account without a confirm", async () => {
-      mockAuth = { token: "tok", role: "admin", userId: "99" };
+      mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true, userId: "99" };
       listing([user({ is_active: false })]);
       render(<UsersPage />);
       await screen.findByText("alice");
@@ -224,7 +246,7 @@ describe("UsersPage", () => {
     });
 
     it("hides the control on the admin's own row", async () => {
-      mockAuth = { token: "tok", role: "admin", userId: "1" };
+      mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true, userId: "1" };
       listing([user()]);
       render(<UsersPage />);
       await screen.findByText("alice");
@@ -232,7 +254,7 @@ describe("UsersPage", () => {
     });
 
     it("surfaces the last-admin 409 as a status message", async () => {
-      mockAuth = { token: "tok", role: "admin", userId: "99" };
+      mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true, userId: "99" };
       apiFetch.mockImplementation(
         (_path: string, opts?: { method?: string }) => {
           if (opts?.method === "PATCH")
@@ -294,7 +316,7 @@ describe("UsersPage", () => {
     }
 
     it("generates a temporary password and shows it once with a copy button", async () => {
-      mockAuth = { token: "tok", role: "admin", userId: "99" };
+      mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true, userId: "99" };
       const writeText = vi.fn().mockResolvedValue(undefined);
       Object.defineProperty(navigator, "clipboard", {
         value: { writeText },
@@ -331,7 +353,7 @@ describe("UsersPage", () => {
     });
 
     it("sets an admin-chosen password, enforcing the length policy", async () => {
-      mockAuth = { token: "tok", role: "admin", userId: "99" };
+      mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true, userId: "99" };
       resetListing([user()], () =>
         Promise.resolve({
           user_id: 1,
@@ -370,7 +392,7 @@ describe("UsersPage", () => {
     });
 
     it("cancel closes the dialog without resetting", async () => {
-      mockAuth = { token: "tok", role: "admin", userId: "99" };
+      mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true, userId: "99" };
       resetListing([user()]);
       render(<UsersPage />);
       await screen.findByText("alice");
@@ -383,7 +405,7 @@ describe("UsersPage", () => {
     });
 
     it("surfaces a server refusal in the dialog", async () => {
-      mockAuth = { token: "tok", role: "admin", userId: "99" };
+      mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true, userId: "99" };
       resetListing([user()], () =>
         Promise.reject(new Error("reset its password in the Authelia portal")),
       );
@@ -401,7 +423,7 @@ describe("UsersPage", () => {
     });
 
     it("hides the action on the admin's own row and on SSO accounts", async () => {
-      mockAuth = { token: "tok", role: "admin", userId: "1" };
+      mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true, userId: "1" };
       resetListing([user(), user({ id: 2, username: "bob", is_oidc_linked: true })]);
       render(<UsersPage />);
       await screen.findByText("bob");

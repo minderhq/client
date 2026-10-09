@@ -28,8 +28,8 @@ export function Sidebar({
   open: boolean;
   onNavigate: () => void;
 }) {
-  const { role } = useAuth();
-  const access = { isAdmin: role === "admin", billing: useBillingAccess() };
+  const { role, isPlatformAdmin } = useAuth();
+  const access = { isAdmin: role === "admin", isPlatformAdmin, billing: useBillingAccess() };
   const { pathname } = useLocation();
   const sectionIdPrefix = useId();
 

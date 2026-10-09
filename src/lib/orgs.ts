@@ -1,4 +1,5 @@
-import { apiFetch } from "./api";
+import { ApiError, apiFetch, friendlyErrorMessage } from "./api";
+import type { components } from "./api-types.gen";
 
 /** An organization the current user belongs to (GET /v1/organizations/mine). */
 export interface MyOrg {
@@ -17,17 +18,45 @@ export interface MyOrgsResponse {
   active_organization_id: number | null;
 }
 
-/** A member of an organization (GET /v1/organizations/{id}/members). */
-export interface OrgMember {
-  user_id: number;
-  username: string;
-  email: string;
-  org_role: string;
-  is_home: boolean;
-}
+/** The active org's Users page (org-scoped member administration). The
+ * installation-wide Platform Admin view stays at /platform/users. */
+export const ORG_USERS_PATH = "/organization/users";
+
+/** A member of an organization (GET /v1/organizations/{id}/members).
+ *
+ * Besides the org-visible state (`is_active`, `suspended_at`), each item says
+ * what the CALLER may do to the account: `managed_by_caller` (account-level
+ * deactivate/reactivate is allowed from this org) and `resettable_by_caller`
+ * (the org-scoped password reset would be accepted). Both are hints for which
+ * actions to offer; the action routes re-check everything. `is_oidc_linked`
+ * and `must_change_password` are null unless the account is managed. */
+export type OrgMember = components["schemas"]["OrgMemberListItem"];
 
 export interface OrgMembersResponse {
   members: OrgMember[];
+}
+
+/** The org the caller is acting in: the token's active org, else their home
+ * org, else the first one they belong to. */
+export function pickActiveOrg(orgs: MyOrg[], activeTenantId: string): MyOrg | undefined {
+  const activeId = activeTenantId ? Number(activeTenantId) : null;
+  return orgs.find((o) => o.id === activeId) ?? orgs.find((o) => o.is_home) ?? orgs[0];
+}
+
+/** A member-administration error in words an admin can act on. A 403 never
+ * logs anyone out: it is either a missing permission or the caller's own
+ * pending forced password change. The API answers 404 alike for an unknown
+ * user and one this org may not act on, so the message covers both. */
+export function orgMemberErrorMessage(e: unknown): string {
+  if (e instanceof ApiError) {
+    if (e.status === 403 && e.message.includes("password_change_required")) {
+      return "Change your own password first: your account has a pending password change, so other actions are blocked until you do.";
+    }
+    if (e.status === 404) {
+      return "That account isn't in this organization any more, or can't be managed from here. Refresh the list and try again.";
+    }
+  }
+  return friendlyErrorMessage(e);
 }
 
 export function fetchMyOrgs(token: string, signal?: AbortSignal) {
@@ -95,7 +124,64 @@ export function removeOrgMember(orgId: number, userId: number, token: string) {
   });
 }
 
-/** A directory user (GET /v1/auth/users, admin) — for the add-member picker. */
+/** Suspend or restore a member's access to THIS org only. Their account and
+ * other memberships are untouched (needs `org.members.suspend`). */
+export function setOrgMemberSuspended(
+  orgId: number,
+  userId: number,
+  suspended: boolean,
+  token: string,
+) {
+  // Two literal paths (not a `${verb}` segment) so the API-contract test can
+  // check each against the gateway spec.
+  const path = suspended
+    ? `/v1/organizations/${orgId}/members/${userId}/suspend`
+    : `/v1/organizations/${orgId}/members/${userId}/unsuspend`;
+  return apiFetch(path, { method: "POST", token });
+}
+
+/** Deactivate or reactivate a MANAGED member's whole account, from this org's
+ * scope (only offered when the member list says `managed_by_caller`). */
+export function setOrgMemberAccountActive(
+  orgId: number,
+  userId: number,
+  isActive: boolean,
+  token: string,
+) {
+  return apiFetch<components["schemas"]["OrgMemberAccountStatusOut"]>(
+    `/v1/organizations/${orgId}/members/${userId}/account-status`,
+    { method: "PATCH", body: { is_active: isActive }, token },
+  );
+}
+
+/** The org-scoped reset-password route for one member — the endpoint the
+ * shared reset control posts to from the org Users page. */
+export function orgMemberResetPasswordPath(orgId: number, userId: number): string {
+  return `/v1/organizations/${orgId}/members/${userId}/reset-password`;
+}
+
+/** Permission keys that gate the org Users page's actions. */
+export const ORG_PERMISSIONS = {
+  manage: "org.members.manage",
+  suspend: "org.members.suspend",
+} as const;
+
+/** The caller's own resolved permission keys in `orgId` — direct grants plus
+ * those delegated from an ancestor org. A member may always read their own. */
+export async function fetchMyOrgPermissions(
+  orgId: number,
+  userId: string | number,
+  token: string,
+  signal?: AbortSignal,
+): Promise<Set<string>> {
+  const res = await apiFetch<components["schemas"]["EffectivePermissionsResponse"]>(
+    `/v1/organizations/${orgId}/members/${userId}/effective-permissions`,
+    { token, signal },
+  );
+  return new Set(res.permissions.map((p) => p.permission_key));
+}
+
+/** A directory user (GET /v1/auth/users, Platform Admin) — for the add-member picker. */
 export interface DirectoryUser {
   id: number;
   username: string;
