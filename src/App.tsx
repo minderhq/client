@@ -77,17 +77,14 @@ export function App() {
   // while another modal (a confirm dialog, the reset-password dialog) is open:
   // the app behind it is inert, and the dialog owns the keyboard until it
   // closes. The key is still swallowed, so it never falls through to the
-  // browser's own ⌘K/Ctrl-K from inside a dialog.
-  const paletteOpenRef = useRef(paletteOpen);
-  useEffect(() => {
-    paletteOpenRef.current = paletteOpen;
-  }, [paletteOpen]);
+  // browser's own ⌘K/Ctrl-K from inside a dialog. A functional update, so two
+  // presses before a re-render still toggle twice.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        if (paletteOpenRef.current) setPaletteOpen(false);
-        else if (!isModalOpen()) setPaletteOpen(true);
+        // Open: close it. Closed: open it, unless another modal is up.
+        setPaletteOpen((wasOpen) => !wasOpen && !isModalOpen());
       }
     }
     window.addEventListener("keydown", onKeyDown);

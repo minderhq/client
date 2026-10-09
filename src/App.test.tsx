@@ -474,6 +474,21 @@ describe("App — ⌘K and the modal layer (#97)", () => {
     expect(focusedTrigger).not.toHaveBeenCalled();
   });
 
+  it("toggles on every ⌘K, however fast they come", () => {
+    renderAt("/");
+    act(() => {
+      pressCommandK();
+      pressCommandK();
+    });
+    expect(palette()).toBeNull();
+    act(() => {
+      pressCommandK();
+      pressCommandK();
+      pressCommandK();
+    });
+    expect(palette()).toBeTruthy();
+  });
+
   it("ignores ⌘K / Ctrl-K while a confirm dialog is open", async () => {
     render(
       <MemoryRouter>
