@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 
 import { apiFetch } from "../lib/api";
@@ -9,6 +10,7 @@ import { ROUTES } from "../lib/routes";
 import { getTheme, setTheme, type Theme } from "../lib/theme";
 import { kbdClass } from "../lib/ui";
 import { useDebouncedValue } from "../lib/useDebouncedValue";
+import { useModal } from "../lib/useModal";
 import { useTokenRef } from "../lib/useTokenRef";
 import { Icon, type IconName } from "./Icon";
 
@@ -26,7 +28,12 @@ interface Command {
 /** ⌘K / Ctrl-K jump-to across the whole app. Built from the same NAV_SECTIONS
  * the sidebar uses (so every page is reachable) plus a handful of verb-first
  * quick actions. A 25-page tree is faster to search than to click through;
- * this is the keyboard-first path power users expect from an ops console. */
+ * this is the keyboard-first path power users expect from an ops console.
+ *
+ * A modal on the shared layer (lib/useModal.ts): portalled into <body>, the
+ * app is inert behind it, Tab stays inside, and closing it -- Escape, a click
+ * outside, ⌘K again, or picking a command -- returns focus to what had it
+ * before it opened (the page heading if that is gone). */
 export function CommandPalette({
   open,
   onClose,
@@ -41,9 +48,9 @@ export function CommandPalette({
   const billing = useBillingAccess();
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const listboxId = useId();
+  const modal = useModal({ open, onDismiss: onClose });
 
   const commands = useMemo<Command[]>(() => {
     const nav: Command[] = NAV_DESTINATIONS.filter((dest) =>
@@ -170,15 +177,12 @@ export function CommandPalette({
     [staticResults, resources],
   );
 
-  // Reset query/selection each time the palette opens, and focus the input.
+  // Reset query/selection each time the palette opens. (useModal moves focus
+  // to the input, marked data-autofocus.)
   useEffect(() => {
     if (open) {
       setQuery("");
       setActive(0);
-      // Focus after paint so the element exists and the browser doesn't
-      // steal focus back to the trigger button.
-      const id = requestAnimationFrame(() => inputRef.current?.focus());
-      return () => cancelAnimationFrame(id);
     }
   }, [open]);
 
@@ -218,17 +222,25 @@ export function CommandPalette({
     }
   }
 
-  return (
+  return createPortal(
     <div
+      ref={modal.layerRef}
       className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-[12vh]"
       role="presentation"
-      onMouseDown={onClose}
+      onKeyDown={modal.onKeyDown}
+      onMouseDown={(e) => {
+        // Don't let the press move focus to <body> after useModal has put it
+        // back on the trigger.
+        e.preventDefault();
+        onClose();
+      }}
     >
       <div
         className="fixed inset-0 bg-gray-950/40 backdrop-blur-sm animate-[fade-in_0.15s_ease-out_both]"
         aria-hidden="true"
       />
       <div
+        ref={modal.panelRef}
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"
@@ -238,7 +250,7 @@ export function CommandPalette({
         <div className="flex items-center gap-2.5 border-b border-gray-200 px-4 dark:border-gray-800">
           <Icon name="search" size={18} className="shrink-0 text-gray-400" />
           <input
-            ref={inputRef}
+            data-autofocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
@@ -307,6 +319,7 @@ export function CommandPalette({
           })}
         </ul>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
