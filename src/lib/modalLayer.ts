@@ -92,3 +92,9 @@ export function pushModalLayer(el: HTMLElement): () => void {
     sync();
   };
 }
+
+/** Whether any modal layer is open -- e.g. so a global shortcut can stand
+ * down while a dialog owns the keyboard. */
+export function isModalOpen(): boolean {
+  return layers.length > 0;
+}
