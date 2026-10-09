@@ -12,6 +12,7 @@ import { Sidebar } from "./components/Sidebar";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { UserMenu } from "./components/UserMenu";
 import { AuthProvider } from "./lib/auth";
+import { isModalOpen } from "./lib/modalLayer";
 import { ORG_USERS_PATH } from "./lib/orgs";
 import { LEGACY_REDIRECTS, ROUTES, SECTION_REDIRECTS } from "./lib/routes";
 import { iconButtonClass, kbdClass, pageEnterClass } from "./lib/ui";
@@ -72,12 +73,21 @@ export function App() {
   const mainRef = useRef<HTMLElement>(null);
   useRouteFocus(mainRef);
 
-  // Global ⌘K / Ctrl-K toggles the command palette from anywhere.
+  // Global ⌘K / Ctrl-K toggles the command palette from anywhere -- except
+  // while another modal (a confirm dialog, the reset-password dialog) is open:
+  // the app behind it is inert, and the dialog owns the keyboard until it
+  // closes. The key is still swallowed, so it never falls through to the
+  // browser's own ⌘K/Ctrl-K from inside a dialog.
+  const paletteOpenRef = useRef(paletteOpen);
+  useEffect(() => {
+    paletteOpenRef.current = paletteOpen;
+  }, [paletteOpen]);
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setPaletteOpen((v) => !v);
+        if (paletteOpenRef.current) setPaletteOpen(false);
+        else if (!isModalOpen()) setPaletteOpen(true);
       }
     }
     window.addEventListener("keydown", onKeyDown);

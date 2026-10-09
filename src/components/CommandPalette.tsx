@@ -255,6 +255,7 @@ export function CommandPalette({
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
             role="combobox"
+            aria-label="Search pages and actions"
             aria-expanded="true"
             aria-controls={listboxId}
             aria-autocomplete="list"
