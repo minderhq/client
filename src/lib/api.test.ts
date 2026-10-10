@@ -218,10 +218,11 @@ describe("apiFetch", () => {
   });
 
   describe("global 401 handling (#46)", () => {
-    it("clears the stored token and dispatches the session-expired event on a 401", async () => {
+    it("clears the stored token and dispatches the session-expired event on an authenticated 401", async () => {
       sessionStorage.setItem(TOKEN_KEY, "stale-token");
       const onSessionExpired = vi.fn();
       window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+      // Every call 401s, the refresh included -> the session is really over.
       vi.mocked(fetch).mockResolvedValue({
         ok: false,
         status: 401,
@@ -229,7 +230,7 @@ describe("apiFetch", () => {
       } as Response);
 
       try {
-        await expect(apiFetch("/v1/things")).rejects.toMatchObject({
+        await expect(apiFetch("/v1/things", { token: "stale-token" })).rejects.toMatchObject({
           message: "Not authenticated",
           status: 401,
         });
@@ -263,6 +264,32 @@ describe("apiFetch", () => {
         }
       },
     );
+
+    it("does NOT log out on a 401 for a request sent without a token (#109)", async () => {
+      // A page that forgot `token` on an endpoint that has since started
+      // requiring auth: the 401 says nothing about the stored session.
+      sessionStorage.setItem(TOKEN_KEY, "still-valid-token");
+      const onSessionExpired = vi.fn();
+      window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+      vi.mocked(fetch).mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({ detail: "Not authenticated" }),
+      } as Response);
+
+      try {
+        await expect(apiFetch("/v1/tts/languages")).rejects.toMatchObject({
+          message: "Not authenticated",
+          status: 401,
+        });
+
+        expect(fetch).toHaveBeenCalledTimes(1); // no refresh attempted either
+        expect(sessionStorage.getItem(TOKEN_KEY)).toBe("still-valid-token");
+        expect(onSessionExpired).not.toHaveBeenCalled();
+      } finally {
+        window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+      }
+    });
   });
 });
 
@@ -601,13 +628,14 @@ describe("silent refresh on 401 (#53)", () => {
     }
   });
 
-  it("does not refresh an unauthenticated request", async () => {
+  it("neither refreshes nor logs out for an unauthenticated request (#109)", async () => {
     mockApi();
 
     await expect(apiFetch("/v1/things")).rejects.toMatchObject({ status: 401 });
 
     expect(refreshCalls()).toHaveLength(0);
-    expect(onSessionExpired).toHaveBeenCalledTimes(1);
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBe("old-token");
+    expect(onSessionExpired).not.toHaveBeenCalled();
   });
 
   it("never recurses: a 401 from the refresh endpoint makes exactly one refresh call", async () => {
@@ -746,13 +774,33 @@ describe("apiFetchBlob", () => {
       } as Response);
 
       try {
-        await expect(apiFetchBlob("/v1/tts")).rejects.toMatchObject({
+        await expect(apiFetchBlob("/v1/tts", { token: "stale-token" })).rejects.toMatchObject({
           message: "Not authenticated",
           status: 401,
         });
 
         expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
         expect(onSessionExpired).toHaveBeenCalledTimes(1);
+      } finally {
+        window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+      }
+    });
+
+    it("does NOT log out on a 401 for a request sent without a token (#109)", async () => {
+      sessionStorage.setItem(TOKEN_KEY, "still-valid-token");
+      const onSessionExpired = vi.fn();
+      window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+      vi.mocked(fetch).mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({ detail: "Not authenticated" }),
+      } as Response);
+
+      try {
+        await expect(apiFetchBlob("/v1/tts")).rejects.toMatchObject({ status: 401 });
+
+        expect(sessionStorage.getItem(TOKEN_KEY)).toBe("still-valid-token");
+        expect(onSessionExpired).not.toHaveBeenCalled();
       } finally {
         window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
       }

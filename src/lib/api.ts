@@ -75,8 +75,9 @@ export const SESSION_EXPIRED_EVENT = "minder:session-expired";
 export const TOKEN_REFRESHED_EVENT = "minder:token-refreshed";
 
 /** Clears the stale token and tells the rest of the app (AuthProvider) that
- * the session is gone. Called once per 401 response, from both apiFetch and
- * apiFetchBlob, and when a refresh is rejected. Idempotent -- safe to call
+ * the session is gone. Called from both apiFetch and apiFetchBlob for a 401 on
+ * an authenticated request that survives the refresh/replay (never for a
+ * token-less request, #109). Idempotent -- safe to call
  * repeatedly. */
 export function handleUnauthorized(): void {
   clearStoredToken();
@@ -262,14 +263,18 @@ export interface Paginated<T> {
  * that survives (refresh rejected/failed, or the replay 401s too) is left for
  * throwApiError to turn into the usual logout.
  *
- * `staleSession` is true when the replay was refused because the session had
- * meanwhile moved to a different user or org (including a refresh that
- * re-derived another active org): only this stale request failed, the stored
- * session is valid, so the caller must NOT log out. */
+ * `logoutOn401` tells throwApiError whether a final 401 means the session is
+ * over. It is false in two cases, where only this one request failed:
+ *  - no bearer was sent (#109). A 401 for a token-less request says nothing
+ *    about the stored session -- e.g. a page that forgot `token` on an endpoint
+ *    that has since started requiring auth -- so it must not log the user out;
+ *  - `staleSession`: the replay was refused because the session had meanwhile
+ *    moved to a different user or org (including a refresh that re-derived
+ *    another active org). The stored session is valid. */
 async function sendWithRefresh(
   path: string,
   { method = "GET", body, token, signal }: ApiOptions,
-): Promise<{ res: Response; staleSession: boolean }> {
+): Promise<{ res: Response; logoutOn401: boolean }> {
   const isFormData = body instanceof FormData;
   const send = (bearer: string | undefined) => {
     const headers: Record<string, string> = {};
@@ -290,7 +295,8 @@ async function sendWithRefresh(
   };
 
   const res = await send(token);
-  const done = { res, staleSession: false };
+  // Only an authenticated request's 401 can speak for the session (#109).
+  const done = { res, logoutOn401: Boolean(token) };
   if (res.status !== 401 || !token) return done;
 
   // No stored token at all means the session is already gone (logged out).
@@ -312,9 +318,9 @@ async function sendWithRefresh(
   // refresh minted. On a mismatch the new token is already adopted (stored +
   // TOKEN_REFRESHED_EVENT); only this request fails, without a logout.
   if (!sameSession(token, candidate)) {
-    return { res, staleSession: true };
+    return { res, logoutOn401: false }; // stale session: keep the stored one
   }
-  return { res: await send(candidate), staleSession: false };
+  return { res: await send(candidate), logoutOn401: true };
 }
 
 /** Thin fetch wrapper: prefixes the gateway base URL, injects the bearer
@@ -325,9 +331,9 @@ export async function apiFetch<T>(
   path: string,
   options: ApiOptions = {},
 ): Promise<T> {
-  const { res, staleSession } = await sendWithRefresh(path, options);
+  const { res, logoutOn401 } = await sendWithRefresh(path, options);
 
-  if (!res.ok) return throwApiError(res, { logoutOn401: !staleSession });
+  if (!res.ok) return throwApiError(res, { logoutOn401 });
 
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -342,9 +348,9 @@ export async function apiFetchBlob(
   path: string,
   options: ApiOptions = {},
 ): Promise<{ blob: Blob; headers: Headers }> {
-  const { res, staleSession } = await sendWithRefresh(path, options);
+  const { res, logoutOn401 } = await sendWithRefresh(path, options);
 
-  if (!res.ok) return throwApiError(res, { logoutOn401: !staleSession });
+  if (!res.ok) return throwApiError(res, { logoutOn401 });
 
   return { blob: await res.blob(), headers: res.headers };
 }

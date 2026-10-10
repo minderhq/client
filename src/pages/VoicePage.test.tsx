@@ -626,3 +626,43 @@ describe("VoicePage", () => {
     expect(textarea.value).toBe("geri konuş");
   });
 });
+
+describe("VoicePage catalog requests carry the bearer (#109)", () => {
+  afterEach(() => {
+    cleanup();
+    apiFetch.mockReset();
+  });
+
+  const CATALOG = ["/v1/tts/languages", "/v1/stt/languages", "/v1/tts/voices"];
+  const catalogCalls = () =>
+    apiFetch.mock.calls.filter(([url]) =>
+      CATALOG.some((path) => (url as string).startsWith(path)),
+    );
+
+  it("sends the token on every tts/stt catalog read, from both cards", async () => {
+    routeApiFetch();
+    render(<VoicePage />);
+
+    // tts/languages + stt/languages (TTS card), stt/languages (STT card), and
+    // tts/voices once the default language has loaded.
+    await vi.waitFor(() => expect(catalogCalls()).toHaveLength(4));
+    for (const [url, options] of catalogCalls()) {
+      expect(options, url as string).toMatchObject({ token: "test-token" });
+    }
+  });
+
+  it("does not refetch the catalogs when the token is silently refreshed", async () => {
+    routeApiFetch();
+    const { rerender } = render(<TextToSpeechCard token="tok-1" seed={null} />);
+    await vi.waitFor(() =>
+      expect(
+        apiFetch.mock.calls.some(([url]) => (url as string).startsWith("/v1/tts/voices")),
+      ).toBe(true),
+    );
+    const before = apiFetch.mock.calls.length;
+
+    rerender(<TextToSpeechCard token="tok-2" seed={null} />);
+
+    expect(apiFetch.mock.calls.length).toBe(before);
+  });
+});
