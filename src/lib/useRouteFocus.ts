@@ -43,3 +43,19 @@ export function focusPageStart(container: HTMLElement): void {
   if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
   target.focus({ preventScroll: true });
 }
+
+/** For a navigation that took focus away from where it was (e.g. a command
+ * palette selection, which closes without returning focus): if the new page
+ * doesn't get it either -- the route redirected (REPLACE, which doesn't move
+ * focus) or the navigation was blocked -- put it on the page's heading rather
+ * than leave it on <body>. Checks two frames on, past useRouteFocus's own. */
+export function focusPageStartIfLost(): void {
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      const active = document.activeElement;
+      if (active && active !== document.body) return;
+      const main = document.querySelector("main");
+      if (main) focusPageStart(main);
+    }),
+  );
+}

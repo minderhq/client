@@ -1,8 +1,9 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { StrictMode, useState } from "react";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { StrictMode, useRef, useState } from "react";
+import { MemoryRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useRouteFocus } from "../lib/useRouteFocus";
 import { CommandPalette } from "./CommandPalette";
 import { useConfirm } from "./ConfirmDialog";
 
@@ -141,6 +142,13 @@ function renderPage(onClose?: () => void, { path = "/", strict = false } = {}) {
   return { ...view, trigger };
 }
 
+/** Let a few animation frames pass: past the focus fallback's two. */
+async function nextFrames() {
+  for (let i = 0; i < 3; i++) {
+    await act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
+  }
+}
+
 /** A full press (down, up, click) on `el`. */
 function press(el: HTMLElement) {
   fireEvent.mouseDown(el);
@@ -252,7 +260,7 @@ describe("CommandPalette — shared modal layer (#97)", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it("does not return focus to the trigger when a selection goes to another page", () => {
+  it("does not return focus to the trigger when a selection goes to another page", async () => {
     const { container, trigger } = renderPage();
     openFromTrigger(trigger);
     const focusedTrigger = vi.fn();
@@ -266,6 +274,46 @@ describe("CommandPalette — shared modal layer (#97)", () => {
     // App.test.tsx); the palette itself must not bounce it to the trigger.
     expect(focusedTrigger).not.toHaveBeenCalled();
     expect(container.hasAttribute("inert")).toBe(false);
+
+    // Nothing here moves focus to the new page, so it isn't left on <body>.
+    await nextFrames();
+    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Home" }));
+    expect(focusedTrigger).not.toHaveBeenCalled();
+  });
+
+  it("puts focus on the page heading when the page a selection goes to redirects", async () => {
+    function RoutedApp() {
+      const mainRef = useRef<HTMLElement>(null);
+      useRouteFocus(mainRef);
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button onClick={() => setOpen(true)}>Open palette</button>
+          <main ref={mainRef}>
+            <Routes>
+              <Route path="/" element={<h1>Home</h1>} />
+              <Route path="/ask" element={<Navigate to="/landed" replace />} />
+              <Route path="/landed" element={<h1>Landed</h1>} />
+            </Routes>
+          </main>
+          <CommandPalette open={open} onClose={() => setOpen(false)} />
+          <Probe />
+        </>
+      );
+    }
+    render(
+      <MemoryRouter>
+        <RoutedApp />
+      </MemoryRouter>,
+    );
+    const { dialog } = openFromTrigger(screen.getByRole("button", { name: "Open palette" }));
+    expect(dialog).toBeTruthy();
+    search("ask a question");
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter" });
+
+    await nextFrames();
+    expect(pathname).toBe("/landed");
+    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Landed" }));
   });
 
   it("opens and closes cleanly under StrictMode: focus in, focus back, no inert left", () => {

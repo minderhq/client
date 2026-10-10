@@ -11,6 +11,7 @@ import { getTheme, setTheme, type Theme } from "../lib/theme";
 import { kbdClass } from "../lib/ui";
 import { useDebouncedValue } from "../lib/useDebouncedValue";
 import { useModal } from "../lib/useModal";
+import { focusPageStartIfLost } from "../lib/useRouteFocus";
 import { useTokenRef } from "../lib/useTokenRef";
 import { Icon, type IconName } from "./Icon";
 
@@ -204,14 +205,16 @@ export function CommandPalette({
   function select(cmd: Command | undefined) {
     if (!cmd) return;
     // Going to another page: the navigation puts focus on its heading
-    // (lib/useRouteFocus.ts), so don't bounce it to the old trigger first.
-    // Same page (only the query changes): focus goes back as usual.
-    if (cmd.to && resolvePath(cmd.to, pathname).pathname !== pathname) {
-      modal.close({ restoreFocus: false });
-    }
+    // (lib/useRouteFocus.ts), so don't bounce it to the old trigger first --
+    // but don't leave it on <body> if that page redirects or the navigation
+    // is blocked. Same page (only the query changes): focus goes back as
+    // usual.
+    const leaving = cmd.to !== undefined && resolvePath(cmd.to, pathname).pathname !== pathname;
+    if (leaving) modal.close({ restoreFocus: false });
     onClose();
     if (cmd.to) navigate(cmd.to);
     else cmd.run?.();
+    if (leaving) focusPageStartIfLost();
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
