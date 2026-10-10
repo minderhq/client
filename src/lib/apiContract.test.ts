@@ -8,6 +8,8 @@
 // /fetch arguments or helper constants). When the literal is the first
 // argument of apiFetch/apiFetchBlob/fetch, the HTTP method is checked as well
 // (from an inline `{ method: "..." }`, default GET); otherwise only the path.
+// A segment whose interpolation is an action rather than an id (see
+// INTERPOLATED_ACTIONS) is expanded to its concrete values first.
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import specText from "../../openapi/api-gateway.json?raw";
@@ -21,6 +23,35 @@ const HTTP_METHODS = ["get", "put", "post", "delete", "options", "head", "patch"
 // reason; an entry that no longer matches a missing call fails the test, so
 // fix the call (or the gateway) and delete the entry.
 const KNOWN_MISSING: Record<string, string> = {};
+
+// Where the concrete values of an interpolated action segment are read from:
+// the string-literal union of a type alias, or a `cond ? "a" : "b"` ternary.
+type ActionSource =
+  | { file: string; typeAlias: string }
+  | { file: string; ternaryOn: string };
+
+// Client paths whose last interpolated segment is an ACTION, not an id
+// (`/submissions/${id}/${action}`): `{}` can't match the fixed spec segment
+// (`/approve`), and a wildcard would let one action route disappear
+// unnoticed. Each is expanded to one call per value, every one of which must
+// exist in the spec. Keyed by the normalised path; `values` are re-read from
+// `source`, so a new or renamed action fails "interpolated action mapping"
+// until this table is updated. Mirrors the core repo's `_INTERPOLATED_ACTIONS`.
+const INTERPOLATED_ACTIONS: Record<
+  string,
+  { caller: string; source: ActionSource; values: string[] }
+> = {
+  "/v1/marketplace/submissions/{}/{}": {
+    caller: "src/components/SubmissionReviewCard.tsx", // runAction()
+    source: { file: "src/lib/submissionReview.ts", typeAlias: "ReviewerAction" },
+    values: ["approve", "archive", "claim", "reject"],
+  },
+  "/v1/marketplace/plugins/{}/{}": {
+    caller: "src/lib/usePluginLifecycle.ts", // toggleEnabled()
+    source: { file: "src/lib/usePluginLifecycle.ts", ternaryOn: "nextEnabled" },
+    values: ["disable", "enable"],
+  },
+};
 
 interface Route {
   segments: string[];
@@ -122,8 +153,7 @@ function callMethod(call: ts.CallExpression): string | null {
 }
 
 function collectCalls(file: string, source: string): Call[] {
-  const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true,
-    file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  const sf = parseSource(file, source);
   const calls: Call[] = [];
   const visit = (node: ts.Node) => {
     const text = literalText(node);
@@ -146,16 +176,62 @@ function collectCalls(file: string, source: string): Call[] {
   return calls;
 }
 
+function parseSource(file: string, source: string): ts.SourceFile {
+  return ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true,
+    file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+}
+
+/** The concrete values an ActionSource can produce (sorted), or null when the
+ * type alias / ternary isn't found or isn't made of string literals only. */
+function actionValues(src: ActionSource, source: string): string[] | null {
+  const found: string[][] = [];
+  const visit = (node: ts.Node) => {
+    if ("typeAlias" in src && ts.isTypeAliasDeclaration(node) &&
+        node.name.text === src.typeAlias) {
+      const members = ts.isUnionTypeNode(node.type) ? node.type.types : [node.type];
+      const lits = members.map((t) =>
+        ts.isLiteralTypeNode(t) && ts.isStringLiteral(t.literal) ? t.literal.text : null);
+      found.push(lits.every((v) => v !== null) ? (lits as string[]) : []);
+    }
+    if ("ternaryOn" in src && ts.isConditionalExpression(node) &&
+        ts.isIdentifier(node.condition) && node.condition.text === src.ternaryOn &&
+        ts.isTemplateSpan(node.parent)) {
+      const lits = [node.whenTrue, node.whenFalse].map((e) =>
+        ts.isStringLiteral(e) ? e.text : null);
+      found.push(lits.every((v) => v !== null) ? (lits as string[]) : []);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(parseSource(src.file, source));
+  if (found.length !== 1 || found[0].length === 0) return null;
+  return [...found[0]].sort();
+}
+
+/** Replaces each INTERPOLATED_ACTIONS call by one call per concrete action. */
+function expandActions(calls: Call[]): Call[] {
+  return calls.flatMap((c) => {
+    const entry = INTERPOLATED_ACTIONS[c.path];
+    if (!entry) return [c];
+    const base = c.path.slice(0, c.path.lastIndexOf("/"));
+    return entry.values.map((v) => ({ ...c, path: `${base}/${v}` }));
+  });
+}
+
 const routes = specRoutes(JSON.parse(specText));
 const sources = import.meta.glob<string>(
   ["../**/*.{ts,tsx}", "!../**/*.test.{ts,tsx}", "!../test/**", "!./api-types.gen.ts"],
   { query: "?raw", import: "default", eager: true },
 );
 
+const sourceByFile = new Map(
+  Object.entries(sources).map(([file, src]) => [
+    file.replace(/^\.\//, "src/lib/").replace(/^\.\.\//, "src/"),
+    src,
+  ]),
+);
+
 describe("API contract (gateway OpenAPI spec)", () => {
-  const calls = Object.entries(sources).flatMap(([file, src]) =>
-    collectCalls(file.replace(/^\.\//, "src/lib/").replace(/^\.\.\//, "src/"), src),
-  );
+  const calls = [...sourceByFile].flatMap(([file, src]) => collectCalls(file, src));
 
   it("finds the client's API calls", () => {
     expect(calls.length).toBeGreaterThan(100);
@@ -164,7 +240,7 @@ describe("API contract (gateway OpenAPI spec)", () => {
 
   it("every client call exists in the spec", () => {
     const missing = new Map<string, string[]>();
-    for (const c of calls) {
+    for (const c of expandActions(calls)) {
       const why = checkCall(routes, c.method, c.path);
       if (!why) continue;
       const key = `${c.method ?? "*"} ${c.path}`;
@@ -179,6 +255,19 @@ describe("API contract (gateway OpenAPI spec)", () => {
         "openapi/api-gateway.json if the gateway changed)",
     ).toEqual([]);
     expect(stale, "KNOWN_MISSING entries that now resolve: delete them").toEqual([]);
+  });
+
+  it("interpolated action mapping matches the client source", () => {
+    for (const [path, { caller, source, values }] of Object.entries(INTERPOLATED_ACTIONS)) {
+      // Still called, and only from `caller`: another call site producing the
+      // same path could use other actions, which the expansion would miss.
+      const callers = [...new Set(calls.filter((c) => c.path === path).map((c) => c.file))];
+      expect(callers, `INTERPOLATED_ACTIONS["${path}"]: calling files`).toEqual([caller]);
+      const text = sourceByFile.get(source.file);
+      expect(text, `${source.file} not found`).toBeDefined();
+      expect(actionValues(source, text!), `INTERPOLATED_ACTIONS["${path}"]: values`)
+        .toEqual(values);
+    }
   });
 });
 
@@ -200,6 +289,61 @@ describe("contract matcher", () => {
     expect(checkCall(r, "DELETE", "/v1/teams/{}")).toMatch(/GET, PATCH/);
     // A dynamic client segment never matches a literal spec segment.
     expect(checkCall(r, "GET", "/v1/organizations/{}")).toMatch(/no such path/);
+  });
+
+  it("expands interpolated actions: a catch-all serves them all", () => {
+    const calls = expandActions([
+      { file: "x.ts", line: 1, method: "POST", path: "/v1/marketplace/submissions/{}/{}" },
+      { file: "x.ts", line: 2, method: "POST", path: "/v1/marketplace/plugins/{}/{}" },
+    ]);
+    expect(calls.map((c) => c.path)).toEqual([
+      "/v1/marketplace/submissions/{}/approve",
+      "/v1/marketplace/submissions/{}/archive",
+      "/v1/marketplace/submissions/{}/claim",
+      "/v1/marketplace/submissions/{}/reject",
+      "/v1/marketplace/plugins/{}/disable",
+      "/v1/marketplace/plugins/{}/enable",
+    ]);
+    const catchAll = specRoutes({ paths: { "/v1/marketplace/{path}": { post: {} } } });
+    expect(calls.map((c) => checkCall(catchAll, c.method, c.path))).toEqual(
+      calls.map(() => null),
+    );
+  });
+
+  it("checks each concrete action route: removing only /approve fails", () => {
+    const calls = expandActions([
+      { file: "x.ts", line: 1, method: "POST", path: "/v1/marketplace/submissions/{}/{}" },
+      { file: "x.ts", line: 2, method: "POST", path: "/v1/marketplace/plugins/{}/{}" },
+    ]);
+    const concrete: Record<string, Record<string, unknown>> = {
+      "/v1/marketplace/submissions/{plugin_id}": { get: {} },
+      "/v1/marketplace/plugins/{plugin_id}/enable": { post: {} },
+      "/v1/marketplace/plugins/{plugin_id}/disable": { post: {} },
+    };
+    for (const a of ["claim", "approve", "reject", "archive"]) {
+      concrete[`/v1/marketplace/submissions/{plugin_id}/${a}`] = { post: {} };
+    }
+    const unserved = (paths: typeof concrete) => {
+      const r = specRoutes({ paths });
+      return calls.filter((c) => checkCall(r, c.method, c.path) !== null).map((c) => c.path);
+    };
+    expect(unserved(concrete)).toEqual([]);
+    const noApprove = { ...concrete };
+    delete noApprove["/v1/marketplace/submissions/{plugin_id}/approve"];
+    expect(unserved(noApprove)).toEqual(["/v1/marketplace/submissions/{}/approve"]);
+  });
+
+  it("reads action values from a type alias or a ternary", () => {
+    const src = { file: "x.ts", typeAlias: "A" };
+    expect(actionValues(src, 'type A = "b" | "a";')).toEqual(["a", "b"]);
+    expect(actionValues(src, 'type A = "a";')).toEqual(["a"]);
+    expect(actionValues(src, 'type A = "a" | string;')).toBeNull();
+    expect(actionValues(src, 'type B = "a";')).toBeNull();
+    const tern = { file: "x.ts", ternaryOn: "on" };
+    expect(actionValues(tern, 'f(`/v1/p/${on ? "enable" : "disable"}`);'))
+      .toEqual(["disable", "enable"]);
+    expect(actionValues(tern, "f(`/v1/p/${on ? x : \"disable\"}`);")).toBeNull();
+    expect(actionValues(tern, 'const s = on ? "a" : "b";')).toBeNull();
   });
 
   it("extracts paths and methods from source", () => {
