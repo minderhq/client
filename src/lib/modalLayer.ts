@@ -98,3 +98,9 @@ export function pushModalLayer(el: HTMLElement): () => void {
 export function isModalOpen(): boolean {
   return layers.length > 0;
 }
+
+/** Whether `el` (a modal's root) is the top-most open layer: the one that is
+ * interactive and should hold focus. */
+export function isTopModalLayer(el: HTMLElement): boolean {
+  return layers.at(-1) === bodyChildOf(el);
+}

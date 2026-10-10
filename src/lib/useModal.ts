@@ -8,7 +8,7 @@ import {
 } from "react";
 
 import { lastInteractedElement, trackLastInteraction } from "./lastInteraction";
-import { pushModalLayer } from "./modalLayer";
+import { isTopModalLayer, pushModalLayer } from "./modalLayer";
 import { focusPageStart } from "./useRouteFocus";
 
 /** Elements that take part in sequential (Tab) focus navigation. */
@@ -136,11 +136,17 @@ export interface UseModalOptions {
    * whether to (e.g. not while a request is in flight). */
   onDismiss: () => void;
   /** Identity of what the modal is showing (e.g. the pending request). A new
-   * value while `open` stays true -- one confirm chained straight after
-   * another, so React batches the close and the reopen into one render --
-   * starts a fresh session, as if the modal had closed and reopened: `inert`
-   * goes back on, focus moves into the panel, and focus will return to where
-   * it was when the new session started. */
+   * value while `open` stays true starts a fresh session:
+   *
+   * - after close() (one confirm chained straight after another, so React
+   *   batches the close and the reopen into one render), as if the modal had
+   *   closed and reopened: its layer goes back on top like any modal that
+   *   opens, focus moves into the panel, and focus will return to where it
+   *   was when the new session started;
+   * - while still open (the content replaced in place), the layer keeps its
+   *   place in the stack -- a modal stacked above stays on top -- and focus
+   *   moves in only if this modal is the top one. Focus still returns to
+   *   where it was before the first session. */
   sessionKey?: unknown;
 }
 
@@ -219,6 +225,7 @@ export function useModal({ open, onDismiss, sessionKey }: UseModalOptions): Moda
   const close = useCallback(({ restoreFocus = true }: CloseOptions = {}) => {
     // Lift `inert` first: an inert element can't take focus.
     releaseRef.current?.();
+    releaseRef.current = null;
     const session = sessionRef.current;
     if (session && !session.returned) {
       session.returned = true;
@@ -226,13 +233,17 @@ export function useModal({ open, onDismiss, sessionKey }: UseModalOptions): Moda
     }
   }, []);
 
-  // Layout effect: inert and focus are in place before the browser paints or
-  // handles the next event. The cleanup also runs when the owner unmounts with
-  // the modal open, so the page never stays inert.
+  // Layout effects: inert and focus are in place before the browser paints or
+  // handles the next event.
+  //
+  // The session: captured, registered and focused per open and per
+  // sessionKey. The return target is captured before the layer goes on (an
+  // inert element loses focus), and the layer only goes on if it isn't
+  // registered already, so restarting a session never reorders the stack.
   useLayoutEffect(() => {
     if (!open) {
       // Closed by `open` going false (not by close()): return focus now. The
-      // previous run's cleanup has already released the layer.
+      // effect below has already released the layer.
       const session = sessionRef.current;
       sessionRef.current = null;
       if (session && !session.returned) returnFocus(session.returnTo);
@@ -251,14 +262,22 @@ export function useModal({ open, onDismiss, sessionKey }: UseModalOptions): Moda
         returned: false,
       };
     }
-    const release = pushModalLayer(layer);
-    releaseRef.current = release;
-    if (panelRef.current) focusInitial(panelRef.current);
-    return () => {
-      release();
-      if (releaseRef.current === release) releaseRef.current = null;
-    };
+    // Not registered: opening (or reopening after close()) -- on top.
+    releaseRef.current ??= pushModalLayer(layer);
+    if (panelRef.current && isTopModalLayer(layer)) focusInitial(panelRef.current);
   }, [open, sessionKey]);
+
+  // The layer's registration ends when the modal closes or the owner
+  // unmounts with it open (so the page never stays inert) -- not when only
+  // the session changes. On close, React runs this cleanup before the effect
+  // above re-runs, so `inert` is lifted before focus is returned.
+  useLayoutEffect(() => {
+    if (!open) return;
+    return () => {
+      releaseRef.current?.();
+      releaseRef.current = null;
+    };
+  }, [open]);
 
   function onKeyDown(e: KeyboardEvent) {
     // A nested modal (React events bubble out of portals) already handled it.

@@ -357,6 +357,29 @@ describe("useConfirm inert", () => {
     expect(screen.queryByRole("alertdialog")).toBeNull();
   });
 
+  it("keeps a dialog stacked above on top when the one below gets a new request", async () => {
+    render(<TwoDialogs />);
+    fireEvent.click(screen.getByText("Open first"));
+    const first = await screen.findByRole("alertdialog", { name: "First?" });
+    // The page is inert, but a test can still dispatch the clicks.
+    fireEvent.click(screen.getByText("Open second"));
+    const second = await screen.findByRole("alertdialog", { name: "Second?" });
+    const secondConfirm = within(second).getByRole("button", { name: "Confirm" });
+    expect(document.activeElement).toBe(secondConfirm);
+
+    // A new request replaces the lower dialog's content in place.
+    fireEvent.click(screen.getByText("Open first"));
+    expect(screen.getByRole("alertdialog", { name: "First?" })).toBe(first);
+
+    expect(second.parentElement!.hasAttribute("inert")).toBe(false);
+    expect(first.parentElement!.hasAttribute("inert")).toBe(true);
+    expect(document.activeElement).toBe(secondConfirm);
+
+    // Closing the top one hands interactivity back to the one below.
+    fireEvent.click(within(second).getByRole("button", { name: "Cancel" }));
+    expect(first.parentElement!.hasAttribute("inert")).toBe(false);
+  });
+
   it("leaves inert that other code sets while a dialog is open", async () => {
     const { container } = render(<Harness />);
     const late = document.createElement("div");
