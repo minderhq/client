@@ -665,4 +665,34 @@ describe("VoicePage catalog requests carry the bearer (#109)", () => {
 
     expect(apiFetch.mock.calls.length).toBe(before);
   });
+
+  it("logged out: skips the catalog reads and shows no load error", async () => {
+    routeApiFetch();
+    useAuthMock.mockReturnValue({ token: "" });
+    try {
+      render(<VoicePage />);
+      await screen.findByText("Log in to synthesize speech.");
+      // Let any (unexpected) fetch settle before asserting.
+      await new Promise((r) => setTimeout(r, 0));
+      expect(catalogCalls()).toHaveLength(0);
+      expect(screen.queryByText("Could not load supported languages.")).toBeNull();
+    } finally {
+      useAuthMock.mockReturnValue({ token: "test-token" });
+    }
+  });
+
+  it("loads the catalogs and clears any stale status after logging in on the page", async () => {
+    routeApiFetch();
+    const { rerender } = render(<TextToSpeechCard token="" seed={null} />);
+    expect(catalogCalls()).toHaveLength(0);
+
+    rerender(<TextToSpeechCard token="tok" seed={null} />);
+
+    await vi.waitFor(() =>
+      expect(
+        apiFetch.mock.calls.some(([url]) => (url as string).startsWith("/v1/tts/voices")),
+      ).toBe(true),
+    );
+    expect(screen.queryByText("Could not load supported languages.")).toBeNull();
+  });
 });

@@ -956,8 +956,8 @@ export function KnowledgeBasesPage() {
         subtitle={
           <>
             Create knowledge bases and upload documents — this is the data your{" "}
-            <em>RAG Pipelines</em> actually search over. Browsing is open for
-            everyone; log in to create, upload, or delete.
+            <em>RAG Pipelines</em> actually search over. Knowledge bases belong to
+            your organization, so log in to see, create, upload, or delete them.
           </>
         }
       />
