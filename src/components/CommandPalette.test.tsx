@@ -141,6 +141,13 @@ function renderPage(onClose?: () => void, { path = "/", strict = false } = {}) {
   return { ...view, trigger };
 }
 
+/** A full press (down, up, click) on `el`. */
+function press(el: HTMLElement) {
+  fireEvent.mouseDown(el);
+  fireEvent.mouseUp(el);
+  fireEvent.click(el);
+}
+
 function openFromTrigger(trigger: HTMLElement) {
   trigger.focus();
   fireEvent.click(trigger);
@@ -214,7 +221,7 @@ describe("CommandPalette — shared modal layer (#97)", () => {
       "Escape on a result",
       () => fireEvent.keyDown(within(screen.getByRole("listbox")).getAllByRole("button")[0], { key: "Escape" }),
     ],
-    ["a press outside the panel", () => fireEvent.mouseDown(screen.getByRole("dialog").parentElement!)],
+    ["a press outside the panel", () => press(screen.getByRole("dialog").parentElement!)],
     ["running an action", () => {
       search("toggle theme");
       fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter" });
@@ -277,17 +284,43 @@ describe("CommandPalette — shared modal layer (#97)", () => {
     // And again: the second session starts from scratch.
     openFromTrigger(trigger);
     expect(container.hasAttribute("inert")).toBe(true);
-    fireEvent.mouseDown(screen.getByRole("dialog").parentElement!);
+    press(screen.getByRole("dialog").parentElement!);
     expect(document.activeElement).toBe(trigger);
     expect(document.querySelectorAll("[inert]")).toHaveLength(0);
   });
 
-  it("prevents the closing press from moving focus off the trigger", () => {
+  it("keeps focus in the search field while a press outside is down, then closes on release", () => {
     const { trigger } = renderPage();
     const { layer } = openFromTrigger(trigger);
-    const press = fireEvent.mouseDown(layer);
-    expect(press).toBe(false); // default prevented
+    const input = screen.getByRole("combobox");
+
+    expect(fireEvent.mouseDown(layer)).toBe(false); // default prevented: no blur
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(document.activeElement).toBe(input);
+
+    fireEvent.mouseUp(layer);
+    fireEvent.click(layer);
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(trigger);
+  });
+
+  it("stays open when a press crosses the panel edge, either way", () => {
+    const { trigger } = renderPage();
+    const { dialog, layer } = openFromTrigger(trigger);
+    const input = screen.getByRole("combobox");
+
+    // Starts outside, ends in the panel: the click lands on the layer.
+    fireEvent.mouseDown(layer);
+    fireEvent.mouseUp(input);
+    fireEvent.click(layer);
+    expect(screen.getByRole("dialog")).toBe(dialog);
+
+    // Starts in the panel (selecting the query), ends outside.
+    fireEvent.mouseDown(input);
+    fireEvent.mouseUp(layer);
+    fireEvent.click(layer);
+    expect(screen.getByRole("dialog")).toBe(dialog);
+    expect(document.activeElement).toBe(input);
   });
 
   it("returns focus to the pressed trigger when the click didn't focus it (Safari)", () => {

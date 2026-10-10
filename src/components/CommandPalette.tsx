@@ -236,15 +236,20 @@ export function CommandPalette({
       className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-[12vh]"
       role="presentation"
       onKeyDown={modal.onKeyDown}
+      // Like every modal: a press that starts AND ends outside the panel
+      // dismisses (lib/useModal.ts).
+      {...modal.backdropProps}
       onMouseDown={(e) => {
-        // Don't let the press move focus to <body> after useModal has put it
-        // back on the trigger.
-        e.preventDefault();
-        onClose();
+        // A press outside the panel mustn't blur the search field (focus
+        // would be lost if the press then ends in the panel).
+        if (e.target === e.currentTarget) e.preventDefault();
+        modal.backdropProps.onMouseDown(e);
       }}
     >
+      {/* Visual only: lets presses through to the layer, so the layer itself
+        is the backdrop the dismiss rule checks for. */}
       <div
-        className="fixed inset-0 bg-gray-950/40 backdrop-blur-sm animate-[fade-in_0.15s_ease-out_both]"
+        className="pointer-events-none fixed inset-0 bg-gray-950/40 backdrop-blur-sm animate-[fade-in_0.15s_ease-out_both]"
         aria-hidden="true"
       />
       <div
@@ -252,7 +257,6 @@ export function CommandPalette({
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"
-        onMouseDown={(e) => e.stopPropagation()}
         className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg ring-1 ring-black/5 animate-[pop_0.16s_cubic-bezier(0.34,1.56,0.64,1)_both] dark:border-gray-800 dark:bg-gray-900"
       >
         <div className="flex items-center gap-2.5 border-b border-gray-200 px-4 dark:border-gray-800">
