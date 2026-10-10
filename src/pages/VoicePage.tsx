@@ -117,21 +117,28 @@ export function TextToSpeechCard({
 
   useEffect(() => {
     const token = tokenRef.current;
-    apiFetch<LanguagesResponse>("/v1/tts/languages", { token })
-      .then((res) => {
-        setLanguages(res.languages);
-        setLanguage(res.default);
-      })
-      .catch(() => {
-        setStatus("Could not load supported languages.");
-        setIsError(true);
-      });
-    // Only used to pick a matching locale for "verify by transcribing" --
-    // never shown as a selector, so a load failure here is silent (the
-    // verify button just stays disabled via matchingSttLanguage's null).
-    apiFetch<LanguagesResponse>("/v1/stt/languages", { token })
-      .then((res) => setSttLanguages(res.languages))
-      .catch(() => {});
+    // Logged out: the speech catalogs need a JWT, so don't request them (the
+    // card already says "Log in to synthesize speech"). On login, clear any
+    // status left over from before and load them.
+    if (token) {
+      setStatus("");
+      setIsError(false);
+      apiFetch<LanguagesResponse>("/v1/tts/languages", { token })
+        .then((res) => {
+          setLanguages(res.languages);
+          setLanguage(res.default);
+        })
+        .catch(() => {
+          setStatus("Could not load supported languages.");
+          setIsError(true);
+        });
+      // Only used to pick a matching locale for "verify by transcribing" --
+      // never shown as a selector, so a load failure here is silent (the
+      // verify button just stays disabled via matchingSttLanguage's null).
+      apiFetch<LanguagesResponse>("/v1/stt/languages", { token })
+        .then((res) => setSttLanguages(res.languages))
+        .catch(() => {});
+    }
     // For the regional-style rewrite's model picker below -- fetched once
     // (not per-click) and reused, since the pulled-model list rarely
     // changes mid-session and re-fetching on every click was wasteful.
@@ -154,7 +161,7 @@ export function TextToSpeechCard({
   // that gets sent alongside a mismatched `language` in the POST /v1/tts body.
   const voicesRequestRef = useRef(0);
   useEffect(() => {
-    if (!language) return;
+    if (!language || !tokenRef.current) return;
     setVoice("");
     const requestId = ++voicesRequestRef.current;
     apiFetch<VoicesResponse>(`/v1/tts/voices?language=${encodeURIComponent(language)}`, {
@@ -166,7 +173,9 @@ export function TextToSpeechCard({
       .catch(() => {
         if (voicesRequestRef.current === requestId) setVoices([]);
       });
-  }, [language]);
+    // `signedIn`: a login on this page must load the voices even though the
+    // language didn't change; a silent refresh doesn't flip it.
+  }, [language, signedIn]);
 
   useEffect(() => {
     // Revoke the previous object URL whenever it's replaced/unmounted --
@@ -586,6 +595,11 @@ function SpeechToTextCard({
   const signedIn = Boolean(token);
 
   useEffect(() => {
+    // Logged out: nothing to load (see TextToSpeechCard). On login, drop any
+    // stale status before loading the catalog.
+    if (!tokenRef.current) return;
+    setStatus("");
+    setIsError(false);
     apiFetch<LanguagesResponse>("/v1/stt/languages", { token: tokenRef.current })
       .then((res) => {
         setLanguages(res.languages);
@@ -804,7 +818,7 @@ export function VoicePage() {
       <PageHeader
         icon="voice"
         title="Voice"
-        subtitle="Try Minder's text-to-speech and speech-to-text engines directly — ~12 languages supported, Turkish by default. Browsing is open for everyone; log in to synthesize or transcribe."
+        subtitle="Try Minder's text-to-speech and speech-to-text engines directly — ~12 languages supported, Turkish by default. Log in to load the languages and voices, and to synthesize or transcribe."
       />
       <TextToSpeechCard token={token} seed={seed} />
       <SpeechToTextCard
