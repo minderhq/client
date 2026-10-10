@@ -67,14 +67,17 @@ export function ResetPasswordControl({
   // A failed request leaves focus nowhere: the button that had it was
   // disabled while the request ran. Once the form is enabled again, put focus
   // back in the dialog -- on the password being set, else the selected mode --
-  // so Escape and Tab work again. (The error itself is announced: role=alert.)
+  // so Escape and Tab work again. If focus is still (or already again) in
+  // the dialog, it stays where it is. (The error itself is announced:
+  // role=alert.)
   const passwordRef = useRef<HTMLInputElement>(null);
   const refocusRef = useRef(false);
   useEffect(() => {
     if (busy || !refocusRef.current) return;
     refocusRef.current = false;
     const panel = modal.panelRef.current;
-    (passwordRef.current ?? (panel && tabbableIn(panel)[0]))?.focus();
+    if (!panel || panel.contains(document.activeElement)) return;
+    (passwordRef.current ?? tabbableIn(panel)[0])?.focus();
   }, [busy, modal.panelRef]);
 
   function close() {

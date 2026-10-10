@@ -173,6 +173,17 @@ describe("ResetPasswordControl dialog (#97)", () => {
     await within(dialog).findByRole("button", { name: "Done" });
   });
 
+  /** Leave focus on <body>, as a browser does when the focused button gets
+   * disabled. (jsdom keeps it on the disabled button and won't blur it, but
+   * does drop focus when the focused element is removed.) */
+  function dropFocus() {
+    const placeholder = document.createElement("button");
+    document.body.appendChild(placeholder);
+    placeholder.focus();
+    placeholder.remove();
+    expect(document.activeElement).toBe(document.body);
+  }
+
   for (const mode of ["generate", "set"] as const) {
     it(`puts focus back in the dialog after a failed reset (${mode})`, async () => {
       let fail: (e: unknown) => void = () => {};
@@ -188,8 +199,7 @@ describe("ResetPasswordControl dialog (#97)", () => {
       submit.focus();
       fireEvent.click(submit);
       await within(dialog).findByRole("button", { name: "Resetting…" });
-      // A browser drops focus from the button it just disabled (jsdom keeps
-      // it there); either way it must end up on a field again.
+      dropFocus(); // what a browser does to the button it just disabled
 
       fail(new Error("Server said no"));
 
@@ -206,6 +216,23 @@ describe("ResetPasswordControl dialog (#97)", () => {
       expect(document.activeElement).toBe(trigger);
     });
   }
+
+  it("leaves focus where it is after a failed reset if it is still in the dialog", async () => {
+    let fail: (e: unknown) => void = () => {};
+    apiFetch.mockReturnValue(new Promise((_, reject) => (fail = reject)));
+    const { dialog } = openDialog();
+    const submit = within(dialog).getByRole("button", { name: "Reset password" });
+    submit.focus();
+    fireEvent.click(submit);
+    await within(dialog).findByRole("button", { name: "Resetting…" });
+    expect(document.activeElement).toBe(submit); // never left the dialog
+
+    fail(new Error("Server said no"));
+
+    await within(dialog).findByRole("alert");
+    await within(dialog).findByRole("button", { name: "Reset password" });
+    expect(document.activeElement).toBe(submit);
+  });
 
   it("leaves focus alone on a validation error (no request, nothing disabled)", () => {
     const { dialog } = openDialog();
