@@ -51,12 +51,37 @@ describe("tabbableIn", () => {
 });
 
 describe("tabbableIn — editable, collapsed and unrendered content", () => {
+  // Restore whatever the environment had (jsdom: nothing), not assume it.
+  const originalCheckVisibility = Object.getOwnPropertyDescriptor(
+    Element.prototype,
+    "checkVisibility",
+  );
   afterEach(() => {
     vi.restoreAllMocks();
-    delete (Element.prototype as Partial<Element>).checkVisibility;
+    if (originalCheckVisibility) {
+      Object.defineProperty(Element.prototype, "checkVisibility", originalCheckVisibility);
+    } else {
+      delete (Element.prototype as Partial<Element>).checkVisibility;
+    }
   });
 
   const names = (els: HTMLElement[]) => els.map((n) => n.getAttribute("aria-label"));
+
+  it("drops every negative or invalid tabindex, however it is written", () => {
+    const el = fixture(`
+      <button aria-label="kept"></button>
+      <div tabindex="-2" aria-label="minus two"></div>
+      <button tabindex=" -1" aria-label="padded minus one"></button>
+      <div tabindex="abc" aria-label="invalid on a div"></div>
+      <button tabindex="abc" aria-label="invalid on a button"></button>
+      <button aria-label="set by property"></button>
+      <div tabindex="0" aria-label="zero"></div>
+    `);
+    el.querySelector<HTMLElement>("[aria-label='set by property']")!.tabIndex = -1;
+    // A button's invalid tabindex is ignored (it stays focusable); a div's
+    // leaves it unfocusable.
+    expect(names(tabbableIn(el))).toEqual(["kept", "invalid on a button", "zero"]);
+  });
 
   it("treats every editable contenteditable state as tabbable", () => {
     const el = fixture(`

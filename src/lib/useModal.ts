@@ -11,8 +11,8 @@ import { lastInteractedElement, trackLastInteraction } from "./lastInteraction";
 import { isTopModalLayer, pushModalLayer } from "./modalLayer";
 import { focusPageStart } from "./useRouteFocus";
 
-/** Elements that take part in sequential (Tab) focus navigation. */
-const TABBABLE = [
+/** Elements that are focusable on their own (no tabindex needed). */
+const NATIVELY_TABBABLE = [
   "a[href]",
   "button",
   "input:not([type='hidden'])",
@@ -24,8 +24,21 @@ const TABBABLE = [
   "[contenteditable='']",
   "[contenteditable='true' i]",
   "[contenteditable='plaintext-only' i]",
-  "[tabindex]:not([tabindex='-1'])",
 ].join(",");
+
+/** Candidates for sequential (Tab) focus navigation; tabbableIn() filters. */
+const TABBABLE = `${NATIVELY_TABBABLE},[tabindex]`;
+
+/** The element's tabindex as the HTML "rules for parsing integers" read it
+ * (leading whitespace, optional sign, digits; trailing junk ignored), or null
+ * if it has none or it doesn't parse -- which browsers treat as no tabindex.
+ * Not `el.tabIndex`: jsdom reports 0 for an invalid value on any element. */
+function tabindexOf(el: HTMLElement): number | null {
+  const raw = el.getAttribute("tabindex");
+  if (raw === null) return null;
+  const match = /^[\t\n\f\r ]*([-+]?\d+)/.exec(raw);
+  return match ? parseInt(match[1], 10) : null;
+}
 
 /** Whether `el` sits in the hidden content of a closed <details> (anything but
  * that details' own <summary>), at any level of nesting. */
@@ -60,10 +73,11 @@ export function tabbableIn(container: HTMLElement): HTMLElement[] {
   const isRendered = renderedTest(container);
   return Array.from(container.querySelectorAll<HTMLElement>(TABBABLE)).filter((el) => {
     if (el.matches(":disabled") || el.closest("[hidden], [inert]")) return false;
-    // A negative (or invalid) tabindex takes it out of the Tab order. Without
-    // one, everything matched is in it -- even where jsdom, which doesn't
-    // know contenteditable, reports -1.
-    if (el.hasAttribute("tabindex") && el.tabIndex < 0) return false;
+    // A negative tabindex takes it out of the Tab order; without a valid
+    // one, only natively focusable elements are in it. (Not `el.tabIndex`:
+    // jsdom, which doesn't know contenteditable, reports -1 for it.)
+    const tabindex = tabindexOf(el);
+    if (tabindex === null ? !el.matches(NATIVELY_TABBABLE) : tabindex < 0) return false;
     if (inClosedDetails(el)) return false;
     if (isRendered && !isRendered(el)) return false;
     if (el instanceof HTMLInputElement && el.type === "radio" && !el.checked && el.name) {
