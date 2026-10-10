@@ -399,18 +399,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/billing/{path}": {
+    "/v1/billing/checkout": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Proxy To Billing */
-        get: operations["proxy_to_billing_v1_billing__path__get"];
+        get?: never;
         put?: never;
-        /** Proxy To Billing */
-        post: operations["proxy_to_billing_v1_billing__path__post"];
+        /** Create Checkout */
+        post: operations["create_checkout_v1_billing_checkout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/billing/portal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Billing Portal */
+        post: operations["billing_portal_v1_billing_portal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/billing/subscription": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Subscription */
+        get: operations["get_subscription_v1_billing_subscription_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -528,28 +561,58 @@ export interface paths {
         patch: operations["proxy_to_graph_rag_v1_graph_rag__path__patch"];
         trace?: never;
     };
-    "/v1/graph/{path}": {
+    "/v1/graph/bundles/required": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Proxy To Marketplace Graph */
-        get: operations["proxy_to_marketplace_graph_v1_graph__path__get"];
-        /** Proxy To Marketplace Graph */
-        put: operations["proxy_to_marketplace_graph_v1_graph__path__put"];
-        /** Proxy To Marketplace Graph */
-        post: operations["proxy_to_marketplace_graph_v1_graph__path__post"];
-        /** Proxy To Marketplace Graph */
-        delete: operations["proxy_to_marketplace_graph_v1_graph__path__delete"];
+        /** All Currently Required Bundles */
+        get: operations["all_currently_required_bundles_v1_graph_bundles_required_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
-        /** Proxy To Marketplace Graph */
-        patch: operations["proxy_to_marketplace_graph_v1_graph__path__patch"];
+        patch?: never;
         trace?: never;
     };
-    "/v1/internal/audit-events": {
+    "/v1/graph/bundles/{name}/required": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bundle Currently Required */
+        get: operations["bundle_currently_required_v1_graph_bundles__name__required_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/graph/conflicts/{plugin_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Plugin Conflicts */
+        get: operations["get_plugin_conflicts_v1_graph_conflicts__plugin_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/graph/dependencies": {
         parameters: {
             query?: never;
             header?: never;
@@ -558,25 +621,76 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Post Service Audit Event */
-        post: operations["post_service_audit_event_v1_internal_audit_events_post"];
+        /** Add Plugin Dependency */
+        post: operations["add_plugin_dependency_v1_graph_dependencies_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/internal/org-authority": {
+    "/v1/graph/dependencies/{plugin_id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Org Authority */
-        get: operations["get_org_authority_v1_internal_org_authority_get"];
+        /** Get Plugin Dependencies */
+        get: operations["get_plugin_dependencies_v1_graph_dependencies__plugin_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/graph/dependencies/{plugin_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Resolve Plugin Dependencies */
+        get: operations["resolve_plugin_dependencies_v1_graph_dependencies__plugin_id__resolve_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/graph/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Graph Health Check */
+        get: operations["graph_health_check_v1_graph_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/graph/recommendations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Get Plugin Recommendations */
+        post: operations["get_plugin_recommendations_v1_graph_recommendations_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -669,44 +783,654 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/licensing/{path}": {
+    "/v1/licensing/plugins/{plugin_name}/license": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Proxy To Licensing */
-        get: operations["proxy_to_licensing_v1_licensing__path__get"];
+        get?: never;
         put?: never;
-        /** Proxy To Licensing */
-        post: operations["proxy_to_licensing_v1_licensing__path__post"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** Proxy To Licensing */
-        patch: operations["proxy_to_licensing_v1_licensing__path__patch"];
+        /** Update Plugin License Endpoint */
+        patch: operations["update_plugin_license_endpoint_v1_licensing_plugins__plugin_name__license_patch"];
         trace?: never;
     };
-    "/v1/marketplace/{path}": {
+    "/v1/licensing/plugins/{plugin_name}/license/tier": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Proxy To Marketplace */
-        get: operations["proxy_to_marketplace_v1_marketplace__path__get"];
-        /** Proxy To Marketplace */
-        put: operations["proxy_to_marketplace_v1_marketplace__path__put"];
-        /** Proxy To Marketplace */
-        post: operations["proxy_to_marketplace_v1_marketplace__path__post"];
-        /** Proxy To Marketplace */
-        delete: operations["proxy_to_marketplace_v1_marketplace__path__delete"];
+        /** Get Plugin Tier */
+        get: operations["get_plugin_tier_v1_licensing_plugins__plugin_name__license_tier_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
-        /** Proxy To Marketplace */
-        patch: operations["proxy_to_marketplace_v1_marketplace__path__patch"];
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/licensing/plugins/{plugin_name}/license/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate Plugin License */
+        post: operations["validate_plugin_license_v1_licensing_plugins__plugin_name__license_validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/ai/plugins/{plugin_id}/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Plugin Ai Tools */
+        get: operations["get_plugin_ai_tools_v1_marketplace_ai_plugins__plugin_id__tools_get"];
+        put?: never;
+        post?: never;
+        /** Deactivate Plugin Tools */
+        delete: operations["deactivate_plugin_tools_v1_marketplace_ai_plugins__plugin_id__tools_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/ai/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sync Ai Tools */
+        post: operations["sync_ai_tools_v1_marketplace_ai_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/ai/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List All Ai Tools */
+        get: operations["list_all_ai_tools_v1_marketplace_ai_tools_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/ai/tools/{tool_name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ai Tool Details */
+        get: operations["get_ai_tool_details_v1_marketplace_ai_tools__tool_name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/entitlements/{tenant_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Org Entitlement */
+        get: operations["get_org_entitlement_v1_marketplace_entitlements__tenant_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/installations/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get My Installations */
+        get: operations["get_my_installations_v1_marketplace_installations_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/licenses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Licenses */
+        get: operations["list_licenses_v1_marketplace_licenses_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/licenses/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate License */
+        post: operations["activate_license_v1_marketplace_licenses_activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/licenses/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lookup Tenant License */
+        get: operations["lookup_tenant_license_v1_marketplace_licenses_lookup_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/licenses/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate License Endpoint */
+        post: operations["validate_license_endpoint_v1_marketplace_licenses_validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/licenses/{license_id}/key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Reveal License Key Endpoint */
+        get: operations["reveal_license_key_endpoint_v1_marketplace_licenses__license_id__key_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/licenses/{license_id}/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rotate License Key Endpoint */
+        post: operations["rotate_license_key_endpoint_v1_marketplace_licenses__license_id__rotate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/plugins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Plugins */
+        get: operations["list_plugins_v1_marketplace_plugins_get"];
+        put?: never;
+        /** Create Plugin */
+        post: operations["create_plugin_v1_marketplace_plugins_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/plugins/featured": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Featured Plugins */
+        get: operations["get_featured_plugins_v1_marketplace_plugins_featured_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/plugins/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search Plugins */
+        get: operations["search_plugins_v1_marketplace_plugins_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/plugins/semantic-search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Semantic Search Plugins */
+        get: operations["semantic_search_plugins_v1_marketplace_plugins_semantic_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/plugins/{plugin_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Plugin */
+        get: operations["get_plugin_v1_marketplace_plugins__plugin_id__get"];
+        /** Update Plugin */
+        put: operations["update_plugin_v1_marketplace_plugins__plugin_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/plugins/{plugin_id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Disable Plugin */
+        post: operations["disable_plugin_v1_marketplace_plugins__plugin_id__disable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/plugins/{plugin_id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enable Plugin */
+        post: operations["enable_plugin_v1_marketplace_plugins__plugin_id__enable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/plugins/{plugin_id}/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Install Plugin */
+        post: operations["install_plugin_v1_marketplace_plugins__plugin_id__install_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/plugins/{plugin_id}/installations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Plugin Installations */
+        get: operations["get_plugin_installations_v1_marketplace_plugins__plugin_id__installations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/plugins/{plugin_id}/ratings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Ratings */
+        get: operations["list_ratings_v1_marketplace_plugins__plugin_id__ratings_get"];
+        put?: never;
+        /** Submit Rating */
+        post: operations["submit_rating_v1_marketplace_plugins__plugin_id__ratings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/plugins/{plugin_id}/uninstall": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Uninstall Plugin */
+        delete: operations["uninstall_plugin_v1_marketplace_plugins__plugin_id__uninstall_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/repositories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Repositories */
+        get: operations["list_repositories_v1_marketplace_repositories_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/repositories/{repository_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Repository */
+        get: operations["get_repository_v1_marketplace_repositories__repository_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/repositories/{repository_id}/plugins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Repository Plugins */
+        get: operations["list_repository_plugins_v1_marketplace_repositories__repository_id__plugins_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Review Queue */
+        get: operations["review_queue_v1_marketplace_submissions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/submissions/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Submissions */
+        get: operations["my_submissions_v1_marketplace_submissions_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/submissions/{plugin_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Submission Detail */
+        get: operations["submission_detail_v1_marketplace_submissions__plugin_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/submissions/{plugin_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Submission */
+        post: operations["approve_submission_v1_marketplace_submissions__plugin_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/submissions/{plugin_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive Submission */
+        post: operations["archive_submission_v1_marketplace_submissions__plugin_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/submissions/{plugin_id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Claim Review */
+        post: operations["claim_review_v1_marketplace_submissions__plugin_id__claim_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/submissions/{plugin_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Submission History */
+        get: operations["submission_history_v1_marketplace_submissions__plugin_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/submissions/{plugin_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject Submission */
+        post: operations["reject_submission_v1_marketplace_submissions__plugin_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/submissions/{plugin_id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit For Review */
+        post: operations["submit_for_review_v1_marketplace_submissions__plugin_id__submit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/model-providers": {
@@ -908,6 +1632,40 @@ export interface paths {
         patch: operations["update_organization_route_v1_organizations__org_id__patch"];
         trace?: never;
     };
+    "/v1/organizations/{org_id}/audit-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Org Audit Logs */
+        get: operations["get_org_audit_logs_v1_organizations__org_id__audit_logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{org_id}/convert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Convert Organization Route */
+        post: operations["convert_organization_route_v1_organizations__org_id__convert_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/organizations/{org_id}/entitlement": {
         parameters: {
             query?: never;
@@ -1006,6 +1764,41 @@ export interface paths {
         /** Revoke Org Invite Route */
         post: operations["revoke_org_invite_route_v1_organizations__org_id__invites__invite_id__revoke_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{org_id}/limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Organization Limits Route */
+        get: operations["get_organization_limits_route_v1_organizations__org_id__limits_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{org_id}/limits/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Organization Limit Route */
+        put: operations["set_organization_limit_route_v1_organizations__org_id__limits__key__put"];
+        post?: never;
+        /** Clear Organization Limit Route */
+        delete: operations["clear_organization_limit_route_v1_organizations__org_id__limits__key__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1510,25 +2303,314 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/plugins/{path}": {
+    "/v1/plugins/ai/tools": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Proxy To Plugin Registry */
-        get: operations["proxy_to_plugin_registry_v1_plugins__path__get"];
-        /** Proxy To Plugin Registry */
-        put: operations["proxy_to_plugin_registry_v1_plugins__path__put"];
-        /** Proxy To Plugin Registry */
-        post: operations["proxy_to_plugin_registry_v1_plugins__path__post"];
-        /** Proxy To Plugin Registry */
-        delete: operations["proxy_to_plugin_registry_v1_plugins__path__delete"];
+        /** Get All Ai Tools */
+        get: operations["get_all_ai_tools_v1_plugins_ai_tools_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
-        /** Proxy To Plugin Registry */
-        patch: operations["proxy_to_plugin_registry_v1_plugins__path__patch"];
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plugins/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Install Plugin */
+        post: operations["install_plugin_v1_plugins_install_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plugins/install-from-git": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Install Plugin From Git */
+        post: operations["install_plugin_from_git_v1_plugins_install_from_git_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plugins/reload-webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reload Plugin Webhook */
+        post: operations["reload_plugin_webhook_v1_plugins_reload_webhook_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plugins/schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Manifest Schema */
+        get: operations["get_manifest_schema_v1_plugins_schema_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plugins/{plugin_name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Plugin */
+        get: operations["get_plugin_v1_plugins__plugin_name__get"];
+        put?: never;
+        post?: never;
+        /** Uninstall Plugin */
+        delete: operations["uninstall_plugin_v1_plugins__plugin_name__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plugins/{plugin_name}/actions/{action}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Invoke Plugin Read Action */
+        get: operations["invoke_plugin_read_action_v1_plugins__plugin_name__actions__action__get"];
+        put?: never;
+        /** Invoke Plugin Action */
+        post: operations["invoke_plugin_action_v1_plugins__plugin_name__actions__action__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plugins/{plugin_name}/analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Plugin Analysis */
+        get: operations["get_plugin_analysis_v1_plugins__plugin_name__analysis_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plugins/{plugin_name}/collect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Trigger Plugin Collection */
+        post: operations["trigger_plugin_collection_v1_plugins__plugin_name__collect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plugins/{plugin_name}/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Plugin Config */
+        get: operations["get_plugin_config_v1_plugins__plugin_name__config_get"];
+        /** Update Plugin Config */
+        put: operations["update_plugin_config_v1_plugins__plugin_name__config_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plugins/{plugin_name}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Disable Plugin */
+        post: operations["disable_plugin_v1_plugins__plugin_name__disable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plugins/{plugin_name}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enable Plugin */
+        post: operations["enable_plugin_v1_plugins__plugin_name__enable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plugins/{plugin_name}/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Plugin Health */
+        get: operations["get_plugin_health_v1_plugins__plugin_name__health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plugins/{plugin_name}/refresh-from-git": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh Plugin From Git */
+        post: operations["refresh_plugin_from_git_v1_plugins__plugin_name__refresh_from_git_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plugins/{plugin_name}/secrets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Secrets */
+        get: operations["list_secrets_v1_plugins__plugin_name__secrets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plugins/{plugin_name}/secrets/{secret_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Secret */
+        put: operations["set_secret_v1_plugins__plugin_name__secrets__secret_key__put"];
+        post?: never;
+        /** Delete Secret */
+        delete: operations["delete_secret_v1_plugins__plugin_name__secrets__secret_key__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plugins/{plugin_name}/{resource_name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Plugin Resource */
+        get: operations["list_plugin_resource_v1_plugins__plugin_name___resource_name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plugins/{plugin_name}/{resource_name}/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Plugin Resource */
+        get: operations["get_plugin_resource_v1_plugins__plugin_name___resource_name___item_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/profile/me": {
@@ -1908,8 +2990,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Tools */
-        get: operations["list_tools_v1_tools_get"];
+        /** List All Tools */
+        get: operations["list_all_tools_v1_tools_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1918,18 +3000,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/tools/{path}": {
+    "/v1/tools/plugins/{plugin_id}/tools": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Proxy To Tools */
-        get: operations["proxy_to_tools_v1_tools__path__get"];
+        /** List Plugin Tools */
+        get: operations["list_plugin_tools_v1_tools_plugins__plugin_id__tools_get"];
         put?: never;
-        /** Proxy To Tools */
-        post: operations["proxy_to_tools_v1_tools__path__post"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tools/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate Tool License */
+        post: operations["validate_tool_license_v1_tools_validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tools/{tool_name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Tool Details */
+        get: operations["get_tool_details_v1_tools__tool_name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tools/{tool_name}/execute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Execute Tool Endpoint */
+        post: operations["execute_tool_endpoint_v1_tools__tool_name__execute_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1975,6 +3107,155 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AIToolDetail */
+        AIToolDetail: {
+            /** Active */
+            active: boolean | null;
+            /** Description */
+            description: string | null;
+            /** Endpoint */
+            endpoint: string | null;
+            /** Id */
+            id: string;
+            /** Method */
+            method: string | null;
+            /** Parameters */
+            parameters: unknown;
+            /** Plugin Description */
+            plugin_description: string | null;
+            /** Plugin Display Name */
+            plugin_display_name: string | null;
+            /** Plugin Id */
+            plugin_id: string;
+            /** Plugin Name */
+            plugin_name: string;
+            /** Required Tier */
+            required_tier: string | null;
+            /** Response Format */
+            response_format: unknown;
+            /** Tool Name */
+            tool_name: string;
+            /** Type */
+            type: string | null;
+        };
+        /** AIToolItem */
+        AIToolItem: {
+            /** Active */
+            active: boolean | null;
+            /** Description */
+            description: string | null;
+            /** Endpoint */
+            endpoint: string | null;
+            /** Id */
+            id: string;
+            /** Method */
+            method: string | null;
+            /** Parameters */
+            parameters: unknown;
+            /** Plugin Display Name */
+            plugin_display_name: string | null;
+            /** Plugin Id */
+            plugin_id: string;
+            /** Plugin Name */
+            plugin_name: string;
+            /** Required Tier */
+            required_tier: string | null;
+            /** Response Format */
+            response_format: unknown;
+            /** Tool Name */
+            tool_name: string;
+            /** Type */
+            type: string | null;
+        };
+        /** AIToolListResponse */
+        AIToolListResponse: {
+            /** Count */
+            count: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Tools */
+            tools: components["schemas"]["AIToolItem"][];
+            /** Total */
+            total: number;
+        };
+        /** AIToolsDeactivateResponse */
+        AIToolsDeactivateResponse: {
+            /** Success */
+            success: boolean;
+            /** Tools Deactivated */
+            tools_deactivated: number;
+        };
+        /** AIToolsResponse */
+        AIToolsResponse: {
+            /** Tools */
+            tools: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** AIToolsSyncRequest */
+        AIToolsSyncRequest: {
+            /** Manifest */
+            manifest: {
+                [key: string]: unknown;
+            };
+            /** Plugin Id */
+            plugin_id: string;
+            /** Plugin Name */
+            plugin_name: string;
+        };
+        /** AIToolsSyncResponse */
+        AIToolsSyncResponse: {
+            /** Errors */
+            errors?: string[] | null;
+            /** Message */
+            message?: string | null;
+            /** Success */
+            success: boolean;
+            /** Tools Deactivated */
+            tools_deactivated?: number | null;
+            /** Tools Imported */
+            tools_imported: number;
+        };
+        /** ActivatedLicense */
+        ActivatedLicense: {
+            /** Activated By */
+            activated_by: string | null;
+            /** Active */
+            active: boolean;
+            /** Id */
+            id: string;
+            /** License Key Masked */
+            license_key_masked: string;
+            /** Plugin Id */
+            plugin_id: string;
+            /** Tenant Id */
+            tenant_id: string;
+            /** Tier */
+            tier: string;
+            /** Trial Expires At */
+            trial_expires_at: string | null;
+            /** Valid From */
+            valid_from: string | null;
+            /** Valid Until */
+            valid_until: string | null;
+        };
+        /** AddDependencyResponse */
+        AddDependencyResponse: {
+            /** Depends On */
+            depends_on: string;
+            /** Depends On Type */
+            depends_on_type: string;
+            /** Plugin Id */
+            plugin_id: string;
+            /** Status */
+            status: string;
+            /** Type */
+            type: string;
+            /** Version Constraint */
+            version_constraint: string | null;
+        };
         /** AuditLogEntry */
         AuditLogEntry: {
             /** Action */
@@ -1991,6 +3272,13 @@ export interface components {
             id: number;
             /** Ip Address */
             ip_address?: string | null;
+            /** Scope Org Id */
+            scope_org_id?: number | null;
+            /**
+             * Scope Type
+             * @default legacy
+             */
+            scope_type: string;
             /** Target Id */
             target_id?: string | null;
             /** Target Type */
@@ -2091,12 +3379,27 @@ export interface components {
             /** User Id */
             user_id: number;
         };
+        /** BundleRequiredResponse */
+        BundleRequiredResponse: {
+            /** Bundle */
+            bundle: string;
+            /** Confirmed */
+            confirmed: boolean;
+            /** Reason */
+            reason: string | null;
+            /** Required */
+            required: boolean | null;
+            /** Requiring Plugins */
+            requiring_plugins: string[];
+        };
         /** CapabilitiesResponse */
         CapabilitiesResponse: {
             /** Email Verification */
             email_verification: boolean;
             /** Password Reset Email */
             password_reset_email: boolean;
+            /** Password Reset Link Minutes */
+            password_reset_link_minutes?: number | null;
             /** Registration Mode */
             registration_mode: string;
         };
@@ -2125,11 +3428,70 @@ export interface components {
             /** Question */
             question: string;
         };
+        /** CheckoutRequest */
+        CheckoutRequest: {
+            /** Tier */
+            tier: string;
+        };
+        /** CheckoutResponse */
+        CheckoutResponse: {
+            /** Checkout Url */
+            checkout_url: string;
+            /** Tier */
+            tier: string;
+        };
         /** ChildGroupIdRequest */
         ChildGroupIdRequest: {
             /** Child Group Id */
             child_group_id: number;
         };
+        /** CollectionTriggeredResponse */
+        CollectionTriggeredResponse: {
+            /** Message */
+            message: string;
+            /** Note */
+            note: string;
+            /** Plugin */
+            plugin: string;
+            /** Status */
+            status: string;
+            /** Timestamp */
+            timestamp: string;
+            /** Triggered By */
+            triggered_by: string;
+        };
+        /** DependencyResolutionResponse */
+        DependencyResolutionResponse: {
+            /** Nodes */
+            nodes: {
+                [key: string]: unknown;
+            }[];
+            /** Plugin Id */
+            plugin_id: string;
+            /** Reason */
+            reason: string | null;
+            /** Resolve Failures */
+            resolve_failures: string[];
+            /** Resolves */
+            resolves: boolean;
+            /** Verdict */
+            verdict: string;
+        };
+        /**
+         * DependencyType
+         * @enum {string}
+         */
+        DependencyType: "requires" | "suggests" | "conflicts_with";
+        /**
+         * DependsOnType
+         * @enum {string}
+         */
+        DependsOnType: "plugin" | "bundle";
+        /**
+         * DistributionType
+         * @enum {string}
+         */
+        DistributionType: "git" | "docker" | "hybrid";
         /** EffectivePermissionEntry */
         EffectivePermissionEntry: {
             /** Permission Group Id */
@@ -2191,6 +3553,17 @@ export interface components {
             /** Rate Limit Per Minute */
             rate_limit_per_minute?: number | null;
         };
+        /** GraphHealthResponse */
+        GraphHealthResponse: {
+            /** Checks */
+            checks: {
+                [key: string]: string;
+            };
+            /** Database */
+            database: string;
+            /** Status */
+            status: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -2207,6 +3580,91 @@ export interface components {
              * @default skip
              */
             policy: string;
+        };
+        /**
+         * InstallSource
+         * @enum {string}
+         */
+        InstallSource: "vendored" | "git" | "manifest";
+        /** InstallationResponse */
+        InstallationResponse: {
+            /** Config Json */
+            config_json: {
+                [key: string]: unknown;
+            } | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Id */
+            id: string;
+            /**
+             * Installed At
+             * Format: date-time
+             */
+            installed_at: string;
+            /**
+             * Last Updated At
+             * Format: date-time
+             */
+            last_updated_at: string;
+            /** Plugin Id */
+            plugin_id: string;
+            status: components["schemas"]["InstallationStatus"];
+            /** User Id */
+            user_id: string;
+            /** Version */
+            version: string | null;
+        };
+        /**
+         * InstallationStatus
+         * @enum {string}
+         */
+        InstallationStatus: "installing" | "installed" | "failed" | "uninstalled";
+        /** InstalledPluginSummary */
+        InstalledPluginSummary: {
+            /** Author */
+            author: string | null;
+            /** Base Tier */
+            base_tier: string;
+            /** Category Id */
+            category_id: string | null;
+            /** Current Version */
+            current_version: string | null;
+            /** Description */
+            description: string | null;
+            /** Display Name */
+            display_name: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Installation Id */
+            installation_id: string;
+            /**
+             * Installed At
+             * Format: date-time
+             */
+            installed_at: string;
+            /**
+             * Last Updated At
+             * Format: date-time
+             */
+            last_updated_at: string;
+            /** Name */
+            name: string;
+            /** @default first_party */
+            origin: components["schemas"]["PluginOrigin"];
+            /** Plugin Id */
+            plugin_id: string;
+            /** Pricing Model */
+            pricing_model: string;
+            /** Repository Url */
+            repository_url?: string | null;
+            /**
+             * Requires Services
+             * @default []
+             */
+            requires_services: string[];
+            status: components["schemas"]["InstallationStatus"];
+            /** Version */
+            version: string | null;
         };
         /** InviteCreate */
         InviteCreate: {
@@ -2230,10 +3688,22 @@ export interface components {
         };
         /** InviteInfo */
         InviteInfo: {
+            /**
+             * Can Create Account
+             * @default false
+             */
+            can_create_account: boolean;
             /** Email */
             email: string;
+            /**
+             * Email Bound
+             * @default false
+             */
+            email_bound: boolean;
             /** Id */
             id: number;
+            /** Invited By Name */
+            invited_by_name?: string | null;
             /** Org Name */
             org_name?: string | null;
             /** Org Role */
@@ -2262,6 +3732,11 @@ export interface components {
         };
         /** InviteOut */
         InviteOut: {
+            /**
+             * Can Create Account
+             * @default false
+             */
+            can_create_account: boolean;
             /** Created At */
             created_at?: string | null;
             /** Email */
@@ -2291,17 +3766,97 @@ export interface components {
              */
             uses: number;
         };
-        /** LicenseKeyAuditAfter */
-        LicenseKeyAuditAfter: {
-            /**
-             * Granted As
-             * @enum {string}
-             */
-            granted_as: "platform_admin" | "org_owner" | "org_billing_manager";
-            /** Organization Id */
-            organization_id: string;
+        /** LicenseActivateRequest */
+        LicenseActivateRequest: {
             /** Plugin Id */
             plugin_id: string;
+            /** Tier */
+            tier: string;
+        };
+        /** LicenseActivateResponse */
+        LicenseActivateResponse: {
+            license: components["schemas"]["ActivatedLicense"];
+            /** Status */
+            status: string;
+        };
+        /** LicenseKeyResponse */
+        LicenseKeyResponse: {
+            /** License Id */
+            license_id: string;
+            /** License Key */
+            license_key: string;
+            /** Plugin Id */
+            plugin_id: string;
+            /** Signed License */
+            signed_license?: string | null;
+            /** Tenant Id */
+            tenant_id: string;
+            /** Tier */
+            tier: string;
+        };
+        /** LicenseListResponse */
+        LicenseListResponse: {
+            /** Count */
+            count: number;
+            /** Licenses */
+            licenses: components["schemas"]["TenantLicense"][];
+        };
+        /** LicenseLookupResponse */
+        LicenseLookupResponse: {
+            /** Active */
+            active: boolean;
+            /** License Tier */
+            license_tier?: string | null;
+            /** Org Tier */
+            org_tier?: string | null;
+            /** Tier */
+            tier: string | null;
+        };
+        /** LicenseRotateResponse */
+        LicenseRotateResponse: {
+            license: components["schemas"]["RotatedLicense"];
+            /** Status */
+            status: string;
+        };
+        /**
+         * LicenseTier
+         * @enum {string}
+         */
+        LicenseTier: "free" | "community" | "pro" | "enterprise";
+        /** LicenseValidateRequest */
+        LicenseValidateRequest: {
+            /** License Key */
+            license_key: string;
+            /** Plugin Id */
+            plugin_id: string;
+        };
+        /** LicenseValidationRequest */
+        LicenseValidationRequest: {
+            /** Tenant Id */
+            tenant_id: string;
+            /** Tool Name */
+            tool_name: string;
+        };
+        /** LicenseValidationResponse */
+        LicenseValidationResponse: {
+            /** Full Tier */
+            full_tier?: string | null;
+            /** Plugin Id */
+            plugin_id?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Tier */
+            tier?: string | null;
+            /** Trial Expires At */
+            trial_expires_at?: string | null;
+            /** Usage Count */
+            usage_count?: number | null;
+            /** User Id */
+            user_id?: string | null;
+            /** Valid */
+            valid: boolean;
+            /** Valid Until */
+            valid_until?: string | null;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -2309,6 +3864,34 @@ export interface components {
             password: string;
             /** Username */
             username: string;
+        };
+        /** PluginListResponse */
+        MarketplacePluginListResponse: {
+            /** Count */
+            count: number;
+            /**
+             * Limit
+             * @default 0
+             */
+            limit: number;
+            /**
+             * Offset
+             * @default 0
+             */
+            offset: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Plugins */
+            plugins: components["schemas"]["PluginResponse"][];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            /** Total Pages */
+            total_pages: number;
         };
         /** MemberAdd */
         MemberAdd: {
@@ -2349,6 +3932,18 @@ export interface components {
             /** Team Role */
             team_role: string;
         };
+        /** MessageResponse */
+        MessageResponse: {
+            /** Message */
+            message: string;
+        };
+        /** MyInstallationsResponse */
+        MyInstallationsResponse: {
+            /** Count */
+            count: number;
+            /** Installations */
+            installations: components["schemas"]["InstalledPluginSummary"][];
+        };
         /** MyOrgItem */
         MyOrgItem: {
             /** Description */
@@ -2357,6 +3952,8 @@ export interface components {
             id: number;
             /** Is Home */
             is_home: boolean;
+            /** Kind */
+            kind?: ("personal" | "standard") | null;
             /** Name */
             name: string;
             /** Org Role */
@@ -2370,17 +3967,6 @@ export interface components {
             active_organization_id?: number | null;
             /** Organizations */
             organizations: components["schemas"]["MyOrgItem"][];
-        };
-        /** OrgAuthorityResponse */
-        OrgAuthorityResponse: {
-            /** Is Platform Admin */
-            is_platform_admin: boolean;
-            /** Organization Id */
-            organization_id: number | null;
-            /** Permissions */
-            permissions: string[];
-            /** User Id */
-            user_id: number | null;
         };
         /** OrgBulkInviteCreate */
         OrgBulkInviteCreate: {
@@ -2396,6 +3982,16 @@ export interface components {
              * @default member
              */
             org_role: string;
+        };
+        /** OrgConvertRequest */
+        OrgConvertRequest: {
+            /** Reason */
+            reason: string;
+            /**
+             * To
+             * @enum {string}
+             */
+            to: "personal" | "standard";
         };
         /** OrgCreateRequest */
         OrgCreateRequest: {
@@ -2439,6 +4035,8 @@ export interface components {
             entitlement_mode: string;
             /** Id */
             id: number;
+            /** Kind */
+            kind?: ("personal" | "standard") | null;
             /** Name */
             name: string;
             /** Parent Organization Id */
@@ -2456,6 +4054,13 @@ export interface components {
             organization_id: number;
             /** Resolved Organization Id */
             resolved_organization_id: number;
+        };
+        /** OrgEntitlementResponse */
+        OrgEntitlementResponse: {
+            /** Tenant Id */
+            tenant_id: string;
+            /** Tier */
+            tier: string;
         };
         /** OrgInviteCreate */
         OrgInviteCreate: {
@@ -2477,6 +4082,11 @@ export interface components {
         };
         /** OrgInviteOut */
         OrgInviteOut: {
+            /**
+             * Can Create Account
+             * @default false
+             */
+            can_create_account: boolean;
             /** Created At */
             created_at?: string | null;
             /** Email */
@@ -2509,6 +4119,58 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** OrgLimitOut */
+        OrgLimitOut: {
+            /** Behaviour */
+            behaviour?: string | null;
+            /** Clamped */
+            clamped?: boolean | null;
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "count" | "behaviour" | "flag" | "knob" | "thresholds";
+            /** Override Scope */
+            override_scope?: ("organization" | "tier" | "all_tiers") | null;
+            /** Restricted By */
+            restricted_by?: "org_kind" | null;
+            /** Source */
+            source?: ("tier_default" | "operator_override" | "license") | null;
+            /** Value */
+            value?: boolean | number | string | number[] | null;
+        };
+        /** OrgLimitOverrideClear */
+        OrgLimitOverrideClear: {
+            /** Reason */
+            reason: string;
+        };
+        /** OrgLimitOverrideSet */
+        OrgLimitOverrideSet: {
+            /** Reason */
+            reason: string;
+            /** Value */
+            value: boolean | number | string | number[] | null;
+        };
+        /** OrgLimitsOut */
+        OrgLimitsOut: {
+            /** Enforced */
+            enforced: boolean;
+            /** Entitlement Root Id */
+            entitlement_root_id?: number | null;
+            /** Limits */
+            limits: components["schemas"]["OrgLimitOut"][];
+            /** Organization Id */
+            organization_id: number;
+            /** Tier */
+            tier: string;
+            /**
+             * View
+             * @enum {string}
+             */
+            view: "full" | "member";
+        };
         /** OrgListItem */
         OrgListItem: {
             /** Created At */
@@ -2517,6 +4179,8 @@ export interface components {
             created_by?: number | null;
             /** Id */
             id: number;
+            /** Kind */
+            kind?: ("personal" | "standard") | null;
             /** Member Count */
             member_count: number;
             /** Name */
@@ -2671,6 +4335,8 @@ export interface components {
             default_team_id: number;
             /** Id */
             id: string;
+            /** Kind */
+            kind?: ("personal" | "standard") | null;
             /** Name */
             name: string;
             /** Owner User Id */
@@ -2882,6 +4548,633 @@ export interface components {
             /** Setup Code Required */
             setup_code_required: boolean;
         };
+        /** PluginAIToolItem */
+        PluginAIToolItem: {
+            /** Active */
+            active: boolean | null;
+            /** Description */
+            description: string | null;
+            /** Endpoint */
+            endpoint: string | null;
+            /** Id */
+            id: string;
+            /** Method */
+            method: string | null;
+            /** Parameters */
+            parameters: unknown;
+            /** Required Tier */
+            required_tier: string | null;
+            /** Response Format */
+            response_format: unknown;
+            /** Tool Name */
+            tool_name: string;
+            /** Type */
+            type: string | null;
+        };
+        /** PluginAIToolsResponse */
+        PluginAIToolsResponse: {
+            /** Count */
+            count: number;
+            /** Plugin Id */
+            plugin_id: string;
+            /** Plugin Name */
+            plugin_name: string;
+            /** Tools */
+            tools: components["schemas"]["PluginAIToolItem"][];
+        };
+        /** PluginActionEnvelope */
+        PluginActionEnvelope: {
+            /** Action */
+            action: string;
+            /** Plugin */
+            plugin: string;
+            /** Result */
+            result: unknown;
+        };
+        /** PluginConfigResponse */
+        PluginConfigResponse: {
+            /** Api Version */
+            api_version: string;
+            /** Capabilities */
+            capabilities: string[];
+            /** Configurable */
+            configurable: boolean;
+            /** Display */
+            display?: {
+                [key: string]: unknown;
+            } | null;
+            /** Json Schema */
+            json_schema: {
+                [key: string]: unknown;
+            };
+            /** Plugin */
+            plugin: string;
+            requires: components["schemas"]["PluginRequires"];
+            /** Schema */
+            schema: unknown[];
+            /** Ui Schema */
+            ui_schema: {
+                [key: string]: unknown;
+            };
+            /** Values */
+            values: {
+                [key: string]: unknown;
+            };
+        };
+        /** PluginConfigUpdateResponse */
+        PluginConfigUpdateResponse: {
+            /** Plugin */
+            plugin: string;
+            /** Updated */
+            updated: string[];
+            /** Values */
+            values: {
+                [key: string]: unknown;
+            };
+        };
+        /** PluginConflictsResponse */
+        PluginConflictsResponse: {
+            /** Conflict Count */
+            conflict_count: number;
+            /** Conflicts */
+            conflicts: {
+                [key: string]: unknown;
+            }[];
+            /** Plugin Id */
+            plugin_id: string;
+        };
+        /** PluginCreate */
+        PluginCreate: {
+            /** Author */
+            author: string;
+            /** Author Email */
+            author_email?: string | null;
+            /**
+             * Base Tier
+             * @default community
+             */
+            base_tier: string;
+            /** Category Id */
+            category_id?: string | null;
+            /** Current Version */
+            current_version?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Developer Id */
+            developer_id?: string | null;
+            /** Display Name */
+            display_name: string;
+            /** @default git */
+            distribution_type: components["schemas"]["DistributionType"];
+            /** Docker Image */
+            docker_image?: string | null;
+            /** Manifest */
+            manifest?: {
+                [key: string]: unknown;
+            } | null;
+            /** Name */
+            name: string;
+            /** @default free */
+            pricing_model: components["schemas"]["PricingModel"];
+            /** Repository Url */
+            repository_url?: string | null;
+            /** Requires Services */
+            requires_services?: string[];
+            /** Screenshots */
+            screenshots?: string[];
+        };
+        /** PluginDependenciesResponse */
+        PluginDependenciesResponse: {
+            /** Dependencies */
+            dependencies: {
+                [key: string]: unknown;
+            }[];
+            /** Plugin Id */
+            plugin_id: string;
+            /** Possibly Truncated */
+            possibly_truncated: boolean;
+            /** Total Count */
+            total_count: number;
+        };
+        /** PluginDetail */
+        PluginDetail: {
+            /** Author */
+            author: string;
+            /**
+             * Capabilities
+             * @default []
+             */
+            capabilities: string[];
+            /**
+             * Configurable
+             * @default false
+             */
+            configurable: boolean;
+            /**
+             * Data Sources
+             * @default []
+             */
+            data_sources: string[];
+            /**
+             * Databases
+             * @default []
+             */
+            databases: string[];
+            /**
+             * Dependencies
+             * @default []
+             */
+            dependencies: string[];
+            /** Description */
+            description: string;
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled: boolean;
+            /**
+             * Health Status
+             * @default unknown
+             */
+            health_status: string;
+            install_source?: components["schemas"]["InstallSource"] | null;
+            /** Last Health Check */
+            last_health_check?: string | null;
+            /** Marketplace Plugin Id */
+            marketplace_plugin_id?: string | null;
+            /** Name */
+            name: string;
+            /** Registered At */
+            registered_at: string;
+            /** Repository Url */
+            repository_url?: string | null;
+            /**
+             * Status
+             * @default registered
+             */
+            status: string;
+            /** Version */
+            version: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /** PluginEnableResponse */
+        PluginEnableResponse: {
+            /** Auto Enabled Dependencies */
+            auto_enabled_dependencies: (string | null)[];
+            /** Plugin Id */
+            plugin_id: string;
+            /** Status */
+            status: string;
+        };
+        /** PluginInfo */
+        PluginInfo: {
+            /** Author */
+            author: string;
+            /**
+             * Capabilities
+             * @default []
+             */
+            capabilities: string[];
+            /**
+             * Configurable
+             * @default false
+             */
+            configurable: boolean;
+            /**
+             * Data Sources
+             * @default []
+             */
+            data_sources: string[];
+            /**
+             * Databases
+             * @default []
+             */
+            databases: string[];
+            /**
+             * Dependencies
+             * @default []
+             */
+            dependencies: string[];
+            /** Description */
+            description: string;
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled: boolean;
+            /**
+             * Health Status
+             * @default unknown
+             */
+            health_status: string;
+            install_source?: components["schemas"]["InstallSource"] | null;
+            /** Last Health Check */
+            last_health_check?: string | null;
+            /** Marketplace Plugin Id */
+            marketplace_plugin_id?: string | null;
+            /** Name */
+            name: string;
+            /** Registered At */
+            registered_at: string;
+            /** Repository Url */
+            repository_url?: string | null;
+            /**
+             * Status
+             * @default registered
+             */
+            status: string;
+            /** Version */
+            version: string;
+        };
+        /** PluginInstallResponse */
+        PluginInstallResponse: {
+            /** Message */
+            message: string;
+            /** Plugin */
+            plugin: string;
+            /** Webhook Path */
+            webhook_path?: string | null;
+        };
+        /** PluginInstallationItem */
+        PluginInstallationItem: {
+            /** Enabled */
+            enabled: boolean | null;
+            /** Id */
+            id: string;
+            /** Installed At */
+            installed_at: string;
+            /** Plugin Id */
+            plugin_id: string;
+            /** Status */
+            status: string | null;
+            /** User Id */
+            user_id: string | null;
+            /** Version */
+            version: string | null;
+        };
+        /** PluginInstallationsResponse */
+        PluginInstallationsResponse: {
+            /** Count */
+            count: number;
+            /** Installations */
+            installations: components["schemas"]["PluginInstallationItem"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Total */
+            total: number;
+        };
+        /** PluginLicenseUpdateResponse */
+        PluginLicenseUpdateResponse: {
+            /** License Key Masked */
+            license_key_masked?: string | null;
+            /** License Tier */
+            license_tier: string;
+            /** Plugin Name */
+            plugin_name: string;
+            /** Updated At */
+            updated_at: string;
+        };
+        /**
+         * PluginOrigin
+         * @enum {string}
+         */
+        PluginOrigin: "first_party" | "submitted";
+        /** PluginRatingsResponse */
+        PluginRatingsResponse: {
+            /** Plugin Id */
+            plugin_id: string;
+            /** Rating Average */
+            rating_average: number | null;
+            /** Rating Count */
+            rating_count: number;
+            /** Ratings */
+            ratings: components["schemas"]["RatingResponse"][];
+        };
+        /** PluginRecommendationsResponse */
+        PluginRecommendationsResponse: {
+            /** Count */
+            count: number;
+            /** Installed Plugins */
+            installed_plugins: string[];
+            /** Recommendations */
+            recommendations: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** PluginListResponse */
+        PluginRegistryPluginListResponse: {
+            /** Count */
+            count: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Plugins */
+            plugins: components["schemas"]["PluginInfo"][];
+            /** Total */
+            total: number;
+        };
+        /** PluginRepositoryListResponse */
+        PluginRepositoryListResponse: {
+            /** Count */
+            count: number;
+            /**
+             * Limit
+             * @default 0
+             */
+            limit: number;
+            /**
+             * Offset
+             * @default 0
+             */
+            offset: number;
+            /**
+             * Page
+             * @default 1
+             */
+            page: number;
+            /**
+             * Page Size
+             * @default 0
+             */
+            page_size: number;
+            /** Repositories */
+            repositories: components["schemas"]["PluginRepositoryResponse"][];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            /**
+             * Total Pages
+             * @default 0
+             */
+            total_pages: number;
+        };
+        /** PluginRepositoryResponse */
+        PluginRepositoryResponse: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description?: string | null;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Owner */
+            owner?: string | null;
+            /**
+             * Plugin Count
+             * @default 0
+             */
+            plugin_count: number;
+            /** Slug */
+            slug: string;
+            /** Source Url */
+            source_url?: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** PluginRequires */
+        PluginRequires: {
+            /** Bundles */
+            bundles: string[];
+            /** Optional Services */
+            optional_services: string[];
+            /** Services */
+            services: string[];
+        };
+        /** PluginResourceItemEnvelope */
+        PluginResourceItemEnvelope: {
+            /** Id */
+            id: string;
+            /** Plugin */
+            plugin: string;
+            /** Resource */
+            resource: string;
+            /** Result */
+            result: unknown;
+        };
+        /** PluginResourceListEnvelope */
+        PluginResourceListEnvelope: {
+            /** Plugin */
+            plugin: string;
+            /** Resource */
+            resource: string;
+            /** Result */
+            result: unknown;
+        };
+        /** PluginResponse */
+        PluginResponse: {
+            /** Author */
+            author: string;
+            /** Author Email */
+            author_email: string | null;
+            /** Base Tier */
+            base_tier: string;
+            /** Category Id */
+            category_id?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Version */
+            current_version: string | null;
+            /** Description */
+            description: string | null;
+            /** Developer Id */
+            developer_id?: string | null;
+            /** Display Name */
+            display_name: string;
+            distribution_type: components["schemas"]["DistributionType"];
+            /** Docker Image */
+            docker_image: string | null;
+            /** Download Count */
+            download_count: number;
+            /** Featured */
+            featured: boolean;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Origin
+             * @default first_party
+             */
+            origin: string;
+            pricing_model: components["schemas"]["PricingModel"];
+            /** Published At */
+            published_at: string | null;
+            /** Rating Average */
+            rating_average?: number | null;
+            /** Rating Count */
+            rating_count: number;
+            /** Repository Id */
+            repository_id?: string | null;
+            /** Repository Url */
+            repository_url: string | null;
+            /** Requires Services */
+            requires_services?: string[];
+            /** Review Notes */
+            review_notes?: string | null;
+            /** Reviewed At */
+            reviewed_at?: string | null;
+            /** Reviewed By */
+            reviewed_by?: string | null;
+            /** Screenshots */
+            screenshots?: string[];
+            status: components["schemas"]["PluginStatus"];
+            /** Submitted At */
+            submitted_at?: string | null;
+            /** Submitted By */
+            submitted_by?: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** PluginSemanticMatch */
+        PluginSemanticMatch: {
+            /**
+             * Author
+             * @default
+             */
+            author: string;
+            /**
+             * Base Tier
+             * @default
+             */
+            base_tier: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Display Name */
+            display_name?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Plugin Id */
+            plugin_id?: string | null;
+            /** Score */
+            score?: number | null;
+        };
+        /** PluginSemanticSearchResponse */
+        PluginSemanticSearchResponse: {
+            /** Count */
+            count: number;
+            /** Matches */
+            matches?: components["schemas"]["PluginSemanticMatch"][];
+            /** Query */
+            query: string;
+        };
+        /** PluginStateChangeResponse */
+        PluginStateChangeResponse: {
+            /** Plugin Id */
+            plugin_id: string;
+            /** Status */
+            status: string;
+        };
+        /**
+         * PluginStatus
+         * @enum {string}
+         */
+        PluginStatus: "draft" | "submitted" | "in_review" | "pending" | "approved" | "rejected" | "archived";
+        /** PluginTierResponse */
+        PluginTierResponse: {
+            /** Plugin Name */
+            plugin_name: string;
+            /** Required Tier */
+            required_tier: string;
+        };
+        /** PluginUpdate */
+        PluginUpdate: {
+            /** Author */
+            author?: string | null;
+            /** Base Tier */
+            base_tier?: string | null;
+            /** Current Version */
+            current_version?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Display Name */
+            display_name?: string | null;
+            /** Featured */
+            featured?: boolean | null;
+            /** Manifest */
+            manifest?: {
+                [key: string]: unknown;
+            } | null;
+            /** Name */
+            name?: string | null;
+            pricing_model?: components["schemas"]["PricingModel"] | null;
+            /** Requires Services */
+            requires_services?: string[] | null;
+            /** Screenshots */
+            screenshots?: string[] | null;
+            status?: components["schemas"]["PluginStatus"] | null;
+        };
+        /** PortalResponse */
+        PortalResponse: {
+            /** Portal Url */
+            portal_url: string;
+        };
+        /**
+         * PricingModel
+         * @enum {string}
+         */
+        PricingModel: "free" | "paid" | "freemium";
         /** ProfileResponse */
         ProfileResponse: {
             /** Created At */
@@ -2905,6 +5198,36 @@ export interface components {
             preferences?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** RatingCreate */
+        RatingCreate: {
+            /** Rating */
+            rating: number;
+            /** Review Text */
+            review_text?: string | null;
+        };
+        /** RatingResponse */
+        RatingResponse: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: string;
+            /** Plugin Id */
+            plugin_id: string;
+            /** Rating */
+            rating: number;
+            /** Review Text */
+            review_text: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** User Id */
+            user_id: string;
         };
         /** RedeemResponse */
         RedeemResponse: {
@@ -2944,7 +5267,132 @@ export interface components {
              * @default User created successfully
              */
             message: string;
+            /** Organization Id */
+            organization_id?: number | null;
+            /** Team Id */
+            team_id?: number | null;
             user: components["schemas"]["UserOut"];
+        };
+        /** RequiredBundlesResponse */
+        RequiredBundlesResponse: {
+            /** Confirmed */
+            confirmed: boolean;
+            /** Reason */
+            reason: string | null;
+            /** Required Bundles */
+            required_bundles: string[];
+            /** Requiring Plugins */
+            requiring_plugins: {
+                [key: string]: string[];
+            };
+        };
+        /** ReviewActionRequest */
+        ReviewActionRequest: {
+            /** Notes */
+            notes?: string | null;
+        };
+        /** ReviewQueueListResponse */
+        ReviewQueueListResponse: {
+            /** Count */
+            count: number;
+            /**
+             * Limit
+             * @default 0
+             */
+            limit: number;
+            /**
+             * Offset
+             * @default 0
+             */
+            offset: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Plugins */
+            plugins: components["schemas"]["ReviewerPluginResponse"][];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            /** Total Pages */
+            total_pages: number;
+        };
+        /** ReviewerPluginResponse */
+        ReviewerPluginResponse: {
+            /** Author */
+            author: string;
+            /** Author Email */
+            author_email: string | null;
+            /** Base Tier */
+            base_tier: string;
+            /** Category Id */
+            category_id?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Version */
+            current_version: string | null;
+            /** Description */
+            description: string | null;
+            /** Developer Id */
+            developer_id?: string | null;
+            /** Display Name */
+            display_name: string;
+            distribution_type: components["schemas"]["DistributionType"];
+            /** Docker Image */
+            docker_image: string | null;
+            /** Download Count */
+            download_count: number;
+            /** Featured */
+            featured: boolean;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Origin
+             * @default first_party
+             */
+            origin: string;
+            pricing_model: components["schemas"]["PricingModel"];
+            /** Published At */
+            published_at: string | null;
+            /** Rating Average */
+            rating_average?: number | null;
+            /** Rating Count */
+            rating_count: number;
+            /** Repository Id */
+            repository_id?: string | null;
+            /** Repository Url */
+            repository_url: string | null;
+            /** Requires Services */
+            requires_services?: string[];
+            /** Review Notes */
+            review_notes?: string | null;
+            /** Reviewed At */
+            reviewed_at?: string | null;
+            /** Reviewed By */
+            reviewed_by?: string | null;
+            /** Reviewed By Username */
+            reviewed_by_username?: string | null;
+            /** Screenshots */
+            screenshots?: string[];
+            status: components["schemas"]["PluginStatus"];
+            /** Submitted At */
+            submitted_at?: string | null;
+            /** Submitted By */
+            submitted_by?: string | null;
+            /** Submitted By Username */
+            submitted_by_username?: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** RoleAssignRequest */
         RoleAssignRequest: {
@@ -3006,24 +5454,36 @@ export interface components {
             /** Roles */
             roles: components["schemas"]["RoleOut"][];
         };
-        /** ServiceAuditEvent */
-        ServiceAuditEvent: {
-            /** Action */
-            action: string;
-            /** Actor Id */
-            actor_id: number;
-            after?: components["schemas"]["LicenseKeyAuditAfter"] | null;
-            /** Ip Address */
-            ip_address?: string | null;
-            /** Target Id */
-            target_id?: string | null;
-            /** Target Type */
-            target_type: string;
-            /** User Agent */
-            user_agent?: string | null;
+        /** RotatedLicense */
+        RotatedLicense: {
+            /** Active */
+            active: boolean | null;
+            /** Id */
+            id: string;
+            /** License Key Masked */
+            license_key_masked: string;
+            /** Plugin Id */
+            plugin_id: string;
+            /** Tenant Id */
+            tenant_id: string;
+            /** Tier */
+            tier: string;
         };
-        /** ServiceAuditResponse */
-        ServiceAuditResponse: {
+        /** SecretKeysResponse */
+        SecretKeysResponse: {
+            /** Count */
+            count: number;
+            /** Plugin */
+            plugin: string;
+            /** Secret Keys */
+            secret_keys: string[];
+        };
+        /** SecretStatusResponse */
+        SecretStatusResponse: {
+            /** Plugin */
+            plugin: string;
+            /** Secret Key */
+            secret_key: string;
             /** Status */
             status: string;
         };
@@ -3041,12 +5501,146 @@ export interface components {
             /** Slug */
             slug: string;
         };
+        /** SubmissionDetailResponse */
+        SubmissionDetailResponse: {
+            /** Author */
+            author: string;
+            /** Author Email */
+            author_email: string | null;
+            /** Base Tier */
+            base_tier: string;
+            /** Category Id */
+            category_id?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Version */
+            current_version: string | null;
+            /** Description */
+            description: string | null;
+            /** Developer Id */
+            developer_id?: string | null;
+            /** Display Name */
+            display_name: string;
+            distribution_type: components["schemas"]["DistributionType"];
+            /** Docker Image */
+            docker_image: string | null;
+            /** Download Count */
+            download_count: number;
+            /** Featured */
+            featured: boolean;
+            /** Id */
+            id: string;
+            /** Manifest */
+            manifest?: {
+                [key: string]: unknown;
+            } | null;
+            /** Name */
+            name: string;
+            /**
+             * Origin
+             * @default first_party
+             */
+            origin: string;
+            pricing_model: components["schemas"]["PricingModel"];
+            /** Published At */
+            published_at: string | null;
+            /** Rating Average */
+            rating_average?: number | null;
+            /** Rating Count */
+            rating_count: number;
+            /** Repository Id */
+            repository_id?: string | null;
+            /** Repository Url */
+            repository_url: string | null;
+            /** Requires Services */
+            requires_services?: string[];
+            /** Review Notes */
+            review_notes?: string | null;
+            /** Reviewed At */
+            reviewed_at?: string | null;
+            /** Reviewed By */
+            reviewed_by?: string | null;
+            /** Reviewed By Username */
+            reviewed_by_username?: string | null;
+            /** Screenshots */
+            screenshots?: string[];
+            status: components["schemas"]["PluginStatus"];
+            /** Submitted At */
+            submitted_at?: string | null;
+            /** Submitted By */
+            submitted_by?: string | null;
+            /** Submitted By Username */
+            submitted_by_username?: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** SubmissionHistoryEntry */
+        SubmissionHistoryEntry: {
+            /** Actor */
+            actor: string;
+            /** Actor Role */
+            actor_role?: string | null;
+            /** Actor Username */
+            actor_username?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** From Status */
+            from_status?: string | null;
+            /** Id */
+            id: string;
+            /** Notes */
+            notes?: string | null;
+            /** To Status */
+            to_status: string;
+        };
+        /** SubmissionHistoryResponse */
+        SubmissionHistoryResponse: {
+            /** Count */
+            count: number;
+            /** Entries */
+            entries: components["schemas"]["SubmissionHistoryEntry"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Plugin Id */
+            plugin_id: string;
+            /** Total */
+            total: number;
+        };
+        /** SubscriptionResponse */
+        SubscriptionResponse: {
+            /** Baseline */
+            baseline: boolean;
+            /** Can Manage */
+            can_manage: boolean;
+            /** Manageable */
+            manageable: boolean;
+            /** Provider */
+            provider: string | null;
+            /** Status */
+            status: string | null;
+            /** Tenant Id */
+            tenant_id: string;
+            /** Tier */
+            tier: string;
+            /** Valid Until */
+            valid_until: string | null;
+        };
         /** TeamCreate */
         TeamCreate: {
             /** Description */
             description?: string | null;
             /** Name */
             name: string;
+            /** Parent Team Id */
+            parent_team_id?: number | null;
         };
         /** TeamCreateOut */
         TeamCreateOut: {
@@ -3078,12 +5672,22 @@ export interface components {
         };
         /** TeamDetailOut */
         TeamDetailOut: {
+            /**
+             * Caller Can Manage
+             * @default false
+             */
+            caller_can_manage: boolean;
             /** Created At */
             created_at?: string | null;
             /** Created By */
             created_by?: number | null;
             /** Description */
             description?: string | null;
+            /**
+             * Emails Visible
+             * @default true
+             */
+            emails_visible: boolean;
             /** Id */
             id: number;
             /** Members */
@@ -3097,6 +5701,11 @@ export interface components {
             name: string;
             /** Parent Team Id */
             parent_team_id?: number | null;
+            /**
+             * Roster Visible
+             * @default true
+             */
+            roster_visible: boolean;
             /** Suspended At */
             suspended_at?: string | null;
         };
@@ -3164,6 +5773,39 @@ export interface components {
             /** Name */
             name?: string | null;
         };
+        /** TenantLicense */
+        TenantLicense: {
+            /** Activated By */
+            activated_by: string | null;
+            /** Active */
+            active: boolean | null;
+            /** Effective Tier */
+            effective_tier: string;
+            /** Id */
+            id: string;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** License Key Masked */
+            license_key_masked: string;
+            /** Plugin Display Name */
+            plugin_display_name: string | null;
+            /** Plugin Id */
+            plugin_id: string;
+            /** Plugin Name */
+            plugin_name: string | null;
+            /** Tenant Id */
+            tenant_id: string | null;
+            /** Tier */
+            tier: string;
+            /** Trial Expires At */
+            trial_expires_at: string | null;
+            /** Usage Count */
+            usage_count: number | null;
+            /** Valid From */
+            valid_from: string;
+            /** Valid Until */
+            valid_until: string | null;
+        };
         /** TokenResponse */
         TokenResponse: {
             /** Access Token */
@@ -3176,6 +5818,93 @@ export interface components {
              */
             token_type: string;
             user?: components["schemas"]["UserOut"] | null;
+        };
+        /** ToolDiscoveryResponse */
+        ToolDiscoveryResponse: {
+            /** Count */
+            count: number;
+            /**
+             * Limit
+             * @default 0
+             */
+            limit: number;
+            /**
+             * Offset
+             * @default 0
+             */
+            offset: number;
+            /** Tools */
+            tools: components["schemas"]["ToolSchema"][];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+        };
+        /** ToolExecutionRequest */
+        ToolExecutionRequest: {
+            /** Parameters */
+            parameters?: {
+                [key: string]: unknown;
+            };
+        };
+        /** ToolExecutionResponse */
+        ToolExecutionResponse: {
+            /** Execution Time */
+            execution_time: number;
+            /** Plugin Name */
+            plugin_name: string;
+            /** Result */
+            result: unknown;
+            /** Tier Required */
+            tier_required: string;
+            /** Tool Name */
+            tool_name: string;
+        };
+        /** ToolParameter */
+        ToolParameter: {
+            /** Default */
+            default?: unknown | null;
+            /** Description */
+            description: string;
+            /** Enum */
+            enum?: string[] | null;
+            /**
+             * Required
+             * @default false
+             */
+            required: boolean;
+            /** Type */
+            type: string;
+        };
+        /** ToolSchema */
+        ToolSchema: {
+            /** Description */
+            description: string;
+            /** Endpoint */
+            endpoint: string;
+            /** Method */
+            method: string;
+            /** Name */
+            name: string;
+            /** Parameters */
+            parameters: {
+                [key: string]: components["schemas"]["ToolParameter"];
+            };
+            /** Required Tier */
+            required_tier: string;
+            /** Response Format */
+            response_format: {
+                [key: string]: unknown;
+            };
+            /** Type */
+            type: string;
+        };
+        /** UpdateLicenseRequest */
+        UpdateLicenseRequest: {
+            /** License Key */
+            license_key?: string | null;
+            license_tier: components["schemas"]["LicenseTier"];
         };
         /** UserListItem */
         UserListItem: {
@@ -3238,6 +5967,11 @@ export interface components {
             /** Username */
             username: string;
         };
+        /** ValidateLicenseRequest */
+        ValidateLicenseRequest: {
+            /** License Key */
+            license_key?: string | null;
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -3250,6 +5984,35 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** WebhookReloadResponse */
+        WebhookReloadResponse: {
+            /** Message */
+            message: string;
+            /** Registered Routes */
+            registered_routes: string[];
+            /** Webhook Path */
+            webhook_path?: string | null;
+        };
+        /** LicenseValidationResponse */
+        models__tool_execution__LicenseValidationResponse: {
+            /** Allowed */
+            allowed: boolean;
+            /** Reason */
+            reason?: string | null;
+            /** Tier Required */
+            tier_required: string;
+            /** User Tier */
+            user_tier: string;
+        };
+        /** LicenseValidationResponse */
+        routes__licensing__LicenseValidationResponse: {
+            /** Message */
+            message: string;
+            /** Tier */
+            tier: string;
+            /** Valid */
+            valid: boolean;
         };
     };
     responses: never;
@@ -3471,6 +6234,7 @@ export interface operations {
                 actor_id?: number | null;
                 action?: string | null;
                 target_type?: string | null;
+                scope_type?: string | null;
             };
             header?: never;
             path?: never;
@@ -4058,16 +6822,18 @@ export interface operations {
             };
         };
     };
-    proxy_to_billing_v1_billing__path__get: {
+    create_checkout_v1_billing_checkout_post: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                path: string;
-            };
+            path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckoutRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -4075,7 +6841,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CheckoutResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4089,13 +6855,11 @@ export interface operations {
             };
         };
     };
-    proxy_to_billing_v1_billing__path__post: {
+    billing_portal_v1_billing_portal_post: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                path: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -4106,16 +6870,27 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PortalResponse"];
                 };
             };
-            /** @description Validation Error */
-            422: {
+        };
+    };
+    get_subscription_v1_billing_subscription_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["SubscriptionResponse"];
                 };
             };
         };
@@ -4576,12 +7351,32 @@ export interface operations {
             };
         };
     };
-    proxy_to_marketplace_graph_v1_graph__path__get: {
+    all_currently_required_bundles_v1_graph_bundles_required_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequiredBundlesResponse"];
+                };
+            };
+        };
+    };
+    bundle_currently_required_v1_graph_bundles__name__required_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                path: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -4593,7 +7388,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["BundleRequiredResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4607,12 +7402,12 @@ export interface operations {
             };
         };
     };
-    proxy_to_marketplace_graph_v1_graph__path__put: {
+    get_plugin_conflicts_v1_graph_conflicts__plugin_id__get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                path: string;
+                plugin_id: string;
             };
             cookie?: never;
         };
@@ -4624,7 +7419,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PluginConflictsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4638,13 +7433,19 @@ export interface operations {
             };
         };
     };
-    proxy_to_marketplace_graph_v1_graph__path__post: {
+    add_plugin_dependency_v1_graph_dependencies_post: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                path: string;
+            query: {
+                plugin_id: string;
+                depends_on: string;
+                dependency_type?: components["schemas"]["DependencyType"];
+                plugin_name?: string | null;
+                depends_on_name?: string | null;
+                version_constraint?: string | null;
+                depends_on_type?: components["schemas"]["DependsOnType"];
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -4655,7 +7456,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AddDependencyResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4669,12 +7470,12 @@ export interface operations {
             };
         };
     };
-    proxy_to_marketplace_graph_v1_graph__path__delete: {
+    get_plugin_dependencies_v1_graph_dependencies__plugin_id__get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                path: string;
+                plugin_id: string;
             };
             cookie?: never;
         };
@@ -4686,7 +7487,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PluginDependenciesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4700,12 +7501,12 @@ export interface operations {
             };
         };
     };
-    proxy_to_marketplace_graph_v1_graph__path__patch: {
+    resolve_plugin_dependencies_v1_graph_dependencies__plugin_id__resolve_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                path: string;
+                plugin_id: string;
             };
             cookie?: never;
         };
@@ -4717,7 +7518,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["DependencyResolutionResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4731,51 +7532,49 @@ export interface operations {
             };
         };
     };
-    post_service_audit_event_v1_internal_audit_events_post: {
+    graph_health_check_v1_graph_health_get: {
         parameters: {
             query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GraphHealthResponse"];
+                };
+            };
+            /** @description Neo4j is down */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GraphHealthResponse"];
+                };
+            };
+        };
+    };
+    get_plugin_recommendations_v1_graph_recommendations_post: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ServiceAuditEvent"];
+                "application/json": string[];
             };
         };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ServiceAuditResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_org_authority_v1_internal_org_authority_get: {
-        parameters: {
-            query: {
-                user_id: string;
-                organization_id: string;
-                permission?: string[];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -4783,7 +7582,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OrgAuthorityResponse"];
+                    "application/json": components["schemas"]["PluginRecommendationsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4989,16 +7788,20 @@ export interface operations {
             };
         };
     };
-    proxy_to_licensing_v1_licensing__path__get: {
+    update_plugin_license_endpoint_v1_licensing_plugins__plugin_name__license_patch: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                path: string;
+                plugin_name: string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLicenseRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -5006,7 +7809,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PluginLicenseUpdateResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5020,12 +7823,12 @@ export interface operations {
             };
         };
     };
-    proxy_to_licensing_v1_licensing__path__post: {
+    get_plugin_tier_v1_licensing_plugins__plugin_name__license_tier_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                path: string;
+                plugin_name: string;
             };
             cookie?: never;
         };
@@ -5037,7 +7840,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PluginTierResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5051,16 +7854,20 @@ export interface operations {
             };
         };
     };
-    proxy_to_licensing_v1_licensing__path__patch: {
+    validate_plugin_license_v1_licensing_plugins__plugin_name__license_validate_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                path: string;
+                plugin_name: string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ValidateLicenseRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -5068,7 +7875,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["routes__licensing__LicenseValidationResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5082,12 +7889,12 @@ export interface operations {
             };
         };
     };
-    proxy_to_marketplace_v1_marketplace__path__get: {
+    get_plugin_ai_tools_v1_marketplace_ai_plugins__plugin_id__tools_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                path: string;
+                plugin_id: string;
             };
             cookie?: never;
         };
@@ -5099,7 +7906,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PluginAIToolsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5113,12 +7920,12 @@ export interface operations {
             };
         };
     };
-    proxy_to_marketplace_v1_marketplace__path__put: {
+    deactivate_plugin_tools_v1_marketplace_ai_plugins__plugin_id__tools_delete: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                path: string;
+                plugin_id: string;
             };
             cookie?: never;
         };
@@ -5130,7 +7937,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AIToolsDeactivateResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5144,16 +7951,18 @@ export interface operations {
             };
         };
     };
-    proxy_to_marketplace_v1_marketplace__path__post: {
+    sync_ai_tools_v1_marketplace_ai_sync_post: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                path: string;
-            };
+            path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AIToolsSyncRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -5161,7 +7970,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AIToolsSyncResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5175,13 +7984,18 @@ export interface operations {
             };
         };
     };
-    proxy_to_marketplace_v1_marketplace__path__delete: {
+    list_all_ai_tools_v1_marketplace_ai_tools_get: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                path: string;
+            query?: {
+                active_only?: boolean;
+                tier?: string;
+                tool_name?: string;
+                plugin_name?: string;
+                limit?: number;
+                offset?: number;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -5192,7 +8006,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AIToolListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5206,12 +8020,12 @@ export interface operations {
             };
         };
     };
-    proxy_to_marketplace_v1_marketplace__path__patch: {
+    get_ai_tool_details_v1_marketplace_ai_tools__tool_name__get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                path: string;
+                tool_name: string;
             };
             cookie?: never;
         };
@@ -5223,7 +8037,1107 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AIToolDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_org_entitlement_v1_marketplace_entitlements__tenant_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgEntitlementResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_my_installations_v1_marketplace_installations_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyInstallationsResponse"];
+                };
+            };
+        };
+    };
+    list_licenses_v1_marketplace_licenses_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LicenseListResponse"];
+                };
+            };
+        };
+    };
+    activate_license_v1_marketplace_licenses_activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LicenseActivateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LicenseActivateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lookup_tenant_license_v1_marketplace_licenses_lookup_get: {
+        parameters: {
+            query: {
+                tenant_id: string;
+                plugin_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LicenseLookupResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_license_endpoint_v1_marketplace_licenses_validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LicenseValidateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LicenseValidationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reveal_license_key_endpoint_v1_marketplace_licenses__license_id__key_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                license_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LicenseKeyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rotate_license_key_endpoint_v1_marketplace_licenses__license_id__rotate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                license_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LicenseRotateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_plugins_v1_marketplace_plugins_get: {
+        parameters: {
+            query?: {
+                limit?: number | null;
+                offset?: number | null;
+                /** @deprecated */
+                page?: number;
+                /** @deprecated */
+                page_size?: number;
+                category?: string | null;
+                pricing_model?: string | null;
+                status?: string | null;
+                origin?: components["schemas"]["PluginOrigin"] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketplacePluginListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_plugin_v1_marketplace_plugins_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_featured_plugins_v1_marketplace_plugins_featured_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketplacePluginListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_plugins_v1_marketplace_plugins_search_get: {
+        parameters: {
+            query: {
+                q: string;
+                limit?: number | null;
+                offset?: number | null;
+                /** @deprecated */
+                page?: number;
+                /** @deprecated */
+                page_size?: number;
+                origin?: components["schemas"]["PluginOrigin"] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketplacePluginListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    semantic_search_plugins_v1_marketplace_plugins_semantic_search_get: {
+        parameters: {
+            query: {
+                query: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginSemanticSearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_plugin_v1_marketplace_plugins__plugin_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_plugin_v1_marketplace_plugins__plugin_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disable_plugin_v1_marketplace_plugins__plugin_id__disable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginStateChangeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enable_plugin_v1_marketplace_plugins__plugin_id__enable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginEnableResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    install_plugin_v1_marketplace_plugins__plugin_id__install_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstallationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_plugin_installations_v1_marketplace_plugins__plugin_id__installations_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginInstallationsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_ratings_v1_marketplace_plugins__plugin_id__ratings_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginRatingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_rating_v1_marketplace_plugins__plugin_id__ratings_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RatingCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RatingResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    uninstall_plugin_v1_marketplace_plugins__plugin_id__uninstall_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginStateChangeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_repositories_v1_marketplace_repositories_get: {
+        parameters: {
+            query?: {
+                limit?: number | null;
+                offset?: number | null;
+                /** @deprecated */
+                page?: number;
+                /** @deprecated */
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginRepositoryListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_repository_v1_marketplace_repositories__repository_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repository_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginRepositoryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_repository_plugins_v1_marketplace_repositories__repository_id__plugins_get: {
+        parameters: {
+            query?: {
+                limit?: number | null;
+                offset?: number | null;
+                /** @deprecated */
+                page?: number;
+                /** @deprecated */
+                page_size?: number;
+            };
+            header?: never;
+            path: {
+                repository_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketplacePluginListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_queue_v1_marketplace_submissions_get: {
+        parameters: {
+            query?: {
+                status?: string;
+                limit?: number | null;
+                offset?: number | null;
+                /** @deprecated */
+                page?: number;
+                /** @deprecated */
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewQueueListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_submissions_v1_marketplace_submissions_mine_get: {
+        parameters: {
+            query?: {
+                limit?: number | null;
+                offset?: number | null;
+                /** @deprecated */
+                page?: number;
+                /** @deprecated */
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketplacePluginListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submission_detail_v1_marketplace_submissions__plugin_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_submission_v1_marketplace_submissions__plugin_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_submission_v1_marketplace_submissions__plugin_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    claim_review_v1_marketplace_submissions__plugin_id__claim_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submission_history_v1_marketplace_submissions__plugin_id__history_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionHistoryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_submission_v1_marketplace_submissions__plugin_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_for_review_v1_marketplace_submissions__plugin_id__submit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5908,6 +9822,78 @@ export interface operations {
             };
         };
     };
+    get_org_audit_logs_v1_organizations__org_id__audit_logs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                actor_id?: number | null;
+                action?: string | null;
+                target_type?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditLogListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    convert_organization_route_v1_organizations__org_id__convert_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrgConvertRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_organization_entitlement_route_v1_organizations__org_id__entitlement_get: {
         parameters: {
             query?: never;
@@ -6128,6 +10114,109 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrgInviteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_organization_limits_route_v1_organizations__org_id__limits_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgLimitsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_organization_limit_route_v1_organizations__org_id__limits__key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: number;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrgLimitOverrideSet"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgLimitsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_organization_limit_route_v1_organizations__org_id__limits__key__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: number;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrgLimitOverrideClear"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgLimitsOut"];
                 };
             };
             /** @description Validation Error */
@@ -7254,6 +11343,38 @@ export interface operations {
     };
     list_plugins_v1_plugins_get: {
         parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginRegistryPluginListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_all_ai_tools_v1_plugins_ai_tools_get: {
+        parameters: {
             query?: never;
             header?: never;
             path?: never;
@@ -7267,17 +11388,99 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AIToolsResponse"];
                 };
             };
         };
     };
-    proxy_to_plugin_registry_v1_plugins__path__get: {
+    install_plugin_v1_plugins_install_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginInstallResponse"];
+                };
+            };
+        };
+    };
+    install_plugin_from_git_v1_plugins_install_from_git_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginInstallResponse"];
+                };
+            };
+        };
+    };
+    reload_plugin_webhook_v1_plugins_reload_webhook_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookReloadResponse"];
+                };
+            };
+        };
+    };
+    get_manifest_schema_v1_plugins_schema_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    get_plugin_v1_plugins__plugin_name__get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                path: string;
+                plugin_name: string;
             };
             cookie?: never;
         };
@@ -7289,7 +11492,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PluginDetail"];
                 };
             };
             /** @description Validation Error */
@@ -7303,12 +11506,12 @@ export interface operations {
             };
         };
     };
-    proxy_to_plugin_registry_v1_plugins__path__put: {
+    uninstall_plugin_v1_plugins__plugin_name__delete: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                path: string;
+                plugin_name: string;
             };
             cookie?: never;
         };
@@ -7320,7 +11523,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MessageResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7334,12 +11537,13 @@ export interface operations {
             };
         };
     };
-    proxy_to_plugin_registry_v1_plugins__path__post: {
+    invoke_plugin_read_action_v1_plugins__plugin_name__actions__action__get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                path: string;
+                plugin_name: string;
+                action: string;
             };
             cookie?: never;
         };
@@ -7351,7 +11555,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PluginActionEnvelope"];
                 };
             };
             /** @description Validation Error */
@@ -7365,12 +11569,13 @@ export interface operations {
             };
         };
     };
-    proxy_to_plugin_registry_v1_plugins__path__delete: {
+    invoke_plugin_action_v1_plugins__plugin_name__actions__action__post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                path: string;
+                plugin_name: string;
+                action: string;
             };
             cookie?: never;
         };
@@ -7382,7 +11587,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PluginActionEnvelope"];
                 };
             };
             /** @description Validation Error */
@@ -7396,12 +11601,12 @@ export interface operations {
             };
         };
     };
-    proxy_to_plugin_registry_v1_plugins__path__patch: {
+    get_plugin_analysis_v1_plugins__plugin_name__analysis_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                path: string;
+                plugin_name: string;
             };
             cookie?: never;
         };
@@ -7413,7 +11618,395 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trigger_plugin_collection_v1_plugins__plugin_name__collect_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CollectionTriggeredResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_plugin_config_v1_plugins__plugin_name__config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginConfigResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_plugin_config_v1_plugins__plugin_name__config_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginConfigUpdateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disable_plugin_v1_plugins__plugin_name__disable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enable_plugin_v1_plugins__plugin_name__enable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_plugin_health_v1_plugins__plugin_name__health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The plugin's own health_check() result, or a {name, health_status, last_health_check, message} fallback when no instance is loaded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_plugin_from_git_v1_plugins__plugin_name__refresh_from_git_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginInstallResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_secrets_v1_plugins__plugin_name__secrets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretKeysResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_secret_v1_plugins__plugin_name__secrets__secret_key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_name: string;
+                secret_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_secret_v1_plugins__plugin_name__secrets__secret_key__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_name: string;
+                secret_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_plugin_resource_v1_plugins__plugin_name___resource_name__get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                plugin_name: string;
+                resource_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginResourceListEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_plugin_resource_v1_plugins__plugin_name___resource_name___item_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_name: string;
+                resource_name: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginResourceItemEnvelope"];
                 };
             };
             /** @description Validation Error */
@@ -8486,9 +13079,14 @@ export interface operations {
             };
         };
     };
-    list_tools_v1_tools_get: {
+    list_all_tools_v1_tools_get: {
         parameters: {
-            query?: never;
+            query?: {
+                active_only?: boolean;
+                tier?: string;
+                limit?: number;
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -8501,29 +13099,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    proxy_to_tools_v1_tools__path__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                path: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ToolDiscoveryResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8537,12 +13113,12 @@ export interface operations {
             };
         };
     };
-    proxy_to_tools_v1_tools__path__post: {
+    list_plugin_tools_v1_tools_plugins__plugin_id__tools_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                path: string;
+                plugin_id: string;
             };
             cookie?: never;
         };
@@ -8554,7 +13130,106 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ToolDiscoveryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_tool_license_v1_tools_validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LicenseValidationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["models__tool_execution__LicenseValidationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_tool_details_v1_tools__tool_name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tool_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolDiscoveryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    execute_tool_endpoint_v1_tools__tool_name__execute_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tool_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToolExecutionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolExecutionResponse"];
                 };
             };
             /** @description Validation Error */
