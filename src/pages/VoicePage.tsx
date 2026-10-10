@@ -107,9 +107,17 @@ export function TextToSpeechCard({
   const [preRewriteText, setPreRewriteText] = useState<string | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const lastBlobRef = useRef<Blob | null>(null);
+  // Every speech route needs a JWT since minder#2108, including the catalog
+  // reads below (#109). Read through a ref and keyed on `signedIn`, so a
+  // silent token refresh (#53) neither refetches the catalogs nor resets the
+  // picked language, while a login on this page does fetch them.
+  const tokenRef = useRef(token);
+  tokenRef.current = token;
+  const signedIn = Boolean(token);
 
   useEffect(() => {
-    apiFetch<LanguagesResponse>("/v1/tts/languages")
+    const token = tokenRef.current;
+    apiFetch<LanguagesResponse>("/v1/tts/languages", { token })
       .then((res) => {
         setLanguages(res.languages);
         setLanguage(res.default);
@@ -121,7 +129,7 @@ export function TextToSpeechCard({
     // Only used to pick a matching locale for "verify by transcribing" --
     // never shown as a selector, so a load failure here is silent (the
     // verify button just stays disabled via matchingSttLanguage's null).
-    apiFetch<LanguagesResponse>("/v1/stt/languages")
+    apiFetch<LanguagesResponse>("/v1/stt/languages", { token })
       .then((res) => setSttLanguages(res.languages))
       .catch(() => {});
     // For the regional-style rewrite's model picker below -- fetched once
@@ -133,7 +141,7 @@ export function TextToSpeechCard({
         setRewriteModel(pickDefaultRewriteModel(res.items));
       })
       .catch(() => {});
-  }, []);
+  }, [signedIn]);
 
   // Voice choices are per-language (a gTTS-only language has none at all) --
   // refetch whenever the selected language changes, and reset the current
@@ -149,7 +157,9 @@ export function TextToSpeechCard({
     if (!language) return;
     setVoice("");
     const requestId = ++voicesRequestRef.current;
-    apiFetch<VoicesResponse>(`/v1/tts/voices?language=${encodeURIComponent(language)}`)
+    apiFetch<VoicesResponse>(`/v1/tts/voices?language=${encodeURIComponent(language)}`, {
+      token: tokenRef.current,
+    })
       .then((res) => {
         if (voicesRequestRef.current === requestId) setVoices(res.voices);
       })
@@ -569,9 +579,14 @@ function SpeechToTextCard({
   const chunksRef = useRef<Blob[]>([]);
   const previewUrlRef = useRef<string | null>(null);
   const elapsed = useElapsedSeconds(recording);
+  // Same as TextToSpeechCard: the catalog read needs the JWT (#109), keyed on
+  // `signedIn` rather than the token so a silent refresh doesn't refetch.
+  const tokenRef = useRef(token);
+  tokenRef.current = token;
+  const signedIn = Boolean(token);
 
   useEffect(() => {
-    apiFetch<LanguagesResponse>("/v1/stt/languages")
+    apiFetch<LanguagesResponse>("/v1/stt/languages", { token: tokenRef.current })
       .then((res) => {
         setLanguages(res.languages);
         setLanguage(res.default);
@@ -580,7 +595,7 @@ function SpeechToTextCard({
         setStatus("Could not load supported languages.");
         setIsError(true);
       });
-  }, []);
+  }, [signedIn]);
 
   useEffect(() => {
     return () => {
