@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { apiFetch, friendlyErrorMessage } from "../lib/api";
 import { MIN_PASSWORD_LENGTH } from "../lib/password";
@@ -9,6 +9,8 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from "../lib/ui";
+import { tabbableIn, useModal } from "../lib/useModal";
+import { Dialog } from "./Dialog";
 import { Icon } from "./Icon";
 import { StatusLine } from "./StatusLine";
 
@@ -33,13 +35,11 @@ interface ResetPasswordResult {
  * an SSO-linked account, and on the org page only when the member list says
  * the account is resettable by the caller). */
 export function ResetPasswordControl({
-  userId,
   username,
   endpoint,
   token,
   formatError = friendlyErrorMessage,
 }: {
-  userId: number;
   username: string;
   endpoint: string;
   token: string;
@@ -53,6 +53,32 @@ export function ResetPasswordControl({
   const [error, setError] = useState("");
   const [result, setResult] = useState<ResetPasswordResult | null>(null);
   const [copied, setCopied] = useState(false);
+  // Unique per instance: the same user can have a control on more than one
+  // mounted view, and ids must never collide.
+  const ids = useId();
+  // Escape and a backdrop click close it like Cancel -- not mid-request.
+  const modal = useModal({
+    open,
+    onDismiss: () => {
+      if (!busy) close();
+    },
+  });
+
+  // A failed request leaves focus nowhere: the button that had it was
+  // disabled while the request ran. Once the form is enabled again, put focus
+  // back in the dialog -- on the password being set, else the selected mode --
+  // so Escape and Tab work again. If focus is still (or already again) in
+  // the dialog, it stays where it is. (The error itself is announced:
+  // role=alert.)
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const refocusRef = useRef(false);
+  useEffect(() => {
+    if (busy || !refocusRef.current) return;
+    refocusRef.current = false;
+    const panel = modal.panelRef.current;
+    if (!panel || panel.contains(document.activeElement)) return;
+    (passwordRef.current ?? tabbableIn(panel)[0])?.focus();
+  }, [busy, modal.panelRef]);
 
   function close() {
     // Drop the one-time password from memory as soon as the dialog closes.
@@ -82,6 +108,7 @@ export function ResetPasswordControl({
       setResult(res);
     } catch (err) {
       setError(formatError(err));
+      refocusRef.current = true;
     }
     setBusy(false);
   }
@@ -107,158 +134,149 @@ export function ResetPasswordControl({
         Reset password
       </button>
       {open && (
-        <div
-          role="presentation"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onKeyDown={(e) => {
-            if (e.key === "Escape" && !busy) close();
-          }}
+        <Dialog
+          modal={modal}
+          title={<>Reset password for {username}?</>}
+          description={
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              {result ? (
+                <>
+                  {username}&apos;s password was reset and their sessions were
+                  signed out. They must choose a new password the next time they
+                  sign in.
+                </>
+              ) : (
+                <>
+                  This signs {username} out everywhere and makes them choose a
+                  new password at their next sign-in.
+                </>
+              )}
+            </p>
+          }
         >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={`reset-password-title-${userId}`}
-            className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl dark:bg-gray-900"
-          >
-            <h2
-              id={`reset-password-title-${userId}`}
-              className="text-base font-semibold text-gray-900 dark:text-gray-100"
-            >
-              Reset password for {username}?
-            </h2>
-            {result ? (
-              <div className="mt-2 flex flex-col gap-3 text-sm text-gray-600 dark:text-gray-400">
-                <p>
-                  {username}&apos;s password was reset and their sessions
-                  were signed out. They must choose a new password the next time
-                  they sign in.
-                </p>
-                {tempPassword && (
-                  <div>
-                    <label
-                      htmlFor={`temp-password-${userId}`}
-                      className="mb-1 block font-medium text-gray-700 dark:text-gray-300"
+          {result ? (
+            <div className="mt-3 flex flex-col gap-3 text-sm text-gray-600 dark:text-gray-400">
+              {tempPassword && (
+                <div>
+                  <label
+                    htmlFor={`${ids}-temp-password`}
+                    className="mb-1 block font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    Temporary password
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      id={`${ids}-temp-password`}
+                      readOnly
+                      value={tempPassword}
+                      onFocus={(e) => e.target.select()}
+                      className={`${inputClass} font-mono`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(tempPassword)}
+                      className={secondaryButtonClass}
                     >
-                      Temporary password
+                      <Icon name="copy" size={15} />{" "}
+                      {copied ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                  <p className={`${fieldHintClass} font-medium`}>
+                    Shown once. It can&apos;t be retrieved again after you
+                    close this dialog, so share it with {username} over a
+                    secure channel now.
+                  </p>
+                </div>
+              )}
+              {error && (
+                <StatusLine isError className="mb-0">
+                  {error}
+                </StatusLine>
+              )}
+              <div className="flex justify-end">
+                {/* Mounts while the dialog is already open, so autoFocus (not
+                  data-autofocus) is what moves focus here. */}
+                <button
+                  type="button"
+                  autoFocus
+                  onClick={close}
+                  className={primaryButtonClass}
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          ) : (
+            <form
+              onSubmit={handleReset}
+              className="mt-3 flex flex-col gap-3 text-sm text-gray-600 dark:text-gray-400"
+            >
+              <fieldset className="flex flex-col gap-2" disabled={busy}>
+                <legend className="sr-only">New password</legend>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name={`${ids}-mode`}
+                    checked={mode === "generate"}
+                    onChange={() => setMode("generate")}
+                  />
+                  Generate a temporary password
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name={`${ids}-mode`}
+                    checked={mode === "set"}
+                    onChange={() => setMode("set")}
+                  />
+                  Set a password
+                </label>
+                {mode === "set" && (
+                  <div>
+                    <label htmlFor={`${ids}-new-password`} className="sr-only">
+                      New password for {username}
                     </label>
-                    <div className="flex gap-2">
-                      <input
-                        id={`temp-password-${userId}`}
-                        readOnly
-                        value={tempPassword}
-                        onFocus={(e) => e.target.select()}
-                        className={`${inputClass} font-mono`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(tempPassword)}
-                        className={secondaryButtonClass}
-                      >
-                        <Icon name="copy" size={15} />{" "}
-                        {copied ? "Copied" : "Copy"}
-                      </button>
-                    </div>
-                    <p className={`${fieldHintClass} font-medium`}>
-                      Shown once. It can&apos;t be retrieved again after you
-                      close this dialog, so share it with {username} over a
-                      secure channel now.
+                    <input
+                      ref={passwordRef}
+                      id={`${ids}-new-password`}
+                      type="password"
+                      autoComplete="new-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="New password"
+                      className={inputClass}
+                    />
+                    <p className={fieldHintClass}>
+                      At least {MIN_PASSWORD_LENGTH} characters.
                     </p>
                   </div>
                 )}
-                {error && (
-                  <StatusLine isError className="mb-0">
-                    {error}
-                  </StatusLine>
-                )}
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    autoFocus
-                    onClick={close}
-                    className={primaryButtonClass}
-                  >
-                    Done
-                  </button>
-                </div>
+              </fieldset>
+              {error && (
+                <StatusLine isError className="mb-0">
+                  {error}
+                </StatusLine>
+              )}
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={close}
+                  disabled={busy}
+                  className={secondaryButtonClass}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className={destructiveButtonClass}
+                >
+                  {busy ? "Resetting…" : "Reset password"}
+                </button>
               </div>
-            ) : (
-              <form
-                onSubmit={handleReset}
-                className="mt-2 flex flex-col gap-3 text-sm text-gray-600 dark:text-gray-400"
-              >
-                <p>
-                  This signs {username} out everywhere and makes them
-                  choose a new password at their next sign-in.
-                </p>
-                <fieldset className="flex flex-col gap-2" disabled={busy}>
-                  <legend className="sr-only">New password</legend>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name={`reset-mode-${userId}`}
-                      checked={mode === "generate"}
-                      onChange={() => setMode("generate")}
-                    />
-                    Generate a temporary password
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name={`reset-mode-${userId}`}
-                      checked={mode === "set"}
-                      onChange={() => setMode("set")}
-                    />
-                    Set a password
-                  </label>
-                  {mode === "set" && (
-                    <div>
-                      <label
-                        htmlFor={`reset-new-password-${userId}`}
-                        className="sr-only"
-                      >
-                        New password for {username}
-                      </label>
-                      <input
-                        id={`reset-new-password-${userId}`}
-                        type="password"
-                        autoComplete="new-password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="New password"
-                        className={inputClass}
-                      />
-                      <p className={fieldHintClass}>
-                        At least {MIN_PASSWORD_LENGTH} characters.
-                      </p>
-                    </div>
-                  )}
-                </fieldset>
-                {error && (
-                  <StatusLine isError className="mb-0">
-                    {error}
-                  </StatusLine>
-                )}
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={close}
-                    disabled={busy}
-                    className={secondaryButtonClass}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={busy}
-                    className={destructiveButtonClass}
-                  >
-                    {busy ? "Resetting…" : "Reset password"}
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
+            </form>
+          )}
+        </Dialog>
       )}
     </>
   );

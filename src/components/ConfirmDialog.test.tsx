@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { StrictMode, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -357,6 +357,29 @@ describe("useConfirm inert", () => {
     expect(screen.queryByRole("alertdialog")).toBeNull();
   });
 
+  it("keeps a dialog stacked above on top when the one below gets a new request", async () => {
+    render(<TwoDialogs />);
+    fireEvent.click(screen.getByText("Open first"));
+    const first = await screen.findByRole("alertdialog", { name: "First?" });
+    // The page is inert, but a test can still dispatch the clicks.
+    fireEvent.click(screen.getByText("Open second"));
+    const second = await screen.findByRole("alertdialog", { name: "Second?" });
+    const secondConfirm = within(second).getByRole("button", { name: "Confirm" });
+    expect(document.activeElement).toBe(secondConfirm);
+
+    // A new request replaces the lower dialog's content in place.
+    fireEvent.click(screen.getByText("Open first"));
+    expect(screen.getByRole("alertdialog", { name: "First?" })).toBe(first);
+
+    expect(second.parentElement!.hasAttribute("inert")).toBe(false);
+    expect(first.parentElement!.hasAttribute("inert")).toBe(true);
+    expect(document.activeElement).toBe(secondConfirm);
+
+    // Closing the top one hands interactivity back to the one below.
+    fireEvent.click(within(second).getByRole("button", { name: "Cancel" }));
+    expect(first.parentElement!.hasAttribute("inert")).toBe(false);
+  });
+
   it("leaves inert that other code sets while a dialog is open", async () => {
     const { container } = render(<Harness />);
     const late = document.createElement("div");
@@ -492,6 +515,47 @@ describe("useConfirm focus return", () => {
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByLabelText("Elsewhere")),
     );
+  });
+
+  it("gives a confirm chained straight after another a session of its own", async () => {
+    function Chained() {
+      const { confirm, dialog } = useConfirm();
+      return (
+        <main>
+          <h1>Page</h1>
+          {dialog}
+          <button
+            onClick={async () => {
+              if (!(await confirm({ title: "First?", message: "One." }))) return;
+              await confirm({ title: "Second?", message: "Two." });
+            }}
+          >
+            Trigger
+          </button>
+        </main>
+      );
+    }
+    const { container } = render(<Chained />);
+    const trigger = screen.getByText("Trigger");
+    trigger.focus();
+    fireEvent.click(trigger);
+    const first = await screen.findByRole("alertdialog", { name: "First?" });
+
+    // The second request is made from the first one's await continuation, so
+    // React renders the close and the reopen as one update.
+    await act(async () => {
+      fireEvent.click(within(first).getByRole("button", { name: "Confirm" }));
+    });
+    const second = screen.getByRole("alertdialog", { name: "Second?" });
+
+    expect(container.hasAttribute("inert")).toBe(true);
+    expect(document.activeElement).toBe(within(second).getByRole("button", { name: "Confirm" }));
+
+    fireEvent.click(within(second).getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(container.hasAttribute("inert")).toBe(false);
+    expect(document.activeElement).toBe(trigger);
   });
 
   for (const mode of ["removed", "disabled"] as const) {

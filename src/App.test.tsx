@@ -9,6 +9,7 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
+import { useConfirm } from "./components/ConfirmDialog";
 import { TOKEN_KEY } from "./lib/api";
 import { MUST_CHANGE_PASSWORD_KEY } from "./lib/auth";
 import { NAV_SECTIONS } from "./lib/nav";
@@ -405,3 +406,108 @@ describe("App — focus after navigation", () => {
   });
 
 });
+
+/** A page-level confirm dialog next to the app, as any page's useConfirm. */
+function AskButton() {
+  const { confirm, dialog } = useConfirm();
+  return (
+    <>
+      {dialog}
+      <button onClick={() => confirm({ title: "Delete it?", message: "Really." })}>Ask</button>
+    </>
+  );
+}
+
+function pressCommandK(init: KeyboardEventInit = { metaKey: true }) {
+  return fireEvent.keyDown(window, { key: "k", ...init });
+}
+
+function palette() {
+  return screen.queryByRole("dialog", { name: "Command palette" });
+}
+
+describe("App — ⌘K and the modal layer (#97)", () => {
+  afterEach(() => {
+    sessionStorage.clear();
+    cleanup();
+  });
+
+  it("opens the palette over an inert app and returns focus when ⌘K closes it", () => {
+    const { container } = renderAt("/");
+    const toggle = screen.getByRole("button", { name: "Toggle navigation" });
+    toggle.focus();
+
+    expect(pressCommandK()).toBe(false); // default prevented
+    expect(palette()).toBeTruthy();
+    expect(container.hasAttribute("inert")).toBe(true);
+    expect(document.activeElement).toBe(screen.getByRole("combobox", { name: "Search pages and actions" }));
+
+    pressCommandK({ ctrlKey: true });
+    expect(palette()).toBeNull();
+    expect(container.hasAttribute("inert")).toBe(false);
+    expect(document.activeElement).toBe(toggle);
+  });
+
+  it("leaves focus on the new page's heading after a palette selection navigates, never on the trigger", async () => {
+    renderAt("/");
+    const trigger = screen.getAllByRole("button", { name: "Open command palette" })[0];
+    trigger.focus();
+    fireEvent.click(trigger);
+    const focusedTrigger = vi.fn();
+    trigger.addEventListener("focus", focusedTrigger);
+
+    const input = screen.getByRole("combobox", { name: "Search pages and actions" });
+    fireEvent.change(input, { target: { value: "discover ai tools" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(palette()).toBeNull();
+    expect(currentLocation?.pathname).toBe(ROUTES.discoverAiTools);
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("heading", { level: 1, name: "Discover AI tools" }),
+      ),
+    );
+    await nextFrames();
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", { level: 1, name: "Discover AI tools" }),
+    );
+    expect(focusedTrigger).not.toHaveBeenCalled();
+  });
+
+  it("toggles on every ⌘K, however fast they come", () => {
+    renderAt("/");
+    act(() => {
+      pressCommandK();
+      pressCommandK();
+    });
+    expect(palette()).toBeNull();
+    act(() => {
+      pressCommandK();
+      pressCommandK();
+      pressCommandK();
+    });
+    expect(palette()).toBeTruthy();
+  });
+
+  it("ignores ⌘K / Ctrl-K while a confirm dialog is open", async () => {
+    render(
+      <MemoryRouter>
+        <App />
+        <AskButton />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    const dialog = await screen.findByRole("alertdialog");
+
+    // Still swallowed, so it can't reach the browser's own shortcut.
+    expect(pressCommandK()).toBe(false);
+    expect(pressCommandK({ ctrlKey: true })).toBe(false);
+    expect(palette()).toBeNull();
+    expect(screen.getByRole("alertdialog")).toBe(dialog);
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    pressCommandK();
+    expect(palette()).toBeTruthy();
+  });
+});
+

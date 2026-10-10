@@ -494,7 +494,6 @@ function MemberRow({
         )}
         {canReset && (
           <ResetPasswordControl
-            userId={m.user_id}
             username={m.username}
             endpoint={orgMemberResetPasswordPath(orgId, m.user_id)}
             token={token}
