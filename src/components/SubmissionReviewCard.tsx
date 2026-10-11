@@ -1,7 +1,8 @@
 import { useId, useRef, useState, type MouseEvent } from "react";
 
-import { apiFetch, friendlyErrorMessage } from "../lib/api";
+import { friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { runReviewerAction, type ReviewActionRequest } from "../lib/marketplace";
 import {
   approveConfirmMessage,
   archiveConfirmMessage,
@@ -150,17 +151,18 @@ export function SubmissionReviewCard({
   /** Run one transition. On failure the error shows on the card and focus
    * returns to `trigger` (the button that started it) once it's re-enabled;
    * on success the page takes over focus (see `onActionDone`). */
-  async function runAction(action: ReviewerAction, trigger: HTMLElement | null, body?: unknown) {
+  async function runAction(
+    action: ReviewerAction,
+    trigger: HTMLElement | null,
+    body?: ReviewActionRequest,
+  ) {
     if (inFlightRef.current) return;
     inFlightRef.current = true;
     setBusy(true);
     setIsError(false);
     setStatus("Working…");
     try {
-      await apiFetch(
-        `/v1/marketplace/submissions/${encodeURIComponent(submission.id)}/${action}`,
-        { method: "POST", token, body },
-      );
+      await runReviewerAction(submission.id, action, token, body);
       setRejecting(false);
       setStatus("");
       setBusy(false);

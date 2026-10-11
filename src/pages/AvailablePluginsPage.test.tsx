@@ -38,6 +38,7 @@ function plugin(overrides: Partial<Plugin> = {}): Plugin {
     display_name: "Weather",
     description: "Current weather lookups",
     author: "Minder",
+    author_email: null,
     repository_url: null,
     distribution_type: "docker",
     docker_image: null,

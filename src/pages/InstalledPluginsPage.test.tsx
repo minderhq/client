@@ -117,6 +117,7 @@ function catalogRow(overrides: Partial<CatalogPlugin> = {}): CatalogPlugin {
     display_name: "Weather",
     description: null,
     author: "Minder",
+    author_email: null,
     repository_url: null,
     distribution_type: "git",
     docker_image: null,

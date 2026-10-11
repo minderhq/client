@@ -27,6 +27,7 @@ function plugin(overrides: Partial<CatalogPlugin>): CatalogPlugin {
     display_name: "P",
     description: null,
     author: "Someone",
+    author_email: null,
     repository_url: null,
     distribution_type: "git",
     docker_image: null,

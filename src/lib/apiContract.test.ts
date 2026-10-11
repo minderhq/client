@@ -42,13 +42,13 @@ const INTERPOLATED_ACTIONS: Record<
   { caller: string; source: ActionSource; values: string[] }
 > = {
   "/v1/marketplace/submissions/{}/{}": {
-    caller: "src/components/SubmissionReviewCard.tsx", // runAction()
+    caller: "src/lib/marketplace.ts", // runReviewerAction()
     source: { file: "src/lib/submissionReview.ts", typeAlias: "ReviewerAction" },
     values: ["approve", "archive", "claim", "reject"],
   },
   "/v1/marketplace/plugins/{}/{}": {
-    caller: "src/lib/usePluginLifecycle.ts", // toggleEnabled()
-    source: { file: "src/lib/usePluginLifecycle.ts", ternaryOn: "nextEnabled" },
+    caller: "src/lib/marketplace.ts", // setPluginEnabled()
+    source: { file: "src/lib/marketplace.ts", ternaryOn: "nextEnabled" },
     values: ["disable", "enable"],
   },
 };

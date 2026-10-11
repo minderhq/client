@@ -3,28 +3,14 @@ import { EmptyState } from "../components/EmptyState";
 import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
-import { apiFetch } from "../lib/api";
+import { fetchMyLicenses, type License } from "../lib/marketplace";
 import { useAsyncResource } from "../lib/useAsyncResource";
 import { useAuth } from "../lib/auth";
 import { badgeClass, badgeTone, cardClass, mutedTextClass } from "../lib/ui";
 
-export interface License {
-  id: string;
-  plugin_id: string;
-  plugin_name: string;
-  plugin_display_name: string;
-  tier: string;
-  valid_from: string;
-  valid_until: string | null;
-  active: boolean;
-  usage_count: number;
-  last_used_at: string | null;
-}
-
-interface LicenseListResponse {
-  licenses: License[];
-  count: number;
-}
+/** The license shape lives in lib/marketplace.ts (#119); re-exported for
+ * existing importers. */
+export type { License };
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
@@ -77,7 +63,7 @@ export function MyLicensesPage() {
   const { token, sessionKey, isAuthenticated } = useAuth();
   const { data, error, loading } = useAsyncResource(
     (signal) =>
-      apiFetch<LicenseListResponse>("/v1/marketplace/licenses", { token, signal }),
+      fetchMyLicenses(token, signal),
     { deps: [sessionKey], enabled: isAuthenticated },
   );
   const licenses = data?.licenses ?? [];

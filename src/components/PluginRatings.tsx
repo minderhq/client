@@ -1,7 +1,13 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import { ApiError, apiFetch, friendlyErrorMessage } from "../lib/api";
+import { ApiError, friendlyErrorMessage } from "../lib/api";
 import { decodeJwtClaims } from "../lib/jwt";
+import {
+  fetchPluginRatings,
+  submitPluginRating,
+  type PluginRating,
+  type PluginRatingsResponse,
+} from "../lib/marketplace";
 import {
   fieldHintClass,
   inputClass,
@@ -11,27 +17,9 @@ import {
 import { EmptyState } from "./EmptyState";
 import { StatusLine } from "./StatusLine";
 
-/** One user's rating/review row, mirroring marketplace RatingResponse
- * (models/rating.py). `user_id` is the reviewer's stringified id, matched
- * against the caller's JWT `sub` to find "your" review. */
-export interface PluginRating {
-  id: string;
-  plugin_id: string;
-  user_id: string;
-  rating: number;
-  review_text: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-/** GET /v1/marketplace/plugins/{id}/ratings — the live aggregate plus the
- * individual reviews (newest first). */
-export interface PluginRatingsResponse {
-  plugin_id: string;
-  rating_average: number | null;
-  rating_count: number;
-  ratings: PluginRating[];
-}
+/** The rating shapes live in lib/marketplace.ts (#119); re-exported for
+ * existing importers. */
+export type { PluginRating, PluginRatingsResponse };
 
 const MAX_REVIEW_LENGTH = 4000;
 
@@ -142,9 +130,7 @@ export function PluginRatings({
     setLoadStatus("Loading…");
     setLoadIsError(false);
     try {
-      const res = await apiFetch<PluginRatingsResponse>(
-        `/v1/marketplace/plugins/${pluginId}/ratings`,
-      );
+      const res = await fetchPluginRatings(pluginId);
       setRatings(res.ratings ?? []);
       setAverage(res.rating_average);
       setCount(res.rating_count);
@@ -184,13 +170,13 @@ export function PluginRatings({
     setSubmitStatus("");
     setSubmitIsError(false);
     try {
-      await apiFetch<PluginRating>(`/v1/marketplace/plugins/${pluginId}/ratings`, {
-        method: "POST",
-        // The reviewer is derived from the JWT server-side — we NEVER send a
-        // user id from the client. Only the star count and optional text.
-        body: { rating, review_text: reviewText.trim() ? reviewText.trim() : null },
+      // The reviewer is derived from the JWT server-side — we NEVER send a
+      // user id from the client. Only the star count and optional text.
+      await submitPluginRating(
+        pluginId,
+        { rating, review_text: reviewText.trim() ? reviewText.trim() : null },
         token,
-      });
+      );
       setSubmitStatus(myReview ? "Review updated." : "Thanks for your review!");
       setSubmitIsError(false);
       setGated(false);

@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { resolvePath, useLocation, useNavigate } from "react-router-dom";
 
 import { apiFetch } from "../lib/api";
+import { searchCatalogPlugins } from "../lib/marketplace";
 import { useBillingAccess } from "../lib/useBillingAccess";
 import { useAuth } from "../lib/auth";
 import { leafVisible, NAV_DESTINATIONS } from "../lib/nav";
@@ -119,10 +120,7 @@ export function CommandPalette({
             { token, signal: ctrl.signal },
           )
         : noToken,
-      apiFetch<{ plugins: { name: string; display_name: string }[] }>(
-        `/v1/marketplace/plugins/search?q=${encodeURIComponent(debouncedQuery)}&limit=5`,
-        { signal: ctrl.signal },
-      ),
+      searchCatalogPlugins(debouncedQuery, 5, ctrl.signal),
     ]).then(([kbs, pipes, plugins]) => {
       if (ctrl.signal.aborted) return;
       const out: Command[] = [];
