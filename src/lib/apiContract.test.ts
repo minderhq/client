@@ -24,7 +24,7 @@ const HTTP_METHODS = ["get", "put", "post", "delete", "options", "head", "patch"
 // fix the call (or the gateway) and delete the entry.
 const KNOWN_MISSING: Record<string, string> = {
   "POST /v1/organizations/personal":
-    "minderhq/minder#2234 (PR #2416): absent until the synced spec is regenerated after it merges (#116)",
+    "create-my-workspace endpoint: absent until the gateway spec that adds it is synced (#116)",
 };
 
 // Where the concrete values of an interpolated action segment are read from:
