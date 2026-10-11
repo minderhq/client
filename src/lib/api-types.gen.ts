@@ -11,7 +11,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Health Check */
+        /**
+         * Health Check
+         * @description Health check with phase-aware downstream dependency status.
+         */
         get: operations["health_check_health_get"];
         put?: never;
         post?: never;
@@ -28,7 +31,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Metrics */
+        /**
+         * Metrics
+         * @description Prometheus metrics endpoint
+         */
         get: operations["metrics_metrics_get"];
         put?: never;
         post?: never;
@@ -47,7 +53,18 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Post Public Feedback */
+        /**
+         * Post Public Feedback
+         * @description Leave feedback (thumbs up/down + optional text) on one chat response.
+         *
+         *     Same trust boundary as ``/message``: the anonymous session token is validated
+         *     and scope-checked against THIS endpoint (a token for endpoint A can't rate on
+         *     endpoint B), the per-endpoint rate limit applies, and the feedback is written
+         *     only through the internal service call to rag-pipeline — which re-verifies the
+         *     rated turn is the session's OWN before storing (a session can't rate another
+         *     session's turns; a mismatch is a 404). The rating is the session's alone: its
+         *     id comes from the token, never the request body.
+         */
         post: operations["post_public_feedback_public_chat__slug__feedback_post"];
         delete?: never;
         options?: never;
@@ -64,7 +81,16 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Post Public Message */
+        /**
+         * Post Public Message
+         * @description Send a chat message on an anonymous session.
+         *
+         *     Validates the session token's scope against this endpoint, enforces the
+         *     per-endpoint rate limit, then runs ONLY the endpoint's bound pipeline (its
+         *     KB[s]) via an internal service call to rag-pipeline, persisting the turn under
+         *     the endpoint's anonymous-session namespace. The anon token reaches nothing
+         *     else in the tenant.
+         */
         post: operations["post_public_message_public_chat__slug__message_post"];
         delete?: never;
         options?: never;
@@ -81,7 +107,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Start Public Session */
+        /**
+         * Start Public Session
+         * @description Start an anonymous chat session against a public endpoint.
+         *
+         *     Returns a short-lived signed anonymous session token scoped to THIS endpoint
+         *     + its tenant. Rate-limited per endpoint so session minting can't be abused to
+         *     fan out load. No Minder account is created or required.
+         */
         post: operations["start_public_session_public_chat__slug__session_post"];
         delete?: never;
         options?: never;
@@ -96,10 +129,56 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Proxy To Orchestrator */
+        /**
+         * Proxy To Orchestrator
+         * @description Proxy /v1/ai/* to the orchestrator service. Orchestrator's own routes
+         *     already carry the full `/v1/ai/...` prefix (like plugin_registry/marketplace),
+         *     so forward the full path back, not just `path`.
+         *
+         *     Deliberately NOT gated by `_require_jwt_for_writes`, unlike every other
+         *     proxy route here: these routes had their own deliberately fine-grained,
+         *     NON-blanket auth model when they lived natively on api-gateway, and that
+         *     behavior must not change on extraction. `GET /v1/ai/functions/definitions`
+         *     and `GET /v1/ai/tools/openapi.json` are unauthenticated on purpose
+         *     (OpenWebUI's Tool Server can't attach a JWT to its discovery fetch);
+         *     `POST /v1/ai/functions/{name}` (execute_function) is a pure pass-through
+         *     with no gateway-level requirement -- it forwards whatever Authorization
+         *     header the caller sent to the tool's own endpoint, which enforces its own
+         *     auth per-action (some plugin actions are deliberately open, #254); only
+         *     `POST /v1/ai/chat/completions` requires a JWT, enforced by orchestrator's
+         *     own route dependency, unchanged since before the extraction. Adding
+         *     `_require_jwt_for_writes` here would newly block unauthenticated tool
+         *     execution for open actions -- a real regression, not a hardening.
+         *
+         *     Long timeout: the multi-turn tool loop and model inference can run well
+         *     past the shared client's 30s default (see _LONG_OPERATION_TIMEOUT).
+         */
         get: operations["proxy_to_orchestrator_v1_ai__path__get"];
         put?: never;
-        /** Proxy To Orchestrator */
+        /**
+         * Proxy To Orchestrator
+         * @description Proxy /v1/ai/* to the orchestrator service. Orchestrator's own routes
+         *     already carry the full `/v1/ai/...` prefix (like plugin_registry/marketplace),
+         *     so forward the full path back, not just `path`.
+         *
+         *     Deliberately NOT gated by `_require_jwt_for_writes`, unlike every other
+         *     proxy route here: these routes had their own deliberately fine-grained,
+         *     NON-blanket auth model when they lived natively on api-gateway, and that
+         *     behavior must not change on extraction. `GET /v1/ai/functions/definitions`
+         *     and `GET /v1/ai/tools/openapi.json` are unauthenticated on purpose
+         *     (OpenWebUI's Tool Server can't attach a JWT to its discovery fetch);
+         *     `POST /v1/ai/functions/{name}` (execute_function) is a pure pass-through
+         *     with no gateway-level requirement -- it forwards whatever Authorization
+         *     header the caller sent to the tool's own endpoint, which enforces its own
+         *     auth per-action (some plugin actions are deliberately open, #254); only
+         *     `POST /v1/ai/chat/completions` requires a JWT, enforced by orchestrator's
+         *     own route dependency, unchanged since before the extraction. Adding
+         *     `_require_jwt_for_writes` here would newly block unauthenticated tool
+         *     execution for open actions -- a real regression, not a hardening.
+         *
+         *     Long timeout: the multi-turn tool loop and model inference can run well
+         *     past the shared client's 30s default (see _LONG_OPERATION_TIMEOUT).
+         */
         post: operations["proxy_to_orchestrator_v1_ai__path__post"];
         delete?: never;
         options?: never;
@@ -114,7 +193,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Audit Logs */
+        /**
+         * Get Audit Logs
+         * @description List audit entries, newest first, paginated. Instance-admin only.
+         *
+         *     Optional filters: actor_id, action (e.g. ROLE_CHANGE), target_type,
+         *     scope_type (org / platform / self / legacy).
+         */
         get: operations["get_audit_logs_v1_audit_logs_get"];
         put?: never;
         post?: never;
@@ -131,7 +216,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Auth Capabilities */
+        /**
+         * Auth Capabilities
+         * @description What the sign-in page may offer. Public; booleans, the registration
+         *     mode and the reset-link lifetime only (no other configuration detail).
+         */
         get: operations["auth_capabilities_v1_auth_capabilities_get"];
         put?: never;
         post?: never;
@@ -150,7 +239,29 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Change Password */
+        /**
+         * Change Password
+         * @description Change the caller's OWN local password (#1776).
+         *
+         *     Authenticated: the account is taken from the JWT ``sub`` claim, never from
+         *     the body, so there is no way to address another user's password here. The
+         *     current password must be re-supplied (a stolen/borrowed bearer token alone
+         *     must not be enough to lock the owner out). SSO-linked (Authelia) accounts
+         *     get 409 -- their credential is managed in the Authelia portal, not here.
+         *
+         *     #1991: the change revokes EVERY existing session of the account (a session
+         *     opened with the old, possibly stolen, password must not survive it),
+         *     including the token this request carried. So the response is 200 with a
+         *     replacement ``access_token`` (the ``/refresh`` shape) minted for the new
+         *     session generation: the caller stays signed in on this device by adopting
+         *     it. It was ``204`` with no body before; a client that ignores the body is
+         *     signed out by its next request.
+         *
+         *     #2075: if the replacement token can't be minted AFTER the change has
+         *     committed, the answer is 401 "Password changed ... sign in again" -- the
+         *     new password is in effect and every session (this one too) is revoked, so
+         *     the caller signs in again with it. Never an unhandled 500.
+         */
         post: operations["change_password_v1_auth_change_password_post"];
         delete?: never;
         options?: never;
@@ -167,7 +278,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Login */
+        /**
+         * Login
+         * @description Verify credentials (bcrypt) against PostgreSQL and return a JWT.
+         */
         post: operations["login_v1_auth_login_post"];
         delete?: never;
         options?: never;
@@ -182,7 +296,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Oidc Callback */
+        /**
+         * Oidc Callback
+         * @description Finish the Authelia SSO redirect: verify the round-tripped state,
+         *     exchange the code for an ID token, verify it, provision/link the Minder
+         *     user, then hand the browser off to the client with a Minder JWT -- same
+         *     shape /v1/auth/login issues, so no downstream service needs to change.
+         */
         get: operations["oidc_callback_v1_auth_oidc_callback_get"];
         put?: never;
         post?: never;
@@ -199,7 +319,19 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Oidc Login */
+        /**
+         * Oidc Login
+         * @description Start the Authelia SSO redirect -- the platform's single login entry
+         *     point (#<issue>). state/nonce are round-tripped through short-lived
+         *     httponly cookies rather than server-side session storage: this is pure
+         *     CSRF/replay defense for one redirect, not a session (the actual session
+         *     is the Minder JWT oidc_callback mints below, same as local login).
+         *
+         *     #2134: an optional client nonce `cnonce` is bound the same way (httponly
+         *     cookie set here, at the start of the login) and echoed back only in the
+         *     final client redirect's fragment. The callback never reads it from its own
+         *     query string. Without `cnonce` the flow is unchanged (older clients).
+         */
         get: operations["oidc_login_v1_auth_oidc_login_get"];
         put?: never;
         post?: never;
@@ -218,7 +350,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Password Reset Confirm */
+        /**
+         * Password Reset Confirm
+         * @description Set a new password with a reset token (from the link's fragment, POSTed
+         *     by the client on an explicit submit). Revokes every session; the user then
+         *     signs in with the new password (no auto-login).
+         */
         post: operations["password_reset_confirm_v1_auth_password_reset_confirm_post"];
         delete?: never;
         options?: never;
@@ -235,7 +372,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Password Reset Request */
+        /**
+         * Password Reset Request
+         * @description Ask for a reset link. Always the same 202, whether or not the address
+         *     has an account, is SSO-linked, deactivated, undeliverable, privileged or
+         *     over a limit -- the outcome is only ever visible to operators (audit,
+         *     metrics). No bcrypt, no SMTP: mail is queued and sent by the worker.
+         */
         post: operations["password_reset_request_v1_auth_password_reset_request_post"];
         delete?: never;
         options?: never;
@@ -250,10 +393,21 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Platform Admin Claim Status */
+        /**
+         * Platform Admin Claim Status
+         * @description Whether the caller should be offered "Enter the setup code from your
+         *     server" (#2005): true only for an active instance admin on an upgraded
+         *     self-host that has no Platform Admin yet. Never returns the code.
+         */
         get: operations["platform_admin_claim_status_v1_auth_platform_admin_claim_get"];
         put?: never;
-        /** Platform Admin Claim */
+        /**
+         * Platform Admin Claim
+         * @description Claim Platform Admin with the one-time setup code printed on the server
+         *     (#2005). On success, refresh the token (POST /v1/auth/refresh) to pick up
+         *     the ``is_platform_admin`` claim. Refused attempts are audited and
+         *     rate-limited (per user and per IP) and capped per user per issued code.
+         */
         post: operations["platform_admin_claim_v1_auth_platform_admin_claim_post"];
         delete?: never;
         options?: never;
@@ -270,7 +424,18 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Refresh Token */
+        /**
+         * Refresh Token
+         * @description Refresh a JWT from a valid bearer token (sent in the Authorization header).
+         *
+         *     #1167: re-validates against the DB rather than blindly renewing. The account
+         *     kill-switch must actually work -- a user disabled (`is_active = false`) or
+         *     deleted after login can no longer refresh (401), instead of keeping access
+         *     indefinitely by refreshing within each expiry window. While we're hitting the
+         *     DB, `role` and `teams` are re-derived from current state too, so an admin
+         *     demotion or team membership change propagates on the next refresh instead of
+         *     only on a full re-login (this supersedes the old deliberate staleness).
+         */
         post: operations["refresh_token_v1_auth_refresh_post"];
         delete?: never;
         options?: never;
@@ -287,7 +452,37 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register */
+        /**
+         * Register
+         * @description Register a new user (username/email/password, min 8 chars). 201 on success.
+         *
+         *     Always creates a "user"-role account (#474) -- admin is only ever granted via
+         *     Authelia OIDC group membership, never self-assignable through this endpoint.
+         *
+         *     #1073/#2002: gated by INSTANCE_REGISTRATION_MODE (`open`, `invite` or
+         *     `closed`; config `sso_only` means `closed`, an unknown value stops startup).
+         *     `closed` disables local self-registration entirely (SSO-only) -> 403.
+         *     `invite` requires a valid, unexpired, unused `invite_token`: no token ->
+         *     403 `invite_required`; an unknown, revoked, used-up or expired one -> 403
+         *     `invite_invalid`; an invite that may not create an account right now ->
+         *     403 `invite_cannot_create_account` (it can still be redeemed from an
+         *     existing account); an email-bound invite for another address -> 403
+         *     `invite_email_mismatch`. An invite creates an account only if its org (a
+         *     team invite: the team's org) is not suspended and its issuer is a Platform
+         *     Admin, or an owner/admin of that org (#2186) while the org is `standard`
+         *     or the mode is `open` (#2191). The account is created and the invite
+         *     consumed (team/org membership + one use) in ONE transaction. `open` lets
+         *     anyone register; a token, if given, is honoured the same way.
+         *
+         *     #2187: an account created through an invite (any mode) gets the invite's
+         *     org -- a team invite: the team's org -- as its home org and NO personal
+         *     org. A token-less `open` signup gets its own `personal` org (#2191)
+         *     while `SELF_SERVE_PERSONAL_ORGS` resolves true (#2234; unset = true in
+         *     `open`); otherwise the account has no organization yet
+         *     (`workspace_state: none` on `GET /v1/profile/me`). The
+         *     response's `organization_id`/`team_id` say where the client should land
+         *     (the home org the first token carries; null when there is none).
+         */
         post: operations["register_v1_auth_register_post"];
         delete?: never;
         options?: never;
@@ -302,7 +497,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Users */
+        /**
+         * Get Users
+         * @description List users across every tenant, paginated. Platform Admin only (#1850).
+         *
+         *     ``?org_id=`` restricts the page to that org's members (ADR Decision 3);
+         *     each item carries all of the user's ``memberships``. There is deliberately
+         *     no caller-scoped variant: org admins use ``GET /v1/organizations/{org_id}/
+         *     members``, so this URL never returns different populations per caller.
+         */
         get: operations["get_users_v1_auth_users_get"];
         put?: never;
         post?: never;
@@ -321,7 +524,21 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reset User Password */
+        /**
+         * Reset User Password
+         * @description Reset another user's LOCAL password (#1776). Platform Admin only (#1850).
+         *
+         *     ``mode: "set"`` takes the admin's ``new_password``; ``mode: "generate"``
+         *     returns a strong server-generated ``temporary_password`` exactly once. Either
+         *     way the user must change it on next login (``must_change_password``) and all
+         *     of their existing sessions stop refreshing (see core.auth).
+         *
+         *     Same authorization scope as the #1803 status endpoint: a DB-rechecked
+         *     Platform Admin. Anyone else -- an org admin, or a legacy ``role = 'admin'``
+         *     without ``is_platform_admin`` -- gets 403 pointing at the org-scoped reset
+         *     route. Callers can't reset themselves here (use /v1/auth/change-password);
+         *     SSO-linked accounts get 409 (their credential lives in the IdP).
+         */
         post: operations["reset_user_password_v1_auth_users__user_id__reset_password_post"];
         delete?: never;
         options?: never;
@@ -342,7 +559,16 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Change User Role */
+        /**
+         * Change User Role
+         * @description Change a user's instance role. Platform Admin only (#1850); the instance
+         *     role no longer implies ``is_platform_admin`` (ADR Decision 4).
+         *
+         *     Rejects OIDC-linked accounts with a 409 (see core.auth.update_user_role's
+         *     docstring) -- their `role` is rewritten on every OIDC login (from Authelia
+         *     group membership on a self-host, always 'user' in SaaS mode, #1849), so
+         *     this endpoint would silently be undone otherwise.
+         */
         patch: operations["change_user_role_v1_auth_users__user_id__role_patch"];
         trace?: never;
     };
@@ -359,7 +585,28 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Change User Status */
+        /**
+         * Change User Status
+         * @description Deactivate (``is_active: false``) or reactivate an account (#1803).
+         *
+         *     Platform Admin only (#1850, ADR Decision 1): the path, request and response
+         *     shape are unchanged, but a non-platform caller -- including a legacy
+         *     ``role = 'admin'`` without ``is_platform_admin`` -- gets 403 pointing at the
+         *     org-scoped ``PATCH /v1/organizations/{org_id}/members/{user_id}/account-status``
+         *     rather than this route silently changing meaning per caller.
+         *
+         *     A soft, reversible removal: the account can no longer sign in (password or
+         *     SSO) or refresh its token, but its row and data stay intact. Already-issued
+         *     access tokens are refused on every request too (#1933,
+         *     ``core.token_liveness``), and deactivation stamps ``sessions_revoked_at`` so
+         *     reactivating doesn't revive them.
+         *
+         *     A caller can't deactivate their own account here (self-lockout; ask another
+         *     Platform Admin), and neither the last active Platform Admin (#1850), the
+         *     last remaining active instance admin, nor the only active owner of any
+         *     organization can be deactivated at all (409 from core.auth.set_user_active;
+         *     the org last-owner guard is shared with the org-scoped route, #1935).
+         */
         patch: operations["change_user_status_v1_auth_users__user_id__status_patch"];
         trace?: never;
     };
@@ -370,10 +617,22 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Proxy To Backups Root */
+        /**
+         * Proxy To Backups Root
+         * @description Proxy /v1/backups (list archives, enqueue a backup job) to Platform
+         *     Ops -- also admin-gated downstream, but a POST here now carries the
+         *     gateway's own JWT-for-writes check (#1325) for consistency with the other
+         *     write-capable proxy routes; GET stays open (Authelia's job, #15).
+         */
         get: operations["proxy_to_backups_root_v1_backups_get"];
         put?: never;
-        /** Proxy To Backups Root */
+        /**
+         * Proxy To Backups Root
+         * @description Proxy /v1/backups (list archives, enqueue a backup job) to Platform
+         *     Ops -- also admin-gated downstream, but a POST here now carries the
+         *     gateway's own JWT-for-writes check (#1325) for consistency with the other
+         *     write-capable proxy routes; GET stays open (Authelia's job, #15).
+         */
         post: operations["proxy_to_backups_root_v1_backups_post"];
         delete?: never;
         options?: never;
@@ -388,10 +647,22 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Proxy To Backups */
+        /**
+         * Proxy To Backups
+         * @description Proxy /v1/backups/* (job listing/status, enqueue a restore job) to
+         *     Platform Ops -- also admin-gated downstream; a POST (e.g. enqueue a
+         *     restore) now carries the gateway JWT-for-writes check (#1325) like the
+         *     other write routes.
+         */
         get: operations["proxy_to_backups_v1_backups__path__get"];
         put?: never;
-        /** Proxy To Backups */
+        /**
+         * Proxy To Backups
+         * @description Proxy /v1/backups/* (job listing/status, enqueue a restore job) to
+         *     Platform Ops -- also admin-gated downstream; a POST (e.g. enqueue a
+         *     restore) now carries the gateway JWT-for-writes check (#1325) like the
+         *     other write routes.
+         */
         post: operations["proxy_to_backups_v1_backups__path__post"];
         delete?: never;
         options?: never;
@@ -408,7 +679,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create Checkout */
+        /**
+         * Create Checkout
+         * @description Create a LemonSqueezy hosted checkout for the caller's org to buy ``tier``.
+         *     Returns the checkout URL for the client to redirect to. Needs billing-manage
+         *     authority (#2036). Limited to 10 calls per minute per caller (429 beyond
+         *     that, #2365). The checkout URL expires after 24 hours (#2365). 422 when the
+         *     caller's tenant isn't an organization (e.g. a service token).
+         */
         post: operations["create_checkout_v1_billing_checkout_post"];
         delete?: never;
         options?: never;
@@ -425,7 +703,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Billing Portal */
+        /**
+         * Billing Portal
+         * @description Return the LemonSqueezy customer-portal URL for the caller's org's current
+         *     subscription (manage/cancel/update payment). Needs billing-manage authority
+         *     (#2036) -- the portal can cancel the org's subscription.
+         */
         post: operations["billing_portal_v1_billing_portal_post"];
         delete?: never;
         options?: never;
@@ -440,7 +723,18 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Subscription */
+        /**
+         * Get Subscription
+         * @description The caller org's current billing state: the tier that ACTUALLY applies right
+         *     now (``effective_tier`` — active + unexpired, else the free baseline), the raw
+         *     entitlement's status/renewal/provider, and whether it's self-manageable via the
+         *     customer portal.
+         *
+         *     Always 200 — an org with no billing event on file is a first-class state
+         *     (``tier`` = baseline, ``status`` = None, ``manageable`` = false), not a 404. No
+         *     provider config is required to read this (unlike checkout/portal), so the client
+         *     can always render the current plan. Needs billing-view authority (#2036).
+         */
         get: operations["get_subscription_v1_billing_subscription_get"];
         put?: never;
         post?: never;
@@ -457,7 +751,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Bundles */
+        /**
+         * List Bundles
+         * @description Proxy GET /v1/bundles to Platform Ops
+         */
         get: operations["list_bundles_v1_bundles_get"];
         put?: never;
         post?: never;
@@ -474,10 +771,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Proxy To Bundles */
+        /**
+         * Proxy To Bundles
+         * @description Proxy /v1/bundles/* (enable/disable/reconcile) to Platform Ops.
+         *     Platform Ops's own routes already carry the full `/v1/bundles/...`
+         *     prefix, so forward the full path back, not just `path` (writes require JWT).
+         */
         get: operations["proxy_to_bundles_v1_bundles__path__get"];
         put?: never;
-        /** Proxy To Bundles */
+        /**
+         * Proxy To Bundles
+         * @description Proxy /v1/bundles/* (enable/disable/reconcile) to Platform Ops.
+         *     Platform Ops's own routes already carry the full `/v1/bundles/...`
+         *     prefix, so forward the full path back, not just `path` (writes require JWT).
+         */
         post: operations["proxy_to_bundles_v1_bundles__path__post"];
         delete?: never;
         options?: never;
@@ -492,7 +799,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Proxy To Containers */
+        /**
+         * Proxy To Containers
+         * @description Proxy /v1/containers/* (recent container logs, for the Status page) to
+         *     Platform Ops -- JWT-gated there (not here), since a log read is
+         *     sensitive but this route only carries GETs, which _require_jwt_for_writes
+         *     never gates.
+         */
         get: operations["proxy_to_containers_v1_containers__path__get"];
         put?: never;
         post?: never;
@@ -509,17 +822,77 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Proxy To Conversations */
+        /**
+         * Proxy To Conversations
+         * @description Proxy /v1/conversations/* to RAG Pipeline.
+         *
+         *     The conversation-history endpoints (e.g. GET /v1/conversations/mine, #934)
+         *     live on rag-pipeline under their own /v1/conversations/* path, not nested
+         *     under /v1/rag/* -- a conversation isn't scoped to a pipeline (see
+         *     list_my_conversations' own docstring), so it gets its own top-level proxy
+         *     route here rather than being folded into proxy_to_rag_pipeline above.
+         *     Without this, the client's Conversations page 404s at the gateway before
+         *     ever reaching rag-pipeline -- caught on a live deployment, not by unit tests
+         *     (which mock the client's fetch layer and never exercise real routing).
+         */
         get: operations["proxy_to_conversations_v1_conversations__path__get"];
-        /** Proxy To Conversations */
+        /**
+         * Proxy To Conversations
+         * @description Proxy /v1/conversations/* to RAG Pipeline.
+         *
+         *     The conversation-history endpoints (e.g. GET /v1/conversations/mine, #934)
+         *     live on rag-pipeline under their own /v1/conversations/* path, not nested
+         *     under /v1/rag/* -- a conversation isn't scoped to a pipeline (see
+         *     list_my_conversations' own docstring), so it gets its own top-level proxy
+         *     route here rather than being folded into proxy_to_rag_pipeline above.
+         *     Without this, the client's Conversations page 404s at the gateway before
+         *     ever reaching rag-pipeline -- caught on a live deployment, not by unit tests
+         *     (which mock the client's fetch layer and never exercise real routing).
+         */
         put: operations["proxy_to_conversations_v1_conversations__path__put"];
-        /** Proxy To Conversations */
+        /**
+         * Proxy To Conversations
+         * @description Proxy /v1/conversations/* to RAG Pipeline.
+         *
+         *     The conversation-history endpoints (e.g. GET /v1/conversations/mine, #934)
+         *     live on rag-pipeline under their own /v1/conversations/* path, not nested
+         *     under /v1/rag/* -- a conversation isn't scoped to a pipeline (see
+         *     list_my_conversations' own docstring), so it gets its own top-level proxy
+         *     route here rather than being folded into proxy_to_rag_pipeline above.
+         *     Without this, the client's Conversations page 404s at the gateway before
+         *     ever reaching rag-pipeline -- caught on a live deployment, not by unit tests
+         *     (which mock the client's fetch layer and never exercise real routing).
+         */
         post: operations["proxy_to_conversations_v1_conversations__path__post"];
-        /** Proxy To Conversations */
+        /**
+         * Proxy To Conversations
+         * @description Proxy /v1/conversations/* to RAG Pipeline.
+         *
+         *     The conversation-history endpoints (e.g. GET /v1/conversations/mine, #934)
+         *     live on rag-pipeline under their own /v1/conversations/* path, not nested
+         *     under /v1/rag/* -- a conversation isn't scoped to a pipeline (see
+         *     list_my_conversations' own docstring), so it gets its own top-level proxy
+         *     route here rather than being folded into proxy_to_rag_pipeline above.
+         *     Without this, the client's Conversations page 404s at the gateway before
+         *     ever reaching rag-pipeline -- caught on a live deployment, not by unit tests
+         *     (which mock the client's fetch layer and never exercise real routing).
+         */
         delete: operations["proxy_to_conversations_v1_conversations__path__delete"];
         options?: never;
         head?: never;
-        /** Proxy To Conversations */
+        /**
+         * Proxy To Conversations
+         * @description Proxy /v1/conversations/* to RAG Pipeline.
+         *
+         *     The conversation-history endpoints (e.g. GET /v1/conversations/mine, #934)
+         *     live on rag-pipeline under their own /v1/conversations/* path, not nested
+         *     under /v1/rag/* -- a conversation isn't scoped to a pipeline (see
+         *     list_my_conversations' own docstring), so it gets its own top-level proxy
+         *     route here rather than being folded into proxy_to_rag_pipeline above.
+         *     Without this, the client's Conversations page 404s at the gateway before
+         *     ever reaching rag-pipeline -- caught on a live deployment, not by unit tests
+         *     (which mock the client's fetch layer and never exercise real routing).
+         */
         patch: operations["proxy_to_conversations_v1_conversations__path__patch"];
         trace?: never;
     };
@@ -530,7 +903,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Capability Entitlement */
+        /**
+         * Get Capability Entitlement
+         * @description Whether `tenant_id` is entitled to `capability` (#1642), for another
+         *     INTERNAL service to consult -- the cross-service counterpart of this
+         *     module's own `core/entitlements.py`'s `require_capability`, which only
+         *     exists as a FastAPI dependency gating THIS service's own routes and can't
+         *     be invoked directly by a sibling service (e.g. marketplace's
+         *     `core/dependency_resolution.py`, whose per-node `entitled` field needs
+         *     exactly this answer).
+         *
+         *     Mirrors marketplace's `GET /v1/marketplace/entitlements/{tenant_id}`
+         *     (the reverse-direction call this module's own `get_org_tier` makes) --
+         *     same shape, same reasoning: service-token-only, since this exposes a
+         *     capability decision for an arbitrary `tenant_id` that a regular user must
+         *     never be able to query for another org.
+         *
+         *     Always 200 for an authenticated service caller: `org_has_capability`
+         *     itself never raises, and with `CAPABILITY_TIER_MAP` still empty (#1447
+         *     undecided) it always resolves `True` -- this route adds no restriction of
+         *     its own beyond that check, and needs no changes when the map is later
+         *     populated (that's the entire point of the seam).
+         */
         get: operations["get_capability_entitlement_v1_entitlements_capabilities__tenant_id__get"];
         put?: never;
         post?: never;
@@ -547,17 +941,67 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Proxy To Graph Rag */
+        /**
+         * Proxy To Graph Rag
+         * @description Proxy /v1/graph-rag/* to the Graph RAG service's own /v1/* routes (writes
+         *     require JWT). Graph RAG's real paths are unprefixed (`/v1/extract`,
+         *     `/v1/construct-graph`, `/v1/retrieve`, `/v1/entity-context`,
+         *     `/v1/graph/document/{id}`) -- the gateway adds the `graph-rag/` segment so
+         *     this doesn't collide with marketplace's own `/v1/graph/*` proxy above.
+         *
+         *     Long timeout: construct-graph runs spaCy NER + several Neo4j writes per
+         *     document (see _LONG_OPERATION_TIMEOUT).
+         */
         get: operations["proxy_to_graph_rag_v1_graph_rag__path__get"];
-        /** Proxy To Graph Rag */
+        /**
+         * Proxy To Graph Rag
+         * @description Proxy /v1/graph-rag/* to the Graph RAG service's own /v1/* routes (writes
+         *     require JWT). Graph RAG's real paths are unprefixed (`/v1/extract`,
+         *     `/v1/construct-graph`, `/v1/retrieve`, `/v1/entity-context`,
+         *     `/v1/graph/document/{id}`) -- the gateway adds the `graph-rag/` segment so
+         *     this doesn't collide with marketplace's own `/v1/graph/*` proxy above.
+         *
+         *     Long timeout: construct-graph runs spaCy NER + several Neo4j writes per
+         *     document (see _LONG_OPERATION_TIMEOUT).
+         */
         put: operations["proxy_to_graph_rag_v1_graph_rag__path__put"];
-        /** Proxy To Graph Rag */
+        /**
+         * Proxy To Graph Rag
+         * @description Proxy /v1/graph-rag/* to the Graph RAG service's own /v1/* routes (writes
+         *     require JWT). Graph RAG's real paths are unprefixed (`/v1/extract`,
+         *     `/v1/construct-graph`, `/v1/retrieve`, `/v1/entity-context`,
+         *     `/v1/graph/document/{id}`) -- the gateway adds the `graph-rag/` segment so
+         *     this doesn't collide with marketplace's own `/v1/graph/*` proxy above.
+         *
+         *     Long timeout: construct-graph runs spaCy NER + several Neo4j writes per
+         *     document (see _LONG_OPERATION_TIMEOUT).
+         */
         post: operations["proxy_to_graph_rag_v1_graph_rag__path__post"];
-        /** Proxy To Graph Rag */
+        /**
+         * Proxy To Graph Rag
+         * @description Proxy /v1/graph-rag/* to the Graph RAG service's own /v1/* routes (writes
+         *     require JWT). Graph RAG's real paths are unprefixed (`/v1/extract`,
+         *     `/v1/construct-graph`, `/v1/retrieve`, `/v1/entity-context`,
+         *     `/v1/graph/document/{id}`) -- the gateway adds the `graph-rag/` segment so
+         *     this doesn't collide with marketplace's own `/v1/graph/*` proxy above.
+         *
+         *     Long timeout: construct-graph runs spaCy NER + several Neo4j writes per
+         *     document (see _LONG_OPERATION_TIMEOUT).
+         */
         delete: operations["proxy_to_graph_rag_v1_graph_rag__path__delete"];
         options?: never;
         head?: never;
-        /** Proxy To Graph Rag */
+        /**
+         * Proxy To Graph Rag
+         * @description Proxy /v1/graph-rag/* to the Graph RAG service's own /v1/* routes (writes
+         *     require JWT). Graph RAG's real paths are unprefixed (`/v1/extract`,
+         *     `/v1/construct-graph`, `/v1/retrieve`, `/v1/entity-context`,
+         *     `/v1/graph/document/{id}`) -- the gateway adds the `graph-rag/` segment so
+         *     this doesn't collide with marketplace's own `/v1/graph/*` proxy above.
+         *
+         *     Long timeout: construct-graph runs spaCy NER + several Neo4j writes per
+         *     document (see _LONG_OPERATION_TIMEOUT).
+         */
         patch: operations["proxy_to_graph_rag_v1_graph_rag__path__patch"];
         trace?: never;
     };
@@ -568,7 +1012,26 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** All Currently Required Bundles */
+        /**
+         * All Currently Required Bundles
+         * @description The Dependency Resolver's batched answer (#1634 sec 7) for the WHOLE
+         *     Bundle vocabulary at once (#1635, ADR sec 12) -- what the reconciler/
+         *     controller's own periodic recompute-then-converge loop calls once per
+         *     tick. `bundle_currently_required` above already runs this exact same full
+         *     computation internally (`resolve_required_bundles` is never scoped to one
+         *     name); this route just returns the WHOLE answer instead of filtering it
+         *     down, so the reconciler's periodic call is ONE round trip, never one per
+         *     Bundle.
+         *
+         *     Same failure/uncertainty contract as the per-name route: `confirmed: false`
+         *     means the computation itself could not be completed (Neo4j/PostgreSQL
+         *     unreachable, a timeout, a malformed response, or the traversal reaching
+         *     the configured depth cap). The reconciler MUST treat this exactly like
+         *     "nothing newly confirmed required" (ADR sec 10/26.4: leave
+         *     `effective_enabled` unchanged everywhere, never write a computed `false`),
+         *     never as a green light to deactivate anything. Admin/service-gated, same
+         *     convention as every other route in this module.
+         */
         get: operations["all_currently_required_bundles_v1_graph_bundles_required_get"];
         put?: never;
         post?: never;
@@ -585,7 +1048,27 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Bundle Currently Required */
+        /**
+         * Bundle Currently Required
+         * @description Live, on-demand answer (#1634, ADR bundle-reconciliation-and-admission.md
+         *     sec 7/21 row 7/26.23) to: is `name` currently required by at least one
+         *     enabled plugin, transitively, via the DEPENDS_ON graph?
+         *
+         *     Computed FRESH on every call -- via the same Dependency Resolver
+         *     (`core.dependency_resolution.resolve_required_bundles`) the (not-yet-built)
+         *     reconciler will use for its own periodic recompute -- never a cached or
+         *     periodic value. This is what plugin-registry's ``POST /v1/bundles/{name}/
+         *     disable`` calls over HTTP (it has no Neo4j/PostgreSQL access of its own) to
+         *     reject a disable-while-required request live.
+         *
+         *     ``confirmed: false`` means the computation itself could not be completed
+         *     (Neo4j/PostgreSQL unreachable, a timeout, a malformed response, or the
+         *     traversal reaching the configured depth cap) -- the caller MUST treat this
+         *     exactly like ``required: true`` (reject the disable), never as a green
+         *     light (ADR sec 10/26.4-5). Admin/service-gated (#1157), same convention as
+         *     `add_plugin_dependency` below -- plugin-registry's own service token is
+         *     accepted alongside a real admin user.
+         */
         get: operations["bundle_currently_required_v1_graph_bundles__name__required_get"];
         put?: never;
         post?: never;
@@ -602,7 +1085,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Plugin Conflicts */
+        /**
+         * Get Plugin Conflicts
+         * @description Find plugins that conflict with the given plugin
+         *
+         *     Args:
+         *         plugin_id: Plugin to check
+         *
+         *     Returns:
+         *         List of conflicting plugins
+         */
         get: operations["get_plugin_conflicts_v1_graph_conflicts__plugin_id__get"];
         put?: never;
         post?: never;
@@ -621,7 +1113,42 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Add Plugin Dependency */
+        /**
+         * Add Plugin Dependency
+         * @description Add a dependency relationship between a plugin and another plugin OR a bundle.
+         *
+         *     Args:
+         *         plugin_id: Plugin that has the dependency
+         *         depends_on: id of the thing that is required -- a plugin id, or (when
+         *             `depends_on_type="bundle"`) a bundle name (e.g. "graph-rag", #1626)
+         *         dependency_type: Type of relationship (requires, suggests, conflicts_with)
+         *         plugin_name / depends_on_name: best-effort display names, used ONLY
+         *             if the graph doesn't already have a node for that plugin (see
+         *             Neo4jClient.add_dependency's ON CREATE SET) -- neither node is
+         *             guaranteed to exist yet when this is called (#484).
+         *         version_constraint: optional PEP 440-style constraint (e.g.
+         *             ">=1.2,<2.0") on the required version of `depends_on` (#1625),
+         *             stored as edge metadata -- see Neo4jClient.add_dependency.
+         *         depends_on_type: "plugin" (default) or "bundle" (#1626) -- lets a
+         *             plugin declare "I require the `graph-rag` bundle" as a first-class
+         *             dependency, enforced by management.py's `_ensure_dependencies_
+         *             enabled` alongside its existing plugin-enabled check. An unknown
+         *             bundle name (not in `shared.bundle_graph.KNOWN_BUNDLES`) is
+         *             rejected -- see Neo4jClient.add_dependency's ValueError -> 400
+         *             mapping below.
+         *
+         *     Returns:
+         *         Success status
+         *
+         *     Admin/service-gated (#1157): the plugin-dependency graph is a single,
+         *     platform-wide control (management.py's #748 enforcement reads it on every
+         *     enable/disable/install), so a non-admin user must not be able to write
+         *     edges into it -- mirrors the admin gate on the sibling ai_tools.py catalog
+         *     writes (#1141). The trusted internal service token is still accepted:
+         *     plugin-registry's own automated sync populates real edges here (e.g.
+         *     "network requires telegraf") at plugin-load time, with no user session in
+         *     hand (#484).
+         */
         post: operations["add_plugin_dependency_v1_graph_dependencies_post"];
         delete?: never;
         options?: never;
@@ -636,7 +1163,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Plugin Dependencies */
+        /**
+         * Get Plugin Dependencies
+         * @description Get all dependencies for a plugin (direct and transitive)
+         *
+         *     Args:
+         *         plugin_id: Plugin identifier
+         *
+         *     Returns:
+         *         List of dependencies with depth information, plus `possibly_truncated`
+         *         (#1633): true if the traversal reached `MAX_DEPENDENCY_DEPTH`, meaning
+         *         real dependencies beyond that depth may be missing from this list --
+         *         the result should be treated as informational/uncertain, not a
+         *         confirmed complete answer, in that case.
+         */
         get: operations["get_plugin_dependencies_v1_graph_dependencies__plugin_id__get"];
         put?: never;
         post?: never;
@@ -653,7 +1193,37 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Resolve Plugin Dependencies */
+        /**
+         * Resolve Plugin Dependencies
+         * @description Structured dependency resolution report for `plugin_id` (#1628).
+         *
+         *     Unlike `GET /dependencies/{plugin_id}` (the raw dependency-chain listing),
+         *     this walks that same chain and composes it into three separately-readable
+         *     parts:
+         *
+         *     - ``resolves``: purely structural graph health (no unresolved cycle, every
+         *       declared version constraint at least parses) -- independent of whether
+         *       anything is actually usable right now.
+         *     - ``nodes``: per-node readiness -- ``installed``/``compatible``/``enabled``
+         *       for plugin nodes; for bundle nodes, TWO independent signals never
+         *       conflated (#1636, ADR bundle-reconciliation-and-admission.md sec
+         *       20/26.18): ``enabled`` (desired state, #1626) and ``healthy``/
+         *       ``healthy_reason`` (runtime reality -- a live Docker running+healthcheck
+         *       query, #1636) -- plus ``entitled`` (see below).
+         *     - ``entitled``: a capability-check seam per node (`plugin:<slug>` /
+         *       `bundle:<name>`, #1624's convention), calling through to api-gateway's
+         *       real (still empty) `CAPABILITY_TIER_MAP` (#1642). Always ``True`` today
+         *       -- #1624/#1447 haven't decided real entitlement policy yet.
+         *
+         *     ``verdict`` is ``READY`` iff `resolves` is true AND every node's every
+         *     dimension is true, else ``BLOCKED`` with ``reason`` naming the first
+         *     failing node/dimension.
+         *
+         *     Readiness is scoped to the CALLER's own installations (`current_user`),
+         *     same as `management.py`'s install/enable checks -- which call this exact
+         *     same builder (`core.dependency_resolution.build_resolution_report`), so
+         *     there is one source of truth for these checks, not two.
+         */
         get: operations["resolve_plugin_dependencies_v1_graph_dependencies__plugin_id__resolve_get"];
         put?: never;
         post?: never;
@@ -670,7 +1240,22 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Graph Health Check */
+        /**
+         * Graph Health Check
+         * @description Check if Neo4j graph database is accessible.
+         *
+         *     Uses shared.health.evaluate_dependencies (the same convention as this
+         *     service's own root /health) instead of an ad-hoc try/except: that gets a
+         *     real 503 on failure for free (the previous version always returned 200,
+         *     even when unhealthy -- misleading to monitoring) and bounds/formats the
+         *     driver exception the same safe way (type name + message, truncated to
+         *     200 chars) rather than returning the raw, unbounded exception text to an
+         *     external caller (CodeQL py/stack-trace-exposure). Takes `neo4j` via
+         *     Depends(get_neo4j_client), matching every sibling route in this file
+         *     (the previous version called get_neo4j_client() directly, the only route
+         *     here that did -- inconsistent, and untestable via this file's own
+         *     dependency_overrides-based test fixture).
+         */
         get: operations["graph_health_check_v1_graph_health_get"];
         put?: never;
         post?: never;
@@ -689,7 +1274,20 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Get Plugin Recommendations */
+        /**
+         * Get Plugin Recommendations
+         * @description Get plugin recommendations based on installed plugins
+         *
+         *     Uses collaborative filtering to suggest plugins that are
+         *     commonly used together with installed ones.
+         *
+         *     Args:
+         *         installed_plugins: List of installed plugin IDs
+         *         limit: Maximum number of recommendations
+         *
+         *     Returns:
+         *         List of recommended plugins with relevance scores
+         */
         post: operations["get_plugin_recommendations_v1_graph_recommendations_post"];
         delete?: never;
         options?: never;
@@ -724,7 +1322,19 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Bulk Create Invites Route */
+        /**
+         * Bulk Create Invites Route
+         * @description Bulk team invite (#1654): invite MULTIPLE emails to the SAME team, at
+         *     the same `team_role`/`max_uses`, in one request -- by calling
+         *     `create_invite` (the EXACT singular mechanism) once per email, never
+         *     reimplementing invite creation. Authorization is checked ONCE for the
+         *     whole batch (`team_id`/`team_role` are fixed for the batch).
+         *
+         *     Same partial-failure convention as `routes/organizations.py`'s
+         *     `bulk_create_org_invites_route` (see its docstring for the full
+         *     rationale): one bad email never aborts the rest, and this always returns
+         *     `207 Multi-Status` with a per-email outcome.
+         */
         post: operations["bulk_create_invites_route_v1_invites_bulk_post"];
         delete?: never;
         options?: never;
@@ -739,7 +1349,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Invite Info Route */
+        /**
+         * Get Invite Info Route
+         * @description Public invite lookup for the landing page. The bound email comes back
+         *     masked (#2186) -- see core.invites.get_invite_info.
+         */
         get: operations["get_invite_info_route_v1_invites_by_token__token__get"];
         put?: never;
         post?: never;
@@ -758,7 +1372,17 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Redeem Invite Route */
+        /**
+         * Redeem Invite Route
+         * @description Redeem a pending invite, adding the caller to the invite's team.
+         *
+         *     #1071: also mints a fresh JWT with an up-to-date `teams` claim. The token
+         *     this request was authenticated with was necessarily issued before this
+         *     exact membership change, and `/v1/auth/refresh` deliberately never
+         *     re-derives `teams` (matching `role`'s existing staleness-until-next-login
+         *     behavior) -- so without this, the caller would have no way to access the
+         *     team's `visibility="team"` content until an unrelated full logout/login.
+         */
         post: operations["redeem_invite_route_v1_invites_by_token__token__redeem_post"];
         delete?: never;
         options?: never;
@@ -796,7 +1420,16 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Update Plugin License Endpoint */
+        /**
+         * Update Plugin License Endpoint
+         * @description Update a plugin's required license tier/key (admin/service-gated).
+         *
+         *     A plugin's *required* tier is a global, security-relevant policy: a
+         *     non-admin could otherwise downgrade a paid plugin's tier to defeat the
+         *     #47 fail-closed license gate, or raise it to deny the plugin to
+         *     everyone. Admin-gated to match the sibling marketplace licensing routes
+         *     (#622/#919) and the #1140-#1146 admin-gate sweep (#1155).
+         */
         patch: operations["update_plugin_license_endpoint_v1_licensing_plugins__plugin_name__license_patch"];
         trace?: never;
     };
@@ -807,7 +1440,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Plugin Tier */
+        /**
+         * Get Plugin Tier
+         * @description Get a plugin's required license tier.
+         */
         get: operations["get_plugin_tier_v1_licensing_plugins__plugin_name__license_tier_get"];
         put?: never;
         post?: never;
@@ -826,7 +1462,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Validate Plugin License */
+        /**
+         * Validate Plugin License
+         * @description Validate a plugin license key against the plugin's required tier.
+         */
         post: operations["validate_plugin_license_v1_licensing_plugins__plugin_name__license_validate_post"];
         delete?: never;
         options?: never;
@@ -841,11 +1480,23 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Plugin Ai Tools */
+        /**
+         * Get Plugin Ai Tools
+         * @description Get all AI tools for a specific plugin
+         */
         get: operations["get_plugin_ai_tools_v1_marketplace_ai_plugins__plugin_id__tools_get"];
         put?: never;
         post?: never;
-        /** Deactivate Plugin Tools */
+        /**
+         * Deactivate Plugin Tools
+         * @description Deactivate all AI tools for a plugin, platform-wide, for every user.
+         *
+         *     Called when a plugin is disabled or uninstalled. Admin/service-only (matches
+         *     the gate already used for other platform-wide destructive actions, e.g.
+         *     model pull/delete, bundle disable) -- this is not scoped to the caller's own
+         *     installation, so a plain authenticated user must not be able to kill a
+         *     popular plugin's tool availability for everyone.
+         */
         delete: operations["deactivate_plugin_tools_v1_marketplace_ai_plugins__plugin_id__tools_delete"];
         options?: never;
         head?: never;
@@ -861,7 +1512,33 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Sync Ai Tools */
+        /**
+         * Sync Ai Tools
+         * @description Sync AI tools from plugin manifest
+         *
+         *     This endpoint is called by the plugin registry when a plugin is loaded.
+         *     It automatically imports/updates AI tools defined in the plugin's manifest.yml.
+         *
+         *     Admin/service-only (found missing in a fresh security re-audit, matches
+         *     deactivate_plugin_tools below): `request.plugin_name`/`plugin_id` are
+         *     caller-supplied and NOT validated against anything the caller owns --
+         *     this writes `marketplace_ai_tools` rows that plugin-registry's
+         *     core/tool_execution.py later dispatches, string-keyed purely by
+         *     `plugin_name`. A bare authenticated user (get_current_user_or_service
+         *     before this) could otherwise register a fake tool naming an EXISTING,
+         *     already-running first-party plugin (e.g. "telegraf") with an `endpoint`
+         *     pointing at one of that real plugin's own ACTIONS methods, then invoke
+         *     it via the AI-tool-execution path to run that method on the real
+         *     instance -- bypassing ACTIONS/ADMIN_ONLY_ACTIONS entirely, since
+         *     tool_execution.py's dispatch never checked the plugin-registry's own
+         *     admin-only gate (see that module's own fix for the same root issue).
+         *
+         *     Args:
+         *         request: Sync request with plugin_name, plugin_id, and manifest
+         *
+         *     Returns:
+         *         Sync result with tools imported/updated
+         */
         post: operations["sync_ai_tools_v1_marketplace_ai_sync_post"];
         delete?: never;
         options?: never;
@@ -876,7 +1553,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List All Ai Tools */
+        /**
+         * List All Ai Tools
+         * @description List all AI tools from all plugins (paginated, #147/C6)
+         *
+         *     Args:
+         *         active_only: Only return active tools
+         *         tier: Filter by required tier
+         *         tool_name: Filter to an exact tool name -- plugin-state-manager's
+         *             validate_tool_access relies on this to look up a SPECIFIC tool's
+         *             required_tier; without it, an unrecognized query param is silently
+         *             dropped by FastAPI and the caller's `tools[0]` picks up whatever
+         *             tool this list's default ordering happens to return first,
+         *             checking an arbitrary tool's tier instead of the one actually
+         *             being invoked.
+         *         plugin_name: Filter to one plugin's tools -- #1322: plugin-registry's
+         *             action routes (``/v1/plugins/{plugin_name}/actions/{action}``) only
+         *             know ``(plugin_name, action)``, not a catalog ``tool_name`` (which is
+         *             unique only per-plugin, schema.sql: ``UNIQUE(plugin_id, tool_name)``),
+         *             so resolving a tool for tier enforcement there must scope by plugin
+         *             first, then match the action, rather than searching the whole catalog.
+         *         limit/offset: Pagination window
+         */
         get: operations["list_all_ai_tools_v1_marketplace_ai_tools_get"];
         put?: never;
         post?: never;
@@ -893,7 +1591,18 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Ai Tool Details */
+        /**
+         * Get Ai Tool Details
+         * @description Get details for a specific AI tool.
+         *
+         *     tool_name is unique per-plugin (schema.sql: UNIQUE(plugin_id, tool_name)),
+         *     NOT globally -- two different plugins can legitimately register the same
+         *     tool name. Filters to active tools (a deactivated tool must not be served
+         *     as live to plugin-state-manager's execution/license-check callers, which
+         *     resolve a tool by this exact endpoint) and orders deterministically so a
+         *     same-name collision across plugins doesn't return a different plugin's
+         *     tool on every query depending on Postgres's own row order.
+         */
         get: operations["get_ai_tool_details_v1_marketplace_ai_tools__tool_name__get"];
         put?: never;
         post?: never;
@@ -910,7 +1619,22 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Org Entitlement */
+        /**
+         * Get Org Entitlement
+         * @description An org's effective entitlement tier, for another INTERNAL service to consult
+         *     when gating a product-level (non-plugin) capability (#1295/#1447).
+         *
+         *     Service-token-only (never a plain user JWT, even an org admin's) -- this exposes
+         *     another tenant's billing tier by id, which a regular caller should never be able
+         *     to query for an arbitrary ``tenant_id``. ``/v1/billing/subscription`` already
+         *     covers "my own org's tier" for an authenticated user; this route is the
+         *     cross-service equivalent for a caller that already knows which tenant it's
+         *     asking about (e.g. api-gateway, resolving the tenant of the request it's
+         *     currently handling).
+         *
+         *     Always 200 for a syntactically-valid tenant_id, mirroring ``effective_tier``'s
+         *     own "no billing event on file -> baseline, not a 404" posture.
+         */
         get: operations["get_org_entitlement_v1_marketplace_entitlements__tenant_id__get"];
         put?: never;
         post?: never;
@@ -927,11 +1651,55 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get My Installations */
+        /**
+         * Get My Installations
+         * @description List the authenticated user's currently-installed plugins, across all
+         *     plugins, with plugin metadata inlined so the client needs no per-plugin
+         *     follow-up fetch just to show a name/description (#402).
+         *
+         *     Each entry carries the installed ``version``, the catalog's
+         *     ``current_version``, an ``update_available`` hint and the
+         *     ``pinned_version`` (#2199).
+         */
         get: operations["get_my_installations_v1_marketplace_installations_me_get"];
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/installations/{installation_id}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Pin Installation
+         * @description Pin an installation to one of its plugin's published versions (#2199).
+         *
+         *     Bulk and automatic updates (phase B, #2371) skip a pinned installation; a
+         *     `blocked` security advisory (#2083) still overrides the pin. Only the
+         *     installation's owner or a Platform Admin may pin it; anyone else (an org
+         *     admin and a service token included) gets 404, the same as an unknown id.
+         *     422 when ``version`` isn't one of the plugin's published
+         *     versions (``GET /v1/marketplace/plugins/{plugin_id}/versions``), 409 when
+         *     the plugin isn't installed. Audited (actor, org, old and new pin); 503 when
+         *     the audit entry can't be written, and then nothing changes. Pinning the
+         *     version already pinned is a no-op.
+         */
+        put: operations["pin_installation_v1_marketplace_installations__installation_id__pin_put"];
+        post?: never;
+        /**
+         * Unpin Installation
+         * @description Remove an installation's version pin (#2199). Same access rule and
+         *     audit as pinning; unpinning an installation that isn't pinned is a no-op.
+         */
+        delete: operations["unpin_installation_v1_marketplace_installations__installation_id__pin_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -944,7 +1712,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Licenses */
+        /**
+         * List Licenses
+         * @description Get all licenses owned by the caller's ORGANIZATION (#622 re-key).
+         *
+         *     Licenses belong to the tenant, so any member sees the org's full set (they
+         *     inherit them). Scoped to the caller's JWT ``tenant_id`` -- never another
+         *     org's records. Keys are masked even for the owning org (#1880).
+         */
         get: operations["list_licenses_v1_marketplace_licenses_get"];
         put?: never;
         post?: never;
@@ -963,7 +1738,22 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Activate License */
+        /**
+         * Activate License
+         * @description Activate a plugin license for the caller's ORGANIZATION, gated on the org's
+         *     paid entitlement (#622 Phase 1 -- real enforcement, replacing the 0a admin
+         *     stop-gap).
+         *
+         *     The license belongs to the tenant (``tenant_id`` from the JWT), so every member
+         *     of the org inherits it. The requested tier must be covered by the org's paid
+         *     entitlement (``org_is_entitled`` -> per-org tier from the billing webhook; for
+         *     an ``inherit`` org, its nearest independent ancestor's, #2331) --
+         *     a plain member can self-serve any plugin up to what the org has PAID for, but
+         *     can no longer mint enterprise for free. The internal service principal bypasses
+         *     the entitlement check (internal provisioning/sync); everyone else, admins
+         *     included, is held to the org's plan -- an org admin can't exceed the tenant's
+         *     entitlement either. A caller with no ``tenant_id`` gets 401 (resolve_tenant_id).
+         */
         post: operations["activate_license_v1_marketplace_licenses_activate_post"];
         delete?: never;
         options?: never;
@@ -978,7 +1768,19 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Lookup Tenant License */
+        /**
+         * Lookup Tenant License
+         * @description Service/admin-only: the tier a SPECIFIC organization's currently-active
+         *     license for a SPECIFIC plugin actually confers, if any (#919, #622 re-key to
+         *     tenant): the license's trial-aware effective tier capped at the org's
+         *     effective entitlement (#2035).
+         *
+         *     Used by plugin-state-manager's tool-tier enforcement to check a caller's org
+         *     entitlement. Now keyed on ``tenant_id`` (the license subject) -- the caller's
+         *     plugin-registry passes the JWT tenant, so every org member is gated by their
+         *     org's license, not a per-user one. Admin/service only: a regular user must
+         *     never probe another tenant's license status.
+         */
         get: operations["lookup_tenant_license_v1_marketplace_licenses_lookup_get"];
         put?: never;
         post?: never;
@@ -997,7 +1799,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Validate License Endpoint */
+        /**
+         * Validate License Endpoint
+         * @description Validate a license key
+         */
         post: operations["validate_license_endpoint_v1_marketplace_licenses_validate_post"];
         delete?: never;
         options?: never;
@@ -1012,7 +1817,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Reveal License Key Endpoint */
+        /**
+         * Reveal License Key Endpoint
+         * @description The full license key (+ signed license, when issued) for self-hosted /
+         *     offline activation (#1951). Owners and billing managers of the owning org,
+         *     or a Platform Admin. Every call is audited; the response is ``no-store``.
+         */
         get: operations["reveal_license_key_endpoint_v1_marketplace_licenses__license_id__key_get"];
         put?: never;
         post?: never;
@@ -1031,7 +1841,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Rotate License Key Endpoint */
+        /**
+         * Rotate License Key Endpoint
+         * @description Issue a new key for the license and invalidate the old one (#1951) --
+         *     ``/validate`` rejects the old key from this point on. Same authorization,
+         *     audit and rate limit as the reveal route; the response is masked (fetch the
+         *     new key through ``GET /{license_id}/key``).
+         */
         post: operations["rotate_license_key_endpoint_v1_marketplace_licenses__license_id__rotate_post"];
         delete?: never;
         options?: never;
@@ -1046,10 +1862,41 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Plugins */
+        /**
+         * List Plugins
+         * @description List all plugins in marketplace
+         *
+         *     Args:
+         *         limit: Page size (canonical, platform-standard)
+         *         offset: Items to skip (canonical, platform-standard)
+         *         page: Deprecated — page number (1-indexed); use limit/offset
+         *         page_size: Deprecated — items per page; use limit/offset
+         *         category: Filter by category
+         *         pricing_model: Filter by pricing model
+         *         status: Filter by status (default: approved). Non-admin/service callers
+         *             are always clamped to the public catalog regardless of what they
+         *             pass here — see submissions.py for a developer's own submissions.
+         *         origin: Filter by catalog origin (``first_party`` = glossary
+         *             first-party | ``submitted`` = glossary community), so a client can
+         *             page one source server-side instead of filtering only the pages it
+         *             has loaded (#2206).
+         */
         get: operations["list_plugins_v1_marketplace_plugins_get"];
         put?: never;
-        /** Create Plugin */
+        /**
+         * Create Plugin
+         * @description Create a new plugin in marketplace.
+         *
+         *     Two distinct callers (#402):
+         *     - the plugin registry (internal **service** token) auto-registering a
+         *       first-party module plugin → created `approved` + `origin='first_party'`,
+         *       as before (these bypass human review by design).
+         *     - a **user** JWT (a developer) → created as a `draft` submission
+         *       (`origin='submitted'`, `submitted_by=<sub>`) that must go through the
+         *       review flow (routes/submissions.py) before it can become visible. This
+         *       closes the prior gap where ANY authenticated user could POST a listing
+         *       that was silently auto-approved and publicly visible immediately.
+         */
         post: operations["create_plugin_v1_marketplace_plugins_post"];
         delete?: never;
         options?: never;
@@ -1064,7 +1911,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Featured Plugins */
+        /**
+         * Get Featured Plugins
+         * @description Get featured plugins
+         */
         get: operations["get_featured_plugins_v1_marketplace_plugins_featured_get"];
         put?: never;
         post?: never;
@@ -1081,7 +1931,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Search Plugins */
+        /**
+         * Search Plugins
+         * @description Search plugins by name or description, optionally within one origin
+         */
         get: operations["search_plugins_v1_marketplace_plugins_search_get"];
         put?: never;
         post?: never;
@@ -1098,7 +1951,21 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Semantic Search Plugins */
+        /**
+         * Semantic Search Plugins
+         * @description Semantically search the plugin catalog (#1683).
+         *
+         *     An ADDITIVE complement to the keyword ``/plugins/search`` endpoint (which is
+         *     left untouched): this embeds ``query`` and ranks catalog entries by vector
+         *     similarity, so a plugin whose wording differs from the query ("procure-flow"
+         *     vs. "purchase-order approval routing") is still found. Backs the
+         *     orchestrator's ``find_plugin`` AI tool.
+         *
+         *     Read-only and public, exactly like the keyword search. Degrades gracefully:
+         *     if the embedding backend or Qdrant is unreachable it returns an empty match
+         *     list (HTTP 200), never an error -- a chat tool call must not break because
+         *     the vector store is momentarily down.
+         */
         get: operations["semantic_search_plugins_v1_marketplace_plugins_semantic_search_get"];
         put?: never;
         post?: never;
@@ -1115,9 +1982,33 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Plugin */
+        /**
+         * Get Plugin
+         * @description Get plugin by ID.
+         *
+         *     A non-public status (draft/submitted/in_review/rejected/archived) is only
+         *     visible to an admin/service caller or the submission's own developer —
+         *     otherwise this is the same unauthenticated-leak class of bug as the
+         *     `status` query param on the list endpoint above (#402 follow-up): the
+         *     id itself isn't secret (it's returned from the create/submit responses),
+         *     so hiding it from listings alone isn't enough.
+         */
         get: operations["get_plugin_v1_marketplace_plugins__plugin_id__get"];
-        /** Update Plugin */
+        /**
+         * Update Plugin
+         * @description Partially update a plugin's marketplace metadata.
+         *
+         *     Only the fields present in the body are changed (the `PluginUpdate` model existed
+         *     but had no route — #147). 404 if the plugin is unknown, 422 if the body is empty.
+         *
+         *     `status` is not updatable via PUT by anyone (#939) — it moves only through
+         *     the review state machine at /v1/marketplace/submissions/*.
+         *
+         *     Non-admin/non-service callers (a submission's own developer) may only edit
+         *     their own `draft`/`rejected` submission, and never `featured` — otherwise a
+         *     developer could feature their own listing or edit anyone else's, bypassing
+         *     the review workflow (#402 follow-up).
+         */
         put: operations["update_plugin_v1_marketplace_plugins__plugin_id__put"];
         post?: never;
         delete?: never;
@@ -1135,7 +2026,19 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Disable Plugin */
+        /**
+         * Disable Plugin
+         * @description Disable the authenticated user's plugin (identity from JWT, #147/C7).
+         *
+         *     #748: rejected with 409 if another of this user's plugins is enabled and
+         *     directly depends on this one (Neo4j DEPENDS_ON graph). enable_plugin's own
+         *     transitive auto-enable keeps the invariant "an enabled plugin's every
+         *     dependency is enabled" true going forward, so a direct (one-hop) check
+         *     here is sufficient to catch a violation regardless of how deep the real
+         *     dependency chain goes -- if some plugin two hops up were enabled, its own
+         *     direct dependency (one hop up from this one) would already have been
+         *     auto-enabled alongside it, and IT is what this check catches.
+         */
         post: operations["disable_plugin_v1_marketplace_plugins__plugin_id__disable_post"];
         delete?: never;
         options?: never;
@@ -1152,7 +2055,19 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Enable Plugin */
+        /**
+         * Enable Plugin
+         * @description Enable the authenticated user's plugin (identity from JWT, #147/C7).
+         *
+         *     #748: the plugin dependency graph (Neo4j DEPENDS_ON) used to be purely
+         *     informational -- a real runtime dependency (e.g. "network" reads
+         *     plugin_instances["telegraf"] directly) could be silently unmet with zero
+         *     warning. This resolves the FULL transitive dependency chain and makes
+         *     sure every one of them is enabled for this user first. A dependency this
+         *     user never installed at all can't be silently auto-installed on their
+         *     behalf (that would bypass their own install choice) -- rejected with a
+         *     clear error naming it instead.
+         */
         post: operations["enable_plugin_v1_marketplace_plugins__plugin_id__enable_post"];
         delete?: never;
         options?: never;
@@ -1169,7 +2084,31 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Install Plugin */
+        /**
+         * Install Plugin
+         * @description Install a plugin for the authenticated user.
+         *
+         *     The user identity comes from the JWT (`sub`) — it used to be a redundant `user_id`
+         *     in the request body/query that duplicated the authenticated principal (#147/C7).
+         *
+         *     plugin_id is str()-cast before InstallationResponse construction: asyncpg returns
+         *     UUID columns as uuid.UUID objects, and InstallationResponse.plugin_id is a `str`
+         *     field -- pydantic v2 does not coerce UUID -> str, so this 500'd on response
+         *     serialization for every install until fixed (#402, found on a live deployment).
+         *
+         *     #892: install used to unconditionally set `enabled=TRUE` on both branches
+         *     below, completely bypassing #748's dependency enforcement -- the single
+         *     most common real-world path (install a plugin) could land an enabled
+         *     plugin whose dependency was never installed, the exact invariant #748
+         *     exists to prevent. Both branches now write the row with `enabled=FALSE`
+         *     first, run the SAME `_ensure_dependencies_enabled` check `/enable`
+         *     already runs, and only flip to `enabled=TRUE` if it passes -- 409ing
+         *     (naming the missing dependency) otherwise, same as `/enable`. The common
+         *     case (no unmet dependency) still lands enabled immediately, unchanged.
+         *     A 409 here leaves the row installed-but-disabled rather than rolling
+         *     back the install entirely -- once the missing dependency is installed,
+         *     the same install call (or a plain `/enable`) completes it.
+         */
         post: operations["install_plugin_v1_marketplace_plugins__plugin_id__install_post"];
         delete?: never;
         options?: never;
@@ -1184,7 +2123,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Plugin Installations */
+        /**
+         * Get Plugin Installations
+         * @description Get a plugin's installations, paginated (#147/C6).
+         *
+         *     Platform Admin or the internal service token only (#2390).
+         *     ``marketplace_installations`` has no tenant column (#2091), so this list
+         *     spans every tenant; ``role == "admin"`` is an ORG admin (#1317) and gets
+         *     403. The Platform Admin claim is confirmed against the DB flag through
+         *     api-gateway; 503 when that can't be answered.
+         */
         get: operations["get_plugin_installations_v1_marketplace_plugins__plugin_id__installations_get"];
         put?: never;
         post?: never;
@@ -1201,10 +2149,27 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Ratings */
+        /**
+         * List Ratings
+         * @description The plugin's current aggregate plus its individual reviews, newest first.
+         */
         get: operations["list_ratings_v1_marketplace_plugins__plugin_id__ratings_get"];
         put?: never;
-        /** Submit Rating */
+        /**
+         * Submit Rating
+         * @description Submit or update the caller's own rating/review for a plugin.
+         *
+         *     Gated on having installed the plugin at some point (ANY row in
+         *     marketplace_installations for this user+plugin, regardless of current
+         *     status) -- matches how most real app-store review systems work (only
+         *     people who actually used it can review), while still letting someone who
+         *     tried it and later uninstalled keep or update their review rather than
+         *     losing that gate retroactively.
+         *
+         *     One review per user per plugin: a second submission UPDATES the existing
+         *     row (upsert) rather than rejecting -- friendlier than a 409, matches "edit
+         *     your review" being the normal expectation on every real review system.
+         */
         post: operations["submit_rating_v1_marketplace_plugins__plugin_id__ratings_post"];
         delete?: never;
         options?: never;
@@ -1222,8 +2187,37 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Uninstall Plugin */
+        /**
+         * Uninstall Plugin
+         * @description Uninstall the authenticated user's plugin (identity from JWT, #147/C7).
+         */
         delete: operations["uninstall_plugin_v1_marketplace_plugins__plugin_id__uninstall_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/marketplace/plugins/{plugin_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Plugin Versions
+         * @description Every recorded version of a plugin (#2199), newest first.
+         *
+         *     Ordered by semantic-version precedence; versions that aren't semantic
+         *     versions come after them, newest first by when they were recorded.
+         *     Readable by whoever may read the plugin itself (``GET /plugins/{id}``):
+         *     anyone for a published plugin; for a draft or an unpublished submission,
+         *     only its developer or an admin (anyone else gets 404).
+         */
+        get: operations["list_plugin_versions_v1_marketplace_plugins__plugin_id__versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1236,7 +2230,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Repositories */
+        /**
+         * List Repositories
+         * @description List plugin source repositories, each with its live linked-plugin count.
+         *
+         *     Public and read-only, mirroring ``/v1/marketplace/plugins`` pagination
+         *     (canonical ``limit``/``offset`` with deprecated ``page``/``page_size``
+         *     fallback).
+         */
         get: operations["list_repositories_v1_marketplace_repositories_get"];
         put?: never;
         post?: never;
@@ -1253,7 +2254,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Repository */
+        /**
+         * Get Repository
+         * @description Get one plugin source repository by id (404 if unknown).
+         */
         get: operations["get_repository_v1_marketplace_repositories__repository_id__get"];
         put?: never;
         post?: never;
@@ -1270,7 +2274,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Repository Plugins */
+        /**
+         * List Repository Plugins
+         * @description List the plugins that belong to one source repository (404 if the
+         *     repository is unknown).
+         *
+         *     Returns the same ``PluginListResponse`` shape as the main plugin listing, so
+         *     a client renders a repository's plugins with the existing plugin card.
+         */
         get: operations["list_repository_plugins_v1_marketplace_repositories__repository_id__plugins_get"];
         put?: never;
         post?: never;
@@ -1287,7 +2298,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Review Queue */
+        /**
+         * Review Queue
+         * @description Admin review queue: submissions in a given status (default ``submitted``),
+         *     oldest-first so the longest-waiting is reviewed next.
+         */
         get: operations["review_queue_v1_marketplace_submissions_get"];
         put?: never;
         post?: never;
@@ -1304,7 +2319,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** My Submissions */
+        /**
+         * My Submissions
+         * @description List the caller's own submissions (any status), newest first — scoped to
+         *     the JWT ``sub`` so one developer can't see another's drafts/rejections.
+         */
         get: operations["my_submissions_v1_marketplace_submissions_mine_get"];
         put?: never;
         post?: never;
@@ -1321,7 +2340,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Submission Detail */
+        /**
+         * Submission Detail
+         * @description One submission with the manifest its developer submitted (#2214).
+         *
+         *     An admin sees any submission, with the submitter's and last reviewer's
+         *     usernames. The submission's own developer sees their own (so they can read
+         *     back the stored manifest), without the account names. Anyone else gets the
+         *     same 404 as an unknown id, so another developer's submission isn't revealed.
+         *     The manifest is JSON data: it is never executed, and credentials in its URLs
+         *     are removed.
+         */
         get: operations["submission_detail_v1_marketplace_submissions__plugin_id__get"];
         put?: never;
         post?: never;
@@ -1340,7 +2369,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Approve Submission */
+        /**
+         * Approve Submission
+         * @description Admin: approve an ``in_review`` submission → ``approved`` (publicly
+         *     visible via the existing catalog read paths).
+         */
         post: operations["approve_submission_v1_marketplace_submissions__plugin_id__approve_post"];
         delete?: never;
         options?: never;
@@ -1357,7 +2390,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Archive Submission */
+        /**
+         * Archive Submission
+         * @description Admin/service: archive (delist) an ``approved`` plugin.
+         */
         post: operations["archive_submission_v1_marketplace_submissions__plugin_id__archive_post"];
         delete?: never;
         options?: never;
@@ -1374,7 +2410,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Claim Review */
+        /**
+         * Claim Review
+         * @description Admin: take a ``submitted`` submission into ``in_review`` (records the
+         *     reviewer).
+         */
         post: operations["claim_review_v1_marketplace_submissions__plugin_id__claim_post"];
         delete?: never;
         options?: never;
@@ -1389,7 +2429,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Submission History */
+        /**
+         * Submission History
+         * @description Admin: every recorded status transition of a submission, oldest first
+         *     (#2214), from the append-only ``marketplace_plugin_reviews`` audit trail.
+         *     Each entry has the from/to status, the actor (and their username when
+         *     known), their role, the notes and the time. Paged with ``limit``/``offset``;
+         *     ``total`` is the full count. 404 for an unknown submission.
+         */
         get: operations["submission_history_v1_marketplace_submissions__plugin_id__history_get"];
         put?: never;
         post?: never;
@@ -1408,7 +2455,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reject Submission */
+        /**
+         * Reject Submission
+         * @description Admin: reject a ``submitted``/``in_review`` submission (feedback
+         *     **required** so the developer knows what to fix before resubmitting).
+         */
         post: operations["reject_submission_v1_marketplace_submissions__plugin_id__reject_post"];
         delete?: never;
         options?: never;
@@ -1425,7 +2476,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Submit For Review */
+        /**
+         * Submit For Review
+         * @description Developer action: move an own ``draft``/``rejected`` submission to
+         *     ``submitted`` (into the review queue). Only the submission's owner (or an
+         *     admin/service) may submit it; a non-owner gets 404 (same message as an
+         *     unknown id — no reason to reveal another tenant's submission exists).
+         */
         post: operations["submit_for_review_v1_marketplace_submissions__plugin_id__submit_post"];
         delete?: never;
         options?: never;
@@ -1440,10 +2497,34 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Model Providers Root */
+        /**
+         * Model Providers Root
+         * @description List (GET) or register (POST) the caller's org's model providers -- the
+         *     Cloud Providers (BYOK) page's collection endpoint (#2043).
+         *
+         *     model-management's provider vault lives under its own `/v1/model-providers`
+         *     prefix (routes/providers.py), not under `/v1/models`, so without this route
+         *     the page 404'd at the gateway before ever reaching the service. Forwarded
+         *     whole. Auth is the same as every other proxied route: writes need a JWT here,
+         *     and proxy_request verifies any Bearer credential (signature + session
+         *     liveness, #1933) before forwarding it; model-management's own
+         *     org-admin gate still decides who may read or change the vault.
+         */
         get: operations["model_providers_root_v1_model_providers_get"];
         put?: never;
-        /** Model Providers Root */
+        /**
+         * Model Providers Root
+         * @description List (GET) or register (POST) the caller's org's model providers -- the
+         *     Cloud Providers (BYOK) page's collection endpoint (#2043).
+         *
+         *     model-management's provider vault lives under its own `/v1/model-providers`
+         *     prefix (routes/providers.py), not under `/v1/models`, so without this route
+         *     the page 404'd at the gateway before ever reaching the service. Forwarded
+         *     whole. Auth is the same as every other proxied route: writes need a JWT here,
+         *     and proxy_request verifies any Bearer credential (signature + session
+         *     liveness, #1933) before forwarding it; model-management's own
+         *     org-admin gate still decides who may read or change the vault.
+         */
         post: operations["model_providers_root_v1_model_providers_post"];
         delete?: never;
         options?: never;
@@ -1458,17 +2539,52 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Proxy To Model Providers */
+        /**
+         * Proxy To Model Providers
+         * @description Proxy `/v1/model-providers/*` (presets, usage, `{id}`, `{id}/test`,
+         *     rotate, ...) to model-management's same path (#2043; writes require JWT).
+         *
+         *     Long timeout: `{id}/test` makes a live call to the remote provider, and
+         *     generate/chat run inference (see _LONG_OPERATION_TIMEOUT).
+         */
         get: operations["proxy_to_model_providers_v1_model_providers__path__get"];
-        /** Proxy To Model Providers */
+        /**
+         * Proxy To Model Providers
+         * @description Proxy `/v1/model-providers/*` (presets, usage, `{id}`, `{id}/test`,
+         *     rotate, ...) to model-management's same path (#2043; writes require JWT).
+         *
+         *     Long timeout: `{id}/test` makes a live call to the remote provider, and
+         *     generate/chat run inference (see _LONG_OPERATION_TIMEOUT).
+         */
         put: operations["proxy_to_model_providers_v1_model_providers__path__put"];
-        /** Proxy To Model Providers */
+        /**
+         * Proxy To Model Providers
+         * @description Proxy `/v1/model-providers/*` (presets, usage, `{id}`, `{id}/test`,
+         *     rotate, ...) to model-management's same path (#2043; writes require JWT).
+         *
+         *     Long timeout: `{id}/test` makes a live call to the remote provider, and
+         *     generate/chat run inference (see _LONG_OPERATION_TIMEOUT).
+         */
         post: operations["proxy_to_model_providers_v1_model_providers__path__post"];
-        /** Proxy To Model Providers */
+        /**
+         * Proxy To Model Providers
+         * @description Proxy `/v1/model-providers/*` (presets, usage, `{id}`, `{id}/test`,
+         *     rotate, ...) to model-management's same path (#2043; writes require JWT).
+         *
+         *     Long timeout: `{id}/test` makes a live call to the remote provider, and
+         *     generate/chat run inference (see _LONG_OPERATION_TIMEOUT).
+         */
         delete: operations["proxy_to_model_providers_v1_model_providers__path__delete"];
         options?: never;
         head?: never;
-        /** Proxy To Model Providers */
+        /**
+         * Proxy To Model Providers
+         * @description Proxy `/v1/model-providers/*` (presets, usage, `{id}`, `{id}/test`,
+         *     rotate, ...) to model-management's same path (#2043; writes require JWT).
+         *
+         *     Long timeout: `{id}/test` makes a live call to the remote provider, and
+         *     generate/chat run inference (see _LONG_OPERATION_TIMEOUT).
+         */
         patch: operations["proxy_to_model_providers_v1_model_providers__path__patch"];
         trace?: never;
     };
@@ -1479,10 +2595,36 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Model Management Root */
+        /**
+         * Model Management Root
+         * @description List (GET) or pull (POST) models.
+         *
+         *     Forwarded to model-management's canonical `/v1/models` (#2043) -- not its
+         *     deprecated unversioned `/models` alias, which this route used to target (the
+         *     #147/C1 fix for the old `/v1/models/models` doubling). model-management
+         *     serves every models route under both paths, so this is behaviour-preserving
+         *     and lets the alias be retired without breaking the gateway.
+         *
+         *     Long timeout: a model pull (POST) blocks on a synchronous, non-streamed
+         *     Ollama download that routinely takes minutes for multi-GB models (see
+         *     _LONG_OPERATION_TIMEOUT).
+         */
         get: operations["model_management_root_v1_models_get"];
         put?: never;
-        /** Model Management Root */
+        /**
+         * Model Management Root
+         * @description List (GET) or pull (POST) models.
+         *
+         *     Forwarded to model-management's canonical `/v1/models` (#2043) -- not its
+         *     deprecated unversioned `/models` alias, which this route used to target (the
+         *     #147/C1 fix for the old `/v1/models/models` doubling). model-management
+         *     serves every models route under both paths, so this is behaviour-preserving
+         *     and lets the alias be retired without breaking the gateway.
+         *
+         *     Long timeout: a model pull (POST) blocks on a synchronous, non-streamed
+         *     Ollama download that routinely takes minutes for multi-GB models (see
+         *     _LONG_OPERATION_TIMEOUT).
+         */
         post: operations["model_management_root_v1_models_post"];
         delete?: never;
         options?: never;
@@ -1497,17 +2639,57 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Proxy To Model Management */
+        /**
+         * Proxy To Model Management
+         * @description Proxy `/v1/models/{id}[/...]` to the service's canonical
+         *     `/v1/models/{id}[/...]` (writes require JWT) -- not the deprecated `/models`
+         *     alias (#2043; see model_management_root).
+         *
+         *     Long timeout: `.../test` runs blocking LLM inference and a delete can take a
+         *     while freeing a large model's disk space (see _LONG_OPERATION_TIMEOUT).
+         */
         get: operations["proxy_to_model_management_v1_models__path__get"];
-        /** Proxy To Model Management */
+        /**
+         * Proxy To Model Management
+         * @description Proxy `/v1/models/{id}[/...]` to the service's canonical
+         *     `/v1/models/{id}[/...]` (writes require JWT) -- not the deprecated `/models`
+         *     alias (#2043; see model_management_root).
+         *
+         *     Long timeout: `.../test` runs blocking LLM inference and a delete can take a
+         *     while freeing a large model's disk space (see _LONG_OPERATION_TIMEOUT).
+         */
         put: operations["proxy_to_model_management_v1_models__path__put"];
-        /** Proxy To Model Management */
+        /**
+         * Proxy To Model Management
+         * @description Proxy `/v1/models/{id}[/...]` to the service's canonical
+         *     `/v1/models/{id}[/...]` (writes require JWT) -- not the deprecated `/models`
+         *     alias (#2043; see model_management_root).
+         *
+         *     Long timeout: `.../test` runs blocking LLM inference and a delete can take a
+         *     while freeing a large model's disk space (see _LONG_OPERATION_TIMEOUT).
+         */
         post: operations["proxy_to_model_management_v1_models__path__post"];
-        /** Proxy To Model Management */
+        /**
+         * Proxy To Model Management
+         * @description Proxy `/v1/models/{id}[/...]` to the service's canonical
+         *     `/v1/models/{id}[/...]` (writes require JWT) -- not the deprecated `/models`
+         *     alias (#2043; see model_management_root).
+         *
+         *     Long timeout: `.../test` runs blocking LLM inference and a delete can take a
+         *     while freeing a large model's disk space (see _LONG_OPERATION_TIMEOUT).
+         */
         delete: operations["proxy_to_model_management_v1_models__path__delete"];
         options?: never;
         head?: never;
-        /** Proxy To Model Management */
+        /**
+         * Proxy To Model Management
+         * @description Proxy `/v1/models/{id}[/...]` to the service's canonical
+         *     `/v1/models/{id}[/...]` (writes require JWT) -- not the deprecated `/models`
+         *     alias (#2043; see model_management_root).
+         *
+         *     Long timeout: `.../test` runs blocking LLM inference and a delete can take a
+         *     while freeing a large model's disk space (see _LONG_OPERATION_TIMEOUT).
+         */
         patch: operations["proxy_to_model_management_v1_models__path__patch"];
         trace?: never;
     };
@@ -1554,7 +2736,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Retry Org Purge Job */
+        /**
+         * Retry Org Purge Job
+         * @description Re-queue a ``failed`` job now with a fresh attempt budget; stores that
+         *     already succeeded are not re-run. 409 if the job is running or done.
+         */
         post: operations["retry_org_purge_job_v1_org_purge_jobs__job_id__retry_post"];
         delete?: never;
         options?: never;
@@ -1569,10 +2755,29 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Organizations Route */
+        /**
+         * List Organizations Route
+         * @description List organizations with member counts. Admin-only (platform-operator view).
+         */
         get: operations["list_organizations_route_v1_organizations_get"];
         put?: never;
-        /** Create Organization Route */
+        /**
+         * Create Organization Route
+         * @description Provision a new TOP-LEVEL organization + its primary owner + a default
+         *     team, atomically (#2231; onboarding ADR D6, D9, edge case 6).
+         *
+         *     A Platform Admin may create one for any owner (`owner_user_id`, default
+         *     the caller): `created_via = platform_admin`. Anyone else must own an
+         *     active top-level organization whose plan allows another, and becomes the
+         *     new organization's owner (`owner_user_id`, if given, must be the caller):
+         *     `created_via = owner`. The new organization is `standard` and starts on
+         *     the baseline plan until its own checkout. The owner's
+         *     `top_level_orgs` and `owned_free_orgs` limits apply: over a `hard` one,
+         *     `403` with `reason: entitlement` and the limit's fields; over a `soft`
+         *     one (community), allowed and audited `ORG_LIMIT_SOFT_EXCEEDED`. Owning no
+         *     organization is a `403` too. Rate-limited per account. `409` on a taken
+         *     slug. Sub-organizations: `POST /{org_id}/suborganizations`.
+         */
         post: operations["create_organization_route_v1_organizations_post"];
         delete?: never;
         options?: never;
@@ -1587,10 +2792,48 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List My Organizations */
+        /**
+         * List My Organizations
+         * @description The organizations the CALLER belongs to, for the org switcher and the
+         *     which-org-am-I indicator. Any authenticated user — distinct from ``GET ""``
+         *     (admin-only, all orgs on the instance). A user with no org membership yet gets
+         *     an empty list (pre-backfill / orgless), which the client renders as no
+         *     switcher rather than an error.
+         */
         get: operations["list_my_organizations_v1_organizations_mine_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/personal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Personal Organization Route
+         * @description Create my workspace (#2234; onboarding ADR Decision 3, edge case 4):
+         *     an account that belongs to no organization creates its own `personal`
+         *     organization, becomes its owner, and gets a fresh token whose tenant is
+         *     the new organization.
+         *
+         *     Allowed only while `SELF_SERVE_PERSONAL_ORGS` resolves true (unset: true
+         *     in `open` registration mode), else `403` with `reason:
+         *     installation_policy`; `409` `workspace_exists` once the account belongs
+         *     to any organization; the free-organization limit (`owned_free_orgs` of
+         *     the baseline plan) applies, `403` with `reason: entitlement` over a hard
+         *     limit. Rate-limited per account. `GET /v1/profile/me` reports
+         *     `can_create_workspace`.
+         */
+        post: operations["create_personal_organization_route_v1_organizations_personal_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1606,7 +2849,17 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Switch Organization */
+        /**
+         * Switch Organization
+         * @description Switch the caller's ACTIVE tenant context to another org they belong to.
+         *
+         *     Re-mints their JWT with ``active_tenant_id`` set to the target (their home
+         *     ``tenant_id`` is unchanged), so subsequent requests read AND write in that org's
+         *     context (``resolve_active_tenant_id`` / ``resolve_tenant_id`` both key on the
+         *     active tenant, as does the RLS session GUC). Member-only: 403 if the caller
+         *     isn't a member of the target. Any authenticated USER may call this (not
+         *     admin-gated) — it only ever moves them between orgs they already belong to.
+         */
         post: operations["switch_organization_v1_organizations_switch_post"];
         delete?: never;
         options?: never;
@@ -1624,11 +2877,21 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete Organization Route */
+        /**
+         * Delete Organization Route
+         * @description Deleting an organization is IRREVERSIBLE. The organization is removed immediately and a background job permanently purges its data from every service; there is no grace period and no undo. The organization export (GET /v1/organizations/{id}/export) does NOT include document or vector payloads, knowledge-graph data or uploaded files, so exporting first does not make a deletion recoverable. Requires `confirm=<organization slug>` matching the target exactly (400 otherwise). The `default` organization can never be deleted (409). `reparent_children_to` must have the children's kind: a sub-organization has its parent's kind (409 `org_kind_mismatch`).
+         */
         delete: operations["delete_organization_route_v1_organizations__org_id__delete"];
         options?: never;
         head?: never;
-        /** Update Organization Route */
+        /**
+         * Update Organization Route
+         * @description Edit an org's own name/description (#1503) and, since #1650, its own
+         *     `entitlement_mode`. Same authority as managing its membership: the org's
+         *     own owner/admin, or an instance/platform admin — `_require_org_manage`
+         *     already encodes exactly that, reused as-is rather than inventing a
+         *     parallel check for a different org-mutating action.
+         */
         patch: operations["update_organization_route_v1_organizations__org_id__patch"];
         trace?: never;
     };
@@ -1639,7 +2902,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Org Audit Logs */
+        /**
+         * Get Org Audit Logs
+         * @description The org audit view (#1851): entries scoped to ``org_id`` or any of its
+         *     sub-organizations (``scope_type = 'org'``), newest first, paginated. A
+         *     delegated action appears under its TARGET org, with the ancestor it was
+         *     delegated from in ``after_state.delegated_via``. Platform, self and
+         *     pre-#1851 (``legacy``) entries are not included -- see the module
+         *     docstring. Requires ``org.audit.view`` on the org (or Platform Admin).
+         */
         get: operations["get_org_audit_logs_v1_organizations__org_id__audit_logs_get"];
         put?: never;
         post?: never;
@@ -1658,7 +2929,28 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Convert Organization Route */
+        /**
+         * Convert Organization Route
+         * @description Convert an organization's kind (#2191, #2230). Only `personal` ->
+         *     `standard` exists: afterwards the org's owners/admins can issue invites
+         *     that create new accounts even in `invite`/`closed` registration mode.
+         *     Conversion is one-way: `"to": "personal"` is refused with 409.
+         *
+         *     Platform Admin only (the claim re-checked against the database): this is
+         *     the operator vetting a self-served tenant, so neither the org's own owner
+         *     nor an ancestor org's admin may do it (403). Converts the whole subtree:
+         *     every `personal` sub-organization becomes `standard` too. A personal
+         *     sub-organization whose parent is still personal can't be converted on its
+         *     own (409 `org_kind_mismatch`): convert the top personal organization.
+         *
+         *     A change is audited once, in the same transaction, as `ORG_KIND_CHANGED`
+         *     on the target, with `from`, `to`, the `reason`, `via: platform_admin` and
+         *     the converted descendants' ids. Idempotent: an org that is already
+         *     `standard` with no personal sub-organization is returned unchanged (200,
+         *     no audit row). 404 for an unknown org. The active owners are e-mailed.
+         *     The setup CLI (`org convert`) and a paid upgrade call the same
+         *     `core.organizations.convert_organization`.
+         */
         post: operations["convert_organization_route_v1_organizations__org_id__convert_post"];
         delete?: never;
         options?: never;
@@ -1673,7 +2965,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Organization Entitlement Route */
+        /**
+         * Get Organization Entitlement Route
+         * @description The org's effective entitlement, resolved fresh on every call (#1650) --
+         *     see `core.organizations.effective_entitlement`. Member-only (or platform
+         *     admin), matching the subtree endpoint's own visibility gate.
+         */
         get: operations["get_organization_entitlement_route_v1_organizations__org_id__entitlement_get"];
         put?: never;
         post?: never;
@@ -1690,7 +2987,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Export Organization Data */
+        /**
+         * Export Organization Data
+         * @description Export the caller's own org as a downloadable JSON bundle (#1506).
+         *
+         *     Owner/admin of the org (or an instance/platform admin) only. The response is the
+         *     bundle itself, served as an attachment so a browser downloads it directly.
+         */
         get: operations["export_organization_data_v1_organizations__org_id__export_get"];
         put?: never;
         post?: never;
@@ -1709,7 +3012,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Import Organization Data */
+        /**
+         * Import Organization Data
+         * @description Import a bundle into the caller's own org (#1506). Owner/admin of the org (or an
+         *     instance/platform admin) only. Returns a report of what was imported and every
+         *     conflict that was resolved (skipped / renamed / unresolved member).
+         */
         post: operations["import_organization_data_v1_organizations__org_id__import_post"];
         delete?: never;
         options?: never;
@@ -1724,10 +3032,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Org Invites Route */
+        /**
+         * List Org Invites Route
+         * @description Pending/spent invites for an org. Owner/admin (or Platform Admin) only.
+         */
         get: operations["list_org_invites_route_v1_organizations__org_id__invites_get"];
         put?: never;
-        /** Create Org Invite Route */
+        /**
+         * Create Org Invite Route
+         * @description Invite a user to an org by email (#1209). Owner/admin of the org (or an
+         *     instance/platform admin, or -- #1652 -- an ancestor org's holder of
+         *     ``org.members.manage`` via delegated hierarchical authority) only.
+         *     Redeeming the token joins the org directly.
+         *
+         *     #2228: under the org's ``invite_policy = members`` any active member may
+         *     also invite, single-use at the ``member`` role, and outside ``open``
+         *     mode only an address that already has an account (403 ``reason:
+         *     org_policy``, ``rule: invite_policy``). An address off the org's
+         *     allowed email domains is refused with 422 (``rule:
+         *     allowed_email_domains``); with account-creating invites switched off,
+         *     an invite for an address without an account is refused in ``invite``
+         *     mode (403, ``rule: allow_account_creating_invites``).
+         */
         post: operations["create_org_invite_route_v1_organizations__org_id__invites_post"];
         delete?: never;
         options?: never;
@@ -1744,7 +3070,29 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Bulk Create Org Invites Route */
+        /**
+         * Bulk Create Org Invites Route
+         * @description Bulk org invite (#1654): invite MULTIPLE emails, all at the same
+         *     `org_role`/`max_uses`, in one request -- by calling `create_org_invite`
+         *     (the EXACT singular mechanism -- #1209, #1652) once per email, never
+         *     reimplementing invite creation. Authorization is evaluated ONCE for the
+         *     whole batch (every email shares the same `org_role`, so there is exactly
+         *     one grant-authority question to answer, not N identical ones).
+         *
+         *     **Partial-failure convention (judgment call -- no prior bulk-with-
+         *     partial-failure precedent existed in this codebase before this issue):**
+         *     one invalid/failing email does NOT abort the batch. Every email is
+         *     attempted independently and this always returns `207 Multi-Status` with a
+         *     per-email outcome (`created` or `failed` + reason) -- HTTP already
+         *     defines `207` for exactly this "some items succeeded, some didn't" shape,
+         *     so this reuses that standard meaning rather than inventing a bespoke
+         *     convention or an all-or-nothing 4xx/2xx choice that would either abandon
+         *     4 good emails over 1 bad one, or hide a real per-email failure behind a
+         *     blanket 201.
+         *
+         *     #2228: the org policy applies per row as on the singular route; a row it
+         *     refuses fails with ``reason: org_policy`` and its ``rule``.
+         */
         post: operations["bulk_create_org_invites_route_v1_organizations__org_id__invites_bulk_post"];
         delete?: never;
         options?: never;
@@ -1761,7 +3109,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Revoke Org Invite Route */
+        /**
+         * Revoke Org Invite Route
+         * @description Revoke an org invite. Verifies the invite belongs to this org (so a caller
+         *     can't revoke another org's invite by guessing ids), then owner/admin-gates.
+         */
         post: operations["revoke_org_invite_route_v1_organizations__org_id__invites__invite_id__revoke_post"];
         delete?: never;
         options?: never;
@@ -1776,7 +3128,21 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Organization Limits Route */
+        /**
+         * Get Organization Limits Route
+         * @description Every onboarding limit of the org (#2226), resolved at its entitlement
+         *     root: tier default, then operator override, bounded by the licensed
+         *     value (strictest wins). Each item says which `source` applied.
+         *
+         *     `view: full` (every limit with `source`, `override_scope`, `clamped` and
+         *     `entitlement_root_id`) for a caller with `org.members.manage` on the org
+         *     (direct or delegated from an ancestor) and for a Platform Admin (any org;
+         *     404 for an unknown one). An ordinary active member gets `view: member`:
+         *     the org-policy knobs' availability only. A suspended member or an
+         *     outsider gets 403, whether or not the org exists. `enforced` is false
+         *     while the gateway runs limits in shadow mode. The full view also carries
+         *     `seats` (as `GET …/seats`, #2227).
+         */
         get: operations["get_organization_limits_route_v1_organizations__org_id__limits_get"];
         put?: never;
         post?: never;
@@ -1794,10 +3160,26 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Set Organization Limit Route */
+        /**
+         * Set Organization Limit Route
+         * @description Set a per-org operator override (#2226). Platform Admin only (403).
+         *     The override replaces the tier default and the installation override for
+         *     this org; a licensed value still bounds it (the response shows the
+         *     effective value, `clamped` when the license or tier tightened it).
+         *     Audited `ORG_LIMIT_OVERRIDE_SET` with the reason. 404 for an unknown org
+         *     or key, 409 on an org that inherits its entitlement, 422 for a value of
+         *     the wrong kind or out of bounds.
+         */
         put: operations["set_organization_limit_route_v1_organizations__org_id__limits__key__put"];
         post?: never;
-        /** Clear Organization Limit Route */
+        /**
+         * Clear Organization Limit Route
+         * @description Remove a per-org operator override (#2226): the installation override
+         *     or tier default applies again. Platform Admin only; audited
+         *     `ORG_LIMIT_OVERRIDE_SET` with `cleared: true` (no row when there was no
+         *     override); the JSON body carries the `reason`. Same 404/409 as setting
+         *     one.
+         */
         delete: operations["clear_organization_limit_route_v1_organizations__org_id__limits__key__delete"];
         options?: never;
         head?: never;
@@ -1811,10 +3193,54 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Organization Members Route */
+        /**
+         * List Organization Members Route
+         * @description Members of an org, for a caller holding ``org.members.view`` on it, an
+         *     ancestor-org manager (delegated ``org.members.manage``) or a Platform
+         *     Admin (#1853; see ``_require_org_members_view``).
+         *     403 otherwise -- org membership is itself tenant-scoped information.
+         *
+         *     Each item carries the org-visible state (``is_active``, ``suspended_at``)
+         *     and two booleans about the caller, from
+         *     ``core.account_admin.org_member_account_flags``: ``managed_by_caller``
+         *     (the caller is verified for account management in this org, as the reset
+         *     route verifies it, and ``managed_by(member, org_id)``) and
+         *     ``resettable_by_caller`` (the org reset-password route would accept it).
+         *     Both are false for a caller who may only view the roster.
+         *     The account-global ``is_oidc_linked`` / ``must_change_password`` are
+         *     returned only where ``managed_by_caller`` is true and are null otherwise:
+         *     for a viewer, or for an account that also lives outside this org's tree,
+         *     they would describe the account beyond this tenant. All of it is a hint;
+         *     the action routes re-check everything.
+         */
         get: operations["list_organization_members_route_v1_organizations__org_id__members_get"];
         put?: never;
-        /** Add Organization Member Route */
+        /**
+         * Add Organization Member Route
+         * @description Add a user to an org, or change their role (upsert). Allowed for the org's
+         *     own owner/admin as well as instance/platform admins (#1208), or -- #1652 --
+         *     an ancestor org's holder of ``org.members.manage``, without needing their
+         *     own separate membership in ``org_id``.
+         *
+         *     #1934 (ADR tenant-scoped-user-administration Decision 1): a caller who is
+         *     not a Platform Admin may only change the role of a user who is already a
+         *     member of ``org_id``, or directly add a user ``org_id`` already manages
+         *     (``managed_by``: an account wholly inside this org's tree). Any other
+         *     user gets the same 404 as an id that doesn't exist, and nothing is
+         *     written; users from elsewhere join by accepting an invite. A Platform
+         *     Admin keeps direct add for any user, and an orgless user added this way
+         *     gets this org as home. The home flag of an existing membership is never
+         *     changed (see ``core.organizations.add_org_member``).
+         *
+         *     #2309: changing the role of a member who is currently an owner or admin
+         *     needs owner-level authority (``org.roles.manage`` in this org, directly
+         *     or delegated from an ancestor; a Platform Admin always has it) -- 403
+         *     with detail ``requires_owner`` otherwise. A change that would demote the
+         *     org's last active owner is refused with 409 and detail ``last_owner``,
+         *     yourself included: promote another member to owner first. Both are
+         *     checked inside the write's transaction. Lowering your own role needs no
+         *     owner authority.
+         */
         post: operations["add_organization_member_route_v1_organizations__org_id__members_post"];
         delete?: never;
         options?: never;
@@ -1831,7 +3257,27 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Bulk Assign Org Role Route */
+        /**
+         * Bulk Assign Org Role Route
+         * @description Bulk role assignment (#1654): grant ONE custom role (#1897),
+         *     optionally time-boxed, to a LIST of user ids in one request -- by calling
+         *     `assign_org_role` (the EXACT singular mechanism `assign_org_role_route`
+         *     itself calls) once per user id, never reimplementing assignment.
+         *     Authorization -- `org.members.manage` (`_require_members_manage`) AND the
+         *     grant-authority superset rule against the SPECIFIC role being granted
+         *     (`_require_can_grant_role`) -- is evaluated ONCE for the whole batch,
+         *     exactly mirroring the singular endpoint's own two checks (this endpoint
+         *     does NOT add #1652 delegated-authority support beyond what
+         *     `_require_members_manage` itself already does -- it has none today,
+         *     unlike `routes/organizations.py`'s member-management gates -- so bulk
+         *     stays byte-identical in authorization shape to the singular route).
+         *
+         *     Same partial-failure convention as the bulk-invite routes (see
+         *     `routes/organizations.py`'s `bulk_create_org_invites_route` docstring):
+         *     one user id that isn't a member of `org_id` (or any other per-row
+         *     failure) does NOT abort the rest of the batch -- always `207
+         *     Multi-Status` with a per-user-id outcome.
+         */
         post: operations["bulk_assign_org_role_route_v1_organizations__org_id__members_bulk_roles_post"];
         delete?: never;
         options?: never;
@@ -1849,7 +3295,30 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Remove Organization Member Route */
+        /**
+         * Remove Organization Member Route
+         * @description Remove a user from an org. Allowed for the org's own owner/admin as well
+         *     as instance/platform admins (#1208). Refuses to remove the org's LAST owner —
+         *     that would leave it unadministrable — mirroring the last-admin guard on user
+         *     roles.
+         *
+         *     #1648: the last-owner guard below is a structural invariant ("is this the
+         *     only holder of the owner ROLE"), independent of any single permission --
+         *     per the ADR and #1647's seed-derivation notes, it intentionally stays
+         *     reading ``organization_members.org_role`` directly (since #2309 inside the
+         *     delete's transaction, ``core.organizations._another_active_owner_conn``)
+         *     rather than being reshaped into a permission check, unaffected by
+         *     this cutover. `_require_org_manage` above is the piece that moved to the
+         *     permission resolver.
+         *
+         *     #2309: removing an owner or admin needs owner-level authority
+         *     (``org.roles.manage`` in this org, directly or delegated; a Platform
+         *     Admin always has it) -- 403 with detail ``requires_owner`` otherwise;
+         *     leaving yourself needs none. Removing the org's last active, unsuspended
+         *     owner is 409 with detail ``last_owner`` (promote another member to owner
+         *     first); the detail used to be prose. Every check runs inside the delete's
+         *     transaction.
+         */
         delete: operations["remove_organization_member_route_v1_organizations__org_id__members__user_id__delete"];
         options?: never;
         head?: never;
@@ -1869,7 +3338,16 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Set Org Member Account Status Route */
+        /**
+         * Set Org Member Account Status Route
+         * @description Deactivate (``is_active: false``) or reactivate a MANAGED account (#1852).
+         *
+         *     Account-global, unlike suspend (which only affects this org): the account
+         *     can no longer sign in anywhere and its sessions stop refreshing. 403
+         *     unless the account is managed by this org; acting on an admin or owner
+         *     needs owner-level authority. 409 for your own account, or when the target
+         *     is the last active owner of an organization.
+         */
         patch: operations["set_org_member_account_status_route_v1_organizations__org_id__members__user_id__account_status_patch"];
         trace?: never;
     };
@@ -1880,7 +3358,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Effective Permissions Route */
+        /**
+         * Get Effective Permissions Route
+         * @description The resolved-permissions view (#1649) -- for every permission the
+         *     member effectively holds (via a non-expired ``organization_member_roles``
+         *     grant), name the role and (if applicable) the permission group it came
+         *     from. See ``core.authorization.get_org_effective_permissions_detailed``
+         *     for exactly how each entry is derived.
+         */
         get: operations["get_effective_permissions_route_v1_organizations__org_id__members__user_id__effective_permissions_get"];
         put?: never;
         post?: never;
@@ -1899,7 +3384,19 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reset Org Member Password Route */
+        /**
+         * Reset Org Member Password Route
+         * @description Reset a MANAGED member's local password (#1852).
+         *
+         *     Same request/response contract as ``POST /v1/auth/users/{id}/reset-password``
+         *     (#1776): ``mode: "set"`` takes ``new_password``; ``mode: "generate"``
+         *     returns a server-generated ``temporary_password`` exactly once. The user
+         *     must change it on next login and all their sessions stop refreshing.
+         *
+         *     403 unless the account is managed by this org; admins may reset members,
+         *     owners may also reset admins, and no one may reset an owner here. SSO
+         *     accounts get 409; resetting yourself gets 409 (use change-password).
+         */
         post: operations["reset_org_member_password_route_v1_organizations__org_id__members__user_id__reset_password_post"];
         delete?: never;
         options?: never;
@@ -1916,7 +3413,31 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Restore Organization Member Role */
+        /**
+         * Restore Organization Member Role
+         * @description Apply ONE member's preserved original role from a past import (#1506 follow-up).
+         *
+         *     ``apply_org_import`` always downgrades an imported member to plain ``member`` (a
+         *     deliberate anti-escalation default that never changes) but PRESERVES the bundle's
+         *     originally-claimed role for reference. This is the governed, later, separate
+         *     action that reapplies it — deliberately ONE member per call, never a bulk
+         *     "restore everyone": a bulk restore would just re-trust the unreviewed bundle
+         *     wholesale, exactly the risk the import downgrade exists to prevent.
+         *
+         *     Requires the SAME authority as export/import (org owner/admin, or an instance/
+         *     platform admin) PLUS the normal role-grant rank check — an org ``admin`` still
+         *     cannot restore a member to ``owner``, mirroring the add-member route's guard.
+         *     404 if this member has no preserved role to restore (never imported, or already
+         *     a plain member the bundle never claimed otherwise). Every actual restoration is
+         *     audited.
+         *
+         *     #2309: a restore is a role change and carries the member-add route's guards,
+         *     checked inside the write's transaction against the member's CURRENT role:
+         *     changing the role of a current owner or admin needs owner-level authority
+         *     (403 ``requires_owner``; a Platform Admin always has it), demoting the org's
+         *     last active owner is 409 ``last_owner``, and a demotion revokes the member's
+         *     sessions. A preserved role restores once: a repeat is 409 ``already_restored``.
+         */
         post: operations["restore_organization_member_role_v1_organizations__org_id__members__user_id__restore_role_post"];
         delete?: never;
         options?: never;
@@ -1934,7 +3455,15 @@ export interface paths {
         /** List Member Role Assignments Route */
         get: operations["list_member_role_assignments_route_v1_organizations__org_id__members__user_id__roles_get"];
         put?: never;
-        /** Assign Org Role Route */
+        /**
+         * Assign Org Role Route
+         * @description Grant a CUSTOM role to a member, optionally time-boxed via
+         *     ``expires_at`` (#1649). A system role is rejected with 422 (#1897): it is
+         *     set through the membership's ``org_role`` instead. Requires
+         *     ``org.members.manage`` (the same base authority as adding/removing a
+         *     member) AND the grant-authority superset rule against the SPECIFIC role
+         *     being granted.
+         */
         post: operations["assign_org_role_route_v1_organizations__org_id__members__user_id__roles_post"];
         delete?: never;
         options?: never;
@@ -1968,7 +3497,32 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Suspend Organization Member Route */
+        /**
+         * Suspend Organization Member Route
+         * @description Suspend an INDIVIDUAL member's access within `org_id` (#1654) -- the
+         *     `organization_members` row stays, membership is not removed, still
+         *     visible in `GET /{org_id}/members`. Distinct from
+         *     `POST /{org_id}/suspend` (#1650), which suspends the WHOLE org for every
+         *     member -- see `core.organizations.suspend_org_member`'s docstring for the
+         *     precise, documented definition of what "blocks active use" means here.
+         *
+         *     Refuses (409) suspending the caller's OWN membership -- a suspended
+         *     member's effective permissions drop to zero (see
+         *     `core.authorization._org_role_ids_conn`), including `org.members.suspend`
+         *     itself, so a self-suspend could only ever be undone by a Platform Admin;
+         *     this is the same self-lockout-prevention spirit as the last-owner guard
+         *     below, just applied to the caller specifically rather than a role count.
+         *     Also refuses suspending the org's LAST owner, mirroring
+         *     `remove_organization_member_route`'s identical guard -- suspending every
+         *     owner leaves the org exactly as unadministrable as removing them would.
+         *
+         *     #2309: suspending an owner or admin needs owner-level authority
+         *     (``org.roles.manage`` in this org, directly or delegated; a Platform
+         *     Admin always has it) -- 403 with detail ``requires_owner`` otherwise.
+         *     Suspending the org's last active, unsuspended owner is 409 with detail
+         *     ``last_owner`` (promote another member to owner first); the detail used
+         *     to be prose. Every check runs inside the suspension's transaction.
+         */
         post: operations["suspend_organization_member_route_v1_organizations__org_id__members__user_id__suspend_post"];
         delete?: never;
         options?: never;
@@ -1985,7 +3539,19 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Unsuspend Organization Member Route */
+        /**
+         * Unsuspend Organization Member Route
+         * @description Reverse `suspend_organization_member_route`. See
+         *     `core.organizations.unsuspend_org_member`.
+         *
+         *     404 when the user is not a member of this organization. #2309:
+         *     unsuspending an owner or admin needs owner-level authority
+         *     (``org.roles.manage`` in this org, directly or delegated; a Platform
+         *     Admin always has it) -- 403 with detail ``requires_owner`` otherwise.
+         *
+         *     #2227: a suspended membership holds no seat, so unsuspending takes one:
+         *     refused with 409 ``reason: seat_limit`` at a hard limit.
+         */
         post: operations["unsuspend_organization_member_route_v1_organizations__org_id__members__user_id__unsuspend_post"];
         delete?: never;
         options?: never;
@@ -2002,7 +3568,19 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Move Organization Route */
+        /**
+         * Move Organization Route
+         * @description Re-parent `org_id` (or detach it to top-level if
+         *     `new_parent_organization_id` is None). #1650: DUAL authority -- the
+         *     caller must hold `org.suborgs.manage` on BOTH the organization being
+         *     moved and the destination parent organization (or be a Platform Admin),
+         *     identical in shape to `core.teams`'s `move_team` one level down.
+         *
+         *     #2191: a sub-organization has its parent's kind, so a move under a parent
+         *     of another kind is refused with 409 `org_kind_mismatch` (a personal tree
+         *     becomes standard only through `POST /{org_id}/convert`). Detaching to
+         *     top-level keeps the kind.
+         */
         post: operations["move_organization_route_v1_organizations__org_id__move_post"];
         delete?: never;
         options?: never;
@@ -2114,6 +3692,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/organizations/{org_id}/policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Organization Policy Route
+         * @description The org's onboarding policy (#2228): each knob's own `value` (null =
+         *     not set), the `effective` value enforced (the stricter of the org's and
+         *     every ancestor's), its `default`, whether the org may set it now
+         *     (`available`; else `locked_reason` and, for `tier`, `available_on`),
+         *     `source` (`default` | `organization` | `parent`) and `grandfathered`
+         *     (set while available, unavailable now: still enforced, can only be
+         *     reset). For the org's active members, `org.settings.manage` holders
+         *     (direct or delegated) and Platform Admins; 403 otherwise.
+         */
+        get: operations["get_organization_policy_route_v1_organizations__org_id__policy_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Organization Policy Route
+         * @description Change the org's onboarding policy (#2228). Requires
+         *     `org.settings.manage` (direct or delegated from an ancestor) or a
+         *     Platform Admin. Only the fields sent change; `null` resets a knob (it is
+         *     inherited from the parent organization again, the default on a root
+         *     org).
+         *
+         *     * `invite_policy`: `admins` (default) or `members` (members may also
+         *       invite EXISTING accounts, single-use, at the member role);
+         *     * `allow_account_creating_invites` (default true; switching it off is
+         *       always allowed);
+         *     * `allowed_email_domains`: normalised (IDNA, lower-case), exact match;
+         *     * `team_admins_may_create_accounts`: needs a non-empty allowed-domain
+         *       list (here or on a parent), else 422 `reason: org_policy`;
+         *     * `require_2fa`: stored only (enforcement is #2241).
+         *
+         *     403 `reason: entitlement`, `feature: policy.<knob>` for a change to a
+         *     knob the org may not set now (a reset to the default is always
+         *     allowed). 422 for an invalid domain. Audited `ORG_POLICY_UPDATED`.
+         */
+        patch: operations["update_organization_policy_route_v1_organizations__org_id__policy_patch"];
+        trace?: never;
+    };
     "/v1/organizations/{org_id}/roles": {
         parameters: {
             query?: never;
@@ -2121,7 +3747,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Roles Route */
+        /**
+         * List Roles Route
+         * @description Every role VISIBLE/usable from ``org_id`` for ``scope`` -- system
+         *     roles, this org's own, and every ancestor's (#1649's descendant-org
+         *     visibility rule).
+         */
         get: operations["list_roles_route_v1_organizations__org_id__roles_get"];
         put?: never;
         /** Create Role Route */
@@ -2218,6 +3849,37 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/organizations/{org_id}/seats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Organization Seats Route
+         * @description Seat usage of the org's entitlement root (#2227): `used` (active
+         *     accounts with a non-suspended membership anywhere in the root's
+         *     `inherit` tree, each person once), `reserved` (pending single-use
+         *     invites for addresses not yet seated), the resolved `max` (null =
+         *     unlimited), its `behaviour` and `source`, and `state` (`over_limit`
+         *     drives the admin banner). Service accounts, API keys and Platform Admins
+         *     acting cross-tenant never take a seat.
+         *
+         *     For a caller with `org.members.manage` on the org (direct or delegated)
+         *     and a Platform Admin (any org; 404 for an unknown one) only: seat numbers
+         *     leak the org's size, so an ordinary member, a suspended member and an
+         *     outsider get 403.
+         */
+        get: operations["get_organization_seats_route_v1_organizations__org_id__seats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/organizations/{org_id}/suborganizations": {
         parameters: {
             query?: never;
@@ -2227,7 +3889,17 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create Suborganization Route */
+        /**
+         * Create Suborganization Route
+         * @description Create a new organization with `parent_organization_id = org_id` (#1650)
+         *     -- recursively, with NO special-casing between a root and an already-nested
+         *     `org_id` (the same `provision_organization` call either way). Requires
+         *     `org.suborgs.create` on `org_id` (or an instance/platform admin, or #1652
+         *     delegated hierarchical authority from a real ancestor grant), and
+         *     (#2231) a tier on `org_id`'s entitlement root that allows
+         *     sub-organizations: otherwise `403` with `reason: entitlement` and
+         *     `limit: suborgs_allowed`, for a Platform Admin too.
+         */
         post: operations["create_suborganization_route_v1_organizations__org_id__suborganizations_post"];
         delete?: never;
         options?: never;
@@ -2242,7 +3914,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Organization Subtree Route */
+        /**
+         * Get Organization Subtree Route
+         * @description The FULL descendant subtree of `org_id` (not just direct children),
+         *     plus an aggregate metering/entitlement summary (#1650, "rolled-up subtree
+         *     reporting"). Member-only (or platform admin), since a subtree listing is
+         *     itself tenant-scoped information about the caller's own org.
+         */
         get: operations["get_organization_subtree_route_v1_organizations__org_id__subtree_get"];
         put?: never;
         post?: never;
@@ -2261,7 +3939,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Suspend Organization Route */
+        /**
+         * Suspend Organization Route
+         * @description Suspend an organization (#1650) -- see `core.organizations.suspend_organization`
+         *     for the precise, documented definition of what "blocks active use" means
+         *     here.
+         */
         post: operations["suspend_organization_route_v1_organizations__org_id__suspend_post"];
         delete?: never;
         options?: never;
@@ -2293,7 +3976,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Plugins */
+        /**
+         * List Plugins
+         * @description List all registered plugins (public endpoint), paginated (#147/C6).
+         *
+         *     Served at both /v1/plugins and the legacy /plugins directly — the old /plugins
+         *     used a 301 redirect, which drops the method/body on non-GET clients (#147).
+         */
         get: operations["list_plugins_v1_plugins_get"];
         put?: never;
         post?: never;
@@ -2310,7 +3999,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get All Ai Tools */
+        /**
+         * Get All Ai Tools
+         * @description Aggregate OpenAI-compatible tool definitions from all active plugins.
+         *
+         *     Tools come from a module plugin's in-code ``AI_TOOLS`` class attribute AND/OR
+         *     a manifest's ``ai_tools`` — so module plugins (telegraf, network) can now
+         *     advertise function-calling tools, not just manifest plugins (#60).
+         */
         get: operations["get_all_ai_tools_v1_plugins_ai_tools_get"];
         put?: never;
         post?: never;
@@ -2329,7 +4025,16 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Install Plugin */
+        /**
+         * Install Plugin
+         * @description Install a plugin from a manifest (manifest-based, no code execution).
+         *
+         *     Admin-only (#1143): this registers a plugin into the single, platform-wide
+         *     plugins_db/webhook_routes state for every tenant -- there is no per-user
+         *     scoping concept for a plugin's existence at all, unlike e.g. /config's
+         *     real per-owner overlay. Matches this service's own bundles.py precedent
+         *     for equally-consequential platform-wide actions.
+         */
         post: operations["install_plugin_v1_plugins_install_post"];
         delete?: never;
         options?: never;
@@ -2346,7 +4051,27 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Install Plugin From Git */
+        /**
+         * Install Plugin From Git
+         * @description Install a manifest/webhook plugin by fetching it from an arbitrary git
+         *     repo -- no image rebuild (#1578, epic #1514; implements the #1577 decided
+         *     model).
+         *
+         *     TRUST MODEL (decided, #1577): third-party plugins are manifest+webhook
+         *     ONLY. This shallow-clones the repo to a throwaway temp dir, reads and
+         *     strictly validates ONLY the plugin manifest, and registers it through the
+         *     exact same manifest/webhook path as an uploaded manifest. Fetched repo
+         *     code is NEVER imported or executed in-process -- the first-party in-process
+         *     code-plugin loader (core/plugin_loader.py) is a separate, untouched path.
+         *
+         *     Admin-only (#1143), platform-wide, same as /install. Body (JSON):
+         *       {"repo_url": "https://...", "ref": "main"?, "subpath": "plugins/x"?,
+         *        "token": "<PAT>"?}
+         *     A private-repo token is used for the fetch and, on success, persisted
+         *     ENCRYPTED via the secrets vault (#1719) keyed per tenant + plugin, so the
+         *     plugin can later be re-fetched (see refresh-from-git) without re-supplying
+         *     it. The token is NEVER logged and never returned in any response.
+         */
         post: operations["install_plugin_from_git_v1_plugins_install_from_git_post"];
         delete?: never;
         options?: never;
@@ -2363,7 +4088,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reload Plugin Webhook */
+        /**
+         * Reload Plugin Webhook
+         * @description Re-register a plugin's trigger from an uploaded manifest: a webhook
+         *     route, or -- #1680 -- a fresh ManifestTriggerRuntime for a schedule/poll
+         *     trigger.
+         *
+         *     Admin-only (#1143): repoints an EXISTING, already-installed plugin's
+         *     trigger from caller-uploaded manifest content.
+         */
         post: operations["reload_plugin_webhook_v1_plugins_reload_webhook_post"];
         delete?: never;
         options?: never;
@@ -2378,7 +4111,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Manifest Schema */
+        /**
+         * Get Manifest Schema
+         * @description The manifest-plugin JSON Schema (Draft-07). Fetch this and validate a
+         *     plugin manifest against it directly -- no auth, no assumption of a running
+         *     instance beyond this registry being reachable. Returns the JSON Schema
+         *     document as-is (it carries its own ``$schema``/``title``).
+         */
         get: operations["get_manifest_schema_v1_plugins_schema_get"];
         put?: never;
         post?: never;
@@ -2395,11 +4134,18 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Plugin */
+        /**
+         * Get Plugin
+         * @description Get plugin details
+         */
         get: operations["get_plugin_v1_plugins__plugin_name__get"];
         put?: never;
         post?: never;
-        /** Uninstall Plugin */
+        /**
+         * Uninstall Plugin
+         * @description Uninstall a plugin. Admin-only (#1143): permanently removes it
+         *     platform-wide, for every tenant.
+         */
         delete: operations["uninstall_plugin_v1_plugins__plugin_name__delete"];
         options?: never;
         head?: never;
@@ -2413,10 +4159,37 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Invoke Plugin Read Action */
+        /**
+         * Invoke Plugin Read Action
+         * @description Invoke a WHITELISTED read-only action on a running plugin, unauthenticated
+         *     FOR FREE-TIER tools.
+         *
+         *     Only methods in the plugin's READ_ONLY_ACTIONS (a declared subset of ACTIONS)
+         *     are reachable here — mutating actions (e.g. "refresh") stay POST-only and
+         *     JWT-gated via invoke_plugin_action below. Query params are passed as keyword
+         *     args (GET has no body). #254: read-only data tools like get_crypto_price were
+         *     gated behind the same JWT requirement as mutating actions purely because all
+         *     actions shared one POST route; this gives them an unauthenticated path that
+         *     matches their actual semantics.
+         *
+         *     #1322: this route enforced no license tier at all, so a paid-tier read tool
+         *     was reachable for free with NO JWT. A tool the catalog doesn't tier above
+         *     community stays fully anonymous (unchanged). A tool tiered above community
+         *     needs a caller identity to check a tier against at all, so it 401s with no
+         *     token, and 403s for an insufficient tier — otherwise "no token" would be
+         *     indistinguishable from "free tier", defeating the gate entirely.
+         */
         get: operations["invoke_plugin_read_action_v1_plugins__plugin_name__actions__action__get"];
         put?: never;
-        /** Invoke Plugin Action */
+        /**
+         * Invoke Plugin Action
+         * @description Invoke a WHITELISTED action on a running plugin (the write/execute path).
+         *
+         *     Only methods a plugin explicitly exposes via its ``ACTIONS`` set are callable
+         *     — no arbitrary method access. A JSON-object body is passed as keyword args.
+         *     Reads still use /collect + /analysis; this is for state-changing actions such
+         *     as the telegraf plugin's config management.
+         */
         post: operations["invoke_plugin_action_v1_plugins__plugin_name__actions__action__post"];
         delete?: never;
         options?: never;
@@ -2431,7 +4204,18 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Plugin Analysis */
+        /**
+         * Get Plugin Analysis
+         * @description Return the plugin's ``analyze()`` output verbatim.
+         *
+         *     The registry does NOT reshape the result — each plugin owns its own
+         *     analysis schema (per the plugin contract, reads go through
+         *     ``/analysis`` → ``analyze()``). Consumers that want a plugin-specific
+         *     view read the fields that plugin documents.
+         *
+         *     Anonymous unless the plugin declares a paid AI tool on ``/analysis``;
+         *     that needs a license tier, checked like an action route's.
+         */
         get: operations["get_plugin_analysis_v1_plugins__plugin_name__analysis_get"];
         put?: never;
         post?: never;
@@ -2450,7 +4234,22 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Trigger Plugin Collection */
+        /**
+         * Trigger Plugin Collection
+         * @description Manually trigger a plugin's background data collection.
+         *
+         *     Dispatches through the same ``collect_plugin_data`` the hourly
+         *     scheduler uses (#1034) rather than calling the plugin instance's
+         *     ``collect_data()`` directly — that raw call skipped both the
+         *     fingerprint-dedup loop shared-data plugins rely on AND the per-owner
+         *     iteration ``PRIVATE_PER_USER`` plugins (e.g. ``portfolio``) rely on,
+         *     running a single collection under whatever config happened to be
+         *     left on the shared instance rather than every real subscriber's own
+         *     config. For a ``PRIVATE_PER_USER`` plugin this also scopes the
+         *     triggered run to the CALLER's own owner_id only — any authenticated
+         *     user could otherwise force a collection cycle across every other
+         *     tenant's private data with no relationship to it at all.
+         */
         post: operations["trigger_plugin_collection_v1_plugins__plugin_name__collect_post"];
         delete?: never;
         options?: never;
@@ -2465,9 +4264,25 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Plugin Config */
+        /**
+         * Get Plugin Config
+         * @description Return a plugin's config schema + current effective values (secrets masked).
+         *
+         *     Effective = declared defaults → env → persisted (API-set) overrides. A UI can
+         *     render `schema` as a form and show `values` as the live config.
+         *
+         *     JWT-gated (like the PUT): config can carry secret-typed fields, and masking
+         *     depends on the schema author flagging them — so it must not be readable by an
+         *     unauthenticated caller (secrets shouldn't ride the platform's GET-open policy).
+         */
         get: operations["get_plugin_config_v1_plugins__plugin_name__config_get"];
-        /** Update Plugin Config */
+        /**
+         * Update Plugin Config
+         * @description Update a plugin's config (JWT-gated): validate → persist → apply live.
+         *
+         *     Body is a JSON object of {key: value} for keys in the plugin's CONFIG_SCHEMA.
+         *     Merges over existing persisted overrides, applies via apply_config (no restart).
+         */
         put: operations["update_plugin_config_v1_plugins__plugin_name__config_put"];
         post?: never;
         delete?: never;
@@ -2485,7 +4300,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Disable Plugin */
+        /**
+         * Disable Plugin
+         * @description Disable a plugin. Admin-only (#1143): toggles availability
+         *     platform-wide, for every tenant.
+         */
         post: operations["disable_plugin_v1_plugins__plugin_name__disable_post"];
         delete?: never;
         options?: never;
@@ -2502,7 +4321,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Enable Plugin */
+        /**
+         * Enable Plugin
+         * @description Enable a plugin. Admin-only (#1143): toggles availability
+         *     platform-wide, for every tenant.
+         */
         post: operations["enable_plugin_v1_plugins__plugin_name__enable_post"];
         delete?: never;
         options?: never;
@@ -2517,7 +4340,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Plugin Health */
+        /**
+         * Get Plugin Health
+         * @description Get plugin health status
+         */
         get: operations["get_plugin_health_v1_plugins__plugin_name__health_get"];
         put?: never;
         post?: never;
@@ -2536,7 +4362,21 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Refresh Plugin From Git */
+        /**
+         * Refresh Plugin From Git
+         * @description Re-fetch an already-installed manifest/webhook plugin from git and apply
+         *     the fresh manifest in place (#1719 — the deferred half of #1578).
+         *
+         *     Admin-only, platform-wide. Body (JSON):
+         *       {"repo_url": "https://...", "ref": "main"?, "subpath": "plugins/x"?,
+         *        "token": "<PAT>"?}
+         *     For a PRIVATE repo the caller need NOT re-supply the token: when ``token`` is
+         *     omitted, the one persisted (encrypted) at install time is used. If a fresh
+         *     ``token`` IS supplied it is used for this fetch AND re-persisted (rotation).
+         *     The token is never logged or returned. The re-fetched manifest's name must
+         *     match ``plugin_name`` (a refresh updates a plugin in place; it does not
+         *     rename or replace it with a different plugin).
+         */
         post: operations["refresh_plugin_from_git_v1_plugins__plugin_name__refresh_from_git_post"];
         delete?: never;
         options?: never;
@@ -2551,7 +4391,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Secrets */
+        /**
+         * List Secrets
+         * @description List the NAMES of secrets configured for this plugin in the caller's
+         *     scope -- never the values. Write-only surface: there is no plaintext
+         *     read-back; a plugin reads its own decrypted creds through the scoped SDK
+         *     path, not this API.
+         */
         get: operations["list_secrets_v1_plugins__plugin_name__secrets_get"];
         put?: never;
         post?: never;
@@ -2569,10 +4415,19 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Set Secret */
+        /**
+         * Set Secret
+         * @description Set/update one named secret (encrypted at rest) for this plugin in the
+         *     caller's scope. Body: ``{"value": "<plaintext>"}``. The response never
+         *     echoes the value -- only confirmation metadata.
+         */
         put: operations["set_secret_v1_plugins__plugin_name__secrets__secret_key__put"];
         post?: never;
-        /** Delete Secret */
+        /**
+         * Delete Secret
+         * @description Delete one named secret for this plugin in the caller's scope. 404 if no
+         *     such secret is set (nothing to delete).
+         */
         delete: operations["delete_secret_v1_plugins__plugin_name__secrets__secret_key__delete"];
         options?: never;
         head?: never;
@@ -2586,7 +4441,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Plugin Resource */
+        /**
+         * List Plugin Resource
+         * @description List a plugin-declared RESOURCES collection: query params besides
+         *     ``limit``/``cursor`` are passed through as ``filters`` -- a plugin
+         *     implements pagination/filtering once in its own ``list()``, with no
+         *     hand-rolled parsing inside a single action (#1677).
+         */
         get: operations["list_plugin_resource_v1_plugins__plugin_name___resource_name__get"];
         put?: never;
         post?: never;
@@ -2603,7 +4464,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Plugin Resource */
+        /**
+         * Get Plugin Resource
+         * @description Get a single item from a plugin-declared resource by id (#1677).
+         *     Same gating as ``list_plugin_resource`` above.
+         */
         get: operations["get_plugin_resource_v1_plugins__plugin_name___resource_name___item_id__get"];
         put?: never;
         post?: never;
@@ -2620,14 +4485,30 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get My Profile */
+        /**
+         * Get My Profile
+         * @description Return the authenticated caller's own Minder profile/preferences.
+         *
+         *     A user who has never edited anything reads back an empty default profile
+         *     (display_name null, preferences {}), so the client can always render the form.
+         *
+         *     #2234: also `workspace_state` and `can_create_workspace`, so the client can
+         *     show the "No workspace yet" page to an account without an organization.
+         */
         get: operations["get_my_profile_v1_profile_me_get"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** Update My Profile */
+        /**
+         * Update My Profile
+         * @description Edit the authenticated caller's own Minder profile/preferences (partial).
+         *
+         *     Only supplied fields change. `preferences`, when supplied, REPLACES the
+         *     stored blob (predictable semantics). Rejects an entirely-empty PATCH and an
+         *     oversized preferences blob.
+         */
         patch: operations["update_my_profile_v1_profile_me_patch"];
         trace?: never;
     };
@@ -2638,10 +4519,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Public Endpoints */
+        /**
+         * List Public Endpoints
+         * @description List the caller's org's public chat endpoints (tenant-scoped).
+         */
         get: operations["list_public_endpoints_v1_public_chat_endpoints_get"];
         put?: never;
-        /** Create Public Endpoint */
+        /**
+         * Create Public Endpoint
+         * @description Create a public chat endpoint in the caller's own org.
+         */
         post: operations["create_public_endpoint_v1_public_chat_endpoints_post"];
         delete?: never;
         options?: never;
@@ -2656,15 +4543,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Public Endpoint */
+        /**
+         * Get Public Endpoint
+         * @description Fetch one endpoint the caller's org owns (404 if it isn't theirs).
+         */
         get: operations["get_public_endpoint_v1_public_chat_endpoints__endpoint_id__get"];
         put?: never;
         post?: never;
-        /** Delete Public Endpoint */
+        /**
+         * Delete Public Endpoint
+         * @description Delete an endpoint the caller's org owns (404 if it isn't theirs).
+         */
         delete: operations["delete_public_endpoint_v1_public_chat_endpoints__endpoint_id__delete"];
         options?: never;
         head?: never;
-        /** Update Public Endpoint */
+        /**
+         * Update Public Endpoint
+         * @description Partially update an endpoint the caller's org owns.
+         */
         patch: operations["update_public_endpoint_v1_public_chat_endpoints__endpoint_id__patch"];
         trace?: never;
     };
@@ -2675,7 +4571,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Endpoint Conversations */
+        /**
+         * List Endpoint Conversations
+         * @description List the anonymous conversations/sessions for an endpoint the caller owns.
+         *
+         *     Paginated, most-recently-active first. 404 if the endpoint isn't in the
+         *     caller's tenant, so an admin only ever sees their own org's conversations.
+         */
         get: operations["list_endpoint_conversations_v1_public_chat_endpoints__endpoint_id__conversations_get"];
         put?: never;
         post?: never;
@@ -2692,7 +4594,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Endpoint Conversation */
+        /**
+         * Get Endpoint Conversation
+         * @description Read a single anonymous conversation's turns for an owned endpoint.
+         *
+         *     404 if the endpoint isn't the caller's tenant's, and 404 (from rag-pipeline)
+         *     if the session isn't one of that endpoint+tenant's — a caller can never read a
+         *     conversation outside their own tenant.
+         */
         get: operations["get_endpoint_conversation_v1_public_chat_endpoints__endpoint_id__conversations__session_id__get"];
         put?: never;
         post?: never;
@@ -2709,7 +4618,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Endpoint Feedback */
+        /**
+         * Get Endpoint Feedback
+         * @description Aggregate thumbs up/down totals for an owned endpoint's responses (#1583).
+         *
+         *     The per-turn feedback is already folded into the conversation-detail read
+         *     above; this is the at-a-glance summary. 404 if the endpoint isn't in the
+         *     caller's tenant, so an admin only ever sees their own org's feedback. The
+         *     endpoint's own ``tenant_id`` is passed to rag-pipeline for the DB-layer
+         *     tenant filter — never a value the caller could forge.
+         */
         get: operations["get_endpoint_feedback_v1_public_chat_endpoints__endpoint_id__feedback_get"];
         put?: never;
         post?: never;
@@ -2726,17 +4644,47 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Proxy To Rag Pipeline */
+        /**
+         * Proxy To Rag Pipeline
+         * @description Proxy all /v1/rag/* requests to RAG Pipeline service (writes require JWT).
+         *
+         *     Long timeout: document ingestion/embedding can run well past the shared
+         *     client's 30s default (see _LONG_OPERATION_TIMEOUT).
+         */
         get: operations["proxy_to_rag_pipeline_v1_rag__path__get"];
-        /** Proxy To Rag Pipeline */
+        /**
+         * Proxy To Rag Pipeline
+         * @description Proxy all /v1/rag/* requests to RAG Pipeline service (writes require JWT).
+         *
+         *     Long timeout: document ingestion/embedding can run well past the shared
+         *     client's 30s default (see _LONG_OPERATION_TIMEOUT).
+         */
         put: operations["proxy_to_rag_pipeline_v1_rag__path__put"];
-        /** Proxy To Rag Pipeline */
+        /**
+         * Proxy To Rag Pipeline
+         * @description Proxy all /v1/rag/* requests to RAG Pipeline service (writes require JWT).
+         *
+         *     Long timeout: document ingestion/embedding can run well past the shared
+         *     client's 30s default (see _LONG_OPERATION_TIMEOUT).
+         */
         post: operations["proxy_to_rag_pipeline_v1_rag__path__post"];
-        /** Proxy To Rag Pipeline */
+        /**
+         * Proxy To Rag Pipeline
+         * @description Proxy all /v1/rag/* requests to RAG Pipeline service (writes require JWT).
+         *
+         *     Long timeout: document ingestion/embedding can run well past the shared
+         *     client's 30s default (see _LONG_OPERATION_TIMEOUT).
+         */
         delete: operations["proxy_to_rag_pipeline_v1_rag__path__delete"];
         options?: never;
         head?: never;
-        /** Proxy To Rag Pipeline */
+        /**
+         * Proxy To Rag Pipeline
+         * @description Proxy all /v1/rag/* requests to RAG Pipeline service (writes require JWT).
+         *
+         *     Long timeout: document ingestion/embedding can run well past the shared
+         *     client's 30s default (see _LONG_OPERATION_TIMEOUT).
+         */
         patch: operations["proxy_to_rag_pipeline_v1_rag__path__patch"];
         trace?: never;
     };
@@ -2747,7 +4695,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Fleet Status */
+        /**
+         * Fleet Status
+         * @description Aggregate health across every core service for the client's Status page
+         *     (#platform-status). No single-service /health today crosses the browser --
+         *     each is internal-docker-network only -- so this is the one endpoint a
+         *     browser can actually reach to see the whole fleet at once. `version` is
+         *     each service's own hardcoded string, not derived from the deployed image
+         *     tag -- a "reported version," not a deployment-tracking signal.
+         */
         get: operations["fleet_status_v1_status_get"];
         put?: never;
         post?: never;
@@ -2766,7 +4722,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Stt Root */
+        /**
+         * Stt Root
+         * @description Proxy POST /v1/stt (no trailing path) -- multipart audio upload, same
+         *     root-route need as /v1/tts above.
+         *
+         *     Long timeout: see proxy_to_stt.
+         */
         post: operations["stt_root_v1_stt_post"];
         delete?: never;
         options?: never;
@@ -2781,10 +4743,22 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Proxy To Stt */
+        /**
+         * Proxy To Stt
+         * @description Proxy /v1/stt/* to the TTS/STT service (writes require JWT).
+         *
+         *     Long timeout: transcribing longer audio can take a while (see
+         *     _LONG_OPERATION_TIMEOUT).
+         */
         get: operations["proxy_to_stt_v1_stt__path__get"];
         put?: never;
-        /** Proxy To Stt */
+        /**
+         * Proxy To Stt
+         * @description Proxy /v1/stt/* to the TTS/STT service (writes require JWT).
+         *
+         *     Long timeout: transcribing longer audio can take a while (see
+         *     _LONG_OPERATION_TIMEOUT).
+         */
         post: operations["proxy_to_stt_v1_stt__path__post"];
         delete?: never;
         options?: never;
@@ -2799,10 +4773,37 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Teams Route */
+        /**
+         * List Teams Route
+         * @description List the teams of the caller's active organization (switching
+         *     organization changes the list), plus any team with no organization that
+         *     the caller belongs to. A caller who is not an active member of their
+         *     active organization gets an empty list. A Platform Admin lists every
+         *     organization's teams (#2311).
+         */
         get: operations["list_teams_route_v1_teams_get"];
         put?: never;
-        /** Create Team Route */
+        /**
+         * Create Team Route
+         * @description Create a team; the caller becomes its team_admin. Also mints a fresh
+         *     JWT (#1148) since the caller's existing token necessarily predates this
+         *     exact membership change -- see TeamCreateOut's docstring.
+         *
+         *     #2287: the team belongs to the caller's ACTIVE organization, resolved
+         *     exactly as every other create stamps its tenant
+         *     (``shared.tenancy.resolve_tenant_id``: ``active_tenant_id``, else the
+         *     home ``tenant_id``). Any active member of that org may create a team in
+         *     it (the RBAC ADR's "any authenticated user can create a team", now inside
+         *     their tenant); the membership is re-checked against the DB, so a stale
+         *     or forged active org, or a suspended membership, gets a 403 and nothing
+         *     is written. A Platform Admin may create in whatever org they are acting
+         *     in. A caller with no org at all gets a 403 (not the shared helper's 401,
+         *     which would end the client's session).
+         *
+         *     With ``parent_team_id`` the team is a sub-team: the caller needs
+         *     ``team.subteams.manage`` on the parent (directly or delegated from an
+         *     ancestor team, #1652), and the parent must be in the same active org.
+         */
         post: operations["create_team_route_v1_teams_post"];
         delete?: never;
         options?: never;
@@ -2817,7 +4818,19 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Team Route */
+        /**
+         * Get Team Route
+         * @description Team detail. A team the caller can't list (another organization, or
+         *     their active one when they aren't an active member of it) is 404, the
+         *     same as a team that doesn't exist (#2311).
+         *
+         *     The roster is returned to the team's members and admins, holders of
+         *     ``org.members.view`` in the team's organization, and Platform Admins;
+         *     otherwise ``members`` is empty and ``roster_visible`` is false. Member
+         *     emails are returned to team admins, organization managers
+         *     (``org.members.manage``) and Platform Admins; otherwise each ``email`` is
+         *     an empty string and ``emails_visible`` is false.
+         */
         get: operations["get_team_route_v1_teams__team_id__get"];
         put?: never;
         post?: never;
@@ -2836,7 +4849,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Export Team Data */
+        /**
+         * Export Team Data
+         * @description Export the caller's own team as a downloadable JSON bundle (#1507).
+         *
+         *     team_admin of the team (or an instance/platform admin) only. Contains the team's
+         *     roster and its team-shared KBs/pipelines — see the module note for what is scoped
+         *     out. Served as an attachment so a browser downloads it directly.
+         */
         get: operations["export_team_data_v1_teams__team_id__export_get"];
         put?: never;
         post?: never;
@@ -2855,7 +4875,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Import Team Data */
+        /**
+         * Import Team Data
+         * @description Import a bundle into the caller's own team (#1507). team_admin of the team (or an
+         *     instance/platform admin) only. Every imported KB/pipeline is stamped to THIS team
+         *     (team_id + visibility='team' + the team's org tenant), so an import can never write
+         *     outside the caller's own team. Returns a report of what was imported and every
+         *     conflict resolved.
+         */
         post: operations["import_team_data_v1_teams__team_id__import_post"];
         delete?: never;
         options?: never;
@@ -2872,7 +4899,21 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Add Team Member Route */
+        /**
+         * Add Team Member Route
+         * @description Add a user to a team, by ``user_id`` or by ``email`` (#1072). Allowed
+         *     for the team's admins (``team.members.manage``), an ancestor team's
+         *     holder of it (#1652), and Platform Admins.
+         *
+         *     #2285 (ADR tenant-scoped-user-administration): a caller who is not a
+         *     Platform Admin may only add a user who is already a member of the team's
+         *     org, or whom that org manages (``managed_by``: an account wholly inside
+         *     the org's tree). Any other user, an id that doesn't exist and an email no
+         *     account has all get the same 404, and nothing is written (no team or org
+         *     membership); users from elsewhere join by accepting an invite. A
+         *     Platform Admin keeps direct add for any user, and an unknown email tells
+         *     them so.
+         */
         post: operations["add_team_member_route_v1_teams__team_id__members_post"];
         delete?: never;
         options?: never;
@@ -2907,7 +4948,24 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Suspend Team Member Route */
+        /**
+         * Suspend Team Member Route
+         * @description Suspend an INDIVIDUAL team member's access within `team_id` (#1654) --
+         *     the `team_members` row stays, membership is not removed, still visible
+         *     via `GET /{team_id}`. Distinct from `POST /{team_id}/suspend` (#1651),
+         *     which suspends the WHOLE team for every member -- see
+         *     `core.teams.suspend_team_member`'s docstring for the precise definition
+         *     of what "blocks active use" means here.
+         *
+         *     Refuses (409) suspending the caller's OWN membership (self-lockout
+         *     prevention -- a suspended member's effective permissions drop to zero,
+         *     including `team.members.suspend` itself). Applies the EXACT same
+         *     last-admin guard `remove_team_member_route` does -- so suspending the
+         *     team's last ACTIVE `team_admin` is refused (409) the same way removing
+         *     them would be. #2312: the guard runs inside the suspension's transaction
+         *     and counts only active, unsuspended team_admins; a Platform Admin is
+         *     exempt.
+         */
         post: operations["suspend_team_member_route_v1_teams__team_id__members__user_id__suspend_post"];
         delete?: never;
         options?: never;
@@ -2924,7 +4982,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Unsuspend Team Member Route */
+        /**
+         * Unsuspend Team Member Route
+         * @description Reverse `suspend_team_member_route`. See
+         *     `core.teams.unsuspend_team_member`.
+         */
         post: operations["unsuspend_team_member_route_v1_teams__team_id__members__user_id__unsuspend_post"];
         delete?: never;
         options?: never;
@@ -2941,7 +5003,19 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Move Team Route */
+        /**
+         * Move Team Route
+         * @description Re-parent `team_id` (or detach it to top-level if
+         *     `new_parent_team_id` is None). #1651: DUAL authority -- the caller must
+         *     hold `team.subteams.manage` on BOTH the team being moved and the
+         *     destination parent team (or be an instance admin), identical in shape to
+         *     what #1650 does for organization move, one level down.
+         *
+         *     #2313: taking a team away from its CURRENT parent (a detach, or a move
+         *     elsewhere) also needs `team.subteams.manage` on that parent, since it
+         *     ends the parent's delegated oversight of the team. The parent-side checks
+         *     are repeated by ``move_team`` against the locked rows.
+         */
         post: operations["move_team_route_v1_teams__team_id__move_post"];
         delete?: never;
         options?: never;
@@ -2958,7 +5032,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Suspend Team Route */
+        /**
+         * Suspend Team Route
+         * @description Suspend a team (#1651) -- see `core/teams.py`'s `suspend_team` for the
+         *     precise, documented definition of what "blocks active use" means here.
+         */
         post: operations["suspend_team_route_v1_teams__team_id__suspend_post"];
         delete?: never;
         options?: never;
@@ -2990,7 +5068,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List All Tools */
+        /**
+         * List All Tools
+         * @description List all available AI tools (paginated).
+         */
         get: operations["list_all_tools_v1_tools_get"];
         put?: never;
         post?: never;
@@ -3007,7 +5088,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Plugin Tools */
+        /**
+         * List Plugin Tools
+         * @description List all tools for a specific plugin (by marketplace UUID).
+         */
         get: operations["list_plugin_tools_v1_tools_plugins__plugin_id__tools_get"];
         put?: never;
         post?: never;
@@ -3026,7 +5110,16 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Validate Tool License */
+        /**
+         * Validate Tool License
+         * @description Validate whether a caller's org tier grants access to a tool.
+         *
+         *     #1322: authenticated + tenant-scoped. This route used to be UNGATED and
+         *     trusted the body ``tenant_id``, letting anyone enumerate any org's tool
+         *     entitlements. Now only the platform operator / internal service principal
+         *     (which legitimately cross tenants) may pass an arbitrary ``tenant_id``;
+         *     every other caller must ask about their OWN JWT tenant.
+         */
         post: operations["validate_tool_license_v1_tools_validate_post"];
         delete?: never;
         options?: never;
@@ -3041,7 +5134,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Tool Details */
+        /**
+         * Get Tool Details
+         * @description Get details for a specific tool.
+         */
         get: operations["get_tool_details_v1_tools__tool_name__get"];
         put?: never;
         post?: never;
@@ -3060,7 +5156,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Execute Tool Endpoint */
+        /**
+         * Execute Tool Endpoint
+         * @description Execute an AI tool. The license/tier check runs against the VERIFIED
+         *     caller's ORGANIZATION (the JWT ``tenant_id``, #622 re-key), not a
+         *     client-suppliable field.
+         */
         post: operations["execute_tool_endpoint_v1_tools__tool_name__execute_post"];
         delete?: never;
         options?: never;
@@ -3077,7 +5178,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Tts Root */
+        /**
+         * Tts Root
+         * @description Proxy POST /v1/tts (no trailing path) -- {path:path} above requires at
+         *     least one path segment after /v1/tts/, so the bare synthesis call needs its
+         *     own route, mirroring the /v1/models root-route pattern.
+         *
+         *     Long timeout: see proxy_to_tts.
+         */
         post: operations["tts_root_v1_tts_post"];
         delete?: never;
         options?: never;
@@ -3092,10 +5200,26 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Proxy To Tts */
+        /**
+         * Proxy To Tts
+         * @description Proxy /v1/tts/* to the TTS/STT service (writes require JWT). Synthesis
+         *     (`POST /v1/tts`) returns binary WAV/MP3, not JSON -- proxy_request already
+         *     passes non-JSON bodies through raw.
+         *
+         *     Long timeout: synthesizing longer text can take a while (see
+         *     _LONG_OPERATION_TIMEOUT).
+         */
         get: operations["proxy_to_tts_v1_tts__path__get"];
         put?: never;
-        /** Proxy To Tts */
+        /**
+         * Proxy To Tts
+         * @description Proxy /v1/tts/* to the TTS/STT service (writes require JWT). Synthesis
+         *     (`POST /v1/tts`) returns binary WAV/MP3, not JSON -- proxy_request already
+         *     passes non-JSON bodies through raw.
+         *
+         *     Long timeout: synthesizing longer text can take a while (see
+         *     _LONG_OPERATION_TIMEOUT).
+         */
         post: operations["proxy_to_tts_v1_tts__path__post"];
         delete?: never;
         options?: never;
@@ -3138,7 +5262,10 @@ export interface components {
             /** Type */
             type: string | null;
         };
-        /** AIToolItem */
+        /**
+         * AIToolItem
+         * @description One tool in ``GET /tools``: a plugin tool plus its plugin's name.
+         */
         AIToolItem: {
             /** Active */
             active: boolean | null;
@@ -3167,7 +5294,10 @@ export interface components {
             /** Type */
             type: string | null;
         };
-        /** AIToolListResponse */
+        /**
+         * AIToolListResponse
+         * @description Predates the shared ``PaginatedList`` envelope (#501).
+         */
         AIToolListResponse: {
             /** Count */
             count: number;
@@ -3194,7 +5324,10 @@ export interface components {
                 [key: string]: unknown;
             }[];
         };
-        /** AIToolsSyncRequest */
+        /**
+         * AIToolsSyncRequest
+         * @description Request model for syncing AI tools from plugin manifest
+         */
         AIToolsSyncRequest: {
             /** Manifest */
             manifest: {
@@ -3205,7 +5338,12 @@ export interface components {
             /** Plugin Name */
             plugin_name: string;
         };
-        /** AIToolsSyncResponse */
+        /**
+         * AIToolsSyncResponse
+         * @description ``POST /sync``. A manifest with no ``ai_tools`` section returns only
+         *     ``success``/``tools_imported``/``message``, so the other keys are unset
+         *     there and dropped (``response_model_exclude_unset``).
+         */
         AIToolsSyncResponse: {
             /** Errors */
             errors?: string[] | null;
@@ -3218,7 +5356,10 @@ export interface components {
             /** Tools Imported */
             tools_imported: number;
         };
-        /** ActivatedLicense */
+        /**
+         * ActivatedLicense
+         * @description ``core.licensing.create_license``. The datetimes are naive UTC.
+         */
         ActivatedLicense: {
             /** Activated By */
             activated_by: string | null;
@@ -3297,7 +5438,12 @@ export interface components {
             /** Total */
             total: number;
         };
-        /** BulkInviteCreate */
+        /**
+         * BulkInviteCreate
+         * @description Body for `POST /v1/invites/bulk` (#1654) -- the team-invite equivalent
+         *     of `routes/organizations.py`'s `OrgBulkInviteCreate`. All invited emails
+         *     share the same `team_id`/`team_role`/`max_uses`.
+         */
         BulkInviteCreate: {
             /** Emails */
             emails: string[];
@@ -3330,6 +5476,10 @@ export interface components {
             /** Error */
             error?: string | null;
             invite?: components["schemas"]["InviteOut"] | null;
+            /** Reason */
+            reason?: string | null;
+            /** Rule */
+            rule?: string | null;
             /** Status */
             status: string;
         };
@@ -3349,10 +5499,18 @@ export interface components {
             /** Error */
             error?: string | null;
             invite?: components["schemas"]["OrgInviteOut"] | null;
+            /** Reason */
+            reason?: string | null;
+            /** Rule */
+            rule?: string | null;
             /** Status */
             status: string;
         };
-        /** BulkRoleAssignRequest */
+        /**
+         * BulkRoleAssignRequest
+         * @description Body for `POST /{org_id}/members/bulk-roles` (#1654): assign ONE
+         *     role, optionally time-boxed, to a LIST of user ids in one request.
+         */
         BulkRoleAssignRequest: {
             /** Expires At */
             expires_at?: string | null;
@@ -3402,6 +5560,11 @@ export interface components {
             password_reset_link_minutes?: number | null;
             /** Registration Mode */
             registration_mode: string;
+            /**
+             * Self Serve Personal Orgs
+             * @default false
+             */
+            self_serve_personal_orgs: boolean;
         };
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
@@ -3410,7 +5573,15 @@ export interface components {
             /** New Password */
             new_password: string;
         };
-        /** ChatFeedback */
+        /**
+         * ChatFeedback
+         * @description An anonymous end user rating one chat response (#1583).
+         *
+         *     ``turn_id`` is the id the ``/message`` response handed back for that response;
+         *     ``rating`` is thumbs up/down, with an optional short free-text ``comment``. The
+         *     session is taken from the anonymous token — never the body — so a caller cannot
+         *     rate on behalf of another session.
+         */
         ChatFeedback: {
             /** Comment */
             comment?: string | null;
@@ -3460,7 +5631,10 @@ export interface components {
             /** Triggered By */
             triggered_by: string;
         };
-        /** DependencyResolutionResponse */
+        /**
+         * DependencyResolutionResponse
+         * @description ``core.dependency_resolution.build_resolution_report``.
+         */
         DependencyResolutionResponse: {
             /** Nodes */
             nodes: {
@@ -3479,16 +5653,27 @@ export interface components {
         };
         /**
          * DependencyType
+         * @description Allowed plugin-dependency relationship types.
+         *
+         *     Typing the route param with this enum makes FastAPI reject an invalid value with a
+         *     422 (listing the allowed values in /docs) instead of the old free string that only
+         *     failed deep in add_dependency as a caught ValueError → 400 (#143).
          * @enum {string}
          */
         DependencyType: "requires" | "suggests" | "conflicts_with";
         /**
          * DependsOnType
+         * @description Which Neo4j node label `depends_on` resolves to (#1626).
+         *
+         *     Typed the same way as DependencyType above: FastAPI rejects an invalid value
+         *     with a 422 instead of it reaching Neo4jClient.add_dependency's own ValueError
+         *     -> 400 fallback.
          * @enum {string}
          */
         DependsOnType: "plugin" | "bundle";
         /**
          * DistributionType
+         * @description Plugin distribution types
          * @enum {string}
          */
         DistributionType: "git" | "docker" | "hybrid";
@@ -3553,7 +5738,10 @@ export interface components {
             /** Rate Limit Per Minute */
             rate_limit_per_minute?: number | null;
         };
-        /** GraphHealthResponse */
+        /**
+         * GraphHealthResponse
+         * @description Returned via ``JSONResponse``, so a 503 carries it too.
+         */
         GraphHealthResponse: {
             /** Checks */
             checks: {
@@ -3569,7 +5757,12 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
-        /** ImportRequest */
+        /**
+         * ImportRequest
+         * @description Import body: the exported ``bundle`` plus a conflict ``policy`` for colliding
+         *     ids/names (``skip`` keeps existing rows, ``rename`` imports collisions as fresh
+         *     copies, ``fail`` aborts on any collision — all non-destructive).
+         */
         ImportRequest: {
             /** Bundle */
             bundle: {
@@ -3583,15 +5776,25 @@ export interface components {
         };
         /**
          * InstallSource
+         * @description How a plugin was installed: ``vendored`` (a code plugin shipped with the
+         *     registry and loaded from its plugins directory), ``git`` (fetched with
+         *     ``POST /v1/plugins/install-from-git`` or last re-fetched with
+         *     ``refresh-from-git``) or ``manifest`` (uploaded to
+         *     ``POST /v1/plugins/install``).
          * @enum {string}
          */
         InstallSource: "vendored" | "git" | "manifest";
-        /** InstallationResponse */
+        /**
+         * InstallationResponse
+         * @description Model for installation response
+         */
         InstallationResponse: {
             /** Config Json */
             config_json: {
                 [key: string]: unknown;
             } | null;
+            /** Current Version */
+            current_version?: string | null;
             /** Enabled */
             enabled: boolean;
             /** Id */
@@ -3606,9 +5809,13 @@ export interface components {
              * Format: date-time
              */
             last_updated_at: string;
+            /** Pinned Version */
+            pinned_version?: string | null;
             /** Plugin Id */
             plugin_id: string;
             status: components["schemas"]["InstallationStatus"];
+            /** Update Available */
+            update_available?: boolean | null;
             /** User Id */
             user_id: string;
             /** Version */
@@ -3616,10 +5823,16 @@ export interface components {
         };
         /**
          * InstallationStatus
+         * @description Installation status
          * @enum {string}
          */
         InstallationStatus: "installing" | "installed" | "failed" | "uninstalled";
-        /** InstalledPluginSummary */
+        /**
+         * InstalledPluginSummary
+         * @description One row of `GET /v1/marketplace/installations/me` (#402) -- an
+         *     installation joined with its plugin's metadata, so the client doesn't need
+         *     an N+1 fetch per installed plugin just to show a name/description.
+         */
         InstalledPluginSummary: {
             /** Author */
             author: string | null;
@@ -3649,13 +5862,24 @@ export interface components {
             last_updated_at: string;
             /** Name */
             name: string;
-            /** @default first_party */
+            /**
+             * @description Catalog origin of the installed plugin: `first_party` (glossary first-party) or `submitted` (glossary community).
+             * @default first_party
+             */
             origin: components["schemas"]["PluginOrigin"];
+            /**
+             * Pinned Version
+             * @description Version this installation is pinned to, or null when not pinned. Bulk/automatic updates skip a pinned installation.
+             */
+            pinned_version?: string | null;
             /** Plugin Id */
             plugin_id: string;
             /** Pricing Model */
             pricing_model: string;
-            /** Repository Url */
+            /**
+             * Repository Url
+             * @description The plugin's source repository URL, when it has one.
+             */
             repository_url?: string | null;
             /**
              * Requires Services
@@ -3663,7 +5887,15 @@ export interface components {
              */
             requires_services: string[];
             status: components["schemas"]["InstallationStatus"];
-            /** Version */
+            /**
+             * Update Available
+             * @description True when current_version is newer than version (semantic-version order). Null when either is unknown or they can't be ordered.
+             */
+            update_available?: boolean | null;
+            /**
+             * Version
+             * @description Version installed (#2199); null for an installation that predates version recording.
+             */
             version: string | null;
         };
         /** InviteCreate */
@@ -3693,16 +5925,23 @@ export interface components {
              * @default false
              */
             can_create_account: boolean;
-            /** Email */
+            /**
+             * Email
+             * @description The invited address, MASKED (e.g. 'j***@example.com') when the invite is email-bound (see email_bound); an empty string for a shareable/unbound link, whose address the invitee needn't use. Never the full address.
+             */
             email: string;
             /**
              * Email Bound
+             * @description True when registering/redeeming must use the invited address (single-use invites and owner/admin org invites): the client asks for it in full and the server verifies it; `email` then carries the masked hint. False for a shareable link (`email` is '').
              * @default false
              */
             email_bound: boolean;
             /** Id */
             id: number;
-            /** Invited By Name */
+            /**
+             * Invited By Name
+             * @description The inviter's username, for 'X invited you' copy -- never their id or email. Set only while the invite is pending and unexpired AND email-bound (single recipient); null for shareable/multi-use links, for accepted, revoked or expired invites, and when the username looks like an email address.
+             */
             invited_by_name?: string | null;
             /** Org Name */
             org_name?: string | null;
@@ -3766,7 +6005,18 @@ export interface components {
              */
             uses: number;
         };
-        /** LicenseActivateRequest */
+        /**
+         * LicenseActivateRequest
+         * @description Request model for license activation.
+         *
+         *     No user_id field -- identity comes from the JWT (`sub`), same as
+         *     installations.py's install/uninstall (#147/C7). A caller-supplied user_id
+         *     used to let any authenticated user activate (or silently overwrite) a
+         *     license for ANY other account; there is still no payment/entitlement
+         *     check behind this endpoint, so this closes the cross-account grant, not
+         *     the "is self-service tier activation free" question (see the issue
+         *     tracking that gap).
+         */
         LicenseActivateRequest: {
             /** Plugin Id */
             plugin_id: string;
@@ -3779,7 +6029,14 @@ export interface components {
             /** Status */
             status: string;
         };
-        /** LicenseKeyResponse */
+        /**
+         * LicenseKeyResponse
+         * @description ``GET /licenses/{license_id}/key`` (#1951) -- the ONE response that carries
+         *     a full license key. ``signed_license`` is the Ed25519 ``mlv1.`` token for
+         *     offline activation; always ``null`` until the platform issues signed licenses
+         *     (``core/signed_license.py`` is verification-only today, no signing key is
+         *     configured).
+         */
         LicenseKeyResponse: {
             /** License Id */
             license_id: string;
@@ -3820,24 +6077,37 @@ export interface components {
         };
         /**
          * LicenseTier
+         * @description Canonical license tiers, ordered free < community < pro < enterprise.
          * @enum {string}
          */
         LicenseTier: "free" | "community" | "pro" | "enterprise";
-        /** LicenseValidateRequest */
+        /**
+         * LicenseValidateRequest
+         * @description Request model for license validation
+         */
         LicenseValidateRequest: {
             /** License Key */
             license_key: string;
             /** Plugin Id */
             plugin_id: string;
         };
-        /** LicenseValidationRequest */
+        /**
+         * LicenseValidationRequest
+         * @description License validation request (tool-access check). #622 re-key: the license
+         *     subject is the ORGANIZATION (tenant_id), not the individual user.
+         */
         LicenseValidationRequest: {
             /** Tenant Id */
             tenant_id: string;
             /** Tool Name */
             tool_name: string;
         };
-        /** LicenseValidationResponse */
+        /**
+         * LicenseValidationResponse
+         * @description ``core.licensing.validate_license``. An invalid key returns only
+         *     ``valid``/``reason`` (plus ``valid_until`` when it expired). Unset keys are
+         *     dropped (``response_model_exclude_unset``), so no nulls are added.
+         */
         LicenseValidationResponse: {
             /** Full Tier */
             full_tier?: string | null;
@@ -3865,7 +6135,14 @@ export interface components {
             /** Username */
             username: string;
         };
-        /** PluginListResponse */
+        /**
+         * PluginListResponse
+         * @description Model for plugin list response.
+         *
+         *     Carries the platform-standard ``limit``/``offset``/``total`` fields (#147/C6)
+         *     alongside the original ``page``/``page_size``/``total_pages`` — a superset, so
+         *     existing page-based clients keep working while new clients use limit/offset.
+         */
         MarketplacePluginListResponse: {
             /** Count */
             count: number;
@@ -3893,7 +6170,16 @@ export interface components {
             /** Total Pages */
             total_pages: number;
         };
-        /** MemberAdd */
+        /**
+         * MemberAdd
+         * @description Exactly one of `user_id`/`email` must be given (#1072). `email` lets a
+         *     team_admin who isn't also an instance admin add an existing colleague
+         *     directly -- `GET /v1/auth/users` (the only way to discover a numeric
+         *     user_id) is instance-admin-gated, so `user_id` alone made this control
+         *     unusable for the overwhelming majority of team_admins. #2285: for a
+         *     caller who is not a Platform Admin, either form only reaches accounts the
+         *     team's org already has or manages (see ``add_team_member_route``).
+         */
         MemberAdd: {
             /** Email */
             email?: string | null;
@@ -3937,7 +6223,10 @@ export interface components {
             /** Message */
             message: string;
         };
-        /** MyInstallationsResponse */
+        /**
+         * MyInstallationsResponse
+         * @description Response for GET /v1/marketplace/installations/me.
+         */
         MyInstallationsResponse: {
             /** Count */
             count: number;
@@ -3952,7 +6241,10 @@ export interface components {
             id: number;
             /** Is Home */
             is_home: boolean;
-            /** Kind */
+            /**
+             * Kind
+             * @description Organization kind: `personal` (the workspace a self-service signup creates, and its sub-organizations) or `standard`. A sub-organization always has its parent's kind. In `invite`/`closed` registration mode only the owners/admins of a `standard` organization (or a Platform Admin) can issue invites that create new accounts. Read-only; a Platform Admin converts with `POST /v1/organizations/{org_id}/convert`.
+             */
             kind?: ("personal" | "standard") | null;
             /** Name */
             name: string;
@@ -3968,7 +6260,12 @@ export interface components {
             /** Organizations */
             organizations: components["schemas"]["MyOrgItem"][];
         };
-        /** OrgBulkInviteCreate */
+        /**
+         * OrgBulkInviteCreate
+         * @description Body for `POST /{org_id}/invites/bulk` (#1654). All invited emails
+         *     share the same `org_role`/`max_uses` -- a single grant-authority question
+         *     to answer once for the whole batch, not the same question asked N times.
+         */
         OrgBulkInviteCreate: {
             /** Emails */
             emails: string[];
@@ -3983,12 +6280,19 @@ export interface components {
              */
             org_role: string;
         };
-        /** OrgConvertRequest */
+        /**
+         * OrgConvertRequest
+         * @description Body of `POST /v1/organizations/{org_id}/convert`.
+         */
         OrgConvertRequest: {
-            /** Reason */
+            /**
+             * Reason
+             * @description Why the organization is being converted, recorded in the `ORG_KIND_CHANGED` audit row. Required; surrounding whitespace is trimmed, then it must be 1-500 characters.
+             */
             reason: string;
             /**
              * To
+             * @description The kind to convert to. Only `standard` is accepted: conversion is one-way, so `personal` is refused with 409.
              * @enum {string}
              */
             to: "personal" | "standard";
@@ -4002,7 +6306,11 @@ export interface components {
             /** Slug */
             slug: string;
         };
-        /** OrgDeleteAccepted */
+        /**
+         * OrgDeleteAccepted
+         * @description 202 body of ``DELETE /v1/organizations/{id}`` (#1805): the org is already
+         *     gone; its data is being purged asynchronously by ``purge_job``.
+         */
         OrgDeleteAccepted: {
             /**
              * Deleted
@@ -4026,6 +6334,11 @@ export interface components {
         OrgDetailOut: {
             /** Created At */
             created_at?: string | null;
+            /**
+             * Created Via
+             * @description How the organization was created. One of: `signup` (a self-service signup workspace), `platform_admin` (created by a Platform Admin), `owner` (created by the owner of an organization whose plan allows more), `suborg` (created under a parent organization); `conversion` and `import` are reserved. New values may be added: treat an unknown value as an unknown creation path. Read-only and never changed afterwards (a conversion to `standard` changes `kind`, not this). Null for organizations created before it was recorded.
+             */
+            created_via?: string | null;
             /** Description */
             description?: string | null;
             /**
@@ -4035,7 +6348,10 @@ export interface components {
             entitlement_mode: string;
             /** Id */
             id: number;
-            /** Kind */
+            /**
+             * Kind
+             * @description Organization kind: `personal` (the workspace a self-service signup creates, and its sub-organizations) or `standard`. A sub-organization always has its parent's kind. In `invite`/`closed` registration mode only the owners/admins of a `standard` organization (or a Platform Admin) can issue invites that create new accounts. Read-only; a Platform Admin converts with `POST /v1/organizations/{org_id}/convert`.
+             */
             kind?: ("personal" | "standard") | null;
             /** Name */
             name: string;
@@ -4150,7 +6466,10 @@ export interface components {
         OrgLimitOverrideSet: {
             /** Reason */
             reason: string;
-            /** Value */
+            /**
+             * Value
+             * @description The override; null means unlimited (counts only).
+             */
             value: boolean | number | string | number[] | null;
         };
         /** OrgLimitsOut */
@@ -4163,6 +6482,7 @@ export interface components {
             limits: components["schemas"]["OrgLimitOut"][];
             /** Organization Id */
             organization_id: number;
+            seats?: components["schemas"]["OrgSeatsOut"] | null;
             /** Tier */
             tier: string;
             /**
@@ -4179,7 +6499,10 @@ export interface components {
             created_by?: number | null;
             /** Id */
             id: number;
-            /** Kind */
+            /**
+             * Kind
+             * @description Organization kind: `personal` (the workspace a self-service signup creates, and its sub-organizations) or `standard`. A sub-organization always has its parent's kind. In `invite`/`closed` registration mode only the owners/admins of a `standard` organization (or a Platform Admin) can issue invites that create new accounts. Read-only; a Platform Admin converts with `POST /v1/organizations/{org_id}/convert`.
+             */
             kind?: ("personal" | "standard") | null;
             /** Member Count */
             member_count: number;
@@ -4244,7 +6567,13 @@ export interface components {
             /** Username */
             username: string;
         };
-        /** OrgMemberListItem */
+        /**
+         * OrgMemberListItem
+         * @description One row of ``GET /{org_id}/members`` (#1853, ADR
+         *     tenant-scoped-user-administration Decision 3): the account state and
+         *     what the CALLER could do about it, so the client can show actions per
+         *     permission without learning anything about other tenants.
+         */
         OrgMemberListItem: {
             /** Email */
             email: string;
@@ -4252,14 +6581,25 @@ export interface components {
             is_active: boolean;
             /** Is Home */
             is_home: boolean;
-            /** Is Oidc Linked */
+            /**
+             * Is Oidc Linked
+             * @description null unless managed_by_caller (not disclosed)
+             */
             is_oidc_linked?: boolean | null;
             /** Managed By Caller */
             managed_by_caller: boolean;
-            /** Must Change Password */
+            /**
+             * Must Change Password
+             * @description null unless managed_by_caller (not disclosed)
+             */
             must_change_password?: boolean | null;
             /** Org Role */
             org_role: string;
+            /**
+             * Outside Allowed Domains
+             * @default false
+             */
+            outside_allowed_domains: boolean;
             /** Resettable By Caller */
             resettable_by_caller: boolean;
             /** Suspended At */
@@ -4303,7 +6643,16 @@ export interface components {
             /** Members */
             members: components["schemas"]["OrgMemberListItem"][];
         };
-        /** OrgMeteringSummary */
+        /**
+         * OrgMeteringSummary
+         * @description Aggregate metering/entitlement summary across a subtree (#1650's
+         *     "rolled-up subtree reporting" decision). **Stubbed**: the token-usage
+         *     ledger this should aggregate (minder#1645) is NOT landed yet (confirmed
+         *     open at the time of this PR) -- ``total_input_tokens``/
+         *     ``total_output_tokens`` are always ``None`` until that ledger exists and
+         *     this is wired to it. Tracked as an explicit follow-up, not silently
+         *     guessed at.
+         */
         OrgMeteringSummary: {
             /**
              * Note
@@ -4322,7 +6671,12 @@ export interface components {
             /** Total Output Tokens */
             total_output_tokens?: number | null;
         };
-        /** OrgMove */
+        /**
+         * OrgMove
+         * @description Body for `POST /{org_id}/move` (#1650). `new_parent_organization_id =
+         *     None` detaches the organization to top-level -- the delete default's
+         *     mirror image.
+         */
         OrgMove: {
             /** New Parent Organization Id */
             new_parent_organization_id?: number | null;
@@ -4331,11 +6685,19 @@ export interface components {
         OrgOut: {
             /** Created At */
             created_at?: string | null;
+            /**
+             * Created Via
+             * @description How the organization was created. One of: `signup` (a self-service signup workspace), `platform_admin` (created by a Platform Admin), `owner` (created by the owner of an organization whose plan allows more), `suborg` (created under a parent organization); `conversion` and `import` are reserved. New values may be added: treat an unknown value as an unknown creation path. Read-only and never changed afterwards (a conversion to `standard` changes `kind`, not this). Null for organizations created before it was recorded.
+             */
+            created_via?: string | null;
             /** Default Team Id */
             default_team_id: number;
             /** Id */
             id: string;
-            /** Kind */
+            /**
+             * Kind
+             * @description Organization kind: `personal` (the workspace a self-service signup creates, and its sub-organizations) or `standard`. A sub-organization always has its parent's kind. In `invite`/`closed` registration mode only the owners/admins of a `standard` organization (or a Platform Admin) can issue invites that create new accounts. Read-only; a Platform Admin converts with `POST /v1/organizations/{org_id}/convert`.
+             */
             kind?: ("personal" | "standard") | null;
             /** Name */
             name: string;
@@ -4345,6 +6707,63 @@ export interface components {
             parent_organization_id?: number | null;
             /** Slug */
             slug: string;
+        };
+        /** OrgPolicyKnobOut */
+        OrgPolicyKnobOut: {
+            /** Available */
+            available: boolean;
+            /** Available On */
+            available_on?: string | null;
+            /** Default */
+            default?: boolean | string | string[] | null;
+            /** Effective */
+            effective?: boolean | string | string[] | null;
+            /** Grandfathered */
+            grandfathered: boolean;
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "invite_policy" | "allow_account_creating_invites" | "allowed_email_domains" | "team_admins_may_create_accounts" | "require_2fa";
+            /** Locked Reason */
+            locked_reason?: ("tier" | "org_kind" | "operator" | "license") | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "default" | "organization" | "parent";
+            /** Value */
+            value?: boolean | string | string[] | null;
+        };
+        /** OrgPolicyOut */
+        OrgPolicyOut: {
+            /** Knobs */
+            knobs: components["schemas"]["OrgPolicyKnobOut"][];
+            /** Organization Id */
+            organization_id: number;
+            /** Parent Organization Id */
+            parent_organization_id?: number | null;
+            /** Tier */
+            tier: string;
+        };
+        /**
+         * OrgPolicyPatch
+         * @description Only the fields present change. ``null`` resets a knob: it is
+         *     inherited from the parent again (the default on a root org); an empty
+         *     ``allowed_email_domains`` list too. An explicit value equal to the
+         *     default is kept (on a sub-org it tightens a looser parent).
+         */
+        OrgPolicyPatch: {
+            /** Allow Account Creating Invites */
+            allow_account_creating_invites?: boolean | null;
+            /** Allowed Email Domains */
+            allowed_email_domains?: string[] | null;
+            /** Invite Policy */
+            invite_policy?: ("admins" | "members") | null;
+            /** Require 2Fa */
+            require_2fa?: boolean | null;
+            /** Team Admins May Create Accounts */
+            team_admins_may_create_accounts?: boolean | null;
         };
         /** OrgPurgeJobList */
         OrgPurgeJobList: {
@@ -4397,6 +6816,37 @@ export interface components {
             /** Tenant Id */
             tenant_id: string;
         };
+        /**
+         * OrgSeatsOut
+         * @description Seats of the org's entitlement root (#2227).
+         */
+        OrgSeatsOut: {
+            /**
+             * Behaviour
+             * @enum {string}
+             */
+            behaviour: "hard" | "soft" | "soft_then_hard";
+            /** Entitlement Root Id */
+            entitlement_root_id: number;
+            /** Max */
+            max?: number | null;
+            /** Organization Id */
+            organization_id: number;
+            /** Reserved */
+            reserved: number;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "tier_default" | "operator_override" | "license";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "unlimited" | "ok" | "warning" | "at_limit" | "over_limit";
+            /** Used */
+            used: number;
+        };
         /** OrgSubtreeItem */
         OrgSubtreeItem: {
             /** Depth */
@@ -4427,7 +6877,12 @@ export interface components {
             /** Organization Id */
             organization_id: number;
         };
-        /** OrgUpdateRequest */
+        /**
+         * OrgUpdateRequest
+         * @description PATCH body (#1503, extended by #1650) — every field optional, only
+         *     what's supplied is changed. At least one field must be present (an empty
+         *     PATCH is almost certainly a client bug, not a legitimate no-op request).
+         */
         OrgUpdateRequest: {
             /** Description */
             description?: string | null;
@@ -4525,6 +6980,57 @@ export interface components {
             /** Permission Key */
             permission_key: string;
         };
+        /**
+         * PersonalOrgOut
+         * @description `POST /v1/organizations/personal` (#2234): the new workspace and a
+         *     fresh token that carries it as the caller's tenant.
+         */
+        PersonalOrgOut: {
+            /** Access Token */
+            access_token: string;
+            /** Created At */
+            created_at?: string | null;
+            /**
+             * Created Via
+             * @description How the organization was created. One of: `signup` (a self-service signup workspace), `platform_admin` (created by a Platform Admin), `owner` (created by the owner of an organization whose plan allows more), `suborg` (created under a parent organization); `conversion` and `import` are reserved. New values may be added: treat an unknown value as an unknown creation path. Read-only and never changed afterwards (a conversion to `standard` changes `kind`, not this). Null for organizations created before it was recorded.
+             */
+            created_via?: string | null;
+            /** Default Team Id */
+            default_team_id: number;
+            /** Expires In */
+            expires_in: number;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @description Organization kind: `personal` (the workspace a self-service signup creates, and its sub-organizations) or `standard`. A sub-organization always has its parent's kind. In `invite`/`closed` registration mode only the owners/admins of a `standard` organization (or a Platform Admin) can issue invites that create new accounts. Read-only; a Platform Admin converts with `POST /v1/organizations/{org_id}/convert`.
+             */
+            kind?: ("personal" | "standard") | null;
+            /** Name */
+            name: string;
+            /** Owner User Id */
+            owner_user_id: number;
+            /** Parent Organization Id */
+            parent_organization_id?: number | null;
+            /** Slug */
+            slug: string;
+            /**
+             * Token Type
+             * @default bearer
+             */
+            token_type: string;
+        };
+        /**
+         * PinVersionRequest
+         * @description Body of ``PUT /v1/marketplace/installations/{installation_id}/pin``.
+         */
+        PinVersionRequest: {
+            /**
+             * Version
+             * @description A recorded version of the installed plugin (see /versions).
+             */
+            version: string;
+        };
         /** PlatformAdminClaimRequest */
         PlatformAdminClaimRequest: {
             /** Code */
@@ -4548,7 +7054,10 @@ export interface components {
             /** Setup Code Required */
             setup_code_required: boolean;
         };
-        /** PluginAIToolItem */
+        /**
+         * PluginAIToolItem
+         * @description One tool in ``GET /plugins/{plugin_id}/tools``.
+         */
         PluginAIToolItem: {
             /** Active */
             active: boolean | null;
@@ -4588,7 +7097,10 @@ export interface components {
             action: string;
             /** Plugin */
             plugin: string;
-            /** Result */
+            /**
+             * Result
+             * @description The plugin action's own return value.
+             */
             result: unknown;
         };
         /** PluginConfigResponse */
@@ -4643,7 +7155,10 @@ export interface components {
             /** Plugin Id */
             plugin_id: string;
         };
-        /** PluginCreate */
+        /**
+         * PluginCreate
+         * @description Model for creating a new plugin
+         */
         PluginCreate: {
             /** Author */
             author: string;
@@ -4668,7 +7183,10 @@ export interface components {
             distribution_type: components["schemas"]["DistributionType"];
             /** Docker Image */
             docker_image?: string | null;
-            /** Manifest */
+            /**
+             * Manifest
+             * @description The plugin manifest (JSON object) for reviewers to inspect. Data only: never executed. At most 64 KiB (compact UTF-8 JSON) and 32 levels deep. The userinfo (user:password@) of every URL in any string value or key is removed, including URLs inside free text. Can only change while the submission is a draft or rejected.
+             */
             manifest?: {
                 [key: string]: unknown;
             } | null;
@@ -4696,7 +7214,14 @@ export interface components {
             /** Total Count */
             total_count: number;
         };
-        /** PluginDetail */
+        /**
+         * PluginDetail
+         * @description ``PluginInfo``, plus -- only when the plugin has a loaded instance -- its
+         *     client-facing surface (#1264): ``display`` (dict or null), ``requires``
+         *     (``{services, optional_services, bundles}``), ``capabilities`` (overrides
+         *     the stored list) and ``api_version``. ``extra="allow"`` so those additive,
+         *     instance-only keys pass through without appearing as nulls when absent.
+         */
         PluginDetail: {
             /** Author */
             author: string;
@@ -4707,6 +7232,7 @@ export interface components {
             capabilities: string[];
             /**
              * Configurable
+             * @description Whether the running plugin declares a config schema, i.e. whether GET /v1/plugins/{name}/config has fields to edit. Computed from the loaded instance at request time; false when it isn't loaded.
              * @default false
              */
             configurable: boolean;
@@ -4737,16 +7263,23 @@ export interface components {
              * @default unknown
              */
             health_status: string;
+            /** @description How the plugin was installed: `vendored` (code plugin loaded from PLUGINS_PATH), `git` (install-from-git) or `manifest` (manifest upload). Null only for a row written since the last boot by a path that doesn't record it; the next boot backfills it. */
             install_source?: components["schemas"]["InstallSource"] | null;
             /** Last Health Check */
             last_health_check?: string | null;
-            /** Marketplace Plugin Id */
+            /**
+             * Marketplace Plugin Id
+             * @description Id of the marketplace catalog row this plugin is linked to, when it has one. Join on this, never on the plugin name.
+             */
             marketplace_plugin_id?: string | null;
             /** Name */
             name: string;
             /** Registered At */
             registered_at: string;
-            /** Repository Url */
+            /**
+             * Repository Url
+             * @description Source repository of a `git` install, without credentials, query or fragment. Null for every other install source.
+             */
             repository_url?: string | null;
             /**
              * Status
@@ -4767,7 +7300,10 @@ export interface components {
             /** Status */
             status: string;
         };
-        /** PluginInfo */
+        /**
+         * PluginInfo
+         * @description Plugin information
+         */
         PluginInfo: {
             /** Author */
             author: string;
@@ -4778,6 +7314,7 @@ export interface components {
             capabilities: string[];
             /**
              * Configurable
+             * @description Whether the running plugin declares a config schema, i.e. whether GET /v1/plugins/{name}/config has fields to edit. Computed from the loaded instance at request time; false when it isn't loaded.
              * @default false
              */
             configurable: boolean;
@@ -4808,16 +7345,23 @@ export interface components {
              * @default unknown
              */
             health_status: string;
+            /** @description How the plugin was installed: `vendored` (code plugin loaded from PLUGINS_PATH), `git` (install-from-git) or `manifest` (manifest upload). Null only for a row written since the last boot by a path that doesn't record it; the next boot backfills it. */
             install_source?: components["schemas"]["InstallSource"] | null;
             /** Last Health Check */
             last_health_check?: string | null;
-            /** Marketplace Plugin Id */
+            /**
+             * Marketplace Plugin Id
+             * @description Id of the marketplace catalog row this plugin is linked to, when it has one. Join on this, never on the plugin name.
+             */
             marketplace_plugin_id?: string | null;
             /** Name */
             name: string;
             /** Registered At */
             registered_at: string;
-            /** Repository Url */
+            /**
+             * Repository Url
+             * @description Source repository of a `git` install, without credentials, query or fragment. Null for every other install source.
+             */
             repository_url?: string | null;
             /**
              * Status
@@ -4838,22 +7382,31 @@ export interface components {
         };
         /** PluginInstallationItem */
         PluginInstallationItem: {
+            /** Current Version */
+            current_version?: string | null;
             /** Enabled */
             enabled: boolean | null;
             /** Id */
             id: string;
             /** Installed At */
             installed_at: string;
+            /** Pinned Version */
+            pinned_version?: string | null;
             /** Plugin Id */
             plugin_id: string;
             /** Status */
             status: string | null;
+            /** Update Available */
+            update_available?: boolean | null;
             /** User Id */
             user_id: string | null;
             /** Version */
             version: string | null;
         };
-        /** PluginInstallationsResponse */
+        /**
+         * PluginInstallationsResponse
+         * @description Predates the shared ``PaginatedList`` envelope (#501).
+         */
         PluginInstallationsResponse: {
             /** Count */
             count: number;
@@ -4879,10 +7432,19 @@ export interface components {
         };
         /**
          * PluginOrigin
+         * @description Where a catalog listing came from. ``first_party`` (glossary:
+         *     first-party) listings are created by the plugin registry for the code
+         *     plugins it ships (auto-approved); ``submitted`` (glossary: community)
+         *     listings are developer submissions that go through review.
          * @enum {string}
          */
         PluginOrigin: "first_party" | "submitted";
-        /** PluginRatingsResponse */
+        /**
+         * PluginRatingsResponse
+         * @description GET /v1/marketplace/plugins/{plugin_id}/ratings -- the plugin's current
+         *     aggregate (same fields already shown on PluginResponse) plus the individual
+         *     reviews, newest first.
+         */
         PluginRatingsResponse: {
             /** Plugin Id */
             plugin_id: string;
@@ -4917,7 +7479,14 @@ export interface components {
             /** Total */
             total: number;
         };
-        /** PluginRepositoryListResponse */
+        /**
+         * PluginRepositoryListResponse
+         * @description GET /v1/marketplace/repositories -- a page of source repositories.
+         *
+         *     Mirrors PluginListResponse's dual pagination envelope (canonical
+         *     ``limit``/``offset``/``total`` plus the deprecated ``page`` fields) so
+         *     clients paginate repositories exactly as they already paginate plugins.
+         */
         PluginRepositoryListResponse: {
             /** Count */
             count: number;
@@ -4954,7 +7523,10 @@ export interface components {
              */
             total_pages: number;
         };
-        /** PluginRepositoryResponse */
+        /**
+         * PluginRepositoryResponse
+         * @description One plugin source repository grouping zero or more plugins.
+         */
         PluginRepositoryResponse: {
             /**
              * Created At
@@ -5001,7 +7573,10 @@ export interface components {
             plugin: string;
             /** Resource */
             resource: string;
-            /** Result */
+            /**
+             * Result
+             * @description The plugin resource's own item payload.
+             */
             result: unknown;
         };
         /** PluginResourceListEnvelope */
@@ -5010,10 +7585,16 @@ export interface components {
             plugin: string;
             /** Resource */
             resource: string;
-            /** Result */
+            /**
+             * Result
+             * @description The plugin resource's own list payload.
+             */
             result: unknown;
         };
-        /** PluginResponse */
+        /**
+         * PluginResponse
+         * @description Model for plugin response
+         */
         PluginResponse: {
             /** Author */
             author: string;
@@ -5084,7 +7665,16 @@ export interface components {
              */
             updated_at: string;
         };
-        /** PluginSemanticMatch */
+        /**
+         * PluginSemanticMatch
+         * @description One semantically-ranked plugin-catalog match (#1683).
+         *
+         *     Deliberately a compact projection of the catalog row (not the full
+         *     PluginResponse): this is consumed by the orchestrator's ``find_plugin`` AI
+         *     tool, whose result is JSON-serialised straight into the model's context, so
+         *     it carries only the fields a "does a plugin for X already exist?" answer
+         *     needs plus the similarity ``score``.
+         */
         PluginSemanticMatch: {
             /**
              * Author
@@ -5110,7 +7700,10 @@ export interface components {
             /** Score */
             score?: number | null;
         };
-        /** PluginSemanticSearchResponse */
+        /**
+         * PluginSemanticSearchResponse
+         * @description Response for GET /v1/marketplace/plugins/semantic-search (#1683).
+         */
         PluginSemanticSearchResponse: {
             /** Count */
             count: number;
@@ -5119,7 +7712,10 @@ export interface components {
             /** Query */
             query: string;
         };
-        /** PluginStateChangeResponse */
+        /**
+         * PluginStateChangeResponse
+         * @description Uninstall and disable replies.
+         */
         PluginStateChangeResponse: {
             /** Plugin Id */
             plugin_id: string;
@@ -5128,6 +7724,12 @@ export interface components {
         };
         /**
          * PluginStatus
+         * @description Plugin status in marketplace.
+         *
+         *     #402 submission lifecycle: DRAFT -> SUBMITTED -> IN_REVIEW -> APPROVED
+         *     (publicly visible) / REJECTED (with notes; may resubmit) ; ARCHIVED (delist).
+         *     APPROVED is the publicly-visible state (existing read paths key on it);
+         *     PENDING is the legacy pre-#402 value, kept for back-compat.
          * @enum {string}
          */
         PluginStatus: "draft" | "submitted" | "in_review" | "pending" | "approved" | "rejected" | "archived";
@@ -5138,7 +7740,10 @@ export interface components {
             /** Required Tier */
             required_tier: string;
         };
-        /** PluginUpdate */
+        /**
+         * PluginUpdate
+         * @description Model for updating a plugin
+         */
         PluginUpdate: {
             /** Author */
             author?: string | null;
@@ -5165,6 +7770,45 @@ export interface components {
             screenshots?: string[] | null;
             status?: components["schemas"]["PluginStatus"] | null;
         };
+        /**
+         * PluginVersionListResponse
+         * @description ``GET /v1/marketplace/plugins/{plugin_id}/versions`` (#2199): every
+         *     recorded version, newest first by semantic version (versions that aren't
+         *     semantic versions follow, newest first by ``created_at``).
+         */
+        PluginVersionListResponse: {
+            /** Count */
+            count: number;
+            /** Current Version */
+            current_version?: string | null;
+            /** Plugin Id */
+            plugin_id: string;
+            /** Versions */
+            versions: components["schemas"]["PluginVersionResponse"][];
+        };
+        /**
+         * PluginVersionResponse
+         * @description One published version of a plugin (#2199). ``changelog``,
+         *     ``download_url``, ``size_bytes`` and ``checksum`` are null until the
+         *     version's source provides them.
+         */
+        PluginVersionResponse: {
+            /** Changelog */
+            changelog?: string | null;
+            /** Checksum */
+            checksum?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /**
+             * Download Url
+             * @description Artifact URL, without credentials.
+             */
+            download_url?: string | null;
+            /** Size Bytes */
+            size_bytes?: number | null;
+            /** Version */
+            version: string;
+        };
         /** PortalResponse */
         PortalResponse: {
             /** Portal Url */
@@ -5172,11 +7816,17 @@ export interface components {
         };
         /**
          * PricingModel
+         * @description Pricing model types
          * @enum {string}
          */
         PricingModel: "free" | "paid" | "freemium";
         /** ProfileResponse */
         ProfileResponse: {
+            /**
+             * Can Create Workspace
+             * @description Whether POST /v1/organizations/personal would create a personal workspace for this account now: it has none, the installation lets accounts create their own and the free-organization limit allows it.
+             */
+            can_create_workspace?: boolean | null;
             /** Created At */
             created_at?: string | null;
             /** Display Name */
@@ -5189,6 +7839,11 @@ export interface components {
             updated_at?: string | null;
             /** User Id */
             user_id: number;
+            /**
+             * Workspace State
+             * @description `ready` once the account belongs to an organization; `none` while it has no workspace yet (its token reaches only sign-in, profile, invite redemption and workspace creation); `pending_request` (reserved: set by access requests, #2235) while a request to join an organization is open. Null when it could not be determined.
+             */
+            workspace_state?: string | null;
         };
         /** ProfileUpdateRequest */
         ProfileUpdateRequest: {
@@ -5199,14 +7854,23 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
-        /** RatingCreate */
+        /**
+         * RatingCreate
+         * @description Body for POST /v1/marketplace/plugins/{plugin_id}/ratings. 1-5 stars,
+         *     matching marketplace_plugins.rating_average's DECIMAL(3,2) ge=0/le=5.0
+         *     range (models/plugin.py) -- a whole-star scale, the common convention for
+         *     this kind of review.
+         */
         RatingCreate: {
             /** Rating */
             rating: number;
             /** Review Text */
             review_text?: string | null;
         };
-        /** RatingResponse */
+        /**
+         * RatingResponse
+         * @description One user's rating/review on a plugin.
+         */
         RatingResponse: {
             /**
              * Created At
@@ -5267,9 +7931,15 @@ export interface components {
              * @default User created successfully
              */
             message: string;
-            /** Organization Id */
+            /**
+             * Organization Id
+             * @description The new account's home organization: the invite's organization (for a team invite, the team's organization) or, for a token-less `open` signup, the personal organization just created for it. The first token's `tenant_id`. Null when the account has no home organization yet.
+             */
             organization_id?: number | null;
-            /** Team Id */
+            /**
+             * Team Id
+             * @description The team a team invite added the account to; null otherwise.
+             */
             team_id?: number | null;
             user: components["schemas"]["UserOut"];
         };
@@ -5286,12 +7956,19 @@ export interface components {
                 [key: string]: string[];
             };
         };
-        /** ReviewActionRequest */
+        /**
+         * ReviewActionRequest
+         * @description Optional reviewer notes for a transition (required on reject).
+         */
         ReviewActionRequest: {
             /** Notes */
             notes?: string | null;
         };
-        /** ReviewQueueListResponse */
+        /**
+         * ReviewQueueListResponse
+         * @description The admin review queue (#2214): a plugin list page whose entries carry
+         *     the submitter's and reviewer's usernames.
+         */
         ReviewQueueListResponse: {
             /** Count */
             count: number;
@@ -5319,7 +7996,16 @@ export interface components {
             /** Total Pages */
             total_pages: number;
         };
-        /** ReviewerPluginResponse */
+        /**
+         * ReviewerPluginResponse
+         * @description A listing as the submission review routes return it (#2214): the catalog
+         *     fields plus the usernames behind ``submitted_by`` / ``reviewed_by``.
+         *
+         *     The names are filled only for an admin (the review queue, and the
+         *     submission detail); null for the submission's own developer, for an
+         *     unknown/deleted account, or when the account directory can't be reached.
+         *     Never an e-mail address. The public catalog never uses this model.
+         */
         ReviewerPluginResponse: {
             /** Author */
             author: string;
@@ -5492,7 +8178,14 @@ export interface components {
             /** Is Active */
             is_active: boolean;
         };
-        /** SubOrgCreateRequest */
+        /**
+         * SubOrgCreateRequest
+         * @description Body for `POST /{org_id}/suborganizations` (#1650) -- creates a new
+         *     organization with `parent_organization_id` set to `org_id`. Structurally
+         *     identical to `OrgCreateRequest` (a separate model rather than reusing it
+         *     so the two routes' request shapes can evolve independently -- e.g. this
+         *     one never needs an instance-admin-only field).
+         */
         SubOrgCreateRequest: {
             /** Name */
             name: string;
@@ -5501,7 +8194,11 @@ export interface components {
             /** Slug */
             slug: string;
         };
-        /** SubmissionDetailResponse */
+        /**
+         * SubmissionDetailResponse
+         * @description One submission for review (#2214): the catalog fields plus the manifest
+         *     the developer submitted (null if none was supplied).
+         */
         SubmissionDetailResponse: {
             /** Author */
             author: string;
@@ -5580,7 +8277,11 @@ export interface components {
              */
             updated_at: string;
         };
-        /** SubmissionHistoryEntry */
+        /**
+         * SubmissionHistoryEntry
+         * @description One recorded status transition of a submission (#2214), from
+         *     ``marketplace_plugin_reviews``.
+         */
         SubmissionHistoryEntry: {
             /** Actor */
             actor: string;
@@ -5599,7 +8300,10 @@ export interface components {
             /** To Status */
             to_status: string;
         };
-        /** SubmissionHistoryResponse */
+        /**
+         * SubmissionHistoryResponse
+         * @description A page of a submission's review history, oldest first (#2214).
+         */
         SubmissionHistoryResponse: {
             /** Count */
             count: number;
@@ -5633,7 +8337,12 @@ export interface components {
             /** Valid Until */
             valid_until: string | null;
         };
-        /** TeamCreate */
+        /**
+         * TeamCreate
+         * @description #2287: the team belongs to the caller's active organization (the org
+         *     their token is acting in), never one named in the body. ``parent_team_id``
+         *     makes it a sub-team of a team in that same org.
+         */
         TeamCreate: {
             /** Description */
             description?: string | null;
@@ -5642,7 +8351,16 @@ export interface components {
             /** Parent Team Id */
             parent_team_id?: number | null;
         };
-        /** TeamCreateOut */
+        /**
+         * TeamCreateOut
+         * @description Extends TeamOut with a fresh JWT for the creator (#1148, mirrors
+         *     #1071's invite-redeem fix): the token this request was authenticated
+         *     with necessarily predates the caller's own new team_admin membership,
+         *     and /v1/auth/refresh deliberately never re-derives `teams` (matching
+         *     `role`'s existing staleness-until-next-login design) -- so without this,
+         *     the creator could not even share their OWN new team's content until an
+         *     unrelated full logout/login.
+         */
         TeamCreateOut: {
             /** Access Token */
             access_token: string;
@@ -5674,6 +8392,7 @@ export interface components {
         TeamDetailOut: {
             /**
              * Caller Can Manage
+             * @description True when the caller may manage this team's members (team admin, delegated team or organization authority, or Platform Admin)
              * @default false
              */
             caller_can_manage: boolean;
@@ -5685,6 +8404,7 @@ export interface components {
             description?: string | null;
             /**
              * Emails Visible
+             * @description False when the caller may not see members' email addresses; each member's email is then an empty string
              * @default true
              */
             emails_visible: boolean;
@@ -5703,6 +8423,7 @@ export interface components {
             parent_team_id?: number | null;
             /**
              * Roster Visible
+             * @description False when the caller may not see this team's roster; members is then empty
              * @default true
              */
             roster_visible: boolean;
@@ -5735,7 +8456,11 @@ export interface components {
             /** Username */
             username: string;
         };
-        /** TeamMove */
+        /**
+         * TeamMove
+         * @description Body for `POST /{team_id}/move` (#1651). `new_parent_team_id = None`
+         *     detaches the team to top-level -- the delete default's mirror image.
+         */
         TeamMove: {
             /** New Parent Team Id */
             new_parent_team_id?: number | null;
@@ -5773,7 +8498,10 @@ export interface components {
             /** Name */
             name?: string | null;
         };
-        /** TenantLicense */
+        /**
+         * TenantLicense
+         * @description One row of ``core.licensing.get_tenant_licenses``.
+         */
         TenantLicense: {
             /** Activated By */
             activated_by: string | null;
@@ -5819,7 +8547,10 @@ export interface components {
             token_type: string;
             user?: components["schemas"]["UserOut"] | null;
         };
-        /** ToolDiscoveryResponse */
+        /**
+         * ToolDiscoveryResponse
+         * @description Tool discovery response (paginated, #147/C6).
+         */
         ToolDiscoveryResponse: {
             /** Count */
             count: number;
@@ -5841,14 +8572,22 @@ export interface components {
              */
             total: number;
         };
-        /** ToolExecutionRequest */
+        /**
+         * ToolExecutionRequest
+         * @description Tool execution request. There is deliberately no caller-supplied user_id:
+         *     the license/tier check must run against the VERIFIED caller (the JWT ``sub`` in
+         *     routes/tools.py), never a client-controlled field.
+         */
         ToolExecutionRequest: {
             /** Parameters */
             parameters?: {
                 [key: string]: unknown;
             };
         };
-        /** ToolExecutionResponse */
+        /**
+         * ToolExecutionResponse
+         * @description Tool execution response.
+         */
         ToolExecutionResponse: {
             /** Execution Time */
             execution_time: number;
@@ -5861,7 +8600,10 @@ export interface components {
             /** Tool Name */
             tool_name: string;
         };
-        /** ToolParameter */
+        /**
+         * ToolParameter
+         * @description Tool parameter definition.
+         */
         ToolParameter: {
             /** Default */
             default?: unknown | null;
@@ -5877,7 +8619,10 @@ export interface components {
             /** Type */
             type: string;
         };
-        /** ToolSchema */
+        /**
+         * ToolSchema
+         * @description A single AI tool's declared schema.
+         */
         ToolSchema: {
             /** Description */
             description: string;
@@ -5900,7 +8645,10 @@ export interface components {
             /** Type */
             type: string;
         };
-        /** UpdateLicenseRequest */
+        /**
+         * UpdateLicenseRequest
+         * @description Update a plugin's required license tier (+ optional key).
+         */
         UpdateLicenseRequest: {
             /** License Key */
             license_key?: string | null;
@@ -5967,7 +8715,11 @@ export interface components {
             /** Username */
             username: string;
         };
-        /** ValidateLicenseRequest */
+        /**
+         * ValidateLicenseRequest
+         * @description Validate-license request. The key lives in the body, not the URL query, so a
+         *     secret isn't logged in access logs / proxies (#147/C7).
+         */
         ValidateLicenseRequest: {
             /** License Key */
             license_key?: string | null;
@@ -5994,7 +8746,10 @@ export interface components {
             /** Webhook Path */
             webhook_path?: string | null;
         };
-        /** LicenseValidationResponse */
+        /**
+         * LicenseValidationResponse
+         * @description License validation response (tool-access check).
+         */
         models__tool_execution__LicenseValidationResponse: {
             /** Allowed */
             allowed: boolean;
@@ -7166,6 +9921,7 @@ export interface operations {
     get_capability_entitlement_v1_entitlements_capabilities__tenant_id__get: {
         parameters: {
             query: {
+                /** @description capability_key()-formed key, e.g. 'plugin:<slug>' or 'bundle:<name>' */
                 capability: string;
             };
             header?: never;
@@ -8102,6 +10858,72 @@ export interface operations {
             };
         };
     };
+    pin_installation_v1_marketplace_installations__installation_id__pin_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                installation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstalledPluginSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unpin_installation_v1_marketplace_installations__installation_id__pin_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                installation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstalledPluginSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_licenses_v1_marketplace_licenses_get: {
         parameters: {
             query?: never;
@@ -8285,15 +11107,24 @@ export interface operations {
     list_plugins_v1_marketplace_plugins_get: {
         parameters: {
             query?: {
+                /** @description Page size (canonical) */
                 limit?: number | null;
+                /** @description Items to skip (canonical) */
                 offset?: number | null;
-                /** @deprecated */
+                /**
+                 * @deprecated
+                 * @description Deprecated: use limit/offset
+                 */
                 page?: number;
-                /** @deprecated */
+                /**
+                 * @deprecated
+                 * @description Deprecated: use limit/offset
+                 */
                 page_size?: number;
                 category?: string | null;
                 pricing_model?: string | null;
                 status?: string | null;
+                /** @description Only plugins of this catalog origin; all when omitted. `first_party` = glossary first-party, `submitted` = glossary community. */
                 origin?: components["schemas"]["PluginOrigin"] | null;
             };
             header?: never;
@@ -8390,12 +11221,21 @@ export interface operations {
         parameters: {
             query: {
                 q: string;
+                /** @description Page size (canonical) */
                 limit?: number | null;
+                /** @description Items to skip (canonical) */
                 offset?: number | null;
-                /** @deprecated */
+                /**
+                 * @deprecated
+                 * @description Deprecated: use limit/offset
+                 */
                 page?: number;
-                /** @deprecated */
+                /**
+                 * @deprecated
+                 * @description Deprecated: use limit/offset
+                 */
                 page_size?: number;
+                /** @description Only plugins of this catalog origin; all when omitted. `first_party` = glossary first-party, `submitted` = glossary community. */
                 origin?: components["schemas"]["PluginOrigin"] | null;
             };
             header?: never;
@@ -8427,7 +11267,9 @@ export interface operations {
     semantic_search_plugins_v1_marketplace_plugins_semantic_search_get: {
         parameters: {
             query: {
+                /** @description Natural-language query */
                 query: string;
+                /** @description Max ranked matches */
                 limit?: number;
             };
             header?: never;
@@ -8749,14 +11591,53 @@ export interface operations {
             };
         };
     };
+    list_plugin_versions_v1_marketplace_plugins__plugin_id__versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginVersionListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_repositories_v1_marketplace_repositories_get: {
         parameters: {
             query?: {
+                /** @description Page size (canonical) */
                 limit?: number | null;
+                /** @description Items to skip (canonical) */
                 offset?: number | null;
-                /** @deprecated */
+                /**
+                 * @deprecated
+                 * @description Deprecated: use limit/offset
+                 */
                 page?: number;
-                /** @deprecated */
+                /**
+                 * @deprecated
+                 * @description Deprecated: use limit/offset
+                 */
                 page_size?: number;
             };
             header?: never;
@@ -8819,11 +11700,19 @@ export interface operations {
     list_repository_plugins_v1_marketplace_repositories__repository_id__plugins_get: {
         parameters: {
             query?: {
+                /** @description Page size (canonical) */
                 limit?: number | null;
+                /** @description Items to skip (canonical) */
                 offset?: number | null;
-                /** @deprecated */
+                /**
+                 * @deprecated
+                 * @description Deprecated: use limit/offset
+                 */
                 page?: number;
-                /** @deprecated */
+                /**
+                 * @deprecated
+                 * @description Deprecated: use limit/offset
+                 */
                 page_size?: number;
             };
             header?: never;
@@ -8858,11 +11747,19 @@ export interface operations {
         parameters: {
             query?: {
                 status?: string;
+                /** @description Page size (canonical) */
                 limit?: number | null;
+                /** @description Items to skip (canonical) */
                 offset?: number | null;
-                /** @deprecated */
+                /**
+                 * @deprecated
+                 * @description Deprecated: use limit/offset
+                 */
                 page?: number;
-                /** @deprecated */
+                /**
+                 * @deprecated
+                 * @description Deprecated: use limit/offset
+                 */
                 page_size?: number;
             };
             header?: never;
@@ -8894,11 +11791,19 @@ export interface operations {
     my_submissions_v1_marketplace_submissions_mine_get: {
         parameters: {
             query?: {
+                /** @description Page size (canonical) */
                 limit?: number | null;
+                /** @description Items to skip (canonical) */
                 offset?: number | null;
-                /** @deprecated */
+                /**
+                 * @deprecated
+                 * @description Deprecated: use limit/offset
+                 */
                 page?: number;
-                /** @deprecated */
+                /**
+                 * @deprecated
+                 * @description Deprecated: use limit/offset
+                 */
                 page_size?: number;
             };
             header?: never;
@@ -9054,7 +11959,9 @@ export interface operations {
     submission_history_v1_marketplace_submissions__plugin_id__history_get: {
         parameters: {
             query?: {
+                /** @description Page size */
                 limit?: number;
+                /** @description Items to skip */
                 offset?: number;
             };
             header?: never;
@@ -9720,6 +12627,26 @@ export interface operations {
             };
         };
     };
+    create_personal_organization_route_v1_organizations_personal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonalOrgOut"];
+                };
+            };
+        };
+    };
     switch_organization_v1_organizations_switch_post: {
         parameters: {
             query?: never;
@@ -9757,6 +12684,7 @@ export interface operations {
         parameters: {
             query?: {
                 reparent_children_to?: number | null;
+                /** @description Must equal the organization's slug exactly -- an explicit acknowledgement that deletion is irreversible. */
                 confirm?: string | null;
             };
             header?: never;
@@ -10953,6 +13881,72 @@ export interface operations {
             };
         };
     };
+    get_organization_policy_route_v1_organizations__org_id__policy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgPolicyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_organization_policy_route_v1_organizations__org_id__policy_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrgPolicyPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgPolicyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_roles_route_v1_organizations__org_id__roles_get: {
         parameters: {
             query?: {
@@ -11201,6 +14195,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_organization_seats_route_v1_organizations__org_id__seats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgSeatsOut"];
+                };
             };
             /** @description Validation Error */
             422: {

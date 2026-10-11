@@ -72,6 +72,7 @@ function member(overrides: Partial<OrgMember> = {}): OrgMember {
     must_change_password: false,
     managed_by_caller: false,
     resettable_by_caller: false,
+    outside_allowed_domains: false,
     ...overrides,
   };
 }
