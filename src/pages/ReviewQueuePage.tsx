@@ -6,7 +6,7 @@ import { PageHeader } from "../components/PageHeader";
 import { Skeleton } from "../components/Skeleton";
 import { StatusLine } from "../components/StatusLine";
 import { SubmissionReviewCard } from "../components/SubmissionReviewCard";
-import { apiFetch } from "../lib/api";
+import { fetchReviewQueue } from "../lib/marketplace";
 import { useAsyncResource } from "../lib/useAsyncResource";
 import { useAuth } from "../lib/auth";
 import {
@@ -58,10 +58,7 @@ export function ReviewQueuePage() {
   const statusRef = useRef<HTMLDivElement>(null);
   const { data, error, loading, reload } = useAsyncResource<QueueResult>(
     (signal) =>
-      apiFetch<ReviewQueueResponse>(
-        `/v1/marketplace/submissions?status=${encodeURIComponent(statusFilter)}&limit=${REVIEW_QUEUE_PAGE_SIZE}`,
-        { token, signal },
-      ).then((response) => ({ filter: statusFilter, response })),
+      fetchReviewQueue(statusFilter, REVIEW_QUEUE_PAGE_SIZE, token, signal).then((response) => ({ filter: statusFilter, response })),
     { deps: [statusFilter, sessionKey], enabled: isAdmin },
   );
 

@@ -1,12 +1,38 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  createSubmission,
+  fetchCatalogPage,
   fetchCatalogPlugins,
+  fetchCatalogToolsPage,
+  fetchFeaturedPlugins,
+  fetchLiveTools,
   fetchMyInstallations,
+  fetchMyLicenses,
+  fetchMySubmissions,
+  fetchPluginConfig,
+  fetchPluginConflicts,
+  fetchPluginDependencies,
+  fetchPluginRatings,
+  fetchRecommendations,
+  fetchReviewQueue,
   fetchRuntimePlugins,
+  fetchSourceRepositoriesPage,
+  fetchSourceRepository,
+  fetchSourceRepositoryPluginsPage,
   hasBackendField,
+  installPlugin,
+  installPluginFromGit,
   isPluginNotRunningError,
   MAX_PAGES,
+  runReviewerAction,
+  searchCatalogPlugins,
+  setPluginEnabled,
+  submitForReview,
+  submitPluginRating,
+  uninstallPlugin,
+  updatePluginConfig,
+  updateSubmission,
 } from "./marketplace";
 
 const apiFetch = vi.fn();
@@ -155,5 +181,205 @@ describe("hasBackendField", () => {
     expect(hasBackendField(inherited, "origin")).toBe(false);
     expect(hasBackendField(null as { origin?: string } | null, "origin")).toBe(false);
     expect(hasBackendField(undefined as { origin?: string } | undefined, "origin")).toBe(false);
+  });
+});
+
+describe("catalog calls", () => {
+  it("lists a catalog page with pricing and origin filters, without a token", async () => {
+    const page = { plugins: [], count: 0, total: 0, limit: 20, offset: 40 };
+    apiFetch.mockResolvedValue(page);
+    expect(
+      await fetchCatalogPage({ pricingModel: "paid", origin: "submitted", limit: 20, offset: 40 }),
+    ).toBe(page);
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/v1/marketplace/plugins?limit=20&offset=40&pricing_model=paid&origin=submitted",
+    );
+  });
+
+  it("searches when the query is non-blank: trimmed, encoded, no pricing_model", async () => {
+    apiFetch.mockResolvedValue({ plugins: [] });
+    await fetchCatalogPage({ query: "  a&b ", pricingModel: "paid", limit: 20, offset: 0 });
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/v1/marketplace/plugins/search?q=a%26b&limit=20&offset=0",
+    );
+    apiFetch.mockClear();
+    await fetchCatalogPage({ query: "   ", limit: 20, offset: 0 });
+    expect(apiFetch).toHaveBeenCalledWith("/v1/marketplace/plugins?limit=20&offset=0");
+  });
+
+  it("fetches featured plugins and the palette search", async () => {
+    apiFetch.mockResolvedValue({ plugins: [] });
+    await fetchFeaturedPlugins();
+    expect(apiFetch).toHaveBeenLastCalledWith("/v1/marketplace/plugins/featured?limit=6");
+    const signal = new AbortController().signal;
+    await searchCatalogPlugins("wea ther", 5, signal);
+    expect(apiFetch).toHaveBeenLastCalledWith(
+      "/v1/marketplace/plugins/search?q=wea%20ther&limit=5",
+      { signal },
+    );
+  });
+});
+
+describe("plugin graph calls", () => {
+  it("reads dependencies and conflicts without a token", async () => {
+    apiFetch.mockResolvedValue({});
+    await fetchPluginDependencies("p1");
+    await fetchPluginConflicts("p1");
+    expect(apiFetch.mock.calls).toEqual([
+      ["/v1/graph/dependencies/p1"],
+      ["/v1/graph/conflicts/p1"],
+    ]);
+  });
+
+  it("posts the installed ids for recommendations", async () => {
+    apiFetch.mockResolvedValue({ recommendations: [] });
+    await fetchRecommendations(["a", "b"], "tok");
+    expect(apiFetch).toHaveBeenCalledWith("/v1/graph/recommendations?limit=5", {
+      method: "POST",
+      body: ["a", "b"],
+      token: "tok",
+    });
+  });
+});
+
+describe("lifecycle calls", () => {
+  it("installs, uninstalls, enables and disables with the right methods", async () => {
+    apiFetch.mockResolvedValue({});
+    await installPlugin("p1", "tok");
+    await uninstallPlugin("p1", "tok");
+    await setPluginEnabled("p1", true, "tok");
+    await setPluginEnabled("p1", false, "tok");
+    expect(apiFetch.mock.calls).toEqual([
+      ["/v1/marketplace/plugins/p1/install", { method: "POST", token: "tok" }],
+      ["/v1/marketplace/plugins/p1/uninstall", { method: "DELETE", token: "tok" }],
+      ["/v1/marketplace/plugins/p1/enable", { method: "POST", token: "tok" }],
+      ["/v1/marketplace/plugins/p1/disable", { method: "POST", token: "tok" }],
+    ]);
+  });
+
+  it("propagates an API error to the caller", async () => {
+    apiFetch.mockRejectedValue(new Error("boom"));
+    await expect(installPlugin("p1", "tok")).rejects.toThrow("boom");
+  });
+});
+
+describe("plugin-registry calls", () => {
+  it("installs from git with the caller's token", async () => {
+    const res = { message: "ok", plugin: "x", webhook_path: null };
+    apiFetch.mockResolvedValue(res);
+    const body = { repo_url: "https://example.com/r.git", ref: "main" };
+    expect(await installPluginFromGit(body, "tok")).toBe(res);
+    expect(apiFetch).toHaveBeenCalledWith("/v1/plugins/install-from-git", {
+      method: "POST",
+      body,
+      token: "tok",
+    });
+  });
+
+  it("reads and saves a plugin's config, encoding the name", async () => {
+    apiFetch.mockResolvedValue({});
+    await fetchPluginConfig("a b", "tok");
+    await updatePluginConfig("a b", { k: 1 }, "tok");
+    expect(apiFetch.mock.calls).toEqual([
+      ["/v1/plugins/a%20b/config", { token: "tok" }],
+      ["/v1/plugins/a%20b/config", { method: "PUT", body: { k: 1 }, token: "tok" }],
+    ]);
+  });
+});
+
+describe("Tools calls", () => {
+  it("pages the catalog, inactive tools included", async () => {
+    apiFetch.mockResolvedValue({ tools: [], total: 0 });
+    await fetchCatalogToolsPage(40);
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/v1/marketplace/ai/tools?active_only=false&limit=20&offset=40",
+    );
+  });
+
+  it("returns the live tools, or [] when the key is missing", async () => {
+    const signal = new AbortController().signal;
+    apiFetch.mockResolvedValueOnce({ tools: [{ type: "function" }] });
+    expect(await fetchLiveTools(signal)).toEqual([{ type: "function" }]);
+    expect(apiFetch).toHaveBeenCalledWith("/v1/plugins/ai/tools", { signal });
+    apiFetch.mockResolvedValueOnce({});
+    expect(await fetchLiveTools()).toEqual([]);
+  });
+});
+
+describe("submission and review calls", () => {
+  it("lists, creates, edits and submits the caller's submissions", async () => {
+    apiFetch.mockResolvedValue({});
+    const signal = new AbortController().signal;
+    await fetchMySubmissions("tok", signal);
+    const draft = {
+      name: "n",
+      display_name: "N",
+      author: "a",
+      distribution_type: "git",
+      pricing_model: "free",
+      base_tier: "community",
+    } as const;
+    await createSubmission(draft, "tok");
+    await updateSubmission("p1", { display_name: "M" }, "tok");
+    await submitForReview("p1", "tok");
+    expect(apiFetch.mock.calls).toEqual([
+      ["/v1/marketplace/submissions/mine", { token: "tok", signal }],
+      [
+        "/v1/marketplace/plugins",
+        { method: "POST", token: "tok", body: draft },
+      ],
+      ["/v1/marketplace/plugins/p1", { method: "PUT", token: "tok", body: { display_name: "M" } }],
+      ["/v1/marketplace/submissions/p1/submit", { method: "POST", token: "tok" }],
+    ]);
+  });
+
+  it("reads the review queue and runs reviewer actions", async () => {
+    apiFetch.mockResolvedValue({ plugins: [] });
+    await fetchReviewQueue("in_review", 100, "tok");
+    await runReviewerAction("a/b", "reject", "tok", { notes: "no" });
+    await runReviewerAction("p1", "claim", "tok");
+    expect(apiFetch.mock.calls).toEqual([
+      ["/v1/marketplace/submissions?status=in_review&limit=100", { token: "tok", signal: undefined }],
+      ["/v1/marketplace/submissions/a%2Fb/reject", { method: "POST", token: "tok", body: { notes: "no" } }],
+      ["/v1/marketplace/submissions/p1/claim", { method: "POST", token: "tok", body: undefined }],
+    ]);
+  });
+});
+
+describe("source repository calls", () => {
+  it("pages repositories and their plugins, and reads one repository", async () => {
+    apiFetch.mockResolvedValue({});
+    const signal = new AbortController().signal;
+    await fetchSourceRepositoriesPage(20);
+    await fetchSourceRepository("r1", signal);
+    await fetchSourceRepositoryPluginsPage("r1", 0);
+    expect(apiFetch.mock.calls).toEqual([
+      ["/v1/marketplace/repositories?limit=20&offset=20"],
+      ["/v1/marketplace/repositories/r1", { signal }],
+      ["/v1/marketplace/repositories/r1/plugins?limit=20&offset=0"],
+    ]);
+  });
+});
+
+describe("ratings and licenses calls", () => {
+  it("reads ratings publicly and posts the caller's rating with a token", async () => {
+    apiFetch.mockResolvedValue({});
+    await fetchPluginRatings("p1");
+    await submitPluginRating("p1", { rating: 4, review_text: null }, "tok");
+    expect(apiFetch.mock.calls).toEqual([
+      ["/v1/marketplace/plugins/p1/ratings"],
+      [
+        "/v1/marketplace/plugins/p1/ratings",
+        { method: "POST", body: { rating: 4, review_text: null }, token: "tok" },
+      ],
+    ]);
+  });
+
+  it("lists the caller's licenses", async () => {
+    const res = { licenses: [], count: 0 };
+    apiFetch.mockResolvedValue(res);
+    const signal = new AbortController().signal;
+    expect(await fetchMyLicenses("tok", signal)).toBe(res);
+    expect(apiFetch).toHaveBeenCalledWith("/v1/marketplace/licenses", { token: "tok", signal });
   });
 });

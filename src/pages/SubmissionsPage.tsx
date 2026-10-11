@@ -7,8 +7,16 @@ import { InfoCallout } from "../components/InfoCallout";
 import { LoadError } from "../components/LoadError";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
-import { apiFetch, friendlyErrorMessage } from "../lib/api";
+import { friendlyErrorMessage } from "../lib/api";
 import { DEFAULT_SUBMISSION_TIER } from "../lib/billing";
+import {
+  createSubmission,
+  fetchMySubmissions,
+  submitForReview,
+  updateSubmission,
+  type PluginStatus,
+  type Submission,
+} from "../lib/marketplace";
 import { useAsyncResource } from "../lib/useAsyncResource";
 import { useAuth } from "../lib/auth";
 import {
@@ -23,34 +31,11 @@ import {
   secondaryButtonClass,
 } from "../lib/ui";
 
-export type SubmissionStatus =
-  | "draft"
-  | "submitted"
-  | "in_review"
-  | "approved"
-  | "rejected"
-  | "archived"
-  | "pending";
-
-export interface Submission {
-  id: string;
-  name: string;
-  display_name: string;
-  description: string | null;
-  author: string;
-  repository_url: string | null;
-  distribution_type: "git" | "docker" | "hybrid";
-  docker_image: string | null;
-  pricing_model: "free" | "paid" | "freemium";
-  base_tier: string;
-  status: SubmissionStatus;
-  review_notes: string | null;
-  requires_services: string[];
-}
-
-interface SubmissionListResponse {
-  plugins: Submission[];
-}
+/** A submission's status: the catalog's full `PluginStatus`. The submission
+ * shapes live in lib/marketplace.ts (#119); re-exported for existing
+ * importers. */
+export type SubmissionStatus = PluginStatus;
+export type { Submission };
 
 // Own submission's editable fields (#402 follow-up) -- mirrors backend's
 // _OWNER_UPDATABLE in routes/marketplace.py exactly: never name/status/featured
@@ -99,10 +84,8 @@ function NewSubmissionForm({ onCreated }: { onCreated: () => void }) {
     setBusy(true);
     setStatusMsg("Creating draft…");
     try {
-      await apiFetch("/v1/marketplace/plugins", {
-        method: "POST",
-        token,
-        body: {
+      await createSubmission(
+        {
           name,
           display_name: displayName,
           description: description.trim() || null,
@@ -113,7 +96,8 @@ function NewSubmissionForm({ onCreated }: { onCreated: () => void }) {
           pricing_model: pricingModel,
           base_tier: baseTier,
         },
-      });
+        token,
+      );
       setName("");
       setDisplayName("");
       setDescription("");
@@ -335,17 +319,17 @@ function EditSubmissionForm({
     try {
       // Deliberately never sends status/featured -- the backend 403s a
       // non-admin for those (self-approval is the exact bug #929 closed).
-      await apiFetch(`/v1/marketplace/plugins/${submission.id}`, {
-        method: "PUT",
-        token,
-        body: {
+      await updateSubmission(
+        submission.id,
+        {
           display_name: displayName,
           description: description.trim() || null,
           author,
           pricing_model: pricingModel,
           base_tier: baseTier,
         },
-      });
+        token,
+      );
       onSaved();
     } catch (err) {
       setStatusMsg(friendlyErrorMessage(err), true);
@@ -473,10 +457,7 @@ function SubmissionCard({
     setBusy(true);
     setStatusMsg("Submitting for review…");
     try {
-      await apiFetch(`/v1/marketplace/submissions/${submission.id}/submit`, {
-        method: "POST",
-        token,
-      });
+      await submitForReview(submission.id, token);
       onChanged();
     } catch (err) {
       setStatusMsg(friendlyErrorMessage(err), true);
@@ -562,10 +543,7 @@ export function SubmissionsPage() {
     reload: loadMine,
   } = useAsyncResource(
     (signal) =>
-      apiFetch<SubmissionListResponse>("/v1/marketplace/submissions/mine", {
-        token,
-        signal,
-      }),
+      fetchMySubmissions(token, signal),
     { deps: [sessionKey], enabled: isAuthenticated },
   );
   const submissions = data?.plugins ?? [];

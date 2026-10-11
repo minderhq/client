@@ -12,11 +12,21 @@ import { PluginVersion } from "../components/PluginVersion";
 import { SourceBadge, SourceLegend } from "../components/SourceBadge";
 import { InstallStateBadge } from "../components/StatusBadge";
 import { StatusLine } from "../components/StatusLine";
-import { apiFetch, friendlyErrorMessage } from "../lib/api";
+import { friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useAutoClearTimeout } from "../lib/browser";
 import { configurableOf, type InstalledEntry } from "../lib/installedPlugins";
-import { isPluginNotRunningError, type RuntimePlugin } from "../lib/marketplace";
+import {
+  fetchPluginConfig,
+  isPluginNotRunningError,
+  updatePluginConfig,
+  type ConfigField,
+  type JsonSchema,
+  type PluginDisplay,
+  type PluginRequires,
+  type RuntimePlugin,
+  type UiSchema,
+} from "../lib/marketplace";
 import type { Installation } from "../lib/types";
 import { useInstalledPlugins } from "../lib/useInstalledPlugins";
 import { usePluginLifecycle } from "../lib/usePluginLifecycle";
@@ -31,65 +41,6 @@ import {
 } from "../lib/ui";
 import { useTokenRef } from "../lib/useTokenRef";
 import { ROUTES } from "../lib/routes";
-
-interface ConfigField {
-  key: string;
-  type?: "string" | "int" | "float" | "bool";
-  secret?: boolean;
-  description?: string;
-  // presentation hints (SDK plugin-driven UI) — all optional, safe fallbacks
-  widget?: string;
-  options?: { value: unknown; label: string }[];
-  options_action?: string;
-  rows?: number;
-  placeholder?: string;
-  group?: string;
-}
-
-interface PluginDisplay {
-  label?: string;
-  summary?: string;
-  logo?: string;
-  color?: string;
-  category?: string;
-}
-
-interface PluginRequires {
-  services: string[];
-  optional_services: string[];
-  bundles: string[];
-}
-
-interface JsonSchemaProperty {
-  type?: string;
-  enum?: unknown[];
-  description?: string;
-}
-
-interface JsonSchema {
-  properties?: Record<string, JsonSchemaProperty>;
-  required?: string[];
-}
-
-type UiSchema = Record<
-  string,
-  { "ui:widget"?: string; "ui:placeholder"?: string; "ui:rows"?: number }
->;
-
-interface PluginConfigResponse {
-  configurable: boolean;
-  schema: ConfigField[];
-  values: Record<string, unknown>;
-  // client-facing surface added by the registry (#1264): branding + what the
-  // plugin needs from the platform.
-  display?: PluginDisplay | null;
-  requires?: PluginRequires | null;
-  capabilities?: string[];
-  // RFC 0001 (#1263) Increment 2: the scalable form for plugins with no flat
-  // `schema` (nested/enum/conditional shapes that don't fit ConfigField).
-  json_schema?: JsonSchema | null;
-  ui_schema?: UiSchema | null;
-}
 
 /** Maps json_schema/ui_schema onto the existing ConfigField shape so the flat
  * schema's rendering/submission logic (FieldInput, handleSubmit's int/float
@@ -298,10 +249,7 @@ export function ConfigurePanel({
     setStatus("Loading…");
     setIsError(false);
     try {
-      const cfg = await apiFetch<PluginConfigResponse>(
-        `/v1/plugins/${encodeURIComponent(name)}/config`,
-        { token },
-      );
+      const cfg = await fetchPluginConfig(name, token);
       setConfigurable(cfg.configurable);
       setSchema(
         cfg.schema.length > 0
@@ -352,11 +300,7 @@ export function ConfigurePanel({
     setStatus("Saving…");
     setIsError(false);
     try {
-      await apiFetch(`/v1/plugins/${encodeURIComponent(name)}/config`, {
-        method: "PUT",
-        body,
-        token,
-      });
+      await updatePluginConfig(name, body, token);
       setStatus(
         skipped.length > 0
           ? `Saved (left ${skipped.join(", ")} unchanged — not a valid number).`

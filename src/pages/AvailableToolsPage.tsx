@@ -9,32 +9,10 @@ import { LoadError } from "../components/LoadError";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
 import { StatusLine } from "../components/StatusLine";
-import { apiFetch } from "../lib/api";
+import { fetchCatalogToolsPage, type CatalogTool } from "../lib/marketplace";
 import { badgeClass, secondaryButtonClass } from "../lib/ui";
 import { usePaginatedList } from "../lib/usePaginatedList";
 import { ROUTES } from "../lib/routes";
-
-interface CatalogTool {
-  id: string;
-  plugin_id: string;
-  plugin_name: string;
-  plugin_display_name: string;
-  tool_name: string;
-  type: string;
-  description: string | null;
-  endpoint: string;
-  method: string;
-  required_tier: string;
-  active: boolean;
-}
-
-interface CatalogToolsResponse {
-  tools: CatalogTool[];
-  count: number;
-  total: number;
-  limit: number;
-  offset: number;
-}
 
 function CatalogToolCard({ tool }: { tool: CatalogTool }) {
   return (
@@ -71,9 +49,7 @@ function CatalogToolCard({ tool }: { tool: CatalogTool }) {
  * in for -- it's read-only either way. */
 export function AvailableToolsPage() {
   const fetchCatalogPage = useCallback(async (offset: number) => {
-    const res = await apiFetch<CatalogToolsResponse>(
-      `/v1/marketplace/ai/tools?active_only=false&limit=20&offset=${offset}`,
-    );
+    const res = await fetchCatalogToolsPage(offset, 20);
     return { items: res.tools, total: res.total };
   }, []);
   const {

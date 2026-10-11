@@ -9,33 +9,16 @@ import { LoadError } from "../components/LoadError";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
 import { ApiError, apiFetch, friendlyErrorMessage } from "../lib/api";
+import { fetchLiveTools, type LiveTool } from "../lib/marketplace";
 import { useAuth } from "../lib/auth";
 import { exampleForSchema } from "../lib/jsonSchemaExample";
 import { badgeClass, inputClass, secondaryButtonClass } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
 import { ROUTES } from "../lib/routes";
 
-export interface LiveTool {
-  type: "function";
-  function: {
-    name: string;
-    description: string;
-    parameters: {
-      type?: string;
-      properties?: Record<string, { type?: string }>;
-      required?: string[];
-    };
-  };
-  metadata: {
-    plugin: string;
-    endpoint: string;
-    method: string;
-  };
-}
-
-interface LiveToolsResponse {
-  tools: LiveTool[];
-}
+/** The live Tool shape lives in lib/marketplace.ts (#119); re-exported for
+ * existing importers. */
+export type { LiveTool };
 
 /** Runnable example query for one tool -- pre-fills a type-appropriate
  * example from the tool's own JSON-Schema parameters (editable), then calls
@@ -186,9 +169,7 @@ export function InstalledToolsPage() {
       // hook's `data` to `undefined`, past the `liveTools.data !== null`
       // guard below and crashing `.length`/`.map` -- same failure shape as
       // HealthStrip.tsx's `services` bug.
-      apiFetch<LiveToolsResponse>("/v1/plugins/ai/tools", { signal }).then(
-        (r) => r.tools ?? [],
-      ),
+      fetchLiveTools(signal),
     { timeoutMs: 15_000 },
   );
 

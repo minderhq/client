@@ -1,34 +1,12 @@
-import type { PluginOrigin } from "./marketplace";
-
 /** Shapes shared across more than one page -- previously each page re-declared
  * its own copy (found drifting: AvailablePluginsPage's `Installation` was
  * missing `requires_services`, RagPipelinesPage's `KnowledgeBase` was a
  * hand-picked subset of KnowledgeBasesPage's). Centralized so an API shape
  * change only needs updating once. */
 
-export interface Installation {
-  installation_id: string;
-  plugin_id: string;
-  version: string | null;
-  status: string;
-  enabled: boolean;
-  installed_at: string;
-  last_updated_at: string;
-  name: string;
-  display_name: string;
-  description: string | null;
-  current_version: string | null;
-  pricing_model: string;
-  base_tier: string;
-  category_id: string | null;
-  author: string | null;
-  requires_services: string[];
-  /** The installed plugin's catalog origin (#2219). Absent on a marketplace
-   * older than #2219, which is why it's optional. */
-  origin?: PluginOrigin;
-  /** The catalog row's source repository URL, when it has one (#2219). */
-  repository_url?: string | null;
-}
+/** A marketplace installation record. Typed from the gateway spec in
+ * lib/marketplace.ts (#119); re-exported here for existing importers. */
+export type { Installation } from "./marketplace";
 
 export interface KnowledgeBase {
   id: string;

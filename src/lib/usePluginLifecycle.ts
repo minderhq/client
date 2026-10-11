@@ -1,9 +1,10 @@
 import { useState } from "react";
 
-import { apiFetch, friendlyErrorMessage } from "./api";
+import { friendlyErrorMessage } from "./api";
+import { installPlugin, setPluginEnabled, uninstallPlugin } from "./marketplace";
 import type { useConfirm } from "../components/ConfirmDialog";
 
-/** Install/enable/disable/uninstall against `/v1/marketplace/plugins/{id}/*`
+/** Install/enable/disable/uninstall of a catalog plugin (lib/marketplace.ts)
  * -- identical logic PluginCard (AvailablePluginsPage) and InstalledPluginCard
  * (InstalledPluginsPage) each hand-rolled separately. Only the confirm-dialog
  * copy and which actions apply differ between the two call sites; the status/
@@ -35,10 +36,7 @@ export function usePluginLifecycle({
     setIsError(false);
     let ok = false;
     try {
-      await apiFetch(`/v1/marketplace/plugins/${pluginId}/install`, {
-        method: "POST",
-        token,
-      });
+      await installPlugin(pluginId, token);
       setStatus("");
       onInstalled?.();
       ok = true;
@@ -62,10 +60,7 @@ export function usePluginLifecycle({
     setIsError(false);
     let ok = false;
     try {
-      await apiFetch(`/v1/marketplace/plugins/${pluginId}/uninstall`, {
-        method: "DELETE",
-        token,
-      });
+      await uninstallPlugin(pluginId, token);
       setStatus("");
       onUninstalled?.(pluginId);
       ok = true;
@@ -84,10 +79,7 @@ export function usePluginLifecycle({
     setIsError(false);
     let ok = false;
     try {
-      await apiFetch(
-        `/v1/marketplace/plugins/${pluginId}/${nextEnabled ? "enable" : "disable"}`,
-        { method: "POST", token },
-      );
+      await setPluginEnabled(pluginId, nextEnabled, token);
       setStatus("");
       onToggleEnabled?.(pluginId, nextEnabled);
       ok = true;

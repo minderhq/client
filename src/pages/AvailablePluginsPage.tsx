@@ -12,13 +12,22 @@ import { ListedVersion } from "../components/PluginVersion";
 import { SourceBadge, SourceLegend } from "../components/SourceBadge";
 import { InstallStateBadge, StatusBadge } from "../components/StatusBadge";
 import { StatusLine } from "../components/StatusLine";
-import { apiFetch, friendlyErrorMessage } from "../lib/api";
+import { friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useAutoClearTimeout } from "../lib/browser";
-import type {
-  CatalogPlugin,
-  CatalogPluginListResponse,
-  MyInstallationsResponse,
+import {
+  fetchCatalogPage,
+  fetchFeaturedPlugins,
+  fetchMyInstallations,
+  fetchPluginConflicts,
+  fetchPluginDependencies,
+  fetchRecommendations,
+  installPluginFromGit,
+  type CatalogPlugin,
+  type ConflictEntry,
+  type DependencyEntry,
+  type InstallFromGitRequest,
+  type Recommendation,
 } from "../lib/marketplace";
 import {
   matchesSourceFilter,
@@ -47,27 +56,9 @@ import {
 import { useTokenRef } from "../lib/useTokenRef";
 import { ROUTES } from "../lib/routes";
 
-/** A marketplace catalog row. The shape lives in lib/marketplace.ts (#2198);
+/** A marketplace catalog row. The shape lives in lib/marketplace.ts (#119);
  * re-exported under its historical name for existing importers. */
 export type Plugin = CatalogPlugin;
-
-interface DependencyEntry {
-  plugin_id: string;
-  name: string;
-  depth: number;
-}
-
-interface ConflictEntry {
-  plugin_id: string;
-  name: string;
-  reason: string;
-}
-
-interface Recommendation {
-  plugin_id: string;
-  name: string;
-  score: number;
-}
 
 function PricingBadge({ plugin }: { plugin: Plugin }) {
   return (
@@ -163,10 +154,8 @@ function DependencyPanel({ pluginId, pluginName }: { pluginId: string; pluginNam
     setIsError(false);
     try {
       const [depsRes, conflictsRes] = await Promise.all([
-        apiFetch<{ dependencies: DependencyEntry[] }>(
-          `/v1/graph/dependencies/${pluginId}`,
-        ),
-        apiFetch<{ conflicts: ConflictEntry[] }>(`/v1/graph/conflicts/${pluginId}`),
+        fetchPluginDependencies(pluginId),
+        fetchPluginConflicts(pluginId),
       ]);
       setDeps(depsRes.dependencies);
       setConflicts(conflictsRes.conflicts);
@@ -214,7 +203,7 @@ function DependencyPanel({ pluginId, pluginName }: { pluginId: string; pluginNam
 
 /** Admin-only affordance turning a plugin's `repository_url` from a display-only
  * link into a real "install from this repo" action (#1579, epic #1514). It POSTs
- * to plugin-registry's `/v1/plugins/install-from-git` (reached through the
+ * to plugin-registry's install-from-git endpoint (reached through the
  * api-gateway proxy), which shallow-clones the repo, strictly validates ONLY the
  * plugin manifest, and registers it as a manifest/webhook plugin.
  *
@@ -256,15 +245,11 @@ function InstallFromRepoPanel({
     setStatus("Installing from repo…");
     setIsError(false);
     try {
-      const body: Record<string, string> = { repo_url: repositoryUrl };
+      const body: InstallFromGitRequest = { repo_url: repositoryUrl };
       if (ref.trim()) body.ref = ref.trim();
       if (subpath.trim()) body.subpath = subpath.trim();
       if (pat.trim()) body.token = pat.trim();
-      const res = await apiFetch<{
-        message: string;
-        plugin: string;
-        webhook_path: string | null;
-      }>("/v1/plugins/install-from-git", { method: "POST", body, token });
+      const res = await installPluginFromGit(body, token);
       setPat(""); // never keep a private-repo token around after the one fetch
       setStatus(
         res.webhook_path
@@ -699,7 +684,7 @@ export function AvailablePluginsPage() {
   const loadFeatured = useCallback(async () => {
     setFeaturedError(null);
     try {
-      const res = await apiFetch<CatalogPluginListResponse>("/v1/marketplace/plugins/featured?limit=6");
+      const res = await fetchFeaturedPlugins(6);
       setFeatured(res.plugins);
     } catch (e) {
       setFeaturedError(friendlyErrorMessage(e));
@@ -723,19 +708,16 @@ export function AvailablePluginsPage() {
   const requestedOriginRef = useRef(new WeakMap<CatalogPlugin, string | null>());
   const fetchPluginsPage = useCallback(
     async (nextOffset: number) => {
-      let path: string;
-      if (query.trim()) {
-        // /plugins/search has no pricing_model param of its own (search-by-text
-        // only) -- the client-side filter on `visiblePlugins` below covers this
-        // path; only the plain browse endpoint gets it as a real server-side
-        // query param.
-        path = `/v1/marketplace/plugins/search?q=${encodeURIComponent(query.trim())}&limit=20&offset=${nextOffset}`;
-      } else {
-        path = `/v1/marketplace/plugins?limit=20&offset=${nextOffset}`;
-        if (pricingModel) path += `&pricing_model=${encodeURIComponent(pricingModel)}`;
-      }
-      if (originParam) path += `&origin=${encodeURIComponent(originParam)}`;
-      const res = await apiFetch<CatalogPluginListResponse>(path);
+      // Search has no pricing_model param of its own (search-by-text only) --
+      // the client-side filter on `visiblePlugins` below covers that path;
+      // only the plain browse endpoint gets it as a real server-side param.
+      const res = await fetchCatalogPage({
+        query,
+        pricingModel,
+        origin: originParam,
+        limit: 20,
+        offset: nextOffset,
+      });
       for (const row of res.plugins) requestedOriginRef.current.set(row, originParam);
       return { items: res.plugins, total: res.total };
     },
@@ -761,9 +743,10 @@ export function AvailablePluginsPage() {
         return;
       }
       try {
-        const rec = await apiFetch<{ recommendations: Recommendation[] }>(
-          "/v1/graph/recommendations?limit=5",
-          { method: "POST", body: installed.map((i) => i.plugin_id), token: tokenRef.current },
+        const rec = await fetchRecommendations(
+          installed.map((i) => i.plugin_id),
+          tokenRef.current,
+          5,
         );
         // `?? []`: a response missing `recommendations` would otherwise set
         // state to `undefined` (no throw happens) and crash later on
@@ -786,12 +769,9 @@ export function AvailablePluginsPage() {
       return;
     }
     try {
-      const res = await apiFetch<MyInstallationsResponse>(
-        "/v1/marketplace/installations/me",
-        { token: tokenRef.current },
-      );
-      setMyInstallations(res.installations);
-      await loadRecommendations(res.installations);
+      const installations = await fetchMyInstallations(tokenRef.current);
+      setMyInstallations(installations);
+      await loadRecommendations(installations);
     } catch (e) {
       // Without the caller's installs, every card offers "Install" -- say so
       // rather than look like nothing is installed.

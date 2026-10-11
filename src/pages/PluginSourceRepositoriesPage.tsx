@@ -8,15 +8,21 @@ import { InfoCallout } from "../components/InfoCallout";
 import { MindHubConnectionPlaceholder } from "../components/MindHubConnectionPlaceholder";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
-import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import {
+  fetchMyInstallations,
+  fetchSourceRepositoriesPage,
+  fetchSourceRepository,
+  fetchSourceRepositoryPluginsPage,
+  type PluginSourceRepository,
+} from "../lib/marketplace";
 import { ROUTES, sourceRepositoryRoute } from "../lib/routes";
 import type { Installation } from "../lib/types";
 import { useAsyncResource } from "../lib/useAsyncResource";
 import { usePaginatedList } from "../lib/usePaginatedList";
 import { badgeClass, cardClass, cardHoverClass, mutedTextClass, secondaryButtonClass } from "../lib/ui";
 import { useTokenRef } from "../lib/useTokenRef";
-import { PluginCard, type Plugin } from "./AvailablePluginsPage";
+import { PluginCard } from "./AvailablePluginsPage";
 
 // #1516 (client half, groundwork already merged in minder#1725): a "plugin
 // source repository" is the first-class grouping entity for the flat
@@ -31,40 +37,9 @@ import { PluginCard, type Plugin } from "./AvailablePluginsPage";
 // issue). Legacy plugins with a NULL `repository_id` simply never appear
 // under any repository; that is correct, not an error state.
 
-/** GET /v1/marketplace/repositories(/{id}) row shape --
- * models/repository.py's PluginRepositoryResponse, mirrored field-for-field. */
-export interface PluginSourceRepository {
-  id: string;
-  slug: string;
-  name: string;
-  description: string | null;
-  source_url: string | null;
-  owner: string | null;
-  plugin_count: number;
-  created_at: string;
-  updated_at: string;
-}
-
-interface RepositoryListResponse {
-  repositories: PluginSourceRepository[];
-  count: number;
-  total: number;
-  limit: number;
-  offset: number;
-}
-
-interface RepositoryPluginsResponse {
-  plugins: Plugin[];
-  count: number;
-  total: number;
-  limit: number;
-  offset: number;
-}
-
-interface MyInstallationsResponse {
-  installations: Installation[];
-  count: number;
-}
+/** The repository row shape lives in lib/marketplace.ts (#119); re-exported
+ * for existing importers. */
+export type { PluginSourceRepository };
 
 function RepositoryCard({ repository }: { repository: PluginSourceRepository }) {
   // The card itself is a plain div, not a Link -- source_url below is a real
@@ -113,9 +88,7 @@ function RepositoryCard({ repository }: { repository: PluginSourceRepository }) 
 
 function RepositoryList() {
   const fetchPage = useCallback(async (offset: number) => {
-    const res = await apiFetch<RepositoryListResponse>(
-      `/v1/marketplace/repositories?limit=20&offset=${offset}`,
-    );
+    const res = await fetchSourceRepositoriesPage(offset, 20);
     return { items: res.repositories, total: res.total };
   }, []);
 
@@ -165,11 +138,7 @@ function RepositoryPluginList({ repositoryId }: { repositoryId: string }) {
       return;
     }
     try {
-      const res = await apiFetch<MyInstallationsResponse>(
-        "/v1/marketplace/installations/me",
-        { token: tokenRef.current },
-      );
-      setMyInstallations(res.installations);
+      setMyInstallations(await fetchMyInstallations(tokenRef.current));
     } catch {
       // best-effort -- an install action below will surface its own error
     }
@@ -181,9 +150,7 @@ function RepositoryPluginList({ repositoryId }: { repositoryId: string }) {
 
   const fetchPage = useCallback(
     async (offset: number) => {
-      const res = await apiFetch<RepositoryPluginsResponse>(
-        `/v1/marketplace/repositories/${repositoryId}/plugins?limit=20&offset=${offset}`,
-      );
+      const res = await fetchSourceRepositoryPluginsPage(repositoryId, offset, 20);
       return { items: res.plugins, total: res.total };
     },
     [repositoryId],
@@ -248,10 +215,7 @@ function RepositoryPluginList({ repositoryId }: { repositoryId: string }) {
 function RepositoryDetail({ repositoryId }: { repositoryId: string }) {
   const repoRes = useAsyncResource(
     (signal) =>
-      apiFetch<PluginSourceRepository>(
-        `/v1/marketplace/repositories/${repositoryId}`,
-        { signal },
-      ),
+      fetchSourceRepository(repositoryId, signal),
     { deps: [repositoryId] },
   );
 
