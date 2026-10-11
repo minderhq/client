@@ -22,7 +22,10 @@ const HTTP_METHODS = ["get", "put", "post", "delete", "options", "head", "patch"
 // params shown as {}; "*" = method not statically known). Each needs a
 // reason; an entry that no longer matches a missing call fails the test, so
 // fix the call (or the gateway) and delete the entry.
-const KNOWN_MISSING: Record<string, string> = {};
+const KNOWN_MISSING: Record<string, string> = {
+  "POST /v1/organizations/personal":
+    "minderhq/minder#2234 (PR #2416): absent until the synced spec is regenerated after it merges (#116)",
+};
 
 // Where the concrete values of an interpolated action segment are read from:
 // the string-literal union of a type alias, or a `cond ? "a" : "b"` ternary.

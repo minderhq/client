@@ -86,6 +86,16 @@ export function handleUnauthorized(): void {
   }
 }
 
+// Dispatched on `window` when a request comes back `403 workspace_required`
+// (#116): the account has no workspace, so its tenant-less token is refused on
+// tenant routes. Unlike a 401 this says nothing about the session, so nothing
+// is cleared and nobody is logged out -- WorkspaceGate listens and shows the
+// waiting room instead.
+export const WORKSPACE_REQUIRED_EVENT = "minder:workspace-required";
+
+/** The `detail` the gateway sends with a 403 for a tenant-less token. */
+export const WORKSPACE_REQUIRED_DETAIL = "workspace_required";
+
 // The in-flight refresh per starting token, shared by every caller holding
 // that token (#53): N requests that 401 at once -- or a 401 racing the
 // scheduled pre-expiry refresh -- all await the same POST instead of
@@ -187,6 +197,13 @@ async function throwApiError(
 ): Promise<never> {
   const detail = await parseErrorDetail(res);
   if (res.status === 401 && logoutOn401) handleUnauthorized();
+  if (
+    res.status === 403 &&
+    detail === WORKSPACE_REQUIRED_DETAIL &&
+    typeof window !== "undefined"
+  ) {
+    window.dispatchEvent(new Event(WORKSPACE_REQUIRED_EVENT));
+  }
   throw new ApiError(detail, res.status);
 }
 
@@ -209,7 +226,19 @@ export function friendlyErrorMessage(e: unknown): string {
   if (e instanceof ApiError && e.status === 401) {
     return "Your session expired — log in again.";
   }
+  if (e instanceof ApiError && isWorkspaceRequired(e)) {
+    return "You don't have a workspace yet.";
+  }
   return e instanceof Error ? e.message : String(e);
+}
+
+/** Whether `e` is the gateway's `403 workspace_required` (#116). */
+export function isWorkspaceRequired(e: unknown): boolean {
+  return (
+    e instanceof ApiError &&
+    e.status === 403 &&
+    e.message === WORKSPACE_REQUIRED_DETAIL
+  );
 }
 
 async function parseErrorDetail(res: Response): Promise<string> {

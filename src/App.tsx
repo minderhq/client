@@ -56,6 +56,7 @@ import { TaxonomyReviewPage } from "./pages/TaxonomyReviewPage";
 import { TeamsPage } from "./pages/TeamsPage";
 import { UsersPage } from "./pages/UsersPage";
 import { VoicePage } from "./pages/VoicePage";
+import { WorkspaceGate } from "./pages/WaitingRoomPage";
 
 const isMac =
   typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
@@ -153,6 +154,7 @@ export function App() {
           </header>
 
           <main ref={mainRef} className="mx-auto w-full max-w-5xl flex-1 p-6">
+            <WorkspaceGate>
             <ErrorBoundary key={location.pathname}>
               <div className={pageEnterClass}>
                 <ForcePasswordChangeGate>
@@ -248,6 +250,7 @@ export function App() {
                 </ForcePasswordChangeGate>
               </div>
             </ErrorBoundary>
+            </WorkspaceGate>
           </main>
         </div>
 

@@ -5,11 +5,13 @@ import {
   apiFetchBlob,
   ApiError,
   friendlyErrorMessage,
+  isWorkspaceRequired,
   refreshAccessToken,
   SESSION_EXPIRED_EVENT,
   TOKEN_KEY,
   TOKEN_RECEIVED_AT_KEY,
   TOKEN_REFRESHED_EVENT,
+  WORKSPACE_REQUIRED_EVENT,
 } from "./api";
 
 describe("ApiError", () => {
@@ -264,6 +266,32 @@ describe("apiFetch", () => {
         }
       },
     );
+
+    it("does NOT log out on a 403 workspace_required, and announces it (#116)", async () => {
+      sessionStorage.setItem(TOKEN_KEY, "tenantless-token");
+      const onSessionExpired = vi.fn();
+      const onRequired = vi.fn();
+      window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+      window.addEventListener(WORKSPACE_REQUIRED_EVENT, onRequired);
+      vi.mocked(fetch).mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => ({ detail: "workspace_required" }),
+      } as Response);
+      try {
+        const err = await apiFetch("/v1/rag/knowledge-bases", {
+          token: "tenantless-token",
+        }).catch((e) => e);
+        expect(isWorkspaceRequired(err)).toBe(true);
+        expect(fetch).toHaveBeenCalledTimes(1); // no refresh either
+        expect(sessionStorage.getItem(TOKEN_KEY)).toBe("tenantless-token");
+        expect(onSessionExpired).not.toHaveBeenCalled();
+        expect(onRequired).toHaveBeenCalledTimes(1);
+      } finally {
+        window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+        window.removeEventListener(WORKSPACE_REQUIRED_EVENT, onRequired);
+      }
+    });
 
     it("does NOT log out on a 401 for a request sent without a token (#109)", async () => {
       // A page that forgot `token` on an endpoint that has since started
