@@ -16,6 +16,43 @@ export interface UserProfile {
   preferences: ProfilePreferences;
   created_at?: string | null;
   updated_at?: string | null;
+  /** `ready` | `none` | `pending_request` (a plain string: read it through
+   * `normalizeWorkspaceState`). Null when the API couldn't determine it;
+   * absent from a gateway that predates #2234. */
+  workspace_state?: string | null;
+  /** Whether `POST /v1/organizations/personal` would be accepted. */
+  can_create_workspace?: boolean | null;
+}
+
+export type WorkspaceState = "ready" | "none" | "pending_request";
+
+/** The profile's `workspace_state` as a known value. An unknown string reads
+ * as `none` (the safe, most restrictive reading); null/absent -- the API
+ * could not say, or predates the field -- reads as `null`, i.e. no gating. */
+export function normalizeWorkspaceState(
+  raw: string | null | undefined,
+): WorkspaceState | null {
+  if (raw === null || raw === undefined) return null;
+  return raw === "ready" || raw === "pending_request" ? raw : "none";
+}
+
+/** The response of `POST /v1/organizations/personal` (#2234): the new
+ * workspace plus a fresh token that carries it as the caller's tenant. */
+export interface PersonalOrgResponse {
+  id: string;
+  name: string;
+  slug: string;
+  access_token: string;
+  expires_in: number;
+  token_type?: string;
+}
+
+/** Create the caller's own personal workspace ("Create my workspace"). */
+export function createPersonalWorkspace(token: string) {
+  return apiFetch<PersonalOrgResponse>("/v1/organizations/personal", {
+    method: "POST",
+    token,
+  });
 }
 
 /** The known keys inside the otherwise free-form preferences blob. Kept as a
