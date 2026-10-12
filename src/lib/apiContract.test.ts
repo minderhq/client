@@ -22,7 +22,12 @@ const HTTP_METHODS = ["get", "put", "post", "delete", "options", "head", "patch"
 // params shown as {}; "*" = method not statically known). Each needs a
 // reason; an entry that no longer matches a missing call fails the test, so
 // fix the call (or the gateway) and delete the entry.
-const KNOWN_MISSING: Record<string, string> = {};
+const KNOWN_MISSING: Record<string, string> = {
+  // The gateway now routes /v1/model-defaults; the published spec on the docs
+  // site hasn't been re-synced yet. Remove both entries when it is.
+  "GET /v1/model-defaults": "gateway routes it; published spec not re-synced yet",
+  "PUT /v1/model-defaults": "gateway routes it; published spec not re-synced yet",
+};
 
 // Where the concrete values of an interpolated action segment are read from:
 // the string-literal union of a type alias, or a `cond ? "a" : "b"` ternary.

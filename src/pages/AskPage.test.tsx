@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -412,5 +412,172 @@ describe("AskPage", () => {
     await screen.findByText(
       "Conversational memory is unavailable on this host — each question is answered independently.",
     );
+  });
+  describe("models (#2523 / #2525)", () => {
+    function askOnce(question = "What is the refund policy?") {
+      fireEvent.change(screen.getByLabelText("Your question"), {
+        target: { value: question },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    }
+
+    it("says which model answered and why, and lists degraded notes", async () => {
+      mockAuth = { token: "tok", isAuthenticated: true };
+      routeApiFetch({
+        queryResult: queryResponse({
+          model_used: "remote:p9:gpt-4o",
+          degraded: true,
+          method_details: {
+            retrieval: "dense",
+            model_source: "org_default",
+            utility_model: "llama3",
+            utility_model_source: "install_default",
+            degraded: [
+              "org default answer model 'x' is unavailable — answered with the install default 'llama3'",
+              "rerank unavailable",
+            ],
+          },
+        }),
+      });
+      render(<AskPage />);
+      await screen.findByText("Ask anything about your documents");
+      askOnce();
+
+      expect(await screen.findByText("Answered by gpt-4o (org default)")).toBeTruthy();
+      expect(screen.getByText("Utility: llama3 (install default)")).toBeTruthy();
+      expect(
+        screen.getByText(
+          /Degraded: org default answer model 'x' is unavailable — answered with the install default 'llama3'; rerank unavailable/,
+        ),
+      ).toBeTruthy();
+    });
+
+    it("disables cloud models for a pipeline over a Local only knowledge base", async () => {
+      mockAuth = { token: "tok", isAuthenticated: true };
+      routeApiFetch({});
+      const route = apiFetch.getMockImplementation()!;
+      apiFetch.mockImplementation((path: string, init?: { method?: string }) => {
+        if (path.startsWith("/v1/models")) {
+          return Promise.resolve({
+            items: [
+              { id: "llama3", name: "llama3", status: "ready" },
+              { id: "remote:p9:gpt-4o", name: "gpt-4o", provider: "OpenAI", status: "ready" },
+            ],
+          });
+        }
+        if (path.startsWith("/v1/rag/knowledge-bases?")) {
+          return Promise.resolve({ items: [{ id: "kb-1", data_policy: "local_only" }] });
+        }
+        return route(path, init);
+      });
+      render(<AskPage />);
+      await screen.findByText("Ask anything about your documents");
+
+      const cloud = (await screen.findByRole("option", {
+        name: /gpt-4o \(OpenAI\) · Cloud \(not allowed: Local only\)/,
+      })) as HTMLOptionElement;
+      expect(cloud.disabled).toBe(true);
+      expect(
+        (screen.getByRole("option", { name: "llama3 · Local" }) as HTMLOptionElement).disabled,
+      ).toBe(false);
+      expect(screen.getByText(/searches a Local only knowledge base/)).toBeTruthy();
+    });
+
+    const LOCAL = { id: "llama3", name: "llama3", status: "ready" };
+    const CLOUD = { id: "remote:p9:gpt-4o", name: "gpt-4o", provider: "OpenAI", status: "ready" };
+
+    it("never sends a cloud model for a Local only pipeline, even when policies load late", async () => {
+      mockAuth = { token: "tok", isAuthenticated: true };
+      routeApiFetch({});
+      const route = apiFetch.getMockImplementation()!;
+      let releasePage2!: () => void;
+      const page2 = new Promise<void>((resolve) => {
+        releasePage2 = resolve;
+      });
+      apiFetch.mockImplementation((path: string, init?: { method?: string }) => {
+        if (path.startsWith("/v1/models")) return Promise.resolve({ items: [LOCAL, CLOUD] });
+        if (path.startsWith("/v1/rag/knowledge-bases?")) {
+          // kb-1 is on the SECOND page, which arrives after the user picked.
+          if (path.includes("offset=0")) {
+            return Promise.resolve({
+              items: Array.from({ length: 100 }, (_, i) => ({
+                id: `other-${i}`,
+                data_policy: "cloud_allowed",
+                llm_model: "",
+              })),
+              total: 101,
+            });
+          }
+          return page2.then(() => ({
+            items: [{ id: "kb-1", data_policy: "local_only", llm_model: "" }],
+            total: 101,
+          }));
+        }
+        return route(path, init);
+      });
+      render(<AskPage />);
+      await screen.findByText("Ask anything about your documents");
+
+      const option = await screen.findByRole("option", { name: "gpt-4o (OpenAI) · Cloud" });
+      const picker = option.closest("select") as HTMLSelectElement;
+      fireEvent.change(picker, { target: { value: "remote:p9:gpt-4o" } });
+      expect(picker.value).toBe("remote:p9:gpt-4o");
+
+      releasePage2();
+      await waitFor(() => expect(picker.value).toBe(""));
+      expect(apiFetch).toHaveBeenCalledWith(
+        "/v1/rag/knowledge-bases?limit=100&offset=100",
+        expect.anything(),
+      );
+
+      askOnce();
+      await screen.findByText("The refund window is 30 days.");
+      const query = apiFetch.mock.calls.find((c) => /\/query$/.test(c[0] as string))!;
+      expect((query[1] as { body: object }).body).not.toHaveProperty("llm_model");
+    });
+
+    it("warns when a Local only pipeline's default answer model is a cloud model", async () => {
+      mockAuth = { token: "tok", isAuthenticated: true };
+      routeApiFetch({});
+      const route = apiFetch.getMockImplementation()!;
+      apiFetch.mockImplementation((path: string, init?: { method?: string }) => {
+        if (path.startsWith("/v1/models")) return Promise.resolve({ items: [LOCAL, CLOUD] });
+        if (path === "/v1/model-defaults") {
+          return Promise.resolve({ answer: "remote:p9:gpt-4o", chat: null, extraction: null, utility: null });
+        }
+        if (path.startsWith("/v1/rag/knowledge-bases?")) {
+          return Promise.resolve({
+            items: [{ id: "kb-1", data_policy: "local_only", llm_model: "" }],
+            total: 1,
+          });
+        }
+        return route(path, init);
+      });
+      render(<AskPage />);
+      expect(
+        await screen.findByText(
+          /Its default answer model \(gpt-4o \(OpenAI\)\)\s+is a cloud model, so questions will be refused/,
+        ),
+      ).toBeTruthy();
+    });
+
+    it("shows the backend's Local only refusal clearly", async () => {
+      mockAuth = { token: "tok", isAuthenticated: true };
+      routeApiFetch({
+        queryError: new ApiError(
+          "this knowledge base is local_only: its content may not be sent to a cloud model. Pick a local model (or a self-hosted provider marked local)",
+          403,
+        ),
+      });
+      render(<AskPage />);
+      await screen.findByText("Ask anything about your documents");
+      askOnce();
+
+      expect(
+        await screen.findByText(
+          /Not sent to a cloud model: this knowledge base is local_only: its content may not be sent to a cloud model\./,
+        ),
+      ).toBeTruthy();
+    });
   });
 });

@@ -11,7 +11,7 @@
 // fetch-models response (#2522). Fields are documented as the backend returns
 // them; nothing here is synthesized client-side.
 
-import { ApiError, apiFetch } from "./api";
+import { ApiError, apiFetch, friendlyErrorMessage } from "./api";
 
 export type ProviderAdapter = "openai_compatible" | "anthropic";
 
@@ -33,6 +33,11 @@ export interface Provider {
    * static catalog for the vendor it describes (OpenAI / Anthropic), else
    * nothing. Empty on a non-local row means no model can be used yet. */
   effective_models: string[];
+  /** #2530: why this stored row breaks the CURRENT network (egress) policy,
+   * e.g. its base URL points somewhere now refused; null when it's fine.
+   * The row is kept, but every call through it is refused with this reason.
+   * Absent on a backend older than #2548. */
+  policy_error?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -219,4 +224,16 @@ export function fetchModelsErrorMessage(e: unknown): string {
     }
   }
   return e instanceof Error ? e.message : String(e);
+}
+
+/** A readable message for a failed create / update / test / delete. A 422
+ * carries the backend's reason as-is: a base URL the network policy refuses,
+ * "self-hosted" (`is_local`) where the install doesn't allow it, a missing
+ * privacy acknowledgment or an invalid model list. */
+export function providerSaveErrorMessage(e: unknown): string {
+  if (e instanceof ApiError) {
+    if (e.status === 422) return `The provider was refused: ${e.message}`;
+    if (e.status === 403) return "Admin role required to manage providers.";
+  }
+  return friendlyErrorMessage(e);
 }

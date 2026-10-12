@@ -10,8 +10,18 @@ import { ApiError, apiFetch, friendlyErrorMessage } from "../lib/api";
 import type { Paginated } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { randomId } from "../lib/browser";
+import {
+  generationModels,
+  isCloudModel,
+  isLocalOnlyRefusal,
+  modelDisplayName,
+  modelOptionLabel,
+  pickerValue,
+  type DataPolicy,
+} from "../lib/modelDefaults";
 import { type ScopeDocument, fetchScopeDocuments } from "../lib/ragDocuments";
-import { usableRewriteModels } from "../lib/rewriteModel";
+import type { KnowledgeBase } from "../lib/types";
+import { useModelChoices } from "../lib/useModelChoices";
 import {
   cardClass,
   fieldHintClass,
@@ -22,7 +32,6 @@ import {
   surfaceMutedClass,
 } from "../lib/ui";
 import { useTokenRef } from "../lib/useTokenRef";
-import { type ModelInfo } from "./ModelManagementPage";
 import {
   type AppliedParameter,
   type Capabilities,
@@ -43,6 +52,8 @@ type OverridableField =
   | "hybrid"
   | "compress"
   | "parent_context";
+
+const KB_PAGE_SIZE = 100;
 
 type Method = "standard" | "hyde" | "self_rag" | "auto" | "corrective" | "raptor";
 
@@ -110,7 +121,7 @@ type Turn = UserTurn | AssistantTurn;
  * QueryResultCard the Pipelines page uses, so answers look identical wherever
  * you ask from. */
 export function AskPage() {
-  const { token, sessionKey, isAuthenticated } = useAuth();
+  const { token, sessionKey, isAuthenticated, role, orgRole } = useAuth();
   const tokenRef = useTokenRef();
   // Deep-link entry points (#1229): "Ask this pipeline" from a pipeline card
   // (?pipeline=<id>) and "Continue →" from Conversations (?conversation_id=<id>).
@@ -154,8 +165,13 @@ export function AskPage() {
     AppliedParameter
   > | null>(null);
   const [sourceFilter, setSourceFilter] = useState("");
-  const [llmModels, setLlmModels] = useState<string[]>([]);
   const [llmModel, setLlmModel] = useState("");
+  // #2525: each knowledge base's data_policy, to know which pipelines search a
+  // Local only KB (cloud models are then disabled in the override picker).
+  const [kbPolicies, setKbPolicies] = useState<Record<string, DataPolicy>>({});
+  // Each KB's own llm_model ("" = follows the org default), to tell whether
+  // the answer model a Local only pipeline would use is a cloud one.
+  const [kbModels, setKbModels] = useState<Record<string, string>>({});
   const [docs, setDocs] = useState<ScopeDocument[]>([]);
   const [documentId, setDocumentId] = useState("");
 
@@ -227,15 +243,47 @@ export function AskPage() {
     load();
   }, [load, sessionKey]);
 
-  // Best-effort: offer the pulled generation models as a per-question override
-  // of the pipeline's KB-configured llm_model. Kept out of `load`'s Promise.all
-  // so a host without model-management (or an empty model list) still asks fine
-  // — the picker just falls back to its single "(pipeline default)" option.
+  // Best-effort: offer the generation models (local, and the org's provider
+  // models when signed in) as a per-question override of the pipeline's
+  // KB-configured llm_model. Kept out of `load`'s Promise.all so a host
+  // without model-management (or an empty model list) still asks fine — the
+  // picker just falls back to its single "(pipeline default)" option.
+  const choices = useModelChoices(token, {
+    canListProviders: role === "admin" || orgRole === "owner" || orgRole === "admin",
+    sessionKey,
+  });
+  const llmModels = generationModels(choices.models);
+
+  // Best-effort: the KBs' data policies. Unknown (not loaded, or a backend
+  // older than #2525) = not known Local only; the backend still refuses a
+  // cloud model with a 403, shown on the answer.
+  // Every page is read (an org can have more KBs than one page holds).
   useEffect(() => {
-    apiFetch<Paginated<ModelInfo>>("/v1/models?limit=500")
-      .then((res) => setLlmModels(usableRewriteModels(res.items).map((m) => m.id)))
-      .catch(() => {});
-  }, []);
+    const token = tokenRef.current;
+    if (!token) {
+      setKbPolicies({});
+      setKbModels({});
+      return;
+    }
+    const controller = new AbortController();
+    (async () => {
+      const all: KnowledgeBase[] = [];
+      for (let offset = 0; ; offset += KB_PAGE_SIZE) {
+        const res = await apiFetch<Paginated<KnowledgeBase>>(
+          `/v1/rag/knowledge-bases?limit=${KB_PAGE_SIZE}&offset=${offset}`,
+          { token, signal: controller.signal },
+        );
+        const items = res?.items ?? [];
+        all.push(...items);
+        if (items.length < KB_PAGE_SIZE || all.length >= (res?.total ?? 0)) break;
+      }
+      setKbPolicies(
+        Object.fromEntries(all.map((kb) => [kb.id, kb.data_policy ?? "cloud_allowed"])),
+      );
+      setKbModels(Object.fromEntries(all.map((kb) => [kb.id, kb.llm_model ?? ""])));
+    })().catch(() => {});
+    return () => controller.abort();
+  }, [sessionKey, tokenRef]);
 
   // Documents in the selected pipeline's KBs, for the "scope to one document"
   // filter (more precise than the filename filter, which collides across
@@ -281,9 +329,33 @@ export function AskPage() {
     // Same reasoning as newChat() above -- the router's last decision was for
     // the previous pipeline's knowledge bases.
     setAppliedParameters(null);
+    // A cloud override can't be used on a Local only pipeline (#2525).
+    if (cloudPicked && pipelineLocalOnly(pipelines.find((p) => p.id === id))) {
+      setLlmModel("");
+    }
   }
 
   const selectedPipeline = pipelines.find((p) => p.id === pipelineId);
+  const pipelineLocalOnly = (p: RagPipeline | undefined) =>
+    !!p && p.knowledge_base_ids.some((id) => kbPolicies[id] === "local_only");
+  const localOnly = pipelineLocalOnly(selectedPipeline);
+  const cloudPicked = !!llmModel && isCloudModel(llmModel, choices.localProviders);
+  // The answer model the pipeline uses without an override: its own, else its
+  // first KB's, else the org's answer default (same order as the backend).
+  const firstKbId = selectedPipeline?.knowledge_base_ids[0];
+  const defaultAnswerModel =
+    selectedPipeline?.llm_model ||
+    (firstKbId ? kbModels[firstKbId] : "") ||
+    choices.defaults?.answer ||
+    "";
+  const defaultIsCloud =
+    !!defaultAnswerModel && isCloudModel(defaultAnswerModel, choices.localProviders);
+
+  // A cloud override never survives onto a Local only pipeline -- including
+  // when the KB policies arrive after the pick (#2525).
+  useEffect(() => {
+    if (localOnly && cloudPicked) setLlmModel("");
+  }, [localOnly, cloudPicked]);
 
   async function ask(text: string) {
     const question = text.trim();
@@ -325,7 +397,8 @@ export function AskPage() {
     if (documentId) metadataFilter.document_id = documentId;
     if (sourceFilter.trim()) metadataFilter.source = sourceFilter.trim();
     if (Object.keys(metadataFilter).length) body.metadata_filter = metadataFilter;
-    if (llmModel) body.llm_model = llmModel;
+    // Belt and braces: never send a cloud model for a Local only pipeline.
+    if (llmModel && !(localOnly && cloudPicked)) body.llm_model = llmModel;
 
     try {
       const res = await apiFetch<QueryResponse>(
@@ -342,7 +415,9 @@ export function AskPage() {
       const msg =
         e instanceof ApiError && e.status === 404
           ? "This pipeline no longer exists on the server. Reloading your pipelines…"
-          : friendlyErrorMessage(e);
+          : isLocalOnlyRefusal(e)
+            ? `Not sent to a cloud model: ${(e as ApiError).message}`
+            : friendlyErrorMessage(e);
       setTurns((prev) =>
         prev.map((t) =>
           t.id === pendingId ? { id: pendingId, role: "assistant", error: msg } : t,
@@ -679,17 +754,36 @@ export function AskPage() {
                         className={inputClass}
                       >
                         <option value="">(pipeline default)</option>
-                        {llmModels.map((m) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
+                        {llmModels.map((m) => {
+                          const blocked =
+                            localOnly && isCloudModel(m.id, choices.localProviders);
+                          return (
+                            <option key={m.id} value={pickerValue(m)} disabled={blocked}>
+                              {modelOptionLabel(m, choices.localProviders)}
+                              {blocked ? " (not allowed: Local only)" : ""}
+                            </option>
+                          );
+                        })}
                       </select>
                       <span className={fieldHintClass}>
                         Answer this question with a specific model instead of the
                         pipeline's configured one — e.g. a stronger model for a
                         hard question. Retrieval is unchanged.
                       </span>
+                      {localOnly && (
+                        <span className={fieldHintClass}>
+                          This pipeline searches a Local only knowledge base, so
+                          its content is never sent to a cloud model: cloud
+                          models can't be picked here.
+                        </span>
+                      )}
+                      {localOnly && !llmModel && defaultIsCloud && (
+                        <span className="text-xs text-amber-700 dark:text-amber-400">
+                          Its default answer model ({modelDisplayName(defaultAnswerModel, choices.models)})
+                          is a cloud model, so questions will be refused. Pick a
+                          local model here.
+                        </span>
+                      )}
                     </label>
                   )}
                   {docs.length > 0 && (

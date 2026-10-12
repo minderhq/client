@@ -17,9 +17,26 @@ vi.mock("../lib/api", async (importOriginal) => ({
   friendlyErrorMessage: (e: unknown) => (e instanceof Error ? e.message : "error"),
 }));
 
-let mockAuth = { token: "", role: "" };
+let mockAuth: { token: string; role: string; orgRole?: string } = { token: "", role: "" };
 vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
+}));
+
+// The Defaults section has its own tests (ModelDefaultsPanel.test.tsx); here a
+// stub just records how the page mounts it.
+vi.mock("../components/ModelDefaultsPanel", () => ({
+  ModelDefaultsPanel: ({
+    canEdit,
+    localProviders,
+  }: {
+    canEdit: boolean;
+    localProviders?: ReadonlySet<string>;
+  }) => (
+    <div data-testid="defaults-panel">
+      {canEdit ? "defaults: editable" : "defaults: read-only"}
+      <span data-testid="local-providers">{[...(localProviders ?? [])].join(",")}</span>
+    </div>
+  ),
 }));
 
 const mockConfirm = vi.fn();
@@ -170,13 +187,91 @@ describe("CloudProvidersPage", () => {
     mockConfirm.mockReset();
   });
 
-  it("shows an admin-required message and never fetches for a non-admin", () => {
+  it("shows an admin-required message and never fetches providers for a non-admin", () => {
     mockAuth = { token: "tok", role: "member" };
     render(<CloudProvidersPage />);
     expect(
       screen.getByText("Admin role required to view or manage cloud providers."),
     ).toBeTruthy();
     expect(apiFetch).not.toHaveBeenCalled();
+    // #2523: members still see the org's default models, read-only.
+    expect(screen.getByTestId("defaults-panel").textContent).toBe("defaults: read-only");
+  });
+
+  it("lets an org owner/admin edit the defaults without being an instance admin", async () => {
+    mockAuth = { token: "tok", role: "member", orgRole: "owner" };
+    installApi({
+      providers: [
+        provider({ id: "cloud", is_local: false }),
+        provider({ id: "box", name: "Box", is_local: true }),
+      ],
+    });
+    render(<CloudProvidersPage />);
+    expect(screen.getByTestId("defaults-panel").textContent).toMatch(/^defaults: editable/);
+    // Providers are listed so self-hosted models are labelled Local, as on
+    // the knowledge-base and Ask pickers; managing them stays admin-only.
+    await waitFor(() => expect(screen.getByTestId("local-providers").textContent).toBe("box"));
+    expect(
+      screen.getByText("Admin role required to view or manage cloud providers."),
+    ).toBeTruthy();
+    expect(apiFetch).not.toHaveBeenCalledWith("/v1/model-providers/presets", expect.anything());
+  });
+
+  it("hides the defaults section when signed out", () => {
+    mockAuth = { token: "", role: "" };
+    render(<CloudProvidersPage />);
+    expect(screen.queryByTestId("defaults-panel")).toBeNull();
+  });
+
+  it("warns on a provider whose base URL breaks the network policy", async () => {
+    // #2548: policy_error = why the stored row violates the current egress
+    // policy; every call through it is refused.
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({
+      providers: [
+        provider({ policy_error: "base_url resolves to a private address." }),
+        provider({ id: "p2", name: "Fine", policy_error: null }),
+      ],
+    });
+    render(<CloudProvidersPage />);
+    expect(await screen.findByText("Blocked by the network policy")).toBeTruthy();
+    expect(screen.getByText(/base_url resolves to a private address\./)).toBeTruthy();
+    expect(screen.getAllByText("blocked")).toHaveLength(1);
+  });
+
+  it("shows the backend's reason when creating a provider is refused (422)", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({ providers: [] });
+    const route = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation((path: string, options: { method?: string } = {}) =>
+      path === "/v1/model-providers" && options.method === "POST"
+        ? Promise.reject(
+            new ApiError("self-hosted providers are not allowed on this installation", 422),
+          )
+        : route(path, options),
+    );
+    render(<CloudProvidersPage />);
+    await screen.findByText("No cloud providers configured yet.");
+
+    fireEvent.click(screen.getByText("Add Provider"));
+    fireEvent.change(await screen.findByRole("combobox"), {
+      target: { value: "vllm" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("e.g. vLLM (self-hosted)"), {
+      target: { value: "Box" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("http://localhost:8000/v1"), {
+      target: { value: "http://10.0.0.5:8000/v1" },
+    });
+    const apiKeyInput = document.querySelector('input[type="password"]') as HTMLInputElement;
+    fireEvent.change(apiKeyInput, { target: { value: "x" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(
+      await screen.findByText(
+        "The provider was refused: self-hosted providers are not allowed on this installation",
+      ),
+    ).toBeTruthy();
   });
 
   it("prompts to log in when unauthenticated", () => {

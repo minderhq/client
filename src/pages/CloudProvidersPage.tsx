@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { EmptyState } from "../components/EmptyState";
 import { Icon } from "../components/Icon";
 import { InfoCallout } from "../components/InfoCallout";
+import { ModelDefaultsPanel } from "../components/ModelDefaultsPanel";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
 import { useConfirm } from "../components/ConfirmDialog";
@@ -10,7 +11,6 @@ import {
   FetchedModelsPicker,
   ModelsEditor,
 } from "../components/ProviderModelsEditor";
-import { friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import {
   createProvider,
@@ -19,6 +19,7 @@ import {
   fetchProviderModels,
   listProviderPresets,
   listProviders,
+  providerSaveErrorMessage,
   testProvider,
   updateProvider,
   type FetchModelsResult,
@@ -170,7 +171,7 @@ function ProviderRow({
       closeEdit();
       onChanged();
     } catch (e) {
-      setStatus(friendlyErrorMessage(e));
+      setStatus(providerSaveErrorMessage(e));
       setIsError(true);
     }
     setBusy(false);
@@ -207,7 +208,7 @@ function ProviderRow({
       );
       onChanged();
     } catch (e) {
-      setStatus(friendlyErrorMessage(e));
+      setStatus(providerSaveErrorMessage(e));
       setIsError(true);
     }
     setBusy(false);
@@ -223,7 +224,7 @@ function ProviderRow({
       setStatus(result.detail);
       setIsError(!result.ok);
     } catch (e) {
-      setStatus(friendlyErrorMessage(e));
+      setStatus(providerSaveErrorMessage(e));
       setIsError(true);
     }
     setBusy(false);
@@ -248,7 +249,7 @@ function ProviderRow({
       await deleteProvider(token, provider.id);
       onChanged();
     } catch (e) {
-      setStatus(friendlyErrorMessage(e));
+      setStatus(providerSaveErrorMessage(e));
       setIsError(true);
     }
     setBusy(false);
@@ -273,7 +274,7 @@ function ProviderRow({
       closeEdit();
       onChanged();
     } catch (e) {
-      setStatus(friendlyErrorMessage(e));
+      setStatus(providerSaveErrorMessage(e));
       setIsError(true);
     }
     setBusy(false);
@@ -299,7 +300,7 @@ function ProviderRow({
       closeEdit();
       onChanged();
     } catch (e) {
-      setStatus(friendlyErrorMessage(e));
+      setStatus(providerSaveErrorMessage(e));
       setIsError(true);
     }
     setBusy(false);
@@ -313,6 +314,9 @@ function ProviderRow({
         </span>
         <span className={badgeClass}>{ADAPTER_LABEL[provider.adapter]}</span>
         {provider.is_local && <span className={badgeClass}>self-hosted</span>}
+        {provider.policy_error && (
+          <span className={`${badgeClass} ${badgeTone.danger}`}>blocked</span>
+        )}
         <span
           className={`${badgeClass} ${provider.enabled ? badgeTone.success : badgeTone.warn}`}
         >
@@ -359,6 +363,18 @@ function ProviderRow({
           </button>
         </div>
       </div>
+      {provider.policy_error && (
+        <div className="mt-2">
+          <InfoCallout icon="warning" tone="danger">
+            <p className="font-medium">Blocked by the network policy</p>
+            <p>
+              {provider.policy_error} Every call through this provider is
+              refused until its base URL is changed (delete it and add it again
+              with an allowed address).
+            </p>
+          </InfoCallout>
+        </div>
+      )}
       {needsModels && editMode !== "models" && (
         <div className="mt-2">
           <InfoCallout icon="warning">
@@ -612,7 +628,7 @@ function AddProviderForm({
       setStatus("");
       onCreated();
     } catch (e) {
-      setStatus(friendlyErrorMessage(e));
+      setStatus(providerSaveErrorMessage(e));
       setIsError(true);
     }
     setBusy(false);
@@ -775,13 +791,19 @@ function AddProviderForm({
 }
 
 export function CloudProvidersPage() {
-  const { token, role } = useAuth();
+  const { token, role, orgRole, sessionKey } = useAuth();
   const isAdmin = role === "admin";
+  // #2523: PUT /v1/model-defaults is open to an org owner/admin as well as an
+  // instance admin; every other member sees the defaults read-only.
+  const canEditDefaults = isAdmin || orgRole === "owner" || orgRole === "admin";
   const { confirm, dialog } = useConfirm();
 
+  // Listed for an org owner/admin too (the endpoint allows it): only so the
+  // Defaults pickers can label self-hosted provider models Local, the same as
+  // the knowledge-base and Ask pickers. Managing providers stays admin-only.
   const providersRes = useAsyncResource(
     (signal) => listProviders(token, signal),
-    { enabled: isAdmin },
+    { enabled: canEditDefaults },
   );
 
   // The add-provider dropdown is backend-driven (#1467/#1585): the preset list
@@ -794,14 +816,39 @@ export function CloudProvidersPage() {
     { enabled: isAdmin },
   );
 
+  // Self-hosted provider rows (`is_local`) serve Local models; every other
+  // `remote:` model is Cloud. Only an admin can list providers.
+  const localProviders = useMemo(
+    () =>
+      new Set(
+        (providersRes.data ?? []).filter((p) => p.is_local).map((p) => p.id),
+      ),
+    [providersRes.data],
+  );
+
   return (
     <>
       {dialog}
       <PageHeader
         icon="globe"
-        title="Cloud Providers"
-        subtitle="Connect an external OpenAI-compatible/Anthropic provider or a self-hosted instance (e.g. vLLM) so models from it appear alongside your local Ollama models. Opt-in and per-organization — nothing here is on by default. Admin-only: this manages the org's own API credentials."
+        title="Providers & defaults"
+        subtitle="Pick the default model for each task, and connect an external OpenAI-compatible/Anthropic provider or a self-hosted instance (e.g. vLLM) so models from it appear alongside your local Ollama models. Opt-in and per-organization — nothing here is on by default. Providers are admin-only: they hold the org's own API credentials."
       />
+
+      {token && (
+        <div className="mb-6">
+          <ModelDefaultsPanel
+            token={token}
+            canEdit={canEditDefaults}
+            sessionKey={sessionKey}
+            localProviders={localProviders}
+          />
+        </div>
+      )}
+
+      <h2 className="mb-2 text-base font-semibold text-gray-900 dark:text-gray-100">
+        Providers
+      </h2>
 
       {!isAdmin && (
         <InfoCallout icon="lock">

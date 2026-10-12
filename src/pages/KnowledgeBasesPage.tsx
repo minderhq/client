@@ -29,6 +29,18 @@ import {
 } from "../lib/ui";
 import { EmptyState } from "../components/EmptyState";
 import { isEmbeddingModelName } from "../lib/modelClassification";
+import {
+  DATA_POLICY_LABEL,
+  LOCAL_ONLY_MODEL_HINT,
+  dataPolicyErrorMessage,
+  generationModels,
+  isCloudModel,
+  modelDisplayName,
+  modelOptionLabel,
+  pickerValue,
+  type DataPolicy,
+} from "../lib/modelDefaults";
+import { useModelChoices, type ModelChoices } from "../lib/useModelChoices";
 import { useTokenRef } from "../lib/useTokenRef";
 
 export interface ModelInfo {
@@ -384,6 +396,80 @@ export function DocumentsList({
   );
 }
 
+const NO_CHOICES: ModelChoices = {
+  models: [],
+  defaults: null,
+  localProviders: new Set(),
+};
+
+/** "Org default (<model>)" -- or "(install default)" when the org set none --
+ * for the answer-model picker's "" option (#2523): a KB with an empty
+ * `llm_model` tracks the org's answer default. */
+function orgDefaultLabel(choices: ModelChoices): string {
+  if (!choices.defaults) return "Org default";
+  const answer = choices.defaults.answer;
+  return `Org default (${answer ? modelDisplayName(answer, choices.models) : "install default"})`;
+}
+
+/** The answer-model `<option>`s: "Org default (X)" first, then every
+ * generation model with its Local/Cloud badge. On a Local only KB the cloud
+ * ones are disabled (#2525) -- the backend would refuse them anyway. A pinned
+ * model the catalog no longer lists is still shown, so editing never silently
+ * changes it. */
+function AnswerModelOptions({
+  choices,
+  current,
+  localOnly,
+}: {
+  choices: ModelChoices;
+  current: string;
+  localOnly: boolean;
+}) {
+  const models = generationModels(choices.models);
+  const known = !current || models.some((m) => pickerValue(m) === current);
+  return (
+    <>
+      <option value="">{orgDefaultLabel(choices)}</option>
+      {!known && <option value={current}>{modelDisplayName(current, choices.models)}</option>}
+      {models.map((m) => {
+        const cloud = isCloudModel(m.id, choices.localProviders);
+        return (
+          <option key={m.id} value={pickerValue(m)} disabled={localOnly && cloud}>
+            {modelOptionLabel(m, choices.localProviders)}
+            {localOnly && cloud ? " (not allowed: Local only)" : ""}
+          </option>
+        );
+      })}
+    </>
+  );
+}
+
+/** The hint under the answer-model picker for a Local only KB: why cloud
+ * models are disabled, and a warning when what it would use is a cloud model
+ * anyway (a pinned cloud model, or a cloud org default). */
+function LocalOnlyModelHint({
+  choices,
+  current,
+}: {
+  choices: ModelChoices;
+  current: string;
+}) {
+  const effective = current || choices.defaults?.answer || "";
+  const usesCloud = !!effective && isCloudModel(effective, choices.localProviders);
+  return (
+    <p className={fieldHintClass}>
+      {LOCAL_ONLY_MODEL_HINT}
+      {usesCloud && (
+        <span className="block text-amber-700 dark:text-amber-400">
+          {current ? "The selected model" : "The org default"} (
+          {modelDisplayName(effective, choices.models)}) is a cloud model, so
+          questions to this knowledge base will be refused. Pick a local model.
+        </span>
+      )}
+    </p>
+  );
+}
+
 /** "Can I actually query this KB yet?" at a glance (#1227). A KB with zero
  * documents — or documents whose embedding failed (#77) so there are no vectors
  * — looks the same as a healthy one in the list, then silently returns nothing
@@ -409,6 +495,7 @@ export function KnowledgeBaseCard({
   kb,
   token,
   myTeams = [],
+  choices = NO_CHOICES,
   onDeleted,
   onRefresh,
   confirm,
@@ -416,6 +503,8 @@ export function KnowledgeBaseCard({
   kb: KnowledgeBase;
   token: string;
   myTeams?: TeamOption[];
+  /** Model catalog + org defaults for the answer-model picker (#2523). */
+  choices?: ModelChoices;
   onDeleted: (id: string) => void;
   onRefresh: (kb: KnowledgeBase) => void;
   confirm: ReturnType<typeof useConfirm>["confirm"];
@@ -430,13 +519,21 @@ export function KnowledgeBaseCard({
     kb.visibility ?? "private",
   );
   const [editTeamId, setEditTeamId] = useState<number | "">(kb.team_id ?? "");
+  // #2523: "" = follow the org's answer default; #2525: the KB's data policy.
+  const savedPolicy: DataPolicy = kb.data_policy ?? "cloud_allowed";
+  const [editLlm, setEditLlm] = useState(kb.llm_model ?? "");
+  const [editPolicy, setEditPolicy] = useState<DataPolicy>(savedPolicy);
   const [saving, setSaving] = useState(false);
+  const llmSelectId = useId();
+  const policySelectId = useId();
 
   function startEdit() {
     setEditName(kb.name);
     setEditDesc(kb.description);
     setEditVisibility(kb.visibility ?? "private");
     setEditTeamId(kb.team_id ?? "");
+    setEditLlm(kb.llm_model ?? "");
+    setEditPolicy(savedPolicy);
     setStatus("");
     setIsError(false);
     setEditing(true);
@@ -456,27 +553,29 @@ export function KnowledgeBaseCard({
     setSaving(true);
     setStatus("Saving…");
     setIsError(false);
+    // Only a changed model / policy is sent: an untouched one stays exactly
+    // as stored, and an unchanged policy can never trip the loosening check.
+    const body: Record<string, unknown> = {
+      name: editName.trim(),
+      description: editDesc,
+      visibility: editVisibility,
+      team_id: editVisibility === "team" ? editTeamId : null,
+    };
+    if (editLlm !== (kb.llm_model ?? "")) body.llm_model = editLlm;
+    if (editPolicy !== savedPolicy) body.data_policy = editPolicy;
+    const loosening = savedPolicy === "local_only" && editPolicy === "cloud_allowed";
     try {
       // Metadata-only edit — does NOT touch the documents/vectors (unlike
       // delete + recreate, which drops the whole collection).
       const updated = await apiFetch<KnowledgeBase>(
         `/v1/rag/knowledge-bases/${kb.id}`,
-        {
-          method: "PATCH",
-          body: {
-            name: editName.trim(),
-            description: editDesc,
-            visibility: editVisibility,
-            team_id: editVisibility === "team" ? editTeamId : null,
-          },
-          token,
-        },
+        { method: "PATCH", body, token },
       );
       onRefresh(updated);
       setStatus("");
       setEditing(false);
     } catch (e) {
-      setStatus(friendlyErrorMessage(e));
+      setStatus(dataPolicyErrorMessage(e, loosening) ?? friendlyErrorMessage(e));
       setIsError(true);
     }
     setSaving(false);
@@ -571,9 +670,57 @@ export function KnowledgeBaseCard({
               </select>
             )}
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label
+              className="text-xs text-gray-500 dark:text-gray-400"
+              htmlFor={policySelectId}
+            >
+              Data policy
+            </label>
+            <select
+              id={policySelectId}
+              className={inputClass}
+              value={editPolicy}
+              onChange={(e) => {
+                const next = e.target.value as DataPolicy;
+                setEditPolicy(next);
+                // A pinned cloud model can't stay on a Local only KB.
+                if (next === "local_only" && editLlm && isCloudModel(editLlm, choices.localProviders)) {
+                  setEditLlm("");
+                }
+              }}
+              disabled={saving}
+            >
+              <option value="cloud_allowed">{DATA_POLICY_LABEL.cloud_allowed}</option>
+              <option value="local_only">{DATA_POLICY_LABEL.local_only}</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label
+              className="text-xs text-gray-500 dark:text-gray-400"
+              htmlFor={llmSelectId}
+            >
+              Answer model
+            </label>
+            <select
+              id={llmSelectId}
+              className={inputClass}
+              value={editLlm}
+              onChange={(e) => setEditLlm(e.target.value)}
+              disabled={saving}
+            >
+              <AnswerModelOptions
+                choices={choices}
+                current={editLlm}
+                localOnly={editPolicy === "local_only"}
+              />
+            </select>
+            {editPolicy === "local_only" && (
+              <LocalOnlyModelHint choices={choices} current={editLlm} />
+            )}
+          </div>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Editing name/description/visibility only — documents and vectors
-            are untouched.
+            Editing settings only — documents and vectors are untouched.
           </p>
           <div className="flex gap-2">
             <button
@@ -599,6 +746,15 @@ export function KnowledgeBaseCard({
               <Icon name="knowledge-bases" size={17} className="shrink-0 text-indigo-500 dark:text-indigo-400" />
               {kb.name}
               <ReadyBadge kb={kb} />
+              {kb.data_policy === "local_only" && (
+                <span
+                  className={badgeClass}
+                  title="Local only: this knowledge base's content is never sent to a cloud model."
+                >
+                  <Icon name="lock" size={12} />
+                  {DATA_POLICY_LABEL.local_only}
+                </span>
+              )}
             </h2>
             {kb.description && (
               <p className="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
@@ -607,8 +763,11 @@ export function KnowledgeBaseCard({
             )}
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {kb.document_count} document{kb.document_count === 1 ? "" : "s"} ·{" "}
-              {kb.vector_count} vectors · embedding: {kb.embedding_model} · llm:{" "}
-              {kb.llm_model}
+              {kb.vector_count} vectors · embedding: {kb.embedding_model} · answer
+              model:{" "}
+              {kb.llm_model
+                ? modelDisplayName(kb.llm_model, choices.models)
+                : orgDefaultLabel(choices)}
             </p>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {kb.visibility === "team"
@@ -664,9 +823,12 @@ export function KnowledgeBaseCard({
 
 export function CreateKbForm({
   token,
+  choices: givenChoices,
   onCreated,
 }: {
   token: string;
+  /** Passed by the page (shared with the cards); loaded here when absent. */
+  choices?: ModelChoices;
   onCreated: (kb: KnowledgeBase) => void;
 }) {
   const nameId = useId();
@@ -675,31 +837,26 @@ export function CreateKbForm({
   const llmModelId = useId();
   const chunkSizeId = useId();
   const chunkOverlapId = useId();
+  const dataPolicyId = useId();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [embeddingModel, setEmbeddingModel] = useState("");
   const [llmModel, setLlmModel] = useState("");
   const [chunkSize, setChunkSize] = useState("");
   const [chunkOverlap, setChunkOverlap] = useState("");
+  const [dataPolicy, setDataPolicy] = useState<DataPolicy>("cloud_allowed");
   const [status, setStatus] = useState("");
-  const [models, setModels] = useState<ModelInfo[]>([]);
   const [creating, setCreating] = useState(false);
   const scheduleTimeout = useAutoClearTimeout();
 
-  useEffect(() => {
-    // Free-text model-name inputs made a user guess/copy-paste an exact
-    // Ollama model string with zero validation, when the platform already
-    // knows exactly which models are pulled (ModelManagementPage's own data
-    // source) -- offer that list instead. Best-effort: an empty list just
-    // means every dropdown falls back to its single "(server default)"
-    // option, same as before this existed.
-    apiFetch<Paginated<ModelInfo>>("/v1/models?limit=500")
-      .then((res) => setModels(res.items))
-      .catch(() => {});
-  }, []);
-
-  const embeddingModels = models.filter((m) => isEmbeddingModelName(m.name));
-  const llmModels = models.filter((m) => !isEmbeddingModelName(m.name));
+  // Free-text model-name inputs made a user guess/copy-paste an exact
+  // Ollama model string with zero validation, when the platform already
+  // knows exactly which models are pulled (ModelManagementPage's own data
+  // source) -- offer that list instead. Best-effort: an empty list just
+  // means every dropdown falls back to its single default option.
+  const ownChoices = useModelChoices(token, { enabled: !givenChoices });
+  const choices = givenChoices ?? ownChoices;
+  const embeddingModels = choices.models.filter((m) => isEmbeddingModelName(m.name));
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -714,6 +871,7 @@ export function CreateKbForm({
     if (llmModel) body.llm_model = llmModel;
     if (chunkSize) body.chunk_size = parseInt(chunkSize, 10);
     if (chunkOverlap) body.chunk_overlap = parseInt(chunkOverlap, 10);
+    if (dataPolicy === "local_only") body.data_policy = dataPolicy;
 
     setCreating(true);
     setStatus("Creating…");
@@ -730,6 +888,7 @@ export function CreateKbForm({
       setLlmModel("");
       setChunkSize("");
       setChunkOverlap("");
+      setDataPolicy("cloud_allowed");
       setStatus("Created.");
       scheduleTimeout(() => setStatus(""), 2000);
     } catch (e) {
@@ -819,16 +978,48 @@ export function CreateKbForm({
               value={llmModel}
               onChange={(e) => setLlmModel(e.target.value)}
             >
-              <option value="">(server default)</option>
-              {llmModels.map((m) => (
-                <option key={m.id} value={m.name}>
-                  {m.name}
-                </option>
-              ))}
+              <AnswerModelOptions
+                choices={choices}
+                current={llmModel}
+                localOnly={dataPolicy === "local_only"}
+              />
+            </select>
+            {dataPolicy === "local_only" ? (
+              <LocalOnlyModelHint choices={choices} current={llmModel} />
+            ) : (
+              <p className={fieldHintClass}>
+                Generates the actual answer from retrieved chunks when this KB
+                is queried through a RAG Pipeline. "Org default" follows the
+                organization's answer model, even when it changes.
+              </p>
+            )}
+          </div>
+          <div className="sm:col-span-2">
+            <label
+              htmlFor={dataPolicyId}
+              className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              Data policy
+            </label>
+            <select
+              id={dataPolicyId}
+              className={inputClass}
+              value={dataPolicy}
+              onChange={(e) => {
+                const next = e.target.value as DataPolicy;
+                setDataPolicy(next);
+                if (next === "local_only" && llmModel && isCloudModel(llmModel, choices.localProviders)) {
+                  setLlmModel("");
+                }
+              }}
+            >
+              <option value="cloud_allowed">{DATA_POLICY_LABEL.cloud_allowed}</option>
+              <option value="local_only">{DATA_POLICY_LABEL.local_only}</option>
             </select>
             <p className={fieldHintClass}>
-              Generates the actual answer from retrieved chunks when this KB
-              is queried through a RAG Pipeline.
+              Local only keeps this knowledge base's content away from cloud
+              models: only local models (or self-hosted providers marked
+              local) can answer from it.
             </p>
           </div>
           <div>
@@ -890,7 +1081,11 @@ export function CreateKbForm({
 }
 
 export function KnowledgeBasesPage() {
-  const { token, sessionKey } = useAuth();
+  const { token, sessionKey, role, orgRole } = useAuth();
+  const choices = useModelChoices(token, {
+    canListProviders: role === "admin" || orgRole === "owner" || orgRole === "admin",
+    sessionKey,
+  });
   const tokenRef = useTokenRef();
   const { confirm, dialog } = useConfirm();
   const [kbs, setKbs] = useState<KnowledgeBase[] | null>(null);
@@ -979,6 +1174,7 @@ export function KnowledgeBasesPage() {
       <StatusLine isError={isError}>{status}</StatusLine>
       <CreateKbForm
         token={token}
+        choices={choices}
         onCreated={(kb) => {
           setKbs((prev) => [...(prev ?? []), kb]);
           setCreatedName(kb.name);
@@ -1015,6 +1211,7 @@ export function KnowledgeBasesPage() {
           kb={kb}
           token={token}
           myTeams={myTeams}
+          choices={choices}
           onDeleted={(id) => setKbs((prev) => (prev ?? []).filter((k) => k.id !== id))}
           onRefresh={(fresh) =>
             setKbs((prev) => (prev ?? []).map((k) => (k.id === fresh.id ? fresh : k)))

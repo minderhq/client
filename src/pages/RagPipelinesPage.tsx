@@ -12,6 +12,12 @@ import { useAuth } from "../lib/auth";
 import { copyText, useAutoClearTimeout } from "../lib/browser";
 import { filterByText } from "../lib/filterByText";
 import { kbReady } from "../lib/journey";
+import {
+  modelShortName,
+  modelSourceLabel,
+  type DataPolicy,
+  type ModelSource,
+} from "../lib/modelDefaults";
 import type { KnowledgeBase as FullKnowledgeBase, TeamOption } from "../lib/types";
 import {
   badgeClass,
@@ -38,6 +44,8 @@ export interface RagPipeline {
   name: string;
   knowledge_base_ids: string[];
   created_at: string;
+  // The pipeline's own answer model, when set; else its first KB's (#2523).
+  llm_model?: string | null;
   // Tenancy/sharing (#1046, Phase 4 slice 4): mirrors KnowledgeBase's
   // owner_id/visibility/team_id -- see lib/types.ts's KnowledgeBase for the
   // same fields' rationale. team_id is only set when visibility === "team".
@@ -185,8 +193,26 @@ export interface QueryResponse {
     retrieval: string;
     degraded?: string[];
     metadata_filter?: { source?: string; document_id?: string };
+    // #2523: which level chose the answer / utility model (request, kb,
+    // org_default, install_default; utility may also be answer_model).
+    model_source?: ModelSource | null;
+    utility_model?: string | null;
+    utility_model_source?: ModelSource | null;
+    // #2523: the org's answer default was unavailable; the install default
+    // answered instead (also listed in `degraded`).
+    stale_org_default?: { model: string; model_used_instead: string } | null;
+    // #2525: a cloud model was refused for a Local only knowledge base.
+    data_policy?: {
+      policy: DataPolicy;
+      cloud_model_refused?: boolean;
+      model_used_instead?: string;
+    } | null;
   } | null;
   applied_parameters?: Record<string, AppliedParameter> | null;
+  /** #1094: true whenever `method_details.degraded` has a reason. */
+  degraded?: boolean;
+  /** #2525: "local_only" when any of the pipeline's knowledge bases is. */
+  data_policy?: DataPolicy;
 }
 
 export interface Turn {
@@ -206,6 +232,11 @@ export function QueryResultCard({
 }) {
   const [copied, setCopied] = useState(false);
   const scheduleTimeout = useAutoClearTimeout();
+  const details = response.method_details;
+  const answerSource = modelSourceLabel(details?.model_source);
+  const utilityModel = details?.utility_model ?? null;
+  const utilitySource = modelSourceLabel(details?.utility_model_source);
+  const degradedNotes = details?.degraded ?? [];
 
   async function handleCopyAnswer() {
     if (!(await copyText(response.answer))) return;
@@ -231,18 +262,41 @@ export function QueryResultCard({
           {Math.round(response.confidence * 100)}% confidence
         </span>
         <span>
-          Model: {response.model_used}
+          {answerSource
+            ? `Answered by ${modelShortName(response.model_used)} (${answerSource})`
+            : `Model: ${response.model_used}`}
           {response.tokens_used != null && ` (${response.tokens_used} tokens)`}
         </span>
+        {utilityModel && utilityModel !== response.model_used && (
+          <span>
+            Utility: {modelShortName(utilityModel)}
+            {utilitySource && ` (${utilitySource})`}
+          </span>
+        )}
+        {response.data_policy === "local_only" && (
+          <span
+            className={badgeClass}
+            title="Local only: this pipeline's knowledge base content is never sent to a cloud model."
+          >
+            <Icon name="lock" size={12} />
+            Local only
+          </span>
+        )}
         <span>
           Method: {response.method}
           {response.method_details?.retrieval && ` (${response.method_details.retrieval} retrieval)`}
         </span>
       </p>
-      {response.method_details?.degraded && response.method_details.degraded.length > 0 && (
+      {degradedNotes.length > 0 ? (
         <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-          ⚠ Degraded: {response.method_details.degraded.join(", ")}
+          ⚠ Degraded: {degradedNotes.join("; ")}
         </p>
+      ) : (
+        response.degraded && (
+          <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+            ⚠ Degraded: this answer used a fallback.
+          </p>
+        )
       )}
       {response.method_details?.metadata_filter && (
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
