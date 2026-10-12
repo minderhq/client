@@ -6,8 +6,25 @@ import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
 import { useConfirm } from "../components/ConfirmDialog";
-import { apiFetch, friendlyErrorMessage } from "../lib/api";
+import {
+  FetchedModelsPicker,
+  ModelsEditor,
+} from "../components/ProviderModelsEditor";
+import { friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import {
+  createProvider,
+  deleteProvider,
+  fetchModelsErrorMessage,
+  fetchProviderModels,
+  listProviderPresets,
+  listProviders,
+  testProvider,
+  updateProvider,
+  type FetchModelsResult,
+  type Provider,
+  type ProviderPreset,
+} from "../lib/modelProviders";
 import {
   badgeClass,
   badgeTone,
@@ -38,21 +55,9 @@ import { useAsyncResource } from "../lib/useAsyncResource";
 // of getting a second "local provider" concept -- see the PR description for
 // the full reasoning.
 
-export interface Provider {
-  id: string;
-  adapter: "openai_compatible" | "anthropic";
-  name: string;
-  base_url: string | null;
-  api_key_masked: string;
-  enabled: boolean;
-  is_local: boolean;
-  // #1511: whether the org admin has acknowledged the privacy tradeoff of a
-  // non-local (cloud/BYOK) provider (see CLOUD_PRIVACY_DISCLOSURE). Always
-  // present; only meaningful for `is_local === false` rows.
-  privacy_acknowledged: boolean;
-  created_at: string;
-  updated_at: string;
-}
+// The provider/preset shapes and every `/v1/model-providers` call live in the
+// typed module lib/modelProviders.ts; re-exported for existing importers.
+export type { Provider, ProviderPreset };
 
 const ADAPTER_LABEL: Record<Provider["adapter"], string> = {
   openai_compatible: "OpenAI-compatible",
@@ -73,28 +78,14 @@ const CLOUD_PRIVACY_DISCLOSURE =
   "boundary and is subject to that provider's own data handling, not this " +
   "platform's. Enabling it is your organization's own choice and responsibility.";
 
-// A suggested "add provider" configuration, served read-only by the backend at
-// GET /v1/model-providers/presets (#1585 / ProviderPresetOut) and rendered as
-// the add-provider dropdown. The backend is the single source of truth for the
-// list (#1467) -- notably the first-class "vLLM (self-hosted)" entry, which is
-// just an `openai_compatible` row with `is_local` pre-set, so a self-hosted
-// vLLM box is a labeled option rather than something the user must know to
-// hand-build as a generic openai_compatible row. Static, credential-free
-// metadata -- see the backend's core.provider_catalog for the field semantics.
-export interface ProviderPreset {
-  id: string;
-  label: string;
-  adapter: Provider["adapter"];
-  is_local: boolean;
-  base_url_placeholder: string | null;
-  requires_api_key: boolean;
-  description: string;
-}
-
 // #1718: which inline edit form (if any) a row currently has open. Only one at
 // a time -- opening one closes the other -- so the compact row never sprouts two
 // stacked forms.
-type RowEditMode = null | "rename" | "rotate";
+// #2522 adds "models": the row's model list editor plus Fetch models.
+type RowEditMode = null | "rename" | "rotate" | "models";
+
+// How many of a row's model ids the card lists before "+N more".
+const CARD_MODEL_PREVIEW = 4;
 
 function ProviderRow({
   provider,
@@ -117,18 +108,72 @@ function ProviderRow({
   const [editMode, setEditMode] = useState<RowEditMode>(null);
   const [nameDraft, setNameDraft] = useState(provider.name);
   const [keyDraft, setKeyDraft] = useState("");
+  // #2522: the models editor's draft (seeded from the saved `models`), and the
+  // last Fetch models result awaiting selection. Fetching never saves; Save
+  // PATCHes `models`.
+  const [modelsDraft, setModelsDraft] = useState<string[]>(provider.models ?? []);
+  const [fetched, setFetched] = useState<FetchModelsResult | null>(null);
+  const [fetching, setFetching] = useState(false);
+  const [fetchError, setFetchError] = useState("");
+
+  // `effective_models` is absent from a backend older than #2522: then nothing
+  // is known about the row's models, so neither the list nor the warning shows.
+  const effective = provider.effective_models;
+  const needsModels =
+    !provider.is_local && Array.isArray(effective) && effective.length === 0;
 
   function openEdit(mode: Exclude<RowEditMode, null>) {
     setStatus("");
     setIsError(false);
     if (mode === "rename") setNameDraft(provider.name);
     if (mode === "rotate") setKeyDraft("");
+    if (mode === "models") {
+      setModelsDraft(provider.models ?? []);
+      setFetched(null);
+      setFetchError("");
+    }
     setEditMode(mode);
   }
 
   function closeEdit() {
     setEditMode(null);
     setKeyDraft(""); // never leave an entered key sitting in component state
+    setFetched(null);
+    setFetchError("");
+  }
+
+  // #2522: ask the provider which models it serves. Opens the models editor
+  // when it isn't already, so the card's Fetch models button lands the admin
+  // straight on the selection list.
+  async function handleFetchModels() {
+    if (fetching) return;
+    if (editMode !== "models") openEdit("models");
+    setFetching(true);
+    setFetchError("");
+    setFetched(null);
+    try {
+      setFetched(await fetchProviderModels(token, provider.id));
+    } catch (e) {
+      setFetchError(fetchModelsErrorMessage(e));
+    }
+    setFetching(false);
+  }
+
+  async function handleSaveModels(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setIsError(false);
+    setStatus("");
+    try {
+      await updateProvider(token, provider.id, { models: modelsDraft });
+      closeEdit();
+      onChanged();
+    } catch (e) {
+      setStatus(friendlyErrorMessage(e));
+      setIsError(true);
+    }
+    setBusy(false);
   }
 
   async function handleToggle() {
@@ -153,13 +198,13 @@ function ProviderRow({
     setIsError(false);
     setStatus("");
     try {
-      await apiFetch(`/v1/model-providers/${encodeURIComponent(provider.id)}`, {
-        method: "PATCH",
+      await updateProvider(
         token,
-        body: needsAck
+        provider.id,
+        needsAck
           ? { enabled: true, privacy_acknowledged: true }
           : { enabled: enabling },
-      });
+      );
       onChanged();
     } catch (e) {
       setStatus(friendlyErrorMessage(e));
@@ -174,10 +219,7 @@ function ProviderRow({
     setIsError(false);
     setStatus("Testing…");
     try {
-      const result = await apiFetch<{ ok: boolean; detail: string }>(
-        `/v1/model-providers/${encodeURIComponent(provider.id)}/test`,
-        { method: "POST", token },
-      );
+      const result = await testProvider(token, provider.id);
       setStatus(result.detail);
       setIsError(!result.ok);
     } catch (e) {
@@ -203,10 +245,7 @@ function ProviderRow({
     setIsError(false);
     setStatus("");
     try {
-      await apiFetch(`/v1/model-providers/${encodeURIComponent(provider.id)}`, {
-        method: "DELETE",
-        token,
-      });
+      await deleteProvider(token, provider.id);
       onChanged();
     } catch (e) {
       setStatus(friendlyErrorMessage(e));
@@ -230,11 +269,7 @@ function ProviderRow({
     setIsError(false);
     setStatus("");
     try {
-      await apiFetch(`/v1/model-providers/${encodeURIComponent(provider.id)}`, {
-        method: "PATCH",
-        token,
-        body: { name: nextName },
-      });
+      await updateProvider(token, provider.id, { name: nextName });
       closeEdit();
       onChanged();
     } catch (e) {
@@ -260,11 +295,7 @@ function ProviderRow({
     setIsError(false);
     setStatus("");
     try {
-      await apiFetch(`/v1/model-providers/${encodeURIComponent(provider.id)}`, {
-        method: "PATCH",
-        token,
-        body: { api_key: nextKey },
-      });
+      await updateProvider(token, provider.id, { api_key: nextKey });
       closeEdit();
       onChanged();
     } catch (e) {
@@ -313,6 +344,13 @@ function ProviderRow({
           >
             <Icon name="reset" size={14} /> Rotate key
           </button>
+          <button
+            onClick={() => (editMode === "models" ? closeEdit() : openEdit("models"))}
+            disabled={busy}
+            className={ghostButtonClass}
+          >
+            <Icon name="models" size={14} /> Edit models
+          </button>
           <button onClick={handleToggle} disabled={busy} className={ghostButtonClass}>
             {provider.enabled ? "Disable" : "Enable"}
           </button>
@@ -321,6 +359,56 @@ function ProviderRow({
           </button>
         </div>
       </div>
+      {needsModels && editMode !== "models" && (
+        <div className="mt-2">
+          <InfoCallout icon="warning">
+            <p className="font-medium">Set models</p>
+            <p>
+              This provider has no models, so nothing can use it yet. Fetch the
+              list from the provider or enter the model ids yourself.
+            </p>
+            <div className="mt-2 flex gap-2">
+              <button
+                onClick={handleFetchModels}
+                disabled={busy || fetching}
+                className={secondaryButtonClass}
+              >
+                <Icon name="download" size={14} /> Fetch models
+              </button>
+              <button
+                onClick={() => openEdit("models")}
+                disabled={busy}
+                className={ghostButtonClass}
+              >
+                Enter models
+              </button>
+            </div>
+          </InfoCallout>
+        </div>
+      )}
+      {!needsModels && Array.isArray(effective) && editMode !== "models" && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+          <span>
+            {effective.length} model{effective.length === 1 ? "" : "s"}
+            {effective.length > 0 ? ":" : ""}
+          </span>
+          {effective.slice(0, CARD_MODEL_PREVIEW).map((id) => (
+            <span key={id} className={`${badgeClass} font-mono`}>
+              {id}
+            </span>
+          ))}
+          {effective.length > CARD_MODEL_PREVIEW && (
+            <span>+{effective.length - CARD_MODEL_PREVIEW} more</span>
+          )}
+          <button
+            onClick={handleFetchModels}
+            disabled={busy || fetching}
+            className={ghostButtonClass}
+          >
+            <Icon name="download" size={14} /> Fetch models
+          </button>
+        </div>
+      )}
       {editMode === "rename" && (
         <form onSubmit={handleRename} className="mt-3 flex flex-wrap items-end gap-2">
           <div className="min-w-48 flex-1">
@@ -386,6 +474,56 @@ function ProviderRow({
           </button>
         </form>
       )}
+      {editMode === "models" && (
+        <form onSubmit={handleSaveModels} className="mt-3 flex flex-col gap-2">
+          <ModelsEditor
+            models={modelsDraft}
+            onChange={setModelsDraft}
+            disabled={busy}
+          />
+          <div>
+            <button
+              type="button"
+              onClick={handleFetchModels}
+              disabled={busy || fetching}
+              className={secondaryButtonClass}
+            >
+              <Icon name="download" size={14} />{" "}
+              {fetching ? "Fetching…" : "Fetch models"}
+            </button>
+          </div>
+          {fetchError && (
+            <StatusLine isError className="mb-0">
+              {fetchError}
+            </StatusLine>
+          )}
+          {fetched && (
+            <FetchedModelsPicker
+              fetched={fetched.models}
+              current={modelsDraft}
+              source={fetched.source}
+              onAdd={(next) => {
+                setModelsDraft(next);
+                setFetched(null);
+              }}
+              onClose={() => setFetched(null)}
+            />
+          )}
+          <div className="flex items-center gap-2">
+            <button type="submit" disabled={busy} className={primaryButtonClass}>
+              {busy ? "Saving…" : "Save models"}
+            </button>
+            <button
+              type="button"
+              onClick={closeEdit}
+              disabled={busy}
+              className={secondaryButtonClass}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
       {status && (
         <StatusLine isError={isError} className="mb-0 mt-2">
           {status}
@@ -421,12 +559,17 @@ function AddProviderForm({
   // preset change so the admin re-affirms it per provider rather than a stale
   // check carrying over from a previous selection.
   const [acknowledged, setAcknowledged] = useState(false);
+  // #2522: the new row's model list. null = untouched, so it follows the chosen
+  // preset's `suggested_models`; reset to null on a preset change so switching
+  // presets re-fills it from the new one.
+  const [modelsDraft, setModelsDraft] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [isError, setIsError] = useState(false);
 
   const selected =
     presets?.find((p) => p.id === presetId) ?? presets?.[0] ?? null;
+  const models = modelsDraft ?? selected?.suggested_models ?? [];
   // A non-local (cloud/BYOK) provider sends data outside the box, so it needs
   // the privacy acknowledgment before it can be added; `is_local` rows don't.
   const requiresAck = !!selected && !selected.is_local;
@@ -437,6 +580,7 @@ function AddProviderForm({
     setBaseUrl("");
     setApiKey("");
     setAcknowledged(false);
+    setModelsDraft(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -446,17 +590,14 @@ function AddProviderForm({
     setIsError(false);
     setStatus("Adding…");
     try {
-      await apiFetch("/v1/model-providers", {
-        method: "POST",
-        token,
-        body: {
-          adapter: selected.adapter,
-          name,
-          base_url: baseUrl || undefined,
-          api_key: apiKey,
-          is_local: selected.is_local,
-          privacy_acknowledged: selected.is_local ? false : acknowledged,
-        },
+      await createProvider(token, {
+        adapter: selected.adapter,
+        name,
+        base_url: baseUrl || undefined,
+        api_key: apiKey,
+        is_local: selected.is_local,
+        privacy_acknowledged: selected.is_local ? false : acknowledged,
+        models,
       });
       reset();
       setOpen(false);
@@ -509,6 +650,7 @@ function AddProviderForm({
               onChange={(e) => {
                 setPresetId(e.target.value);
                 setAcknowledged(false);
+                setModelsDraft(null);
               }}
             >
               {presets?.map((option) => (
@@ -563,6 +705,11 @@ function AddProviderForm({
               required
             />
           </div>
+          <ModelsEditor
+            models={models}
+            onChange={setModelsDraft}
+            disabled={busy}
+          />
           {requiresAck && (
             <div>
               <InfoCallout icon="warning">{CLOUD_PRIVACY_DISCLOSURE}</InfoCallout>
@@ -625,7 +772,7 @@ export function CloudProvidersPage() {
   const { confirm, dialog } = useConfirm();
 
   const providersRes = useAsyncResource(
-    (signal) => apiFetch<Provider[]>("/v1/model-providers", { token, signal }),
+    (signal) => listProviders(token, signal),
     { enabled: isAdmin },
   );
 
@@ -635,7 +782,7 @@ export function CloudProvidersPage() {
   // preset ships without a client change. Admin-only, like the endpoint itself.
   const presetsRes = useAsyncResource(
     (signal) =>
-      apiFetch<ProviderPreset[]>("/v1/model-providers/presets", { token, signal }),
+      listProviderPresets(token, signal),
     { enabled: isAdmin },
   );
 

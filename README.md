@@ -102,6 +102,9 @@ src/
   round-trips).
 - **`usePaginatedList.ts`** — "load a page, then Load More" offset pagination for
   the marketplace catalog.
+- **`modelProviders.ts`** — typed `/v1/model-providers` calls and shapes for
+  Cloud Providers (list, presets, create/update/delete, test, fetch-models),
+  plus the model-id validation that mirrors the backend's rules.
 - **`marketplace.ts`** — typed marketplace / plugin-registry calls and shapes
   (catalog, runtime-loaded plugins, `installations/me`); the start of #2198's
   single typed module. **`installedPlugins.ts`** + **`useInstalledPlugins.ts`**
