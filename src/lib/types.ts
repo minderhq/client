@@ -8,6 +8,8 @@
  * lib/marketplace.ts (#119); re-exported here for existing importers. */
 export type { Installation } from "./marketplace";
 
+import type { DataPolicy } from "./modelDefaults";
+
 export interface KnowledgeBase {
   id: string;
   name: string;
@@ -25,6 +27,9 @@ export interface KnowledgeBase {
   owner_id?: string | null;
   visibility?: "private" | "team" | "shared" | null;
   team_id?: number | null;
+  // #2525 (ADR model-selection D5): "local_only" = this KB's content is never
+  // sent to a cloud model. Absent on a backend older than #2525.
+  data_policy?: DataPolicy | null;
 }
 
 /** Just enough of a team to populate a sharing picker -- the full `Team`

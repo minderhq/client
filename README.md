@@ -105,6 +105,11 @@ src/
 - **`modelProviders.ts`** — typed `/v1/model-providers` calls and shapes for
   Cloud Providers (list, presets, create/update/delete, test, fetch-models),
   plus the model-id validation that mirrors the backend's rules.
+- **`modelDefaults.ts`** — typed `/v1/model-defaults` calls (the org's default
+  model per role: answer, chat, extraction, utility), the Local/Cloud rule every
+  model picker uses (a `remote:` id is Cloud unless its provider is marked
+  local), and the knowledge-base `data_policy` (Cloud allowed / Local only)
+  labels and error messages.
 - **`marketplace.ts`** — typed marketplace / plugin-registry calls and shapes
   (catalog, runtime-loaded plugins, `installations/me`); the start of #2198's
   single typed module. **`installedPlugins.ts`** + **`useInstalledPlugins.ts`**

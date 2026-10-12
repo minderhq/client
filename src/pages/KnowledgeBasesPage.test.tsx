@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "../lib/api";
 import type { KnowledgeBase } from "../lib/types";
 import {
   ChunkViewer,
@@ -55,6 +56,15 @@ function kb(overrides: Partial<KnowledgeBase> = {}): KnowledgeBase {
     ...overrides,
   };
 }
+
+const NO_DEFAULTS = {
+  answer: null,
+  chat: null,
+  extraction: null,
+  utility: null,
+  updated_at: null,
+  updated_by: null,
+};
 
 // jsdom's File doesn't implement enough for the component's needs; the
 // component only ever reads `.name` off each queued file and hands the File
@@ -745,6 +755,7 @@ describe("KnowledgeBasesPage", () => {
         return Promise.resolve({ items: [], total: 0, limit: 100, offset: 0 });
       }
       if (path.startsWith("/v1/teams")) return Promise.resolve({ teams: [] });
+      if (path === "/v1/model-defaults") return Promise.resolve(NO_DEFAULTS);
       throw new Error(`unexpected path ${path}`);
     });
     render(<KnowledgeBasesPage />);
@@ -757,6 +768,7 @@ describe("KnowledgeBasesPage", () => {
       if (path.startsWith("/v1/rag/knowledge-bases?")) return Promise.resolve({ items: [] });
       if (path.startsWith("/v1/models")) return Promise.resolve({ items: [] });
       if (path.startsWith("/v1/teams")) return Promise.resolve({ teams: [] });
+      if (path === "/v1/model-defaults") return Promise.resolve(NO_DEFAULTS);
       throw new Error(`unexpected path ${path}`);
     });
     render(<KnowledgeBasesPage />);
@@ -769,6 +781,7 @@ describe("KnowledgeBasesPage", () => {
       if (path.startsWith("/v1/rag/knowledge-bases?")) return Promise.reject(new Error("rag-pipeline unreachable"));
       if (path.startsWith("/v1/models")) return Promise.resolve({ items: [] });
       if (path.startsWith("/v1/teams")) return Promise.resolve({ teams: [] });
+      if (path === "/v1/model-defaults") return Promise.resolve(NO_DEFAULTS);
       throw new Error(`unexpected path ${path}`);
     });
     render(<KnowledgeBasesPage />);
@@ -786,6 +799,7 @@ describe("KnowledgeBasesPage", () => {
       if (path.startsWith("/v1/models")) return Promise.resolve({ items: [] });
       if (path.includes("/documents")) return Promise.resolve({ items: [], total: 0, limit: 100, offset: 0 });
       if (path.startsWith("/v1/teams")) return Promise.resolve({ teams: [] });
+      if (path === "/v1/model-defaults") return Promise.resolve(NO_DEFAULTS);
       throw new Error(`unexpected path ${path}`);
     });
     render(<KnowledgeBasesPage />);
@@ -812,10 +826,151 @@ describe("KnowledgeBasesPage", () => {
       if (path.startsWith("/v1/teams")) {
         return Promise.resolve({ teams: [{ id: 7, name: "Engineering" }] });
       }
+      if (path === "/v1/model-defaults") return Promise.resolve(NO_DEFAULTS);
       throw new Error(`unexpected path ${path}`);
     });
     render(<KnowledgeBasesPage />);
 
     await screen.findByText("👥 Shared with team: Engineering");
+  });
+});
+
+describe("model defaults and data policy (#2523 / #2525)", () => {
+  const CHOICES = {
+    models: [
+      { id: "llama3", name: "llama3", status: "ready" },
+      { id: "nomic-embed-text", name: "nomic-embed-text", status: "ready" },
+      { id: "remote:p1:gpt-4o", name: "gpt-4o", provider: "OpenAI", status: "ready" },
+    ],
+    defaults: { ...NO_DEFAULTS, answer: "remote:p1:gpt-4o" },
+    localProviders: new Set<string>(),
+  };
+
+  function renderCard(overrides: Partial<KnowledgeBase>, onRefresh = vi.fn()) {
+    render(
+      <KnowledgeBaseCard
+        kb={kb(overrides)}
+        token="tok"
+        choices={CHOICES}
+        onDeleted={vi.fn()}
+        onRefresh={onRefresh}
+        confirm={vi.fn()}
+      />,
+    );
+  }
+
+  it("shows a KB that follows the org default, and a pinned KB's own model", () => {
+    apiFetch.mockResolvedValue({ items: [] });
+    renderCard({ llm_model: "" });
+    expect(screen.getByText(/answer\s+model: Org default \(gpt-4o \(OpenAI\)\)/)).toBeTruthy();
+    cleanup();
+    renderCard({ llm_model: "llama3" });
+    expect(screen.getByText(/answer\s+model: llama3/)).toBeTruthy();
+  });
+
+  it("marks a Local only KB with a lock badge", () => {
+    apiFetch.mockResolvedValue({ items: [] });
+    renderCard({ data_policy: "local_only" });
+    expect(screen.getByText("Local only")).toBeTruthy();
+  });
+
+  it("disables cloud models in a Local only KB's picker and explains why", () => {
+    apiFetch.mockResolvedValue({ items: [] });
+    renderCard({ data_policy: "local_only", llm_model: "" });
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    const picker = screen.getByLabelText("Answer model") as HTMLSelectElement;
+    const options = Array.from(picker.options);
+    expect(options[0].value).toBe("");
+    expect(options[0].textContent).toBe("Org default (gpt-4o (OpenAI))");
+    const cloud = options.find((o) => o.value === "remote:p1:gpt-4o")!;
+    expect(cloud.disabled).toBe(true);
+    expect(cloud.textContent).toMatch(/Cloud \(not allowed: Local only\)/);
+    expect(options.find((o) => o.value === "llama3")!.disabled).toBe(false);
+    // Embedding-only models never answer.
+    expect(options.some((o) => o.value === "nomic-embed-text")).toBe(false);
+    expect(screen.getByText(/its content is never sent to a cloud model/)).toBeTruthy();
+    // The cloud org default would be refused -- say so.
+    expect(screen.getByText(/is a cloud model, so\s+questions to this knowledge base will be refused/)).toBeTruthy();
+  });
+
+  it("switching to Local only drops a pinned cloud model and sends both changes", async () => {
+    apiFetch.mockImplementation((_path: string, opts?: { method?: string }) =>
+      opts?.method === "PATCH"
+        ? Promise.resolve(kb({ data_policy: "local_only", llm_model: "" }))
+        : Promise.resolve({ items: [] }),
+    );
+    renderCard({ llm_model: "remote:p1:gpt-4o" });
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Data policy"), { target: { value: "local_only" } });
+    expect((screen.getByLabelText("Answer model") as HTMLSelectElement).value).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        "/v1/rag/knowledge-bases/kb-1",
+        expect.objectContaining({
+          method: "PATCH",
+          body: expect.objectContaining({ data_policy: "local_only", llm_model: "" }),
+        }),
+      ),
+    );
+  });
+
+  it("leaves an untouched model and policy out of the PATCH", async () => {
+    apiFetch.mockImplementation((_path: string, opts?: { method?: string }) =>
+      opts?.method === "PATCH" ? Promise.resolve(kb()) : Promise.resolve({ items: [] }),
+    );
+    renderCard({ data_policy: "local_only" });
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        "/v1/rag/knowledge-bases/kb-1",
+        expect.objectContaining({ method: "PATCH" }),
+      ),
+    );
+    const patch = apiFetch.mock.calls.find((c) => c[1]?.method === "PATCH")!;
+    expect(patch[1].body).not.toHaveProperty("data_policy");
+    expect(patch[1].body).not.toHaveProperty("llm_model");
+  });
+
+  it("explains a refused loosening (403) and keeps the form open", async () => {
+    apiFetch.mockImplementation((_path: string, opts?: { method?: string }) =>
+      opts?.method === "PATCH"
+        ? Promise.reject(new ApiError("Insufficient permissions", 403))
+        : Promise.resolve({ items: [] }),
+    );
+    renderCard({ data_policy: "local_only" });
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Data policy"), { target: { value: "cloud_allowed" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(
+      await screen.findByText(
+        "Only the knowledge base owner or an org admin can switch a Local only knowledge base back to Cloud allowed.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByLabelText("Data policy")).toBeTruthy();
+  });
+
+  it("creates a Local only KB that follows the org default", async () => {
+    apiFetch.mockResolvedValue(kb({ data_policy: "local_only" }));
+    const onCreated = vi.fn();
+    render(<CreateKbForm token="tok" choices={CHOICES} onCreated={onCreated} />);
+    expect(
+      (screen.getByLabelText("LLM model") as HTMLSelectElement).options[0].textContent,
+    ).toBe("Org default (gpt-4o (OpenAI))");
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Secrets" } });
+    fireEvent.change(screen.getByLabelText("Data policy"), { target: { value: "local_only" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith("/v1/rag/knowledge-bases", {
+        method: "POST",
+        body: { name: "Secrets", data_policy: "local_only" },
+        token: "tok",
+      }),
+    );
   });
 });

@@ -159,7 +159,6 @@ describe("nav — marketplace IA (#2197)", () => {
     expect(adminOnly).toEqual([
       "/rag/public-chat",
       ROUTES.publishSubmissionReview,
-      "/platform/providers",
       "/organizations",
       "/audit",
       ROUTES.sources,
