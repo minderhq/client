@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "../lib/api";
+
 import {
   CloudProvidersPage,
   type Provider,
@@ -8,7 +10,9 @@ import {
 } from "./CloudProvidersPage";
 
 const apiFetch = vi.fn();
-vi.mock("../lib/api", () => ({
+vi.mock("../lib/api", async (importOriginal) => ({
+  // The real ApiError, so fetch-models error handling can switch on `status`.
+  ApiError: (await importOriginal<typeof import("../lib/api")>()).ApiError,
   apiFetch: (...args: unknown[]) => apiFetch(...args),
   friendlyErrorMessage: (e: unknown) => (e instanceof Error ? e.message : "error"),
 }));
@@ -33,6 +37,8 @@ function provider(overrides: Partial<Provider> = {}): Provider {
     enabled: true,
     is_local: false,
     privacy_acknowledged: true,
+    models: [],
+    effective_models: ["gpt-4o", "gpt-4o-mini"],
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
     ...overrides,
@@ -53,6 +59,7 @@ const PRESETS: ProviderPreset[] = [
     base_url_placeholder: null,
     requires_api_key: true,
     description: "OpenAI's hosted API (gpt-4o, o1, ...).",
+    suggested_models: [],
   },
   {
     id: "anthropic",
@@ -62,6 +69,7 @@ const PRESETS: ProviderPreset[] = [
     base_url_placeholder: null,
     requires_api_key: true,
     description: "Anthropic's hosted Claude models.",
+    suggested_models: [],
   },
   {
     id: "vllm",
@@ -72,6 +80,27 @@ const PRESETS: ProviderPreset[] = [
     requires_api_key: false,
     description:
       "A self-hosted vLLM OpenAI-compatible server. Local compute with no per-call cost, so exempt from the cloud-provider rate limit.",
+    suggested_models: [],
+  },
+  {
+    id: "zai",
+    label: "z.ai (GLM)",
+    adapter: "openai_compatible",
+    is_local: false,
+    base_url_placeholder: "https://api.z.ai/api/paas/v4",
+    requires_api_key: true,
+    description: "z.ai's GLM models through its OpenAI-compatible API.",
+    suggested_models: ["glm-4.6", "glm-4.5-air"],
+  },
+  {
+    id: "openrouter",
+    label: "OpenRouter",
+    adapter: "openai_compatible",
+    is_local: false,
+    base_url_placeholder: "https://openrouter.ai/api/v1",
+    requires_api_key: true,
+    description: "Many vendors' models through one OpenAI-compatible API.",
+    suggested_models: [],
   },
   {
     id: "openai_compatible",
@@ -81,6 +110,7 @@ const PRESETS: ProviderPreset[] = [
     base_url_placeholder: "https://your-endpoint.example/v1",
     requires_api_key: true,
     description: "Any other endpoint speaking the OpenAI chat-completions API.",
+    suggested_models: [],
   },
 ];
 
@@ -93,6 +123,7 @@ function installApi(
     providersError?: Error;
     presetsError?: Error;
     testResult?: { ok: boolean; detail: string };
+    fetchModels?: { models: string[]; source: string } | Error;
   } = {},
 ) {
   const {
@@ -101,6 +132,7 @@ function installApi(
     providersError,
     presetsError,
     testResult = { ok: true, detail: "connection verified" },
+    fetchModels = { models: [], source: "vendor" },
   } = opts;
   apiFetch.mockImplementation(
     (path: string, options: { method?: string } = {}) => {
@@ -119,6 +151,11 @@ function installApi(
         return Promise.resolve(provider());
       }
       if (path.endsWith("/test")) return Promise.resolve(testResult);
+      if (path.endsWith("/fetch-models")) {
+        return fetchModels instanceof Error
+          ? Promise.reject(fetchModels)
+          : Promise.resolve(fetchModels);
+      }
       if (method === "PATCH") return Promise.resolve({});
       if (method === "DELETE") return Promise.resolve(undefined);
       return Promise.resolve(undefined);
@@ -230,6 +267,7 @@ describe("CloudProvidersPage", () => {
           api_key: "secret-key",
           is_local: false,
           privacy_acknowledged: true,
+          models: [],
         },
       }),
     );
@@ -273,6 +311,7 @@ describe("CloudProvidersPage", () => {
           // #1511: a self-hosted (is_local) provider never leaves the box, so no
           // acknowledgment is required or sent as acknowledged.
           privacy_acknowledged: false,
+          models: [],
         },
       }),
     );
@@ -566,5 +605,285 @@ describe("CloudProvidersPage", () => {
     installApi({ providersError: new Error("model-management unreachable") });
     render(<CloudProvidersPage />);
     expect(await screen.findByText("model-management unreachable")).toBeTruthy();
+  });
+
+  // ---------------------------------------------------------------------------
+  // #2522: per-provider model lists, Fetch models, z.ai / OpenRouter presets
+  // ---------------------------------------------------------------------------
+
+  async function openAddForm() {
+    await screen.findByText("No cloud providers configured yet.");
+    fireEvent.click(screen.getByText("Add Provider"));
+    return screen.findByRole("combobox");
+  }
+
+  function chips(): string[] {
+    const list = screen.queryByRole("list", { name: "Selected models" });
+    return list
+      ? Array.from(list.querySelectorAll("li")).map((li) => li.textContent ?? "")
+      : [];
+  }
+
+  it("offers the z.ai and OpenRouter presets and pre-fills suggested models", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({ providers: [] });
+    render(<CloudProvidersPage />);
+    const select = await openAddForm();
+
+    expect(screen.getByRole("option", { name: "z.ai (GLM)" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "OpenRouter" })).toBeTruthy();
+    expect(chips()).toEqual([]);
+
+    fireEvent.change(select, { target: { value: "zai" } });
+    expect(chips()).toEqual(["glm-4.6", "glm-4.5-air"]);
+    expect(screen.getByPlaceholderText("https://api.z.ai/api/paas/v4")).toBeTruthy();
+
+    // Switching preset re-fills from the new preset's suggestions.
+    fireEvent.change(select, { target: { value: "openrouter" } });
+    expect(chips()).toEqual([]);
+  });
+
+  it("adds, removes and validates model ids in the editor, and sends them on create", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({ providers: [] });
+    render(<CloudProvidersPage />);
+    fireEvent.change(await openAddForm(), { target: { value: "zai" } });
+
+    const input = screen.getByLabelText("Add model id");
+    // Enter adds the trimmed id (and must not submit the form).
+    fireEvent.change(input, { target: { value: "  glm-4-plus " } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(chips()).toEqual(["glm-4.6", "glm-4.5-air", "glm-4-plus"]);
+    expect(apiFetch).not.toHaveBeenCalledWith(
+      "/v1/model-providers",
+      expect.objectContaining({ method: "POST" }),
+    );
+
+    // A duplicate, an id with a space and an over-long id are each rejected.
+    fireEvent.change(input, { target: { value: "glm-4.6" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(screen.getByRole("alert").textContent).toContain("already in the list");
+    fireEvent.change(input, { target: { value: "glm 4" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add model" }));
+    expect(screen.getByRole("alert").textContent).toContain("spaces");
+    fireEvent.change(input, { target: { value: "x".repeat(201) } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(screen.getByRole("alert").textContent).toContain("200 characters");
+    expect(chips()).toHaveLength(3);
+
+    // Remove via the chip's button, and via Backspace in the empty input.
+    fireEvent.click(screen.getByRole("button", { name: "Remove model glm-4.5-air" }));
+    fireEvent.change(input, { target: { value: "" } });
+    fireEvent.keyDown(input, { key: "Backspace" });
+    expect(chips()).toEqual(["glm-4.6"]);
+
+    fireEvent.change(screen.getByPlaceholderText("e.g. z.ai (GLM)"), {
+      target: { value: "GLM" },
+    });
+    fireEvent.change(
+      document.querySelector('input[type="password"]') as HTMLInputElement,
+      { target: { value: "zai-key" } },
+    );
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        "/v1/model-providers",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.objectContaining({ models: ["glm-4.6"] }),
+        }),
+      ),
+    );
+  });
+
+  it("keeps only the rejected remainder in the input when a later id is a duplicate", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({ providers: [] });
+    render(<CloudProvidersPage />);
+    await openAddForm();
+
+    const input = screen.getByLabelText("Add model id") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "a, a, b" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(chips()).toEqual(["a"]);
+    expect(screen.getByRole("alert").textContent).toContain("already in the list");
+    // The remainder starts at the rejected (second) "a", not the first one.
+    expect(input.value).toBe("a, b");
+
+    // Fixing the remainder and retrying makes progress instead of looping.
+    fireEvent.change(input, { target: { value: "b" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(chips()).toEqual(["a", "b"]);
+    expect(input.value).toBe("");
+  });
+
+  it("explains that an empty list falls back to the built-in catalog", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({ providers: [provider({ models: [], effective_models: ["gpt-4o", "o1"] })] });
+    render(<CloudProvidersPage />);
+    await screen.findByText("OpenAI (production)");
+
+    fireEvent.click(screen.getByText("Edit models"));
+    expect(chips()).toEqual([]);
+    expect(screen.getByText(/Empty = use the built-in catalog \(2 models\)/)).toBeTruthy();
+  });
+
+  it("de-duplicates fetched ids and enables Select all/none only when they'd change something", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({
+      providers: [provider()],
+      fetchModels: { models: ["m1", "m2", "m1"], source: "vendor" },
+    });
+    render(<CloudProvidersPage />);
+    await screen.findByText("OpenAI (production)");
+
+    fireEvent.click(screen.getByRole("button", { name: "Fetch models" }));
+    const found = await screen.findByText("2 models found");
+    expect(found.getAttribute("role")).toBe("status");
+    expect(
+      screen.getByRole("list", { name: "Fetched models" }).querySelectorAll("li"),
+    ).toHaveLength(2);
+
+    const all = screen.getByRole("button", { name: "Select all" }) as HTMLButtonElement;
+    const none = screen.getByRole("button", { name: "Select none" }) as HTMLButtonElement;
+    expect(all.disabled).toBe(false);
+    expect(none.disabled).toBe(true);
+    fireEvent.click(all);
+    expect(all.disabled).toBe(true);
+    expect(none.disabled).toBe(false);
+    fireEvent.click(none);
+    expect(none.disabled).toBe(true);
+  });
+
+  it("shows a row's model count and first few models", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({
+      providers: [
+        provider({ effective_models: ["m1", "m2", "m3", "m4", "m5", "m6"] }),
+      ],
+    });
+    render(<CloudProvidersPage />);
+    expect(await screen.findByText(/6 models/)).toBeTruthy();
+    expect(screen.getByText("m4")).toBeTruthy();
+    expect(screen.queryByText("m5")).toBeNull();
+    expect(screen.getByText("+2 more")).toBeTruthy();
+  });
+
+  it("warns 'Set models' only on a non-local row with no effective models", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({
+      providers: [
+        provider({ id: "z", name: "z.ai", effective_models: [] }),
+        provider({ id: "v", name: "vLLM box", is_local: true, effective_models: [] }),
+      ],
+    });
+    render(<CloudProvidersPage />);
+    await screen.findByText("z.ai");
+    expect(screen.getAllByText("Set models")).toHaveLength(1);
+    expect(screen.getByText(/This provider has no models/)).toBeTruthy();
+  });
+
+  it("fetches models, merges the selected ones and saves them via PATCH models", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({
+      providers: [provider({ id: "z", name: "z.ai", effective_models: [] })],
+      fetchModels: {
+        models: ["glm-4.6", "glm-4.5-air", "glm-4.5-flash"],
+        source: "vendor",
+      },
+    });
+    render(<CloudProvidersPage />);
+    await screen.findByText("Set models");
+
+    fireEvent.click(screen.getByRole("button", { name: "Fetch models" }));
+    await screen.findByText("3 models found");
+    expect(apiFetch).toHaveBeenCalledWith("/v1/model-providers/z/fetch-models", {
+      method: "POST",
+      token: "tok",
+    });
+
+    // Select all, then untick one.
+    fireEvent.click(screen.getByRole("button", { name: "Select all" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "glm-4.5-flash" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add selected (2)" }));
+    expect(chips()).toEqual(["glm-4.6", "glm-4.5-air"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Save models" }));
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith("/v1/model-providers/z", {
+        method: "PATCH",
+        token: "tok",
+        body: { models: ["glm-4.6", "glm-4.5-air"] },
+      }),
+    );
+  });
+
+  it("filters a long fetched list and keeps already-added ids locked", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    const many = Array.from({ length: 12 }, (_, i) => `vendor/model-${i}`);
+    installApi({
+      providers: [
+        provider({ models: ["vendor/model-0"], effective_models: ["vendor/model-0"] }),
+      ],
+      fetchModels: { models: many, source: "vendor" },
+    });
+    render(<CloudProvidersPage />);
+    await screen.findByText("OpenAI (production)");
+
+    fireEvent.click(screen.getByText("Edit models"));
+    expect(chips()).toEqual(["vendor/model-0"]);
+    fireEvent.click(screen.getByRole("button", { name: "Fetch models" }));
+    await screen.findByText("12 models found");
+
+    const already = screen.getByRole("checkbox", {
+      name: "vendor/model-0 added",
+    }) as HTMLInputElement;
+    expect(already.checked).toBe(true);
+    expect(already.disabled).toBe(true);
+
+    fireEvent.change(screen.getByLabelText("Filter fetched models"), {
+      target: { value: "model-1" },
+    });
+    // model-1, model-10, model-11
+    expect(
+      screen.getByRole("list", { name: "Fetched models" }).querySelectorAll("li"),
+    ).toHaveLength(3);
+    fireEvent.click(screen.getByRole("button", { name: "Select all" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add selected (3)" }));
+    expect(chips()).toEqual([
+      "vendor/model-0",
+      "vendor/model-1",
+      "vendor/model-10",
+      "vendor/model-11",
+    ]);
+  });
+
+  it.each([
+    [
+      "502 auth",
+      new ApiError("authentication failed — check the API key", 502),
+      "authentication failed — check the API key",
+    ],
+    [
+      "429",
+      new ApiError("Too Many Requests", 429),
+      "Too many fetch requests — wait a moment and try again.",
+    ],
+    [
+      "504",
+      new ApiError("Gateway Timeout", 504),
+      "The provider didn't answer in time — try again, or enter the model ids manually.",
+    ],
+  ])("renders a fetch-models %s error and keeps manual entry", async (_label, err, message) => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({ providers: [provider()], fetchModels: err });
+    render(<CloudProvidersPage />);
+    await screen.findByText("OpenAI (production)");
+
+    fireEvent.click(screen.getByRole("button", { name: "Fetch models" }));
+    expect(await screen.findByText(message)).toBeTruthy();
+    expect(screen.getByLabelText("Add model id")).toBeTruthy();
   });
 });
