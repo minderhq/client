@@ -480,8 +480,13 @@ function ProviderRow({
             models={modelsDraft}
             onChange={setModelsDraft}
             disabled={busy}
+            hint={
+              (provider.models ?? []).length === 0 && (effective ?? []).length > 0
+                ? `Empty = use the built-in catalog (${effective.length} model${effective.length === 1 ? "" : "s"}).`
+                : undefined
+            }
           />
-          <div>
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleFetchModels}
@@ -491,6 +496,9 @@ function ProviderRow({
               <Icon name="download" size={14} />{" "}
               {fetching ? "Fetching…" : "Fetch models"}
             </button>
+            <span role="status" aria-live="polite" className="text-xs text-gray-500 dark:text-gray-400">
+              {fetching ? "Fetching models from the provider…" : ""}
+            </span>
           </div>
           {fetchError && (
             <StatusLine isError className="mb-0">

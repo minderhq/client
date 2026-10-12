@@ -698,6 +698,65 @@ describe("CloudProvidersPage", () => {
     );
   });
 
+  it("keeps only the rejected remainder in the input when a later id is a duplicate", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({ providers: [] });
+    render(<CloudProvidersPage />);
+    await openAddForm();
+
+    const input = screen.getByLabelText("Add model id") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "a, a, b" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(chips()).toEqual(["a"]);
+    expect(screen.getByRole("alert").textContent).toContain("already in the list");
+    // The remainder starts at the rejected (second) "a", not the first one.
+    expect(input.value).toBe("a, b");
+
+    // Fixing the remainder and retrying makes progress instead of looping.
+    fireEvent.change(input, { target: { value: "b" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(chips()).toEqual(["a", "b"]);
+    expect(input.value).toBe("");
+  });
+
+  it("explains that an empty list falls back to the built-in catalog", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({ providers: [provider({ models: [], effective_models: ["gpt-4o", "o1"] })] });
+    render(<CloudProvidersPage />);
+    await screen.findByText("OpenAI (production)");
+
+    fireEvent.click(screen.getByText("Edit models"));
+    expect(chips()).toEqual([]);
+    expect(screen.getByText(/Empty = use the built-in catalog \(2 models\)/)).toBeTruthy();
+  });
+
+  it("de-duplicates fetched ids and enables Select all/none only when they'd change something", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({
+      providers: [provider()],
+      fetchModels: { models: ["m1", "m2", "m1"], source: "vendor" },
+    });
+    render(<CloudProvidersPage />);
+    await screen.findByText("OpenAI (production)");
+
+    fireEvent.click(screen.getByRole("button", { name: "Fetch models" }));
+    const found = await screen.findByText("2 models found");
+    expect(found.getAttribute("role")).toBe("status");
+    expect(
+      screen.getByRole("list", { name: "Fetched models" }).querySelectorAll("li"),
+    ).toHaveLength(2);
+
+    const all = screen.getByRole("button", { name: "Select all" }) as HTMLButtonElement;
+    const none = screen.getByRole("button", { name: "Select none" }) as HTMLButtonElement;
+    expect(all.disabled).toBe(false);
+    expect(none.disabled).toBe(true);
+    fireEvent.click(all);
+    expect(all.disabled).toBe(true);
+    expect(none.disabled).toBe(false);
+    fireEvent.click(none);
+    expect(none.disabled).toBe(true);
+  });
+
   it("shows a row's model count and first few models", async () => {
     mockAuth = { token: "tok", role: "admin" };
     installApi({

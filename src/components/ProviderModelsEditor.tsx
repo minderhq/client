@@ -25,10 +25,13 @@ export function ModelsEditor({
   models,
   onChange,
   disabled = false,
+  hint,
 }: {
   models: string[];
   onChange: (next: string[]) => void;
   disabled?: boolean;
+  /** Extra guidance under the field, e.g. what an empty list means. */
+  hint?: string;
 }) {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
@@ -44,16 +47,17 @@ export function ModelsEditor({
       return;
     }
     let next = models;
-    for (const part of parts) {
-      const problem = modelIdError(part, next);
+    for (let i = 0; i < parts.length; i++) {
+      const problem = modelIdError(parts[i], next);
       if (problem) {
         setError(problem);
-        // Keep what was valid so far and leave the rejected text to fix.
+        // Keep what was valid so far and leave only the rejected remainder
+        // (from this position, not the first equal id) in the input to fix.
         if (next !== models) onChange(next);
-        setDraft(parts.slice(parts.indexOf(part)).join(", "));
+        setDraft(parts.slice(i).join(", "));
         return;
       }
-      next = [...next, part];
+      next = [...next, parts[i]];
     }
     onChange(next);
     setDraft("");
@@ -131,7 +135,7 @@ export function ModelsEditor({
       ) : (
         <p className={fieldHintClass}>
           The model ids this provider offers. Only these can be used in chat
-          and pipelines.
+          and pipelines.{hint ? ` ${hint}` : ""}
         </p>
       )}
     </div>
@@ -144,7 +148,7 @@ export function ModelsEditor({
 // None act on the visible (filtered) ids. Nothing is saved here -- "Add
 // selected" only merges into the editor; the row's Save sends the PATCH.
 export function FetchedModelsPicker({
-  fetched,
+  fetched: fetchedRaw,
   current,
   source,
   onAdd,
@@ -158,6 +162,8 @@ export function FetchedModelsPicker({
 }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  // A vendor can list an id twice; render (and key) each once.
+  const fetched = Array.from(new Set(fetchedRaw));
   const visible = filterByText(fetched, query, (id) => [id]);
   const addable = visible.filter((id) => !current.includes(id));
 
@@ -186,7 +192,11 @@ export function FetchedModelsPicker({
   return (
     <div className="mt-2 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
       <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-medium text-gray-700 dark:text-gray-300">
+        <span
+          role="status"
+          aria-live="polite"
+          className="font-medium text-gray-700 dark:text-gray-300"
+        >
           {fetched.length} model{fetched.length === 1 ? "" : "s"} found
         </span>
         {source === "catalog" && (
@@ -214,7 +224,7 @@ export function FetchedModelsPicker({
             <button
               type="button"
               onClick={() => setVisible(true)}
-              disabled={addable.length === 0}
+              disabled={addable.every((id) => selected.has(id))}
               className={ghostButtonClass}
             >
               Select all
@@ -222,6 +232,7 @@ export function FetchedModelsPicker({
             <button
               type="button"
               onClick={() => setVisible(false)}
+              disabled={!addable.some((id) => selected.has(id))}
               className={ghostButtonClass}
             >
               Select none
