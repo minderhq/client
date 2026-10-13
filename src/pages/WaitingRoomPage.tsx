@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 
 import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
+import { StatusLine } from "../components/StatusLine";
 import {
   ApiError,
   EMAIL_VERIFICATION_REQUIRED_EVENT,
@@ -211,6 +212,7 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
     tenantId,
     activeTenantId,
     emailVerificationRequired,
+    logout,
   } = useAuth();
   const tokenRef = useTokenRef();
   const { pathname } = useLocation();
@@ -220,8 +222,11 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
   } | null>(null);
   const [requiredKey, setRequiredKey] = useState("");
   const [verificationKey, setVerificationKey] = useState("");
-  // The session whose restricted token is being swapped for a full one.
-  const [continuingKey, setContinuingKey] = useState("");
+  // The session whose restricted token is being swapped for a full one, and
+  // the error if that failed transiently (then offered as a retry).
+  const [continuing, setContinuing] = useState<{ key: string; error: string } | null>(
+    null,
+  );
   const continueAfterVerification = useContinueAfterVerification();
 
   // `token` changes on every silent refresh; the session (sessionKey) doesn't.
@@ -264,20 +269,46 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
   const staleVerificationFlag =
     !exempt && emailVerificationRequired && loaded?.email_verification_required === false;
 
+  const finishSignIn = useCallback(() => {
+    setContinuing({ key: sessionKey, error: "" });
+    // Success adopts a new session (sessionKey), which re-reads the profile; a
+    // refused refresh signs out. A transient failure keeps the flag set and
+    // shows a retry below, never the restricted session's waiting room.
+    continueAfterVerification().catch((e) =>
+      setContinuing({ key: sessionKey, error: friendlyErrorMessage(e) }),
+    );
+  }, [sessionKey, continueAfterVerification]);
+
+  const attempted = continuing?.key === sessionKey;
   useEffect(() => {
-    if (!staleVerificationFlag) return;
-    // Clears the flag first, so this runs once; the new session (sessionKey)
-    // re-reads the profile.
-    setContinuingKey(sessionKey);
-    continueAfterVerification().catch(() => setContinuingKey(""));
-  }, [staleVerificationFlag, sessionKey, continueAfterVerification]);
+    // Once per session; a retry is the user's call.
+    if (staleVerificationFlag && !attempted) finishSignIn();
+  }, [staleVerificationFlag, attempted, finishSignIn]);
 
   // A forced password change comes first (ForcePasswordChangeGate).
   if (exempt) {
     return <>{children}</>;
   }
-  if (staleVerificationFlag || continuingKey === sessionKey) {
-    return <p className="text-sm text-gray-500">Finishing sign-in…</p>;
+  if (staleVerificationFlag || attempted) {
+    const error = attempted ? continuing?.error : "";
+    return error ? (
+      <>
+        <p className="text-sm text-gray-700 dark:text-gray-300">
+          Your email address is confirmed, but signing you in didn't finish.
+        </p>
+        <StatusLine isError>{error}</StatusLine>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={finishSignIn} className={primaryButtonClass}>
+            Retry
+          </button>
+          <button type="button" onClick={logout} className={secondaryButtonClass}>
+            Sign out
+          </button>
+        </div>
+      </>
+    ) : (
+      <StatusLine>Finishing sign-in…</StatusLine>
+    );
   }
   const required = requiredKey === sessionKey;
   // Until the profile for this session arrives the app renders as usual (a

@@ -149,22 +149,29 @@ export function formatWait(seconds: number): string {
 /** Once the address is confirmed, swap the signed-in session's restricted
  * token for a full one (the refresh also carries the personal workspace a
  * verification may just have created) and adopt it as a new session, so
- * every gate re-reads the profile. Resolves to false when the server refused
- * the refresh (the session is over: sign in again). With no session it only
- * resolves true. */
+ * every gate re-reads the profile. The login's "email not confirmed" flag is
+ * cleared only once that worked. Resolves to false when the server refused
+ * the refresh (the session is over: signed out); rejects on a transient
+ * failure, leaving everything as it was. With no session it only clears the
+ * flag. */
 export function useContinueAfterVerification(): () => Promise<boolean> {
   const { loginWithToken, clearEmailVerificationRequired, logout } = useAuth();
   const tokenRef = useTokenRef();
   return useCallback(async () => {
-    clearEmailVerificationRequired();
     const token = tokenRef.current;
-    if (!token) return true;
+    if (!token) {
+      clearEmailVerificationRequired();
+      return true;
+    }
     const sentAt = Date.now();
+    // Rejects on a transient failure (network, 5xx): the flag then stays set,
+    // so the caller can offer a retry instead of a restricted session.
     const fresh = await refreshAccessToken(token);
     if (!fresh) {
-      logout();
+      logout(); // clears the flag too
       return false;
     }
+    clearEmailVerificationRequired();
     loginWithToken(fresh, sentAt);
     return true;
   }, [tokenRef, loginWithToken, clearEmailVerificationRequired, logout]);

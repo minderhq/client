@@ -125,6 +125,32 @@ describe("WorkspaceGate / check your email (#2447)", () => {
     expect(screen.queryByText("Choose an organization")).toBeNull();
   });
 
+  it("offers a retry when that refresh fails transiently, keeping the flag", async () => {
+    sessionStorage.setItem(FLAG_KEY, "1");
+    let refreshes = 0;
+    mockApi({
+      "GET /v1/profile/me": () => json(verified),
+      "POST /v1/auth/refresh": () =>
+        ++refreshes === 1 ? json({ detail: "upstream down" }, 503) : json({ access_token: full }),
+    });
+    renderGate();
+    expect(await screen.findByText(/signing you in didn't finish/)).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toBe("upstream down");
+    // Not the restricted session's waiting room, and nothing given up.
+    expect(screen.queryByText("No workspace yet")).toBeNull();
+    expect(screen.queryByText("Choose an organization")).toBeNull();
+    expect(screen.queryByText("app routes")).toBeNull();
+    expect(sessionStorage.getItem(FLAG_KEY)).toBe("1");
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBe(restricted);
+    expect(refreshes).toBe(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("app routes")).toBeTruthy();
+    expect(refreshes).toBe(2);
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBe(full);
+    expect(sessionStorage.getItem(FLAG_KEY)).toBeNull();
+  });
+
   it("puts a forced password change before the email check", async () => {
     sessionStorage.setItem(FLAG_KEY, "1");
     sessionStorage.setItem("minder_must_change_password", "1");

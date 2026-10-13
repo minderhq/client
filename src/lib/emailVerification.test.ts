@@ -153,6 +153,32 @@ describe("email verification API (#2447)", () => {
       expect(sessionStorage.getItem("minder_jwt")).toBe("jwt");
     });
 
+    it("carries the replayed token after a 401 -> refresh -> replay", async () => {
+      const jwt = (sub: string, n: number) =>
+        `h.${btoa(JSON.stringify({ sub, n, exp: Math.floor(Date.now() / 1000) + 3600 }))
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_")
+          .replace(/=+$/, "")}.s`;
+      const stale = jwt("7", 1);
+      const fresh = jwt("7", 2);
+      sessionStorage.setItem("minder_jwt", stale);
+      const seen = vi.fn((e: Event) => (e as CustomEvent<unknown>).detail);
+      window.addEventListener(EMAIL_VERIFICATION_REQUIRED_EVENT, seen);
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(respond(401, { detail: "expired" }))
+        .mockResolvedValueOnce(respond(200, { access_token: fresh }))
+        .mockResolvedValueOnce(respond(403, { detail: "email_verification_required" }));
+      const err = await apiFetch("/v1/plugins", { token: stale }).catch((e) => e);
+      window.removeEventListener(EMAIL_VERIFICATION_REQUIRED_EVENT, seen);
+      expect(String(vi.mocked(fetch).mock.calls[1][0])).toMatch(/\/v1\/auth\/refresh$/);
+      expect(
+        (vi.mocked(fetch).mock.calls[2][1]?.headers as Record<string, string>).Authorization,
+      ).toBe(`Bearer ${fresh}`);
+      expect(isEmailVerificationRequired(err)).toBe(true);
+      expect(seen).toHaveBeenCalledTimes(1);
+      expect(seen.mock.results[0].value).toBe(fresh);
+    });
+
     it("is not announced for any other 403", async () => {
       const seen = vi.fn();
       window.addEventListener(EMAIL_VERIFICATION_REQUIRED_EVENT, seen);
