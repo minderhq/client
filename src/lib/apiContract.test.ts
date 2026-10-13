@@ -27,6 +27,10 @@ const KNOWN_MISSING: Record<string, string> = {
   // site hasn't been re-synced yet. Remove both entries when it is.
   "GET /v1/model-defaults": "gateway routes it; published spec not re-synced yet",
   "PUT /v1/model-defaults": "gateway routes it; published spec not re-synced yet",
+  // Email verification (#2447, gateway #1807): routed by the gateway (only when
+  // email is configured); the published spec hasn't been re-synced yet.
+  "POST /v1/auth/verify-email": "gateway routes it; published spec not re-synced yet",
+  "POST /v1/auth/verify-email/resend": "gateway routes it; published spec not re-synced yet",
 };
 
 // Where the concrete values of an interpolated action segment are read from:

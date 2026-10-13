@@ -5,6 +5,7 @@ import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
 import {
   ApiError,
+  EMAIL_VERIFICATION_REQUIRED_EVENT,
   friendlyErrorMessage,
   WORKSPACE_REQUIRED_EVENT,
 } from "../lib/api";
@@ -20,6 +21,7 @@ import {
 import { isGateExemptPath } from "../lib/recoveryRoutes";
 import { primaryButtonClass, secondaryButtonClass } from "../lib/ui";
 import { useTokenRef } from "../lib/useTokenRef";
+import { CheckEmailPage } from "./CheckEmailPage";
 
 /** Routes a workspace-less account may still use: a tenant-less token can
  * redeem an invite (that is how an admin brings it into an org), plus the
@@ -183,7 +185,14 @@ export function WaitingRoomPage({
   );
 }
 
-/** Renders the waiting room instead of `children` (the app's routes) while the
+/** Renders "Check your email" instead of `children` (the app's routes) while
+ * the signed-in account must still confirm its email address (#2447): the
+ * profile says `email_verification_required`, a request came back `403
+ * email_verification_required`, or (until the profile arrives, or when it
+ * can't say) the login response said so. That comes before the workspace: an
+ * open sign-up gets its workspace only once verified.
+ *
+ * Otherwise renders the waiting room instead of `children` while the
  * signed-in account has no usable workspace (#116): the profile says
  * `workspace_state` is `none`/`pending_request` (or unknown), a request came
  * back `403 workspace_required`, or the account is `ready` but its token has no
@@ -196,6 +205,7 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
     sessionKey,
     tenantId,
     activeTenantId,
+    emailVerificationRequired,
   } = useAuth();
   const tokenRef = useTokenRef();
   const { pathname } = useLocation();
@@ -204,6 +214,7 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
     data: UserProfile | null;
   } | null>(null);
   const [requiredKey, setRequiredKey] = useState("");
+  const [verificationKey, setVerificationKey] = useState("");
 
   // `token` changes on every silent refresh; the session (sessionKey) doesn't.
   useEffect(() => {
@@ -224,6 +235,13 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(WORKSPACE_REQUIRED_EVENT, onRequired);
   }, [sessionKey]);
 
+  useEffect(() => {
+    const onRequired = () => setVerificationKey(sessionKey);
+    window.addEventListener(EMAIL_VERIFICATION_REQUIRED_EVENT, onRequired);
+    return () =>
+      window.removeEventListener(EMAIL_VERIFICATION_REQUIRED_EVENT, onRequired);
+  }, [sessionKey]);
+
   // A forced password change comes first (ForcePasswordChangeGate).
   if (!isAuthenticated || mustChangePassword || isWorkspaceExemptPath(pathname)) {
     return <>{children}</>;
@@ -232,6 +250,15 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
   const required = requiredKey === sessionKey;
   // Until the profile for this session arrives the app renders as usual (a
   // tenant call that fails meanwhile raises `required` above).
+
+  const profileSays = loaded?.email_verification_required;
+  if (
+    profileSays === true ||
+    verificationKey === sessionKey ||
+    (typeof profileSays !== "boolean" && emailVerificationRequired)
+  ) {
+    return <CheckEmailPage />;
+  }
 
   const state = normalizeWorkspaceState(loaded?.workspace_state);
   const hasTenant = Boolean(activeTenantId || tenantId);
