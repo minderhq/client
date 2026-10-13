@@ -55,6 +55,7 @@ import { EntityMergeReviewPage } from "./pages/EntityMergeReviewPage";
 import { TaxonomyReviewPage } from "./pages/TaxonomyReviewPage";
 import { TeamsPage } from "./pages/TeamsPage";
 import { UsersPage } from "./pages/UsersPage";
+import { VerifyEmailPage } from "./pages/VerifyEmailPage";
 import { VoicePage } from "./pages/VoicePage";
 import { WorkspaceGate } from "./pages/WaitingRoomPage";
 
@@ -166,6 +167,7 @@ export function App() {
                     <Route path="/auth/callback" element={<AuthCallbackPage />} />
                     <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                     <Route path="/reset-password" element={<ResetPasswordPage />} />
+                    <Route path="/verify-email" element={<VerifyEmailPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/billing" element={<BillingPage />} />
                     <Route path="/invite/:token" element={<InviteRedeemPage />} />

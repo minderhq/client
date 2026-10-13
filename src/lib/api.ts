@@ -96,6 +96,20 @@ export const WORKSPACE_REQUIRED_EVENT = "minder:workspace-required";
 /** The `detail` the gateway sends with a 403 for a tenant-less token. */
 export const WORKSPACE_REQUIRED_DETAIL = "workspace_required";
 
+// Dispatched on `window` when a request comes back `403
+// email_verification_required` (#2447): the account hasn't confirmed its email
+// address yet, so its token reaches only the verification allowlist (resend,
+// change-password, profile read). Like WORKSPACE_REQUIRED_EVENT it says
+// nothing about the session: WorkspaceGate shows "Check your email" instead.
+// A CustomEvent whose `detail` is the bearer token the refused request carried
+// ("" for none), so a 403 for a token the session has since replaced (e.g.
+// one still in flight while verification moved the session to a full token)
+// can be told apart and ignored.
+export const EMAIL_VERIFICATION_REQUIRED_EVENT = "minder:email-verification-required";
+
+/** The `detail` the gateway sends with a 403 for an unverified account. */
+export const EMAIL_VERIFICATION_REQUIRED_DETAIL = "email_verification_required";
+
 // The in-flight refresh per starting token, shared by every caller holding
 // that token (#53): N requests that 401 at once -- or a 401 racing the
 // scheduled pre-expiry refresh -- all await the same POST instead of
@@ -193,26 +207,51 @@ function sameSession(a: string, b: string): boolean {
  * `return throwApiError(res)` regardless of their own return type. */
 async function throwApiError(
   res: Response,
-  { logoutOn401 = true }: { logoutOn401?: boolean } = {},
+  { logoutOn401 = true, bearer = "" }: { logoutOn401?: boolean; bearer?: string } = {},
 ): Promise<never> {
-  const detail = await parseErrorDetail(res);
+  const body = await res.json().catch(() => ({}));
+  const detail = errorDetail(body, res.status);
   if (res.status === 401 && logoutOn401) handleUnauthorized();
-  if (
-    res.status === 403 &&
-    detail === WORKSPACE_REQUIRED_DETAIL &&
-    typeof window !== "undefined"
-  ) {
-    window.dispatchEvent(new Event(WORKSPACE_REQUIRED_EVENT));
+  if (res.status === 403 && typeof window !== "undefined") {
+    if (detail === WORKSPACE_REQUIRED_DETAIL) {
+      window.dispatchEvent(new Event(WORKSPACE_REQUIRED_EVENT));
+    } else if (detail === EMAIL_VERIFICATION_REQUIRED_DETAIL) {
+      window.dispatchEvent(
+        new CustomEvent(EMAIL_VERIFICATION_REQUIRED_EVENT, { detail: bearer }),
+      );
+    }
   }
-  throw new ApiError(detail, res.status);
+  throw new ApiError(detail, res.status, {
+    body,
+    retryAfterSeconds: retryAfterSeconds(res),
+  });
+}
+
+/** The `Retry-After` header in whole seconds (delta-seconds form only), or
+ * null when it is absent, unreadable, or not exposed to the page by CORS. */
+export function retryAfterSeconds(res: Response): number | null {
+  const raw = res.headers?.get?.("Retry-After");
+  if (!raw || !/^\d+$/.test(raw.trim())) return null;
+  return Number(raw.trim());
 }
 
 export class ApiError extends Error {
   status: number;
+  /** The parsed error body (`{}` when it wasn't JSON), for fields beside
+   * `detail` such as a reason code. */
+  body: unknown;
+  /** Seconds from the response's `Retry-After`, or null. */
+  retryAfterSeconds: number | null;
 
-  constructor(message: string, status: number) {
+  constructor(
+    message: string,
+    status: number,
+    extra: { body?: unknown; retryAfterSeconds?: number | null } = {},
+  ) {
     super(message);
     this.status = status;
+    this.body = extra.body ?? {};
+    this.retryAfterSeconds = extra.retryAfterSeconds ?? null;
   }
 }
 
@@ -229,6 +268,9 @@ export function friendlyErrorMessage(e: unknown): string {
   if (e instanceof ApiError && isWorkspaceRequired(e)) {
     return "You don't have a workspace yet.";
   }
+  if (isEmailVerificationRequired(e)) {
+    return "Confirm your email address to continue.";
+  }
   return e instanceof Error ? e.message : String(e);
 }
 
@@ -241,9 +283,22 @@ export function isWorkspaceRequired(e: unknown): boolean {
   );
 }
 
+/** Whether `e` is the gateway's `403 email_verification_required` (#2447). */
+export function isEmailVerificationRequired(e: unknown): boolean {
+  return (
+    e instanceof ApiError &&
+    e.status === 403 &&
+    e.message === EMAIL_VERIFICATION_REQUIRED_DETAIL
+  );
+}
+
 async function parseErrorDetail(res: Response): Promise<string> {
-  const data = await res.json().catch(() => ({}) as { detail?: unknown });
-  const detail = (data as { detail?: unknown }).detail;
+  return errorDetail(await res.json().catch(() => ({})), res.status);
+}
+
+/** The human-readable `detail` of a parsed error body. */
+function errorDetail(data: unknown, status: number): string {
+  const detail = (data as { detail?: unknown } | null)?.detail;
   if (typeof detail === "string") return detail;
   // Some endpoints return a structured detail `{error: string, errors?: []}`
   // rather than a bare string -- e.g. plugin-registry's install-from-git route
@@ -263,7 +318,7 @@ async function parseErrorDetail(res: Response): Promise<string> {
       : d.error;
   }
   if (detail !== undefined) return JSON.stringify(detail);
-  return `Request failed (${res.status})`;
+  return `Request failed (${status})`;
 }
 
 export interface ApiOptions {
@@ -303,7 +358,7 @@ export interface Paginated<T> {
 async function sendWithRefresh(
   path: string,
   { method = "GET", body, token, signal }: ApiOptions,
-): Promise<{ res: Response; logoutOn401: boolean }> {
+): Promise<{ res: Response; logoutOn401: boolean; bearer: string }> {
   const isFormData = body instanceof FormData;
   const send = (bearer: string | undefined) => {
     const headers: Record<string, string> = {};
@@ -325,7 +380,7 @@ async function sendWithRefresh(
 
   const res = await send(token);
   // Only an authenticated request's 401 can speak for the session (#109).
-  const done = { res, logoutOn401: Boolean(token) };
+  const done = { res, logoutOn401: Boolean(token), bearer: token ?? "" };
   if (res.status !== 401 || !token) return done;
 
   // No stored token at all means the session is already gone (logged out).
@@ -347,9 +402,9 @@ async function sendWithRefresh(
   // refresh minted. On a mismatch the new token is already adopted (stored +
   // TOKEN_REFRESHED_EVENT); only this request fails, without a logout.
   if (!sameSession(token, candidate)) {
-    return { res, logoutOn401: false }; // stale session: keep the stored one
+    return { res, logoutOn401: false, bearer: token }; // stale session: keep the stored one
   }
-  return { res: await send(candidate), logoutOn401: true };
+  return { res: await send(candidate), logoutOn401: true, bearer: candidate };
 }
 
 /** Thin fetch wrapper: prefixes the gateway base URL, injects the bearer
@@ -360,9 +415,9 @@ export async function apiFetch<T>(
   path: string,
   options: ApiOptions = {},
 ): Promise<T> {
-  const { res, logoutOn401 } = await sendWithRefresh(path, options);
+  const { res, logoutOn401, bearer } = await sendWithRefresh(path, options);
 
-  if (!res.ok) return throwApiError(res, { logoutOn401 });
+  if (!res.ok) return throwApiError(res, { logoutOn401, bearer });
 
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -377,9 +432,9 @@ export async function apiFetchBlob(
   path: string,
   options: ApiOptions = {},
 ): Promise<{ blob: Blob; headers: Headers }> {
-  const { res, logoutOn401 } = await sendWithRefresh(path, options);
+  const { res, logoutOn401, bearer } = await sendWithRefresh(path, options);
 
-  if (!res.ok) return throwApiError(res, { logoutOn401 });
+  if (!res.ok) return throwApiError(res, { logoutOn401, bearer });
 
   return { blob: await res.blob(), headers: res.headers };
 }

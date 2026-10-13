@@ -95,6 +95,15 @@ describe("nginx.conf reset-password route", () => {
   });
 });
 
+describe("nginx.conf verify-email route", () => {
+  expectProtected(["/verify-email", "/verify-email/", "/VERIFY-EMAIL", "/Verify-Email/"]);
+
+  it("leaves look-alike routes on the SPA fallback", () => {
+    expect(locationFor(all, "/verify-email-extra")?.pattern).toBe("/");
+    expect(locationFor(all, "/verify-email/extra")?.pattern).toBe("/");
+  });
+});
+
 describe("nginx.conf invite route", () => {
   // Every URL React Router renders InviteRedeemPage (/invite/:token) for, as
   // nginx sees it: decoded, so a token with an encoded slash (/invite/a%2Fb)

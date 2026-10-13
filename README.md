@@ -125,6 +125,13 @@ src/
   **`submissionReview.ts`** holds the submission review queue's shapes, status
   vocabulary, reviewer transitions (mirroring the backend state machine) and
   confirm-dialog copy.
+- **`emailVerification.ts`** — registration email verification (#2447): the
+  verify / resend calls mapped to outcomes (expired vs used link, cooldown from
+  `Retry-After`, the 409 codes), the fragment-token reader, and the hook that
+  swaps a signed-in session's restricted token for a full one once confirmed.
+  `WorkspaceGate` shows **`CheckEmailPage`** while the account must confirm its
+  address (profile, login response, or a `403 email_verification_required`);
+  the emailed link opens **`VerifyEmailPage`** (`/verify-email#token=…`).
 - **`ui.ts`** — Tailwind class constants (`inputClass`, `primaryButtonClass`,
   `cardClass`, `badgeClass`, …), the `badgeTone` {success,warn,danger} palette,
   `confidenceBadgeColor`, `fieldHintClass`, `mutedTextClass`. Change a style once

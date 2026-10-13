@@ -120,6 +120,36 @@ describe("AuthProvider / useAuth", () => {
       expect(sessionStorage.getItem("minder_must_change_password")).toBeNull();
     });
 
+    it("records email_verification_required from the login response (#2447)", async () => {
+      const jwt = makeJwt({ username: "ada", exp: Math.floor(Date.now() / 1000) + 3600 });
+      vi.mocked(fetch).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          access_token: jwt,
+          user: { email_verified: false, email_verification_required: true },
+        }),
+      } as Response);
+
+      const { result } = renderAuth();
+      expect(result.current.emailVerificationRequired).toBe(false);
+      await act(async () => {
+        await result.current.login("ada", "hunter22");
+      });
+      expect(result.current.emailVerificationRequired).toBe(true);
+      expect(sessionStorage.getItem("minder_email_verification_required")).toBe("1");
+
+      act(() => result.current.clearEmailVerificationRequired());
+      expect(result.current.emailVerificationRequired).toBe(false);
+      expect(sessionStorage.getItem("minder_email_verification_required")).toBeNull();
+
+      await act(async () => {
+        await result.current.login("ada", "hunter22");
+      });
+      act(() => result.current.logout());
+      expect(result.current.emailVerificationRequired).toBe(false);
+      expect(sessionStorage.getItem("minder_email_verification_required")).toBeNull();
+    });
+
     it("logout clears a pending forced password change (#1776)", async () => {
       const jwt = makeJwt({ exp: Math.floor(Date.now() / 1000) + 3600 });
       vi.mocked(fetch).mockResolvedValue({
@@ -243,7 +273,24 @@ describe("AuthProvider / useAuth", () => {
       await act(async () => {
         landing = await result.current.register("ada", "ada@example.com", "hunter22", "tok");
       });
-      expect(landing).toEqual({ organization_id: 5, team_id: 9 });
+      expect(landing).toEqual({ organization_id: 5, team_id: 9, verification_pending: false });
+    });
+
+    it("reports a pending email verification from the register response (#2447)", async () => {
+      vi.mocked(fetch).mockResolvedValue({
+        ok: true,
+        json: async () => ({ user: { id: 7 }, organization_id: null, verification_pending: true }),
+      } as Response);
+      const { result } = renderAuth();
+      let landing: unknown;
+      await act(async () => {
+        landing = await result.current.register("ada", "ada@example.com", "hunter22");
+      });
+      expect(landing).toEqual({
+        organization_id: null,
+        team_id: null,
+        verification_pending: true,
+      });
     });
 
     it("returns an empty hint from an API without one, or an unreadable body", async () => {
@@ -264,8 +311,8 @@ describe("AuthProvider / useAuth", () => {
         landings.push(await result.current.register("bob", "b@example.com", "hunter22"));
       });
       expect(landings).toEqual([
-        { organization_id: null, team_id: null },
-        { organization_id: null, team_id: null },
+        { organization_id: null, team_id: null, verification_pending: false },
+        { organization_id: null, team_id: null, verification_pending: false },
       ]);
     });
 

@@ -54,6 +54,13 @@ interface AuthContextValue {
   mustChangePassword: boolean;
   /** Clear the forced-change state after a successful password change. */
   clearMustChangePassword: () => void;
+  /** Set when the login response says this account must still confirm its
+   * email address (#2447): its token reaches only the verification allowlist,
+   * so the app shows "Check your email" until it does. The profile's
+   * `email_verification_required` overrides it once loaded (WorkspaceGate). */
+  emailVerificationRequired: boolean;
+  /** Clear that state once the address is confirmed. */
+  clearEmailVerificationRequired: () => void;
   login: (username: string, password: string) => Promise<void>;
   /** Adopt a token obtained outside `login` (SSO callback, invite redeem,
    * team create). `sentAt` is the local time just before the request that
@@ -82,13 +89,20 @@ interface AuthContextValue {
 export interface RegisterLanding {
   organization_id: number | null;
   team_id: number | null;
+  /** The account must confirm its email address before it can be used
+   * (#2447); false from an API that predates the field. */
+  verification_pending: boolean;
 }
 
 /** The landing hint in a register response body, tolerating its absence. */
 function registerLanding(body: unknown): RegisterLanding {
   const b = (body ?? {}) as Record<string, unknown>;
   const id = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
-  return { organization_id: id(b.organization_id), team_id: id(b.team_id) };
+  return {
+    organization_id: id(b.organization_id),
+    team_id: id(b.team_id),
+    verification_pending: b.verification_pending === true,
+  };
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -101,6 +115,10 @@ const REFRESH_RETRY_MS = 30_000;
  * token (same lifetime) so a page reload can't skip the forced change. */
 export const MUST_CHANGE_PASSWORD_KEY = "minder_must_change_password";
 
+/** sessionStorage key for the "email not confirmed yet" flag from the login
+ * response, kept beside the token for the same reason. */
+export const EMAIL_VERIFICATION_REQUIRED_KEY = "minder_email_verification_required";
+
 async function parseError(res: Response): Promise<string> {
   const data = await res.json().catch(() => ({}) as { detail?: string });
   return data.detail || `Request failed (${res.status})`;
@@ -112,6 +130,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
   const [mustChangePassword, setMustChangePassword] = useState(
     () => sessionStorage.getItem(MUST_CHANGE_PASSWORD_KEY) === "1",
+  );
+  const [emailVerificationRequired, setEmailVerificationRequired] = useState(
+    () => sessionStorage.getItem(EMAIL_VERIFICATION_REQUIRED_KEY) === "1",
   );
   const claims = useMemo(() => decodeJwtClaims(token), [token]);
   // Bumped by every explicit token adoption (login, SSO/invite loginWithToken,
@@ -158,12 +179,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!res.ok) throw new Error(await parseError(res));
     const data = (await res.json()) as {
       access_token: string;
-      user?: { must_change_password?: boolean };
+      user?: { must_change_password?: boolean; email_verification_required?: boolean };
     };
     const mustChange = !!data.user?.must_change_password;
     setMustChangePassword(mustChange);
     if (mustChange) sessionStorage.setItem(MUST_CHANGE_PASSWORD_KEY, "1");
     else sessionStorage.removeItem(MUST_CHANGE_PASSWORD_KEY);
+    const unverified = data.user?.email_verification_required === true;
+    setEmailVerificationRequired(unverified);
+    if (unverified) sessionStorage.setItem(EMAIL_VERIFICATION_REQUIRED_KEY, "1");
+    else sessionStorage.removeItem(EMAIL_VERIFICATION_REQUIRED_KEY);
     setToken(data.access_token);
     setAdoption((n) => n + 1);
     storeToken(data.access_token, sentAt);
@@ -172,6 +197,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clearMustChangePassword = useCallback(() => {
     setMustChangePassword(false);
     sessionStorage.removeItem(MUST_CHANGE_PASSWORD_KEY);
+  }, []);
+
+  const clearEmailVerificationRequired = useCallback(() => {
+    setEmailVerificationRequired(false);
+    sessionStorage.removeItem(EMAIL_VERIFICATION_REQUIRED_KEY);
   }, []);
 
   const register = useCallback(
@@ -226,6 +256,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearStoredToken();
     setMustChangePassword(false);
     sessionStorage.removeItem(MUST_CHANGE_PASSWORD_KEY);
+    setEmailVerificationRequired(false);
+    sessionStorage.removeItem(EMAIL_VERIFICATION_REQUIRED_KEY);
   }, []);
 
   // Global 401 reaction (#46): apiFetch/apiFetchBlob (src/lib/api.ts) already
@@ -318,6 +350,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: authenticated,
         mustChangePassword: authenticated && mustChangePassword,
         clearMustChangePassword,
+        emailVerificationRequired: authenticated && emailVerificationRequired,
+        clearEmailVerificationRequired,
         login,
         loginWithToken,
         switchOrg,

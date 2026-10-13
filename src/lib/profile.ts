@@ -22,6 +22,13 @@ export interface UserProfile {
   workspace_state?: string | null;
   /** Whether `POST /v1/organizations/personal` would be accepted. */
   can_create_workspace?: boolean | null;
+  /** Whether the account has confirmed its email address (#2447). Null when
+   * the API couldn't determine it; absent from an older gateway. */
+  email_verified?: boolean | null;
+  /** True while the account must confirm its email address before it can be
+   * used: every request outside the verification allowlist answers `403
+   * email_verification_required`. Null/absent: unknown. */
+  email_verification_required?: boolean | null;
 }
 
 export type WorkspaceState = "ready" | "none" | "pending_request";

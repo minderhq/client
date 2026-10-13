@@ -6,8 +6,10 @@
  * a reset link opened in a gated tab would never mount ResetPasswordPage, so
  * its token would stay in the address bar and the link couldn't be used.
  * On the reset page a signed-in user is asked to sign out first, which also
- * clears the forced-change flag. */
-const GATE_EXEMPT_PATHS = new Set(["/reset-password", "/forgot-password"]);
+ * clears the forced-change flag. The email-verification page (#2447) is
+ * exempt for the same reason, and because an account that must confirm its
+ * email can do nothing else until it opens that link. */
+const GATE_EXEMPT_PATHS = new Set(["/reset-password", "/forgot-password", "/verify-email"]);
 
 /** `pathname` percent-decoded the way React Router decodes it before
  * matching: segment by segment, keeping an encoded `/` encoded. A malformed

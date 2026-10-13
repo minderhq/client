@@ -99,11 +99,12 @@ export function isInvalidResetTokenError(e: unknown): boolean {
   return e instanceof ApiError && e.status === 400 && e.message === INVALID_OR_EXPIRED_TOKEN;
 }
 
-/** Reads the reset token from the URL fragment (`#token=...`, where reset
- * emails put it so it never reaches a server log or a Referer header) and
- * immediately removes the fragment from the address bar and the history
- * entry. Returns null when the URL carries no token. */
-export function takeResetTokenFromUrl(): string | null {
+/** Reads `token` from the URL fragment (`#token=...`, where emailed links
+ * -- password reset, email verification -- put it so it never reaches a
+ * server log or a Referer header) and immediately removes the fragment from
+ * the address bar and the history entry. Returns null when the URL carries no
+ * token. */
+export function takeTokenFromUrlFragment(): string | null {
   const hash = window.location.hash;
   if (!hash) return null;
   const token = new URLSearchParams(hash.slice(1)).get("token");

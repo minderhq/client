@@ -3,12 +3,15 @@ import { useLocation } from "react-router-dom";
 
 import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
+import { StatusLine } from "../components/StatusLine";
 import {
   ApiError,
+  EMAIL_VERIFICATION_REQUIRED_EVENT,
   friendlyErrorMessage,
   WORKSPACE_REQUIRED_EVENT,
 } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { useContinueAfterVerification } from "../lib/emailVerification";
 import { fetchMyOrgs, type MyOrg } from "../lib/orgs";
 import {
   createPersonalWorkspace,
@@ -20,6 +23,7 @@ import {
 import { isGateExemptPath } from "../lib/recoveryRoutes";
 import { primaryButtonClass, secondaryButtonClass } from "../lib/ui";
 import { useTokenRef } from "../lib/useTokenRef";
+import { CheckEmailPage } from "./CheckEmailPage";
 
 /** Routes a workspace-less account may still use: a tenant-less token can
  * redeem an invite (that is how an admin brings it into an org), plus the
@@ -183,12 +187,23 @@ export function WaitingRoomPage({
   );
 }
 
-/** Renders the waiting room instead of `children` (the app's routes) while the
+/** Renders "Check your email" instead of `children` (the app's routes) while
+ * the signed-in account must still confirm its email address (#2447): the
+ * profile says `email_verification_required`, a request came back `403
+ * email_verification_required`, or (until the profile arrives, or when it
+ * can't say) the login response said so. That comes before the workspace: an
+ * open sign-up gets its workspace only once verified. When the login said so
+ * but the profile now says the address is confirmed (confirmed in another tab
+ * or on another device, then reloaded), the restricted token is refreshed
+ * once into a full, tenanted one instead of landing in the waiting room; a
+ * refused refresh means the session is over and signs out.
+ *
+ * Otherwise renders the waiting room instead of `children` while the
  * signed-in account has no usable workspace (#116): the profile says
  * `workspace_state` is `none`/`pending_request` (or unknown), a request came
  * back `403 workspace_required`, or the account is `ready` but its token has no
  * tenant. A profile that can't be read, or that predates the field, lets the
- * app through (the API still enforces access). Never logs out. */
+ * app through (the API still enforces access). Never logs out otherwise. */
 export function WorkspaceGate({ children }: { children: ReactNode }) {
   const {
     isAuthenticated,
@@ -196,6 +211,8 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
     sessionKey,
     tenantId,
     activeTenantId,
+    emailVerificationRequired,
+    logout,
   } = useAuth();
   const tokenRef = useTokenRef();
   const { pathname } = useLocation();
@@ -204,6 +221,13 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
     data: UserProfile | null;
   } | null>(null);
   const [requiredKey, setRequiredKey] = useState("");
+  const [verificationKey, setVerificationKey] = useState("");
+  // The session whose restricted token is being swapped for a full one, and
+  // the error if that failed transiently (then offered as a retry).
+  const [continuing, setContinuing] = useState<{ key: string; error: string } | null>(
+    null,
+  );
+  const continueAfterVerification = useContinueAfterVerification();
 
   // `token` changes on every silent refresh; the session (sessionKey) doesn't.
   useEffect(() => {
@@ -224,14 +248,80 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(WORKSPACE_REQUIRED_EVENT, onRequired);
   }, [sessionKey]);
 
+  // Only a refusal of the CURRENT token counts: a request still in flight
+  // with a token the session has since replaced (e.g. the restricted one,
+  // after verification) mustn't send a verified user back to this screen.
+  useEffect(() => {
+    const onRequired = (e: Event) => {
+      const bearer = (e as CustomEvent<unknown>).detail;
+      if (typeof bearer === "string" && bearer && bearer === tokenRef.current) {
+        setVerificationKey(sessionKey);
+      }
+    };
+    window.addEventListener(EMAIL_VERIFICATION_REQUIRED_EVENT, onRequired);
+    return () =>
+      window.removeEventListener(EMAIL_VERIFICATION_REQUIRED_EVENT, onRequired);
+  }, [sessionKey, tokenRef]);
+
+  const exempt = !isAuthenticated || mustChangePassword || isWorkspaceExemptPath(pathname);
+  const loaded = profile?.key === sessionKey ? profile.data : null;
+  // The login flag is stale: the profile says the address is confirmed.
+  const staleVerificationFlag =
+    !exempt && emailVerificationRequired && loaded?.email_verification_required === false;
+
+  const finishSignIn = useCallback(() => {
+    setContinuing({ key: sessionKey, error: "" });
+    // Success adopts a new session (sessionKey), which re-reads the profile; a
+    // refused refresh signs out. A transient failure keeps the flag set and
+    // shows a retry below, never the restricted session's waiting room.
+    continueAfterVerification().catch((e) =>
+      setContinuing({ key: sessionKey, error: friendlyErrorMessage(e) }),
+    );
+  }, [sessionKey, continueAfterVerification]);
+
+  const attempted = continuing?.key === sessionKey;
+  useEffect(() => {
+    // Once per session; a retry is the user's call.
+    if (staleVerificationFlag && !attempted) finishSignIn();
+  }, [staleVerificationFlag, attempted, finishSignIn]);
+
   // A forced password change comes first (ForcePasswordChangeGate).
-  if (!isAuthenticated || mustChangePassword || isWorkspaceExemptPath(pathname)) {
+  if (exempt) {
     return <>{children}</>;
   }
-  const loaded = profile?.key === sessionKey ? profile.data : null;
+  if (staleVerificationFlag || attempted) {
+    const error = attempted ? continuing?.error : "";
+    return error ? (
+      <>
+        <p className="text-sm text-gray-700 dark:text-gray-300">
+          Your email address is confirmed, but signing you in didn't finish.
+        </p>
+        <StatusLine isError>{error}</StatusLine>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={finishSignIn} className={primaryButtonClass}>
+            Retry
+          </button>
+          <button type="button" onClick={logout} className={secondaryButtonClass}>
+            Sign out
+          </button>
+        </div>
+      </>
+    ) : (
+      <StatusLine>Finishing sign-in…</StatusLine>
+    );
+  }
   const required = requiredKey === sessionKey;
   // Until the profile for this session arrives the app renders as usual (a
   // tenant call that fails meanwhile raises `required` above).
+
+  const profileSays = loaded?.email_verification_required;
+  if (
+    profileSays === true ||
+    verificationKey === sessionKey ||
+    (typeof profileSays !== "boolean" && emailVerificationRequired)
+  ) {
+    return <CheckEmailPage />;
+  }
 
   const state = normalizeWorkspaceState(loaded?.workspace_state);
   const hasTenant = Boolean(activeTenantId || tenantId);
