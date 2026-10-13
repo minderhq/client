@@ -16,7 +16,7 @@ import {
   confirmPasswordReset,
   forgetResetEmail,
   isInvalidResetTokenError,
-  takeResetTokenFromUrl,
+  takeTokenFromUrlFragment,
 } from "../lib/passwordReset";
 import {
   cardClass,
@@ -82,7 +82,7 @@ export function ResetPasswordPage() {
   // Take the token out of the address bar before the first paint.
   useLayoutEffect(() => {
     // Kept on a second run (StrictMode), when the fragment is already gone.
-    const fromUrl = takeResetTokenFromUrl();
+    const fromUrl = takeTokenFromUrlFragment();
     if (fromUrl) setToken(fromUrl);
     setChecked(true);
   }, []);

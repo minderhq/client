@@ -9,11 +9,11 @@ import { useAuth } from "../lib/auth";
 import {
   confirmEmailVerification,
   formatWait,
-  takeVerifyTokenFromUrl,
   useContinueAfterVerification,
   type VerifyResult,
 } from "../lib/emailVerification";
 import { cardClass, primaryButtonClass, secondaryButtonClass } from "../lib/ui";
+import { takeTokenFromUrlFragment } from "../lib/passwordReset";
 import { useNoReferrer } from "../lib/useNoReferrer";
 
 export const EMAIL_VERIFIED_NOTICE = "Your email address is confirmed. Log in to continue.";
@@ -48,7 +48,7 @@ export function VerifyEmailPage() {
   // Take the token out of the address bar before the first paint.
   useLayoutEffect(() => {
     // Kept on a second run (StrictMode), when the fragment is already gone.
-    const fromUrl = takeVerifyTokenFromUrl();
+    const fromUrl = takeTokenFromUrlFragment();
     if (fromUrl) setToken(fromUrl);
     setChecked(true);
   }, []);

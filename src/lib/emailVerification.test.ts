@@ -11,9 +11,9 @@ import {
   DEFAULT_RESEND_COOLDOWN_SECONDS,
   formatWait,
   resendVerificationEmail,
-  takeVerifyTokenFromUrl,
   verifyLinkHours,
 } from "./emailVerification";
+import { takeTokenFromUrlFragment } from "./passwordReset";
 
 function respond(
   status: number,
@@ -108,6 +108,16 @@ describe("email verification API (#2447)", () => {
       expect((init?.headers as Record<string, string>).Authorization).toBe("Bearer jwt");
     });
 
+    it("falls back to the body's retry_after_seconds when Retry-After isn't readable", async () => {
+      vi.mocked(fetch).mockResolvedValueOnce(
+        respond(429, { detail: "verification_email_rate_limited", retry_after_seconds: 37 }),
+      );
+      expect(await resendVerificationEmail("jwt")).toEqual({
+        kind: "rate_limited",
+        retryAfterSeconds: 37,
+      });
+    });
+
     it("maps 429 and every 409 code", async () => {
       vi.mocked(fetch)
         .mockResolvedValueOnce(
@@ -127,9 +137,9 @@ describe("email verification API (#2447)", () => {
   });
 
   describe("403 email_verification_required", () => {
-    it("is announced, recognised and explained without logging out", async () => {
+    it("is announced with the refused request's bearer, without logging out", async () => {
       sessionStorage.setItem("minder_jwt", "jwt");
-      const seen = vi.fn();
+      const seen = vi.fn((e: Event) => (e as CustomEvent<unknown>).detail);
       window.addEventListener(EMAIL_VERIFICATION_REQUIRED_EVENT, seen);
       vi.mocked(fetch).mockResolvedValue(
         respond(403, { detail: "email_verification_required" }),
@@ -137,9 +147,24 @@ describe("email verification API (#2447)", () => {
       const err = await apiFetch("/v1/plugins", { token: "jwt" }).catch((e) => e);
       window.removeEventListener(EMAIL_VERIFICATION_REQUIRED_EVENT, seen);
       expect(seen).toHaveBeenCalledTimes(1);
+      expect(seen.mock.results[0].value).toBe("jwt");
       expect(isEmailVerificationRequired(err)).toBe(true);
       expect(friendlyErrorMessage(err)).toBe("Confirm your email address to continue.");
       expect(sessionStorage.getItem("minder_jwt")).toBe("jwt");
+    });
+
+    it("is not announced for any other 403", async () => {
+      const seen = vi.fn();
+      window.addEventListener(EMAIL_VERIFICATION_REQUIRED_EVENT, seen);
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(respond(403, { detail: "workspace_required" }))
+        .mockResolvedValueOnce(respond(403, { detail: "Forbidden" }));
+      const a = await apiFetch("/v1/plugins", { token: "jwt" }).catch((e) => e);
+      const b = await apiFetch("/v1/plugins", { token: "jwt" }).catch((e) => e);
+      window.removeEventListener(EMAIL_VERIFICATION_REQUIRED_EVENT, seen);
+      expect(seen).not.toHaveBeenCalled();
+      expect(isEmailVerificationRequired(a)).toBe(false);
+      expect(isEmailVerificationRequired(b)).toBe(false);
     });
   });
 });
@@ -149,11 +174,11 @@ describe("email verification helpers", () => {
 
   it("takes the token from the fragment and strips it from the URL", () => {
     window.history.replaceState(null, "", "/verify-email?x=1#token=mev_secret");
-    expect(takeVerifyTokenFromUrl()).toBe("mev_secret");
+    expect(takeTokenFromUrlFragment()).toBe("mev_secret");
     expect(window.location.hash).toBe("");
     expect(window.location.href).not.toContain("mev_secret");
     expect(window.location.search).toBe("?x=1");
-    expect(takeVerifyTokenFromUrl()).toBeNull();
+    expect(takeTokenFromUrlFragment()).toBeNull();
   });
 
   it("formats a wait in the largest whole unit, rounding up", () => {

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { apiFetch } from "../lib/api";
 import { AuthProvider } from "../lib/auth";
+import { ForcePasswordChangeGate } from "./ForcePasswordChangePage";
 import { WorkspaceGate } from "./WaitingRoomPage";
 
 const TOKEN_KEY = "minder_jwt";
@@ -101,10 +102,49 @@ describe("WorkspaceGate / check your email (#2447)", () => {
 
   it("lets the app through once the profile says the address is confirmed", async () => {
     sessionStorage.setItem(TOKEN_KEY, full);
-    sessionStorage.setItem(FLAG_KEY, "1");
     mockApi({ "GET /v1/profile/me": () => json(verified) });
     renderGate();
     expect(await screen.findByText("app routes")).toBeTruthy();
+  });
+
+  it("on reload with a stale login flag, refreshes once to a full token", async () => {
+    // Confirmed elsewhere: the tab still has the restricted, tenant-less
+    // token and the login's flag, but the profile says confirmed.
+    sessionStorage.setItem(FLAG_KEY, "1");
+    const refresh = vi.fn(() => json({ access_token: full }));
+    mockApi({
+      "GET /v1/profile/me": () => json(verified),
+      "POST /v1/auth/refresh": refresh,
+    });
+    renderGate();
+    expect(await screen.findByText("app routes")).toBeTruthy();
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBe(full);
+    expect(sessionStorage.getItem(FLAG_KEY)).toBeNull();
+    expect(screen.queryByText("No workspace yet")).toBeNull();
+    expect(screen.queryByText("Choose an organization")).toBeNull();
+  });
+
+  it("puts a forced password change before the email check", async () => {
+    sessionStorage.setItem(FLAG_KEY, "1");
+    sessionStorage.setItem("minder_must_change_password", "1");
+    mockApi({
+      "GET /v1/profile/me": () => json(pending),
+      "GET /v1/auth/capabilities": () => json({}),
+    });
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <AuthProvider>
+          <WorkspaceGate>
+            <ForcePasswordChangeGate>
+              <div>app routes</div>
+            </ForcePasswordChangeGate>
+          </WorkspaceGate>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole("heading", { name: "Change your password" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Check your email" })).toBeNull();
   });
 
   it("switches to it when a request is refused with email_verification_required", async () => {
@@ -122,6 +162,22 @@ describe("WorkspaceGate / check your email (#2447)", () => {
     expect(await screen.findByRole("heading", { name: "Check your email" })).toBeTruthy();
     // Not a logout.
     expect(sessionStorage.getItem(TOKEN_KEY)).toBe(full);
+  });
+
+  it("ignores a refusal of a token the session has already replaced", async () => {
+    sessionStorage.setItem(TOKEN_KEY, full);
+    mockApi({
+      "GET /v1/profile/me": () => json({ user_id: 7, workspace_state: "ready" }),
+      "GET /v1/plugins": () => json({ detail: "email_verification_required" }, 403),
+    });
+    renderGate();
+    expect(await screen.findByText("app routes")).toBeTruthy();
+    await act(async () => {
+      // Sent with the old, restricted token.
+      await apiFetch("/v1/plugins", { token: restricted }).catch(() => undefined);
+    });
+    expect(screen.getByText("app routes")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Check your email" })).toBeNull();
   });
 
   it("does not gate the verification link itself", () => {
@@ -191,6 +247,21 @@ describe("WorkspaceGate / check your email (#2447)", () => {
     fireEvent.click(screen.getByRole("button", { name: "I've confirmed my email" }));
     expect(await screen.findByText("app routes")).toBeTruthy();
     expect(sessionStorage.getItem(TOKEN_KEY)).toBe(full);
+  });
+
+  it("signs out when the refresh after confirming is refused", async () => {
+    let confirmed = false;
+    mockApi({
+      "GET /v1/profile/me": () => json(confirmed ? verified : pending),
+      "GET /v1/auth/capabilities": () => json({}),
+      "POST /v1/auth/refresh": () => json({ detail: "revoked" }, 401),
+    });
+    renderGate();
+    const button = await screen.findByRole("button", { name: "I've confirmed my email" });
+    confirmed = true;
+    fireEvent.click(button);
+    expect(await screen.findByText("app routes")).toBeTruthy();
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
   });
 
   it("Sign out leaves the screen", async () => {

@@ -101,6 +101,10 @@ export const WORKSPACE_REQUIRED_DETAIL = "workspace_required";
 // address yet, so its token reaches only the verification allowlist (resend,
 // change-password, profile read). Like WORKSPACE_REQUIRED_EVENT it says
 // nothing about the session: WorkspaceGate shows "Check your email" instead.
+// A CustomEvent whose `detail` is the bearer token the refused request carried
+// ("" for none), so a 403 for a token the session has since replaced (e.g.
+// one still in flight while verification moved the session to a full token)
+// can be told apart and ignored.
 export const EMAIL_VERIFICATION_REQUIRED_EVENT = "minder:email-verification-required";
 
 /** The `detail` the gateway sends with a 403 for an unverified account. */
@@ -203,7 +207,7 @@ function sameSession(a: string, b: string): boolean {
  * `return throwApiError(res)` regardless of their own return type. */
 async function throwApiError(
   res: Response,
-  { logoutOn401 = true }: { logoutOn401?: boolean } = {},
+  { logoutOn401 = true, bearer = "" }: { logoutOn401?: boolean; bearer?: string } = {},
 ): Promise<never> {
   const body = await res.json().catch(() => ({}));
   const detail = errorDetail(body, res.status);
@@ -212,7 +216,9 @@ async function throwApiError(
     if (detail === WORKSPACE_REQUIRED_DETAIL) {
       window.dispatchEvent(new Event(WORKSPACE_REQUIRED_EVENT));
     } else if (detail === EMAIL_VERIFICATION_REQUIRED_DETAIL) {
-      window.dispatchEvent(new Event(EMAIL_VERIFICATION_REQUIRED_EVENT));
+      window.dispatchEvent(
+        new CustomEvent(EMAIL_VERIFICATION_REQUIRED_EVENT, { detail: bearer }),
+      );
     }
   }
   throw new ApiError(detail, res.status, {
@@ -352,7 +358,7 @@ export interface Paginated<T> {
 async function sendWithRefresh(
   path: string,
   { method = "GET", body, token, signal }: ApiOptions,
-): Promise<{ res: Response; logoutOn401: boolean }> {
+): Promise<{ res: Response; logoutOn401: boolean; bearer: string }> {
   const isFormData = body instanceof FormData;
   const send = (bearer: string | undefined) => {
     const headers: Record<string, string> = {};
@@ -374,7 +380,7 @@ async function sendWithRefresh(
 
   const res = await send(token);
   // Only an authenticated request's 401 can speak for the session (#109).
-  const done = { res, logoutOn401: Boolean(token) };
+  const done = { res, logoutOn401: Boolean(token), bearer: token ?? "" };
   if (res.status !== 401 || !token) return done;
 
   // No stored token at all means the session is already gone (logged out).
@@ -396,9 +402,9 @@ async function sendWithRefresh(
   // refresh minted. On a mismatch the new token is already adopted (stored +
   // TOKEN_REFRESHED_EVENT); only this request fails, without a logout.
   if (!sameSession(token, candidate)) {
-    return { res, logoutOn401: false }; // stale session: keep the stored one
+    return { res, logoutOn401: false, bearer: token }; // stale session: keep the stored one
   }
-  return { res: await send(candidate), logoutOn401: true };
+  return { res: await send(candidate), logoutOn401: true, bearer: candidate };
 }
 
 /** Thin fetch wrapper: prefixes the gateway base URL, injects the bearer
@@ -409,9 +415,9 @@ export async function apiFetch<T>(
   path: string,
   options: ApiOptions = {},
 ): Promise<T> {
-  const { res, logoutOn401 } = await sendWithRefresh(path, options);
+  const { res, logoutOn401, bearer } = await sendWithRefresh(path, options);
 
-  if (!res.ok) return throwApiError(res, { logoutOn401 });
+  if (!res.ok) return throwApiError(res, { logoutOn401, bearer });
 
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -426,9 +432,9 @@ export async function apiFetchBlob(
   path: string,
   options: ApiOptions = {},
 ): Promise<{ blob: Blob; headers: Headers }> {
-  const { res, logoutOn401 } = await sendWithRefresh(path, options);
+  const { res, logoutOn401, bearer } = await sendWithRefresh(path, options);
 
-  if (!res.ok) return throwApiError(res, { logoutOn401 });
+  if (!res.ok) return throwApiError(res, { logoutOn401, bearer });
 
   return { blob: await res.blob(), headers: res.headers };
 }

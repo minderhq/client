@@ -3,7 +3,6 @@ import { useCallback } from "react";
 import { ApiError, apiFetch, friendlyErrorMessage, refreshAccessToken } from "./api";
 import { useAuth } from "./auth";
 import type { AuthCapabilities } from "./passwordReset";
-import { takeTokenFromUrlFragment } from "./passwordReset";
 import { useTokenRef } from "./useTokenRef";
 
 /** Registration email verification (#2447, backend #1807).
@@ -33,6 +32,17 @@ export function verifyLinkHours(
 /** The wait used when a 429 carries no readable `Retry-After` (the gateway's
  * minimum interval between two sends). */
 export const DEFAULT_RESEND_COOLDOWN_SECONDS = 60;
+
+/** The wait a 429 asks for: the `Retry-After` header, else a
+ * `retry_after_seconds` in the body (for when the header isn't exposed to
+ * the page by CORS), else {@link DEFAULT_RESEND_COOLDOWN_SECONDS}. */
+export function rateLimitWait(e: ApiError): number {
+  if (e.retryAfterSeconds !== null) return e.retryAfterSeconds;
+  const fromBody = (e.body as { retry_after_seconds?: unknown } | null)?.retry_after_seconds;
+  return typeof fromBody === "number" && Number.isFinite(fromBody) && fromBody >= 0
+    ? Math.ceil(fromBody)
+    : DEFAULT_RESEND_COOLDOWN_SECONDS;
+}
 
 export type VerifyResult =
   | { kind: "verified"; organizationId: number | null }
@@ -68,7 +78,7 @@ export async function confirmEmailVerification(token: string): Promise<VerifyRes
       if (e.status === 429) {
         return {
           kind: "rate_limited",
-          retryAfterSeconds: e.retryAfterSeconds ?? DEFAULT_RESEND_COOLDOWN_SECONDS,
+          retryAfterSeconds: rateLimitWait(e),
         };
       }
       if (e.status === 404) return { kind: "unavailable" };
@@ -110,7 +120,7 @@ export async function resendVerificationEmail(token: string): Promise<ResendResu
       if (e.status === 429) {
         return {
           kind: "rate_limited",
-          retryAfterSeconds: e.retryAfterSeconds ?? DEFAULT_RESEND_COOLDOWN_SECONDS,
+          retryAfterSeconds: rateLimitWait(e),
         };
       }
       if (e.status === 409) {
@@ -124,12 +134,6 @@ export async function resendVerificationEmail(token: string): Promise<ResendResu
     }
     return { kind: "error", message: friendlyErrorMessage(e) };
   }
-}
-
-/** Reads the verification token from the link's fragment and strips the
- * fragment from the address bar (see takeTokenFromUrlFragment). */
-export function takeVerifyTokenFromUrl(): string | null {
-  return takeTokenFromUrlFragment();
 }
 
 /** A wait in words: "45 seconds", "2 minutes", "3 hours". */

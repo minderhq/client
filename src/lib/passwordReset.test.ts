@@ -6,7 +6,7 @@ import {
   confirmPasswordReset,
   isInvalidResetTokenError,
   requestPasswordReset,
-  takeResetTokenFromUrl,
+  takeTokenFromUrlFragment,
 } from "./passwordReset";
 
 function respond(status: number, body?: unknown): Response {
@@ -51,12 +51,12 @@ describe("password reset API", () => {
   });
 });
 
-describe("takeResetTokenFromUrl", () => {
+describe("takeTokenFromUrlFragment", () => {
   afterEach(() => window.history.replaceState(null, "", "/"));
 
   it("reads the fragment token and removes it from the URL", () => {
     window.history.replaceState(null, "", "/reset-password?x=1#token=abc-DEF_123");
-    expect(takeResetTokenFromUrl()).toBe("abc-DEF_123");
+    expect(takeTokenFromUrlFragment()).toBe("abc-DEF_123");
     expect(window.location.hash).toBe("");
     expect(window.location.href).not.toContain("abc-DEF_123");
     expect(window.location.pathname + window.location.search).toBe("/reset-password?x=1");
@@ -64,9 +64,9 @@ describe("takeResetTokenFromUrl", () => {
 
   it("returns null without a token, still clearing any fragment", () => {
     window.history.replaceState(null, "", "/reset-password");
-    expect(takeResetTokenFromUrl()).toBeNull();
+    expect(takeTokenFromUrlFragment()).toBeNull();
     window.history.replaceState(null, "", "/reset-password#other=1");
-    expect(takeResetTokenFromUrl()).toBeNull();
+    expect(takeTokenFromUrlFragment()).toBeNull();
     expect(window.location.hash).toBe("");
   });
 });
