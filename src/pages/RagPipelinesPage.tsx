@@ -10,6 +10,7 @@ import { ApiError, apiFetch, friendlyErrorMessage } from "../lib/api";
 import type { Paginated } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { copyText, useAutoClearTimeout } from "../lib/browser";
+import type { Citation, RetrievedSource } from "../lib/citations";
 import { filterByText } from "../lib/filterByText";
 import { kbReady } from "../lib/journey";
 import {
@@ -168,11 +169,8 @@ export function RetrievalMethodsReference() {
   );
 }
 
-export interface Source {
-  text: string;
-  source: string;
-  score: number;
-}
+/** A retrieved source with its chunk provenance (#2429). */
+export type Source = RetrievedSource;
 
 /** One entry per Semantic Intent Router (backend #1733) Auto-Pilot field --
  * "router" if the pipeline's decision engine picked the value, "manual" if the
@@ -183,8 +181,12 @@ export interface AppliedParameter {
 }
 
 export interface QueryResponse {
+  /** Citation markers are normalised to `[n]`; see `citations`. */
   answer: string;
   sources: Source[];
+  /** #2429: one entry per distinct marker in the answer, in order of first
+   * use; empty when compression ran or there were no sources. */
+  citations?: Citation[] | null;
   confidence: number;
   model_used: string;
   tokens_used?: number | null;
@@ -311,7 +313,7 @@ export function QueryResultCard({
           <ul className="flex flex-col gap-1">
             {response.sources.map((s, i) => (
               <li key={i} className="text-xs text-gray-600 dark:text-gray-400">
-                [{s.source}] score {s.score.toFixed(3)} — {s.text.slice(0, 200)}
+                [{s.source}] score {s.score?.toFixed(3) ?? "n/a"} — {s.text.slice(0, 200)}
                 {s.text.length > 200 && "…"}
               </li>
             ))}
