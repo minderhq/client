@@ -14,6 +14,7 @@ import type { Paginated } from "../lib/api";
 import { useAutoClearTimeout } from "../lib/browser";
 import { filterByText } from "../lib/filterByText";
 import { kbReady } from "../lib/journey";
+import type { ChunkInfo } from "../lib/ragDocuments";
 import type { KnowledgeBase, TeamOption } from "../lib/types";
 import { useAsyncResource } from "../lib/useAsyncResource";
 import { useAuth } from "../lib/auth";
@@ -68,11 +69,6 @@ export interface KbDocument {
   filename: string;
   chunk_count: number;
   uploaded_at?: string;
-}
-
-export interface ChunkInfo {
-  chunk_index: number;
-  text: string;
 }
 
 /** Lazily fetches a document's stored chunk text on first expand -- lets a

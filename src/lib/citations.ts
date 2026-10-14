@@ -173,3 +173,9 @@ export function citationLabel(marker: number, source: RetrievedSource | undefine
   const page = source.page != null ? `, page ${source.page}` : "";
   return `Source ${marker}: ${source.source}${page}`;
 }
+
+/** True when a source carries enough provenance to locate its chunk (never
+ * for the public chat, which drops document_id and chunk_id). */
+export function canOpenPassage(source: RetrievedSource): boolean {
+  return Boolean(source.document_id) && (source.chunk_id != null || source.chunk_index != null);
+}

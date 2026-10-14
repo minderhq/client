@@ -7,12 +7,13 @@ import { GoldenPathStepper } from "../components/GoldenPathStepper";
 import { Icon } from "../components/Icon";
 import { PageHeader } from "../components/PageHeader";
 import { SourceCards } from "../components/SourceCards";
+import { SourcePassage } from "../components/SourcePassage";
 import { StatusLine } from "../components/StatusLine";
 import { ApiError, apiFetch, friendlyErrorMessage } from "../lib/api";
 import type { Paginated } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { copyText, useAutoClearTimeout } from "../lib/browser";
-import type { Citation, RetrievedSource } from "../lib/citations";
+import { canOpenPassage, type Citation, type RetrievedSource } from "../lib/citations";
 import { filterByText } from "../lib/filterByText";
 import { kbReady } from "../lib/journey";
 import {
@@ -230,9 +231,15 @@ export interface Turn {
 export function QueryResultCard({
   response,
   compact = false,
+  kbIds,
+  token,
 }: {
   response: QueryResponse;
   compact?: boolean;
+  /** The queried pipeline's knowledge bases and the session token: with both,
+   * a source with chunk provenance gets an "Open passage" view (#2429). */
+  kbIds?: readonly string[];
+  token?: string | null;
 }) {
   const [copied, setCopied] = useState(false);
   const scheduleTimeout = useAutoClearTimeout();
@@ -349,6 +356,14 @@ export function QueryResultCard({
               if (el) cardEls.current.set(i, el);
               else cardEls.current.delete(i);
             }}
+            renderExtra={
+              token && kbIds?.length
+                ? (s) =>
+                    canOpenPassage(s) ? (
+                      <SourcePassage source={s} kbIds={kbIds} token={token} />
+                    ) : null
+                : undefined
+            }
           />
         </div>
       )}
