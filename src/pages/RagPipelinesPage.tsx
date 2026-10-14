@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
+import { CitedAnswer } from "../components/CitedAnswer";
 import { useConfirm } from "../components/ConfirmDialog";
 import { GoldenPathStepper } from "../components/GoldenPathStepper";
 import { Icon } from "../components/Icon";
 import { PageHeader } from "../components/PageHeader";
+import { SourceCards } from "../components/SourceCards";
 import { StatusLine } from "../components/StatusLine";
 import { ApiError, apiFetch, friendlyErrorMessage } from "../lib/api";
 import type { Paginated } from "../lib/api";
@@ -239,6 +241,26 @@ export function QueryResultCard({
   const utilityModel = details?.utility_model ?? null;
   const utilitySource = modelSourceLabel(details?.utility_model_source);
   const degradedNotes = details?.degraded ?? [];
+  const sourceIdPrefix = `source${useId().replace(/:/g, "")}`;
+  // #2429: the source card a citation chip last pointed at.
+  const [activeSource, setActiveSource] = useState<number | null>(null);
+  const cardEls = useRef(new Map<number, HTMLLIElement>());
+  const showSources = !compact && response.sources.length > 0;
+  const markersBySource = useMemo(() => {
+    const map = new Map<number, number[]>();
+    for (const c of response.citations ?? []) {
+      map.set(c.source_index, [...(map.get(c.source_index) ?? []), c.marker]);
+    }
+    return map;
+  }, [response.citations]);
+
+  const handleCite = useCallback((sourceIndex: number) => {
+    setActiveSource(sourceIndex);
+    const el = cardEls.current.get(sourceIndex);
+    if (!el) return;
+    el.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+    el.focus({ preventScroll: true });
+  }, []);
 
   async function handleCopyAnswer() {
     if (!(await copyText(response.answer))) return;
@@ -249,7 +271,15 @@ export function QueryResultCard({
   return (
     <>
       <div className="mb-2 flex items-start gap-2">
-        <p className="whitespace-pre-wrap">{response.answer}</p>
+        <CitedAnswer
+          answer={response.answer}
+          sources={response.sources}
+          citations={response.citations}
+          sourceIdPrefix={sourceIdPrefix}
+          activeSource={activeSource}
+          // Chips need cards to point at: a compact turn renders plain text.
+          onCite={showSources ? handleCite : undefined}
+        />
         <button
           onClick={handleCopyAnswer}
           title={copied ? "Answer copied" : "Copy answer"}
@@ -305,19 +335,21 @@ export function QueryResultCard({
           Filtered to: {response.method_details.metadata_filter.source}
         </p>
       )}
-      {!compact && response.sources.length > 0 && (
+      {showSources && (
         <div className="mt-3 border-t border-gray-200 pt-2 dark:border-gray-700">
           <p className="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400">
             Sources
           </p>
-          <ul className="flex flex-col gap-1">
-            {response.sources.map((s, i) => (
-              <li key={i} className="text-xs text-gray-600 dark:text-gray-400">
-                [{s.source}] score {s.score?.toFixed(3) ?? "n/a"} — {s.text.slice(0, 200)}
-                {s.text.length > 200 && "…"}
-              </li>
-            ))}
-          </ul>
+          <SourceCards
+            sources={response.sources}
+            idPrefix={sourceIdPrefix}
+            activeSource={activeSource}
+            markersBySource={markersBySource}
+            cardRef={(i, el) => {
+              if (el) cardEls.current.set(i, el);
+              else cardEls.current.delete(i);
+            }}
+          />
         </div>
       )}
     </>

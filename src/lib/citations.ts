@@ -166,3 +166,10 @@ export function parseCitedAnswer(
   pushText(answer.slice(last));
   return segments;
 }
+
+/** Accessible name of a citation chip: "Source 2: handbook.pdf, page 4". */
+export function citationLabel(marker: number, source: RetrievedSource | undefined): string {
+  if (!source) return `Source ${marker}`;
+  const page = source.page != null ? `, page ${source.page}` : "";
+  return `Source ${marker}: ${source.source}${page}`;
+}
