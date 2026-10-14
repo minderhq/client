@@ -206,6 +206,48 @@ describe("AskPage", () => {
     );
   });
 
+  it("renders citation chips and opens a cited passage from the pipeline's KB (#2429)", async () => {
+    mockAuth = { token: "tok", isAuthenticated: true };
+    routeApiFetch({
+      queryResult: queryResponse({
+        answer: "The refund window is 30 days [1].",
+        sources: [
+          {
+            text: "Refunds within 30 days.",
+            source: "policy.pdf",
+            score: 0.9,
+            document_id: "doc-9",
+            chunk_id: "c-3",
+            chunk_index: 3,
+            page: 4,
+          },
+        ],
+        citations: [{ marker: 1, source_index: 0, chunk_id: "c-3" }],
+      }),
+    });
+    render(<AskPage />);
+    await screen.findByText("Ask anything about your documents");
+
+    fireEvent.change(screen.getByLabelText("Your question"), {
+      target: { value: "Refunds?" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+
+    const chip = await screen.findByRole("button", { name: "Source 1: policy.pdf, page 4" });
+    fireEvent.click(chip);
+    expect(
+      screen.getByRole("listitem", { name: "Source 1: policy.pdf" }).getAttribute("data-highlighted"),
+    ).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Open passage" }));
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        "/v1/rag/knowledge-bases/kb-1/documents/doc-9/chunks?limit=500",
+        expect.objectContaining({ token: "tok" }),
+      ),
+    );
+  });
+
   it("sends manual_overrides only for controls the user has touched (#1733)", async () => {
     mockAuth = { token: "tok", isAuthenticated: true };
     routeApiFetch({});

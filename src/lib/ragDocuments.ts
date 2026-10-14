@@ -1,4 +1,4 @@
-import { apiFetch } from "./api";
+import { ApiError, apiFetch } from "./api";
 import type { Paginated } from "./api";
 
 /** One uploaded document, for the query "scope to a single document" picker. */
@@ -46,4 +46,91 @@ export async function fetchScopeDocuments(
     ),
   );
   return dedupeScopeDocuments(lists);
+}
+
+/** One stored chunk of a document (GET .../documents/{id}/chunks). The
+ * provenance fields (#2429) are absent on older backends. */
+export interface ChunkInfo {
+  chunk_index: number;
+  text: string;
+  chunk_id?: string | null;
+  /** 1-based PDF page, PPTX slide or DOCX page. */
+  page?: number | null;
+  /** Span in the document's extracted text (end exclusive). */
+  char_start?: number | null;
+  char_end?: number | null;
+}
+
+/** The max page size the chunks endpoint allows. */
+export const CHUNK_PAGE_LIMIT = 500;
+
+/** A document's chunks, from the first of `kbIds` that holds it. A source
+ * carries its `document_id` but not its knowledge base, so each of the
+ * pipeline's KBs is tried in order; null when none has the document. Any
+ * error other than a 404 is thrown. */
+export async function fetchDocumentChunks(
+  kbIds: readonly string[],
+  documentId: string,
+  token: string,
+  signal?: AbortSignal,
+): Promise<ChunkInfo[] | null> {
+  for (const kb of kbIds) {
+    try {
+      const res = await apiFetch<Paginated<ChunkInfo>>(
+        `/v1/rag/knowledge-bases/${encodeURIComponent(kb)}/documents/${encodeURIComponent(documentId)}/chunks?limit=${CHUNK_PAGE_LIMIT}`,
+        { token, signal },
+      );
+      return res.items ?? [];
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) continue;
+      throw e;
+    }
+  }
+  return null;
+}
+
+/** Index into `chunks` of the chunk a source points at: by `chunk_id` when
+ * both sides have one, else by `chunk_index`; -1 when absent. */
+export function findSourceChunk(
+  chunks: readonly ChunkInfo[],
+  ref: { chunk_id?: string | null; chunk_index?: number | null },
+): number {
+  if (ref.chunk_id) {
+    const byId = chunks.findIndex((c) => c.chunk_id === ref.chunk_id);
+    if (byId !== -1) return byId;
+  }
+  if (ref.chunk_index != null) {
+    return chunks.findIndex((c) => c.chunk_index === ref.chunk_index);
+  }
+  return -1;
+}
+
+/** UTF-16 index in `text` of code-point offset `cp` (clamped to the text). The
+ * backend's offsets are Python code-point offsets; JS strings index UTF-16
+ * units, so an astral character (emoji) before the span would otherwise shift
+ * it, or split a surrogate pair. */
+export function codePointToUtf16Index(text: string, cp: number): number {
+  let i = 0;
+  for (let n = 0; n < cp && i < text.length; n++) {
+    const code = text.charCodeAt(i);
+    i += code >= 0xd800 && code <= 0xdbff && i + 1 < text.length ? 2 : 1;
+  }
+  return i;
+}
+
+/** The part of `chunk.text` to highlight for a source span given in document
+ * code-point offsets, as UTF-16 [start, end) indices into `chunk.text`; null
+ * when either side lacks offsets or the span doesn't overlap the chunk
+ * (highlight the whole chunk). */
+export function chunkHighlightRange(
+  chunk: ChunkInfo,
+  span: { char_start?: number | null; char_end?: number | null },
+): [number, number] | null {
+  if (chunk.char_start == null || span.char_start == null || span.char_end == null) {
+    return null;
+  }
+  const text = chunk.text ?? "";
+  const start = codePointToUtf16Index(text, Math.max(0, span.char_start - chunk.char_start));
+  const end = codePointToUtf16Index(text, Math.max(0, span.char_end - chunk.char_start));
+  return end > start ? [start, end] : null;
 }

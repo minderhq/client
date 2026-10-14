@@ -107,6 +107,8 @@ interface AssistantTurn {
   role: "assistant";
   pending?: boolean;
   response?: QueryResponse;
+  /** The queried pipeline's knowledge bases, to open a cited passage (#2429). */
+  kbIds?: string[];
   error?: string;
 }
 type Turn = UserTurn | AssistantTurn;
@@ -360,6 +362,8 @@ export function AskPage() {
   async function ask(text: string) {
     const question = text.trim();
     if (!question || sending || !pipelineId || !token) return;
+    // Captured now: the user may switch pipelines before this turn is read.
+    const pipelineKbIds = selectedPipeline?.knowledge_base_ids ?? [];
 
     let convId = conversationId;
     if (conversationalAvailable && !convId) {
@@ -407,7 +411,9 @@ export function AskPage() {
       );
       setTurns((prev) =>
         prev.map((t) =>
-          t.id === pendingId ? { id: pendingId, role: "assistant", response: res } : t,
+          t.id === pendingId
+            ? { id: pendingId, role: "assistant", response: res, kbIds: pipelineKbIds }
+            : t,
         ),
       );
       setAppliedParameters(res.applied_parameters ?? null);
@@ -589,7 +595,11 @@ export function AskPage() {
                             {turn.error}
                           </span>
                         ) : turn.response ? (
-                          <QueryResultCard response={turn.response} />
+                          <QueryResultCard
+                            response={turn.response}
+                            kbIds={turn.kbIds}
+                            token={token}
+                          />
                         ) : null}
                       </div>
                     </div>

@@ -14,6 +14,7 @@ import type { Paginated } from "../lib/api";
 import { useAutoClearTimeout } from "../lib/browser";
 import { filterByText } from "../lib/filterByText";
 import { kbReady } from "../lib/journey";
+import type { ChunkInfo } from "../lib/ragDocuments";
 import type { KnowledgeBase, TeamOption } from "../lib/types";
 import { useAsyncResource } from "../lib/useAsyncResource";
 import { useAuth } from "../lib/auth";
@@ -70,11 +71,6 @@ export interface KbDocument {
   uploaded_at?: string;
 }
 
-export interface ChunkInfo {
-  chunk_index: number;
-  text: string;
-}
-
 /** Lazily fetches a document's stored chunk text on first expand -- lets a
  * user tell a bad extraction/OCR (garbled or missing text) apart from a
  * retrieval/generation issue, which previously had no diagnostic short of
@@ -101,7 +97,7 @@ export function ChunkViewer({
       // the UI -- a document with more chunks than that is a rare edge case
       // not worth building pagination controls for in a first version.
       const res = await apiFetch<Paginated<ChunkInfo>>(
-        `/v1/rag/knowledge-bases/${kbId}/documents/${documentId}/chunks?limit=500`,
+        `/v1/rag/knowledge-bases/${encodeURIComponent(kbId)}/documents/${encodeURIComponent(documentId)}/chunks?limit=500`,
         { token },
       );
       setChunks(res.items);
