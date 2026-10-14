@@ -5,6 +5,7 @@ import { ApiError } from "../lib/api";
 import type { RetrievedSource } from "../lib/citations";
 import {
   chunkHighlightRange,
+  codePointToUtf16Index,
   fetchDocumentChunks,
   findSourceChunk,
   type ChunkInfo,
@@ -49,6 +50,26 @@ describe("chunk helpers", () => {
     expect(chunkHighlightRange(chunks[1], { char_start: 100, char_end: 120 })).toBeNull();
     expect(chunkHighlightRange(chunks[1], { char_start: null, char_end: 20 })).toBeNull();
     expect(chunkHighlightRange({ chunk_index: 1, text: "x" }, { char_start: 0, char_end: 1 })).toBeNull();
+  });
+
+  it("treats offsets as code points, so an emoji before the span doesn't shift it", () => {
+    // "😀" is one code point but two UTF-16 units.
+    const chunk: ChunkInfo = { chunk_index: 0, text: "😀 Refunds 💸 in 30 days.", char_start: 100 };
+    expect(codePointToUtf16Index(chunk.text, 2)).toBe(3);
+    // Code points: "😀"=0, " "=1, "Refunds"=2..8, " "=9, "💸"=10, " "=11, "in"=12..13
+    const range = chunkHighlightRange(chunk, { char_start: 102, char_end: 109 })!;
+    expect(chunk.text.slice(...range)).toBe("Refunds");
+    const emoji = chunkHighlightRange(chunk, { char_start: 110, char_end: 111 })!;
+    expect(chunk.text.slice(...emoji)).toBe("💸");
+    expect(chunk.text.slice(emoji[1])).toBe(" in 30 days.");
+  });
+
+  it("URL-encodes ids so one containing / or ? stays a single path segment", async () => {
+    apiFetch.mockResolvedValueOnce({ items: [] });
+    await fetchDocumentChunks(["kb/1"], "doc?x=1/../2", "tok");
+    expect(apiFetch.mock.calls[0][0]).toBe(
+      "/v1/rag/knowledge-bases/kb%2F1/documents/doc%3Fx%3D1%2F..%2F2/chunks?limit=500",
+    );
   });
 
   it("tries each knowledge base until one has the document", async () => {

@@ -55,14 +55,16 @@ const SourceCard = forwardRef<
     children?: ReactNode;
   }
 >(function SourceCard({ id, source, markers, active, children }, ref) {
-  const long = source.text.length > SNIPPET_CHARS;
+  const text = source.text ?? "";
+  const filename = source.source ?? "";
+  const long = text.length > SNIPPET_CHARS;
   const label = markers.length ? `Source ${markers.join(", ")}` : "Source";
   return (
     <li
       id={id}
       ref={ref}
       tabIndex={-1}
-      aria-label={`${label}: ${source.source}`}
+      aria-label={`${label}: ${filename}`}
       data-highlighted={active || undefined}
       className={`rounded-md border px-2.5 py-2 text-xs outline-none transition ${
         active
@@ -80,7 +82,7 @@ const SourceCard = forwardRef<
           </span>
         ))}
         <Icon name="file" size={12} />
-        <span className="font-medium">{source.source}</span>
+        <span className="font-medium">{filename}</span>
         {source.page != null && <span className={badgeClass}>page {source.page}</span>}
         {source.score != null && (
           <span className="text-gray-400 dark:text-gray-500">
@@ -93,7 +95,7 @@ const SourceCard = forwardRef<
           active ? "max-h-60 overflow-auto" : ""
         }`}
       >
-        {active || !long ? source.text : `${source.text.slice(0, SNIPPET_CHARS)}…`}
+        {active || !long ? text : `${text.slice(0, SNIPPET_CHARS)}…`}
       </p>
       {children}
     </li>

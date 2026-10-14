@@ -97,7 +97,7 @@ export function ChunkViewer({
       // the UI -- a document with more chunks than that is a rare edge case
       // not worth building pagination controls for in a first version.
       const res = await apiFetch<Paginated<ChunkInfo>>(
-        `/v1/rag/knowledge-bases/${kbId}/documents/${documentId}/chunks?limit=500`,
+        `/v1/rag/knowledge-bases/${encodeURIComponent(kbId)}/documents/${encodeURIComponent(documentId)}/chunks?limit=500`,
         { token },
       );
       setChunks(res.items);

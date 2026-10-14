@@ -88,30 +88,44 @@ export function codeRanges(text: string): Array<[number, number]> {
     cursor = e;
   }
   gaps.push([cursor, text.length]);
-  for (const [gs, ge] of gaps) {
-    const run = /`+/g;
-    run.lastIndex = gs;
-    const segment = text.slice(0, ge);
-    let m: RegExpExecArray | null;
-    while ((m = run.exec(segment)) !== null) {
-      const ticks = m[0];
-      const closeRe = /`+/g;
-      closeRe.lastIndex = m.index + ticks.length;
-      let close: RegExpExecArray | null;
-      let closedAt = -1;
-      while ((close = closeRe.exec(segment)) !== null) {
-        if (close[0].length === ticks.length) {
-          closedAt = close.index + close[0].length;
-          break;
-        }
-      }
-      if (closedAt === -1) continue; // unclosed: literal backticks
-      ranges.push([m.index, closedAt]);
-      run.lastIndex = closedAt;
-    }
-  }
-  ranges.push(...fenced);
+  // Loops, not spread: a huge answer could exceed the argument-count limit.
+  for (const [gs, ge] of gaps) for (const span of inlineCodeSpans(text, gs, ge)) ranges.push(span);
+  for (const f of fenced) ranges.push(f);
   return ranges.sort((a, b) => a[0] - b[0]);
+}
+
+/** Inline code spans within text[from, to): a backtick run is closed by the
+ * next run of exactly the same length; an unclosed run is literal. Linear in
+ * the gap: each run's next same-length run is precomputed right to left. */
+function inlineCodeSpans(text: string, from: number, to: number): Array<[number, number]> {
+  const runs: Array<{ start: number; len: number }> = [];
+  for (let i = from; i < to; ) {
+    if (text[i] !== "`") {
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j < to && text[j] === "`") j++;
+    runs.push({ start: i, len: j - i });
+    i = j;
+  }
+  const nextSame = new Array<number>(runs.length).fill(-1);
+  const seen = new Map<number, number>();
+  for (let k = runs.length - 1; k >= 0; k--) {
+    nextSame[k] = seen.get(runs[k].len) ?? -1;
+    seen.set(runs[k].len, k);
+  }
+  const spans: Array<[number, number]> = [];
+  for (let k = 0; k < runs.length; ) {
+    const close = nextSame[k];
+    if (close === -1) {
+      k++; // unclosed: literal backticks
+      continue;
+    }
+    spans.push([runs[k].start, runs[close].start + runs[close].len]);
+    k = close + 1;
+  }
+  return spans;
 }
 
 /** `[n]` not immediately followed by `(` (a markdown link like `[5](https://…)`). */
@@ -141,8 +155,14 @@ export function parseCitedAnswer(
   }
   if (byMarker.size === 0) return answer ? [{ kind: "text", text: answer }] : [];
 
+  // Ranges are sorted and disjoint and markers come in increasing order, so
+  // one pointer walks the ranges alongside the markers (linear overall).
   const code = codeRanges(answer);
-  const inCode = (i: number) => code.some(([s, e]) => i >= s && i < e);
+  let r = 0;
+  const inCode = (i: number) => {
+    while (r < code.length && code[r][1] <= i) r++;
+    return r < code.length && code[r][0] <= i;
+  };
 
   const segments: AnswerSegment[] = [];
   const pushText = (text: string) => {
@@ -171,7 +191,7 @@ export function parseCitedAnswer(
 export function citationLabel(marker: number, source: RetrievedSource | undefined): string {
   if (!source) return `Source ${marker}`;
   const page = source.page != null ? `, page ${source.page}` : "";
-  return `Source ${marker}: ${source.source}${page}`;
+  return `Source ${marker}: ${source.source ?? ""}${page}`;
 }
 
 /** True when a source carries enough provenance to locate its chunk (never

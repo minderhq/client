@@ -77,7 +77,7 @@ export async function fetchDocumentChunks(
   for (const kb of kbIds) {
     try {
       const res = await apiFetch<Paginated<ChunkInfo>>(
-        `/v1/rag/knowledge-bases/${kb}/documents/${documentId}/chunks?limit=${CHUNK_PAGE_LIMIT}`,
+        `/v1/rag/knowledge-bases/${encodeURIComponent(kb)}/documents/${encodeURIComponent(documentId)}/chunks?limit=${CHUNK_PAGE_LIMIT}`,
         { token, signal },
       );
       return res.items ?? [];
@@ -105,9 +105,23 @@ export function findSourceChunk(
   return -1;
 }
 
+/** UTF-16 index in `text` of code-point offset `cp` (clamped to the text). The
+ * backend's offsets are Python code-point offsets; JS strings index UTF-16
+ * units, so an astral character (emoji) before the span would otherwise shift
+ * it, or split a surrogate pair. */
+export function codePointToUtf16Index(text: string, cp: number): number {
+  let i = 0;
+  for (let n = 0; n < cp && i < text.length; n++) {
+    const code = text.charCodeAt(i);
+    i += code >= 0xd800 && code <= 0xdbff && i + 1 < text.length ? 2 : 1;
+  }
+  return i;
+}
+
 /** The part of `chunk.text` to highlight for a source span given in document
- * offsets, as [start, end) within the chunk; null when either side lacks
- * offsets or the span doesn't overlap the chunk (highlight the whole chunk). */
+ * code-point offsets, as UTF-16 [start, end) indices into `chunk.text`; null
+ * when either side lacks offsets or the span doesn't overlap the chunk
+ * (highlight the whole chunk). */
 export function chunkHighlightRange(
   chunk: ChunkInfo,
   span: { char_start?: number | null; char_end?: number | null },
@@ -115,7 +129,8 @@ export function chunkHighlightRange(
   if (chunk.char_start == null || span.char_start == null || span.char_end == null) {
     return null;
   }
-  const start = Math.max(0, span.char_start - chunk.char_start);
-  const end = Math.min(chunk.text.length, span.char_end - chunk.char_start);
+  const text = chunk.text ?? "";
+  const start = codePointToUtf16Index(text, Math.max(0, span.char_start - chunk.char_start));
+  const end = codePointToUtf16Index(text, Math.max(0, span.char_end - chunk.char_start));
   return end > start ? [start, end] : null;
 }

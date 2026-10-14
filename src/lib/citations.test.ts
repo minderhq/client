@@ -105,3 +105,26 @@ describe("codeRanges", () => {
     ]);
   });
 });
+
+describe("parseCitedAnswer performance", () => {
+  it("stays linear on a long answer with many code spans and markers", () => {
+    const cites2k: Citation[] = Array.from({ length: 2000 }, (_, i) => ({
+      marker: i + 1,
+      source_index: 0,
+    }));
+    const parts: string[] = [];
+    for (let i = 1; i <= 2000; i++) parts.push(`Fact ${i} \`code${i}[1]\` and \`\` x \`\` [${i}]. `);
+    let answer = parts.join("");
+    answer += "\n```\nfenced [1]\n```".repeat(200) + "\n";
+    answer = answer.padEnd(80_000, " a ` b"); // trailing unclosed backticks too
+    expect(answer.length).toBeGreaterThanOrEqual(80_000);
+
+    const t0 = performance.now();
+    const segs = parseCitedAnswer(answer, cites2k, 1);
+    const elapsed = performance.now() - t0;
+
+    expect(segs.filter((s) => s.kind === "citation")).toHaveLength(2000);
+    expect(elapsed).toBeLessThan(100);
+  });
+});
+
