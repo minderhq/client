@@ -165,13 +165,18 @@ export const PERSONA_IDS = Object.keys(PERSONAS) as PersonaId[];
 
 /** A persona with some fields replaced, e.g. a plan variant
  * (`withPersona("orgOwner", { tier: "pro" })`) or an unusual token
- * (`withPersona("orgOwner", { claims: { is_platform_admin: true } })`). */
+ * (`withPersona("orgOwner", { claims: { is_platform_admin: true } })`).
+ * Claim overrides need a signed-in persona: passing them for `loggedOut`
+ * (which has no token) throws instead of being silently dropped. */
 export function withPersona(
   id: PersonaId,
   overrides: Partial<Omit<Persona, "claims">> & { claims?: Partial<PersonaClaims> } = {},
 ): Persona {
   const base = PERSONAS[id];
   const { claims, ...rest } = overrides;
+  if (claims && !base.claims) {
+    throw new Error(`withPersona: "${id}" has no token, so claim overrides can't apply`);
+  }
   return {
     ...base,
     ...rest,
@@ -201,9 +206,11 @@ export function personaToken(persona: Persona, now: number = Date.now()): string
 }
 
 /** The NavAccess today's Sidebar/PageTabs/CommandPalette derive for this
- * persona (mirrors Sidebar.tsx: `role === "admin"`, the platform-admin claim,
- * and the billing probe; a logged-out visitor's probe never runs, so it reads
- * as visible). */
+ * persona. It MIRRORS Sidebar.tsx (`role === "admin"`, the platform-admin
+ * claim, and the billing probe; a logged-out visitor's probe never runs, so it
+ * reads as visible) and can drift from it: the rendered-sidebar test in
+ * navigation.matrix.test.tsx is the real check, this only cross-checks the
+ * expected tables against nav.ts. */
 export function personaNavAccess(persona: Persona): NavAccess {
   return {
     isAdmin: persona.claims?.role === "admin",

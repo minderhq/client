@@ -8,9 +8,11 @@
  * here -- or a nav entry without a route -- fails this test.
  *
  * App.tsx declares its routes inline as JSX, so they are read from its source
- * text. A `path` expression this file can't resolve fails too, rather than
- * being skipped.
+ * with the TypeScript parser: every `<Route>` element, whatever the order of
+ * its attributes. A `<Route>` without a `path`, or a `path` expression this
+ * file can't resolve, fails too, rather than being skipped.
  */
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 import appSource from "./App.tsx?raw";
@@ -69,26 +71,56 @@ interface DeclaredRoutes {
   redirectTableMapped: boolean;
 }
 
-/** Every `<Route path=…>` in App.tsx, resolved. */
+/** Every `<Route>` element in App.tsx (self-closing or not), its `path`
+ * attribute resolved, found by walking the parsed JSX tree. */
 function declaredRoutes(source: string): DeclaredRoutes {
   const paths: string[] = [];
   const unresolved: string[] = [];
   let redirectTableMapped = false;
-  const re = /<Route\b[^>]*?\spath=(?:"([^"]*)"|\{(`[^`]*`|[^}]*)\})/g;
-  for (const m of source.matchAll(re)) {
-    if (m[1] !== undefined) {
-      paths.push(m[1]);
-      continue;
+  const sf = ts.createSourceFile("App.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+
+  function visitRoute(el: ts.JsxSelfClosingElement | ts.JsxOpeningElement) {
+    const pathAttr = el.attributes.properties.find(
+      (p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && p.name.getText(sf) === "path",
+    );
+    const init = pathAttr?.initializer;
+    if (!init) {
+      unresolved.push(`<Route> without a path at line ${sf.getLineAndCharacterOfPosition(el.getStart(sf)).line + 1}`);
+      return;
     }
-    const expr = m[2].trim();
-    if (expr === REDIRECT_TABLE_EXPRESSION) {
+    if (ts.isStringLiteral(init)) {
+      paths.push(init.text);
+      return;
+    }
+    const expr = ts.isJsxExpression(init) ? init.expression : undefined;
+    if (!expr) {
+      unresolved.push(init.getText(sf));
+      return;
+    }
+    if (ts.isNoSubstitutionTemplateLiteral(expr) || ts.isStringLiteral(expr)) {
+      paths.push(expr.text);
+      return;
+    }
+    const text = expr.getText(sf).trim();
+    if (text === REDIRECT_TABLE_EXPRESSION) {
       redirectTableMapped = true;
-      continue;
+      return;
     }
-    const value = resolvePathExpression(expr);
-    if (value === null) unresolved.push(expr);
+    const value = resolvePathExpression(text);
+    if (value === null) unresolved.push(text);
     else paths.push(value);
   }
+
+  function visit(node: ts.Node) {
+    if (
+      (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) &&
+      node.tagName.getText(sf) === "Route"
+    ) {
+      visitRoute(node);
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(sf);
   return { paths, unresolved, redirectTableMapped };
 }
 

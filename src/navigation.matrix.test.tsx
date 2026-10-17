@@ -24,12 +24,12 @@ import {
   tierVariants,
   withPersona,
 } from "./test/personas";
-import { appLocation, renderApp, resetApp } from "./test/renderApp";
+import { appLocation, renderApp, resetApp, settleApp } from "./test/renderApp";
 
-/** Each case renders the whole app; on a busy CI host that can take seconds. */
-const APP_TEST = { timeout: 30_000 };
+/** Each case renders the whole app; the slowest takes about 2 s. */
+const APP_TEST = { timeout: 10_000 };
 /** How long to wait for async state (the billing probe, a page's fetch). */
-const SETTLE = { timeout: 10_000 };
+const SETTLE = { timeout: 5_000 };
 
 /** The heading-less top group (Home, Ask). */
 const TOP = "(top)";
@@ -131,6 +131,8 @@ describe("navigation matrix: sidebar per persona", APP_TEST, () => {
     const { nav, billingHref } = EXPECTED_NAV[id];
     // Billing visibility settles after the subscription probe answers.
     await waitFor(() => expect(navHref("Billing & licenses")).toBe(billingHref), SETTLE);
+    await settleApp();
+    expect(navHref("Billing & licenses")).toBe(billingHref);
     expect(renderedNav()).toEqual(nav);
   });
 
@@ -158,9 +160,10 @@ describe("navigation matrix: in-page tab strips", APP_TEST, () => {
 
   it.each(["orgOwner", "orgAdmin", "teamlessMember"] as const)(
     "shows %s no Publish tab strip (Submission review is instance-admin only)",
-    (id) => {
+    async (id) => {
       renderApp(PERSONAS[id], ROUTES.publishSubmissions);
       expect(screen.getByRole("heading", { level: 1, name: "Plugin submissions" })).toBeTruthy();
+      await settleApp();
       expect(screen.queryByRole("navigation", { name: "Publish sections" })).toBeNull();
     },
   );
@@ -197,6 +200,14 @@ describe("team role: Teams page controls per persona", APP_TEST, () => {
   ] as const)("%s may manage its team: %s", async (id, canManage) => {
     renderApp(PERSONAS[id], "/platform/teams");
     await openTeam("Engineering", PERSONAS[id]);
+    if (canManage) {
+      // The controls appear once GET /v1/teams/{id} has answered.
+      expect(await screen.findByRole("button", { name: "Add Member" }, SETTLE)).toBeTruthy();
+    }
+    // Then let every request (a team admin's invites too) answer: the page
+    // must still be there, and a member must still have no controls.
+    await settleApp();
+    expect(screen.getByText("Engineering")).toBeTruthy();
     expect(!!screen.queryByRole("button", { name: "Add Member" })).toBe(canManage);
   });
 
@@ -272,8 +283,11 @@ const ROUTE_CASES = GATED_ROUTES.flatMap((route) =>
 describe("route access matrix: page-level gates per persona", APP_TEST, () => {
   afterEach(resetApp);
 
-  it.each(ROUTE_CASES)("%s as %s is %s", (path, id, access, route) => {
+  it.each(ROUTE_CASES)("%s as %s is %s", async (path, id, access, route) => {
     renderApp(PERSONAS[id], path);
+    // Let the page's own requests answer first, so a lock that only appears
+    // after a fetch still counts.
+    await settleApp();
     // No route guard redirects anyone away; the page itself decides.
     expect(appLocation()?.pathname).toBe(path);
     expect(screen.getByRole("heading", { level: 1, name: route.heading })).toBeTruthy();
@@ -303,9 +317,11 @@ describe("known gaps (client#126)", APP_TEST, () => {
   // not an instance admin.
   it.each(PERSONA_IDS.filter((id) => id !== "platformAdmin"))(
     "Backups is in the nav for %s but the page locks them out",
-    (id) => {
+    async (id) => {
       expect(navShows(PERSONAS[id], "/platform/backups")).toBe(true);
       renderApp(PERSONAS[id], "/platform/backups");
+      expect(await screen.findByText(/to view or manage backups/, {}, SETTLE)).toBeTruthy();
+      await settleApp();
       expect(screen.getByText(/to view or manage backups/)).toBeTruthy();
     },
   );
@@ -318,6 +334,7 @@ describe("known gaps (client#126)", APP_TEST, () => {
     async (id) => {
       expect(navShows(PERSONAS[id], "/rag/public-chat")).toBe(false);
       const { fetchMock } = renderApp(PERSONAS[id], "/rag/public-chat");
+      await settleApp();
       expect(screen.queryByText(/to manage public chat endpoints/)).toBeNull();
       await waitFor(() =>
         expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/v1/public-chat/endpoints"))).toBe(
@@ -369,4 +386,11 @@ describe("known gaps (client#126)", APP_TEST, () => {
     // including a logged-out visitor, lands on the same Home dashboard.
     "each persona lands on its own default page",
   );
+});
+
+describe("persona fixtures", () => {
+  it("refuses claim overrides for the logged-out visitor", () => {
+    expect(() => withPersona("loggedOut", { claims: { role: "admin" } })).toThrow(/no token/);
+    expect(withPersona("loggedOut", { tier: PERSONAS.orgOwner.tier }).claims).toBeNull();
+  });
 });

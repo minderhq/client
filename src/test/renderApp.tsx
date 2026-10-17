@@ -12,7 +12,7 @@
  *
  * Call `resetApp()` in afterEach.
  */
-import { cleanup, render, type RenderResult } from "@testing-library/react";
+import { act, cleanup, render, waitFor, type RenderResult } from "@testing-library/react";
 import { MemoryRouter, type Location } from "react-router-dom";
 import { vi } from "vitest";
 
@@ -22,8 +22,10 @@ import { resetBillingAccessCache } from "../lib/useBillingAccess";
 import { LocationProbe } from "./LocationProbe";
 import { BASELINE_TIER, type Persona, personaToken } from "./personas";
 
-/** Every array/count key a mounted page's fetch destructures, all empty (the
- * same stub App.test.tsx uses). */
+/** Every array/count key a mounted page's fetch destructures, all empty: the
+ * stub App.test.tsx uses, plus the keys of pages it only renders before their
+ * data arrives (Backups, All users, a team's invites), since these tests
+ * wait for it. */
 export const SAFE_EMPTY_RESPONSE = {
   items: [],
   total: 0,
@@ -41,6 +43,10 @@ export const SAFE_EMPTY_RESPONSE = {
   repositories: [],
   organizations: [],
   licenses: [],
+  archives: [],
+  jobs: [],
+  users: [],
+  invites: [],
 };
 
 function json(body: unknown, status = 200): Response {
@@ -142,6 +148,28 @@ export function appLocation(): Location | null {
   return currentLocation;
 }
 
+/** Requests the current render's fake API has received but not yet answered.
+ * A fresh object per renderApp, so a late answer to an earlier test's request
+ * can't skew this test's count. */
+let traffic = { inFlight: 0 };
+
+/** Wait until the app is quiet: no fake request outstanding, and still none
+ * after React has applied the responses (a response can trigger another
+ * request). Use it before asserting that something is NOT shown, so a lock
+ * callout or tab strip that appears only after a fetch would be caught. */
+export async function settleApp(timeoutMs = 5_000): Promise<void> {
+  for (let round = 0; round < 20; round++) {
+    await waitFor(() => {
+      if (traffic.inFlight !== 0) throw new Error(`${traffic.inFlight} request(s) still in flight`);
+    }, { timeout: timeoutMs });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    if (traffic.inFlight === 0) return;
+  }
+  throw new Error("the app kept sending requests; it never settled");
+}
+
 export interface RenderAppResult extends RenderResult {
   persona: Persona;
   /** The fake fetch, for asserting which endpoints a persona hit. */
@@ -155,9 +183,19 @@ export function renderApp(persona: Persona, path = "/"): RenderAppResult {
   const token = personaToken(persona);
   if (token) storeToken(token);
 
+  const counter = { inFlight: 0 };
+  traffic = counter;
   const fetchMock = vi.fn((input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-    return Promise.resolve(personaResponse(persona, url));
+    counter.inFlight++;
+    // Answer on a later macrotask, like a real network, and count it done
+    // only once the caller has had the response.
+    return new Promise<Response>((resolve) =>
+      setTimeout(() => {
+        resolve(personaResponse(persona, url));
+        setTimeout(() => counter.inFlight--, 0);
+      }, 0),
+    );
   });
   vi.stubGlobal("fetch", fetchMock);
 
@@ -177,4 +215,5 @@ export function resetApp(): void {
   resetBillingAccessCache();
   vi.unstubAllGlobals();
   currentLocation = null;
+  traffic = { inFlight: 0 };
 }
