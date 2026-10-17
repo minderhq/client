@@ -1,11 +1,10 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { i18n, useI18n } from "../i18n";
 import { useAuth } from "../lib/auth";
 import { consumeReturnPath } from "../lib/returnPath";
 import { completeSsoLogin } from "../lib/ssoLogin";
-
-const SIGN_IN_INCOMPLETE = "Sign-in did not complete — please try again.";
 
 function hashParam(hash: string, name: string): string | null {
   const match = hash.match(new RegExp(`(?:^#|&)${name}=([^&]*)`));
@@ -26,6 +25,7 @@ function hashParam(hash: string, name: string): string | null {
 export function AuthCallbackPage() {
   const { loginWithToken } = useAuth();
   const navigate = useNavigate();
+  const { t } = useI18n();
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -33,11 +33,13 @@ export function AuthCallbackPage() {
     const boundToThisLogin = completeSsoLogin(hashParam(hash, "cnonce"));
     // Where the sign-in was started from (e.g. an invite link), if anywhere.
     const returnPath = consumeReturnPath();
+    // Runs once on mount: read the active language's copy right here.
+    const incomplete = i18n().t("auth.callback.incomplete");
     if (token) {
       if (!boundToThisLogin) {
         navigate("/login", {
           replace: true,
-          state: { oidcError: SIGN_IN_INCOMPLETE, from: returnPath ?? undefined },
+          state: { oidcError: incomplete, from: returnPath ?? undefined },
         });
         return;
       }
@@ -60,7 +62,7 @@ export function AuthCallbackPage() {
     const error = hashParam(hash, "error_description") || hashParam(hash, "error");
     const message = error
       ? decodeURIComponent(error.replace(/\+/g, " "))
-      : SIGN_IN_INCOMPLETE;
+      : incomplete;
     navigate("/login", {
       replace: true,
       state: { oidcError: message, from: returnPath ?? undefined },
@@ -73,7 +75,7 @@ export function AuthCallbackPage() {
 
   return (
     <p className="text-sm text-gray-500 dark:text-gray-400">
-      Completing sign-in…
+      {t("auth.callback.completing")}
     </p>
   );
 }

@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 
+import { i18n } from "../i18n";
 import {
   ApiError,
   apiBaseUrl,
@@ -121,7 +122,7 @@ export const EMAIL_VERIFICATION_REQUIRED_KEY = "minder_email_verification_requir
 
 async function parseError(res: Response): Promise<string> {
   const data = await res.json().catch(() => ({}) as { detail?: string });
-  return data.detail || `Request failed (${res.status})`;
+  return data.detail || i18n().t("errors.requestFailed", { status: String(res.status) });
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

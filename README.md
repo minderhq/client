@@ -146,7 +146,7 @@ src/
 `leafVisible`: `adminOnly`, `requiresBilling`). `src/lib/routes.ts` holds the
 marketplace routes and every redirect. One vocabulary is used for the route,
 the tab, the page title (`PageHeader`) and the palette entry; tests hold the
-pages' titles to `nav.ts`. `useRouteFocus` moves focus to the new page's `<h1>`
+pages' titles to `nav.ts` (its copy: `src/i18n/messages`). `useRouteFocus` moves focus to the new page's `<h1>`
 after a client-side navigation.
 
 | Section › entry | Tabs → route | Who sees it |
@@ -160,6 +160,37 @@ after a client-side navigation.
 Old URLs (`/plugins/*`, `/ai-tools/*`, `/bundles/*`, `/platform/bundles`,
 `/marketplace/plugins/*`, …) redirect to these, query string included. Add to
 `LEGACY_REDIRECTS` when you move a page; never remove an entry.
+
+## Translations (i18n)
+
+The console ships in **English** and **Turkish**. Copy lives in typed message
+catalogs, not in components:
+
+- `src/i18n/messages/en.ts` is the source of truth for the keys;
+  `src/i18n/messages/tr.ts` is typed against it, so a key missing from (or
+  extra in) any language fails `tsc`, and `t()` rejects unknown keys too.
+- In a component: `const { t, plural, rich, formatDate, formatNumber } = useI18n()`.
+  `t("shell.searchOrJump")`; `{name}` placeholders take `t(key, { name })`;
+  plurals are objects of CLDR forms (`one`, `other`, optional `=0`) read with
+  `plural(key, count)`; `rich(key, { link: <a…/> })` fills a placeholder with a
+  React node. Dates and numbers go through `Intl` in the active locale.
+- Outside React (e.g. `friendlyErrorMessage`): `i18n().t(…)`.
+- Language on first visit: the saved choice (`localStorage` `minder-locale`),
+  then the browser's languages, then English. Users switch it in
+  **Settings › Language**; `<html lang>` follows. The choice is stored in the
+  browser for now; `src/i18n/locale.ts` marks where a per-user preference from
+  the API will plug in.
+- **Lint:** files listed in `I18N_MIGRATED_FILES` (`eslint.config.js`) may not
+  contain hard-coded user-facing text (JSX text, string children, `aria-label`,
+  `title`, `placeholder`, …). When you move a file's copy into the catalogs,
+  add it to that list. Write Turkish copy as natural Turkish with its proper
+  characters (ç ğ ı İ ö ş ü), not a word-for-word rendering.
+
+Why no i18n library: the catalogs are plain typed objects and the runtime is
+about 250 lines over `Intl.PluralRules` / `NumberFormat` / `DateTimeFormat`, so
+there is no extra dependency, keys are checked by `tsc` without codegen, and
+the whole change (runtime, both catalogs, migrated screens) adds about 9 kB
+gzipped to the bundle.
 
 ## Tests
 

@@ -2,11 +2,12 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { resolvePath, useLocation, useNavigate } from "react-router-dom";
 
+import { useI18n } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { searchCatalogPlugins } from "../lib/marketplace";
 import { useBillingAccess } from "../lib/useBillingAccess";
 import { useAuth } from "../lib/auth";
-import { leafVisible, NAV_DESTINATIONS } from "../lib/nav";
+import { leafVisible, useNav } from "../lib/nav";
 import { ROUTES } from "../lib/routes";
 import { getTheme, setTheme, type Theme } from "../lib/theme";
 import { kbdClass } from "../lib/ui";
@@ -27,7 +28,7 @@ interface Command {
   run?: () => void;
 }
 
-/** ⌘K / Ctrl-K jump-to across the whole app. Built from the same NAV_SECTIONS
+/** ⌘K / Ctrl-K jump-to across the whole app. Built from the same nav model
  * the sidebar uses (so every page is reachable) plus a handful of verb-first
  * quick actions. A 25-page tree is faster to search than to click through;
  * this is the keyboard-first path power users expect from an ops console.
@@ -55,14 +56,16 @@ export function CommandPalette({
   const listRef = useRef<HTMLUListElement>(null);
   const listboxId = useId();
   const modal = useModal({ open, onDismiss: onClose });
+  const { t, messages, locale } = useI18n();
+  const { destinations } = useNav();
 
   const commands = useMemo<Command[]>(() => {
-    const nav: Command[] = NAV_DESTINATIONS.filter((dest) =>
+    const nav: Command[] = destinations.filter((dest) =>
       leafVisible(dest, { isAdmin, isPlatformAdmin, billing }),
     ).map((dest) => ({
       id: `nav:${dest.to}:${dest.label}`,
       label: dest.label,
-      sublabel: dest.description ?? `Go to ${dest.group}`,
+      sublabel: dest.description ?? t("palette.goTo", { group: dest.group }),
       icon: dest.icon,
       group: dest.group,
       keywords: dest.keywords ?? "",
@@ -73,25 +76,41 @@ export function CommandPalette({
       const next = order[(order.indexOf(getTheme()) + 1) % order.length];
       setTheme(next);
     };
+    // Copy comes from the catalog (palette.actions.<key>).
+    const copy = messages.palette.actions;
+    const action = (
+      key: keyof typeof copy,
+      icon: IconName,
+      target: Pick<Command, "to" | "run">,
+    ): Command => ({
+      id: `act:${key}`,
+      ...copy[key],
+      icon,
+      group: t("palette.groupActions"),
+      ...target,
+    });
     const actions: Command[] = [
-      { id: "act:ask", label: "Ask a question", sublabel: "Query your knowledge", icon: "ask", group: "Actions", keywords: "chat rag query", to: "/ask" },
-      { id: "act:kb", label: "New knowledge base", sublabel: "Upload documents", icon: "knowledge-bases", group: "Actions", keywords: "create add upload", to: "/rag" },
-      { id: "act:pipe", label: "New pipeline", sublabel: "Combine knowledge bases", icon: "pipelines", group: "Actions", keywords: "create add", to: "/rag/pipelines" },
-      { id: "act:model", label: "Pull a model", sublabel: "Ollama model lifecycle", icon: "models", group: "Actions", keywords: "download install ollama", to: "/platform" },
-      { id: "act:theme", label: "Toggle theme", sublabel: "System / light / dark", icon: "theme-dark", group: "Actions", keywords: "dark light mode appearance", run: cycleTheme },
+      action("ask", "ask", { to: "/ask" }),
+      action("kb", "knowledge-bases", { to: "/rag" }),
+      action("pipeline", "pipelines", { to: "/rag/pipelines" }),
+      action("model", "models", { to: "/platform" }),
+      action("theme", "theme-dark", { run: cycleTheme }),
     ];
     return [...actions, ...nav];
-  }, [isAdmin, isPlatformAdmin, billing]);
+  }, [isAdmin, isPlatformAdmin, billing, destinations, messages, t]);
 
   const staticResults = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    // Fold every dotted/dotless I to plain "i" before lowercasing, so a Turkish
+    // "İ"/"ı" query matches English labels and "API" still matches "api" under tr.
+    const fold = (s: string) => s.replace(/[İIı]/g, "i").toLocaleLowerCase(locale);
+    const q = fold(query.trim());
     if (!q) return commands;
     const terms = q.split(/\s+/);
     return commands.filter((c) => {
-      const hay = `${c.label} ${c.sublabel} ${c.group} ${c.keywords}`.toLowerCase();
-      return terms.every((t) => hay.includes(t));
+      const hay = fold(`${c.label} ${c.sublabel} ${c.group} ${c.keywords}`);
+      return terms.every((term) => hay.includes(term));
     });
-  }, [commands, query]);
+  }, [commands, query, locale]);
 
   // Live resource search (#1210): find a specific KB / pipeline / plugin by
   // name, not just pages. Debounced; navigates to the resource's list page with
@@ -131,9 +150,9 @@ export function CommandPalette({
           out.push({
             id: `kb:${kb.id}`,
             label: kb.name,
-            sublabel: "Open in Knowledge Bases",
+            sublabel: t("palette.openInKnowledgeBases"),
             icon: "knowledge-bases",
-            group: "Knowledge base",
+            group: t("palette.groupKnowledgeBase"),
             keywords: "",
             to: `/rag?q=${encodeURIComponent(kb.name)}`,
           });
@@ -146,9 +165,9 @@ export function CommandPalette({
           out.push({
             id: `pipe:${p.id}`,
             label: p.name,
-            sublabel: "Open in Pipelines",
+            sublabel: t("palette.openInPipelines"),
             icon: "pipelines",
-            group: "Pipeline",
+            group: t("palette.groupPipeline"),
             keywords: "",
             to: `/rag/pipelines?q=${encodeURIComponent(p.name)}`,
           });
@@ -160,9 +179,9 @@ export function CommandPalette({
           out.push({
             id: `plugin:${pl.name}`,
             label: name,
-            sublabel: "Open in Discover plugins",
+            sublabel: t("palette.openInDiscoverPlugins"),
             icon: "plugins",
-            group: "Plugin",
+            group: t("palette.groupPlugin"),
             keywords: "",
             to: `${ROUTES.discoverPlugins}?q=${encodeURIComponent(name)}`,
           });
@@ -171,7 +190,7 @@ export function CommandPalette({
       setResources(out);
     });
     return () => ctrl.abort();
-  }, [open, debouncedQuery, sessionKey, tokenRef]);
+  }, [open, debouncedQuery, sessionKey, tokenRef, t]);
 
   const results = useMemo(
     () => [...staticResults, ...resources],
@@ -257,7 +276,7 @@ export function CommandPalette({
         ref={modal.panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Command palette"
+        aria-label={t("palette.dialog")}
         className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg ring-1 ring-black/5 animate-[pop_0.16s_cubic-bezier(0.34,1.56,0.64,1)_both] dark:border-gray-800 dark:bg-gray-900"
       >
         <div className="flex items-center gap-2.5 border-b border-gray-200 px-4 dark:border-gray-800">
@@ -268,26 +287,26 @@ export function CommandPalette({
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
             role="combobox"
-            aria-label="Search pages and actions"
+            aria-label={t("palette.search")}
             aria-expanded="true"
             aria-controls={listboxId}
             aria-autocomplete="list"
-            placeholder="Search pages and actions…"
+            placeholder={t("palette.placeholder")}
             className="w-full bg-transparent py-3.5 text-sm text-gray-900 outline-none placeholder:text-gray-400 dark:text-gray-100"
           />
-          <kbd className={kbdClass}>Esc</kbd>
+          <kbd className={kbdClass}>{t("palette.escape")}</kbd>
         </div>
 
         <ul
           ref={listRef}
           id={listboxId}
           role="listbox"
-          aria-label="Results"
+          aria-label={t("palette.results")}
           className="max-h-[52vh] overflow-y-auto p-2"
         >
           {results.length === 0 && (
             <li className="px-3 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-              No matches for “{query}”.
+              {t("palette.noMatches", { query })}
             </li>
           )}
           {results.map((cmd, i) => {

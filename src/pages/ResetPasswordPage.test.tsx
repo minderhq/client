@@ -2,7 +2,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { PASSWORD_RESET_DONE, ResetPasswordPage } from "./ResetPasswordPage";
+import { en } from "../i18n";
+import { ResetPasswordPage } from "./ResetPasswordPage";
+
+const PASSWORD_RESET_DONE = en.auth.reset.done;
 
 let isAuthenticated = false;
 const logout = vi.fn(() => {

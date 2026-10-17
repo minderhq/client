@@ -5,8 +5,10 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { getLocale, setLocale } from "../i18n";
 import type { UserProfile } from "../lib/profile";
 import { SettingsPage } from "./SettingsPage";
 
@@ -79,7 +81,31 @@ describe("SettingsPage", () => {
     fetchMyProfile.mockResolvedValue(profileFixture());
     updateMyProfile.mockResolvedValue(profileFixture());
   });
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    setLocale("en");
+  });
+
+  it("switches the UI language from the Language section, at once", () => {
+    render(<SettingsPage />);
+    const select = screen.getByLabelText("Display language") as HTMLSelectElement;
+    expect(select.value).toBe("en");
+    expect(Array.from(select.options).map((o) => o.textContent)).toEqual([
+      "English",
+      "Türkçe",
+    ]);
+
+    act(() => {
+      fireEvent.change(select, { target: { value: "tr" } });
+    });
+    expect(getLocale()).toBe("tr");
+    expect(document.documentElement.lang).toBe("tr");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Ayarlar");
+    expect(screen.getByRole("button", { name: "Çıkış yap" })).toBeTruthy();
+    expect((screen.getByLabelText("Arayüz dili") as HTMLSelectElement).value).toBe("tr");
+    // Switching doesn't touch the server profile (local for now).
+    expect(updateMyProfile).not.toHaveBeenCalled();
+  });
 
   it("redirects home when not authenticated", () => {
     isAuthenticated = false;

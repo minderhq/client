@@ -2,8 +2,11 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { RESET_REQUEST_SENT } from "../components/PasswordResetRequestForm";
-import { ASK_ADMIN_TO_RESET, ForgotPasswordPage } from "./ForgotPasswordPage";
+import { en } from "../i18n";
+import { ForgotPasswordPage } from "./ForgotPasswordPage";
+
+const RESET_REQUEST_SENT = en.auth.resetRequest.sent;
+const ASK_ADMIN_TO_RESET = en.auth.forgot.askAdmin;
 
 function respond(status: number, body?: unknown): Response {
   return { ok: status >= 200 && status < 300, status, json: async () => body } as Response;

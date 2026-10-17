@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 
+import { useI18n } from "../i18n";
 import { useAuth } from "../lib/auth";
 import { primaryButtonClass, secondaryButtonClass } from "../lib/ui";
 import { Icon } from "./Icon";
@@ -11,12 +12,13 @@ import { Icon } from "./Icon";
  * needs the `*.minder.local` Traefik hostnames (real DNS + TLS). */
 export function UserMenu() {
   const { isAuthenticated, username, logout } = useAuth();
+  const { t } = useI18n();
 
   if (!isAuthenticated) {
     return (
       <Link to="/login" className={primaryButtonClass}>
         <Icon name="login" size={16} />
-        Log in
+        {t("common.logIn")}
       </Link>
     );
   }
@@ -34,10 +36,10 @@ export function UserMenu() {
         type="button"
         onClick={logout}
         className={secondaryButtonClass}
-        title="Log out"
+        title={t("common.logOut")}
       >
         <Icon name="logout" size={16} />
-        <span className="hidden sm:inline">Log out</span>
+        <span className="hidden sm:inline">{t("common.logOut")}</span>
       </button>
     </div>
   );

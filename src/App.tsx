@@ -11,6 +11,7 @@ import { RedirectWithQuery } from "./components/RedirectWithQuery";
 import { Sidebar } from "./components/Sidebar";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { UserMenu } from "./components/UserMenu";
+import { useI18n } from "./i18n";
 import { AuthProvider } from "./lib/auth";
 import { isModalOpen } from "./lib/modalLayer";
 import { ORG_USERS_PATH } from "./lib/orgs";
@@ -61,12 +62,15 @@ import { WorkspaceGate } from "./pages/WaitingRoomPage";
 
 const isMac =
   typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+/** The palette shortcut's modifier key, as printed on the keyboard. */
+const MOD_KEY = isMac ? "⌘" : "Ctrl";
 
 export function App() {
   // Mobile-only: the sidebar is always visible on lg+ (Sidebar.tsx's own
   // lg:translate-x-0 lg:static), this only controls the slide-in overlay
   // below that breakpoint.
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { t } = useI18n();
   const [paletteOpen, setPaletteOpen] = useState(false);
   // Re-key the ErrorBoundary per route so navigating to another page clears a
   // previous page's crash instead of staying stuck on the fallback.
@@ -110,7 +114,7 @@ export function App() {
               type="button"
               onClick={() => setSidebarOpen((v) => !v)}
               className={`${iconButtonClass} lg:hidden`}
-              aria-label="Toggle navigation"
+              aria-label={t("shell.toggleNav")}
             >
               <Icon name="menu" size={20} />
             </button>
@@ -125,13 +129,13 @@ export function App() {
             <button
               type="button"
               onClick={() => setPaletteOpen(true)}
-              aria-label="Open command palette"
+              aria-label={t("shell.openPalette")}
               className="ml-1 hidden w-full max-w-sm items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-400 shadow-sm transition hover:border-gray-400 hover:text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600 sm:flex"
             >
               <Icon name="search" size={16} />
-              <span>Search or jump to…</span>
+              <span>{t("shell.searchOrJump")}</span>
               <span className="ml-auto flex items-center gap-0.5">
-                <kbd className={kbdClass}>{isMac ? "⌘" : "Ctrl"}</kbd>
+                <kbd className={kbdClass}>{MOD_KEY}</kbd>
                 <kbd className={kbdClass}>K</kbd>
               </span>
             </button>
@@ -140,7 +144,7 @@ export function App() {
               <button
                 type="button"
                 onClick={() => setPaletteOpen(true)}
-                aria-label="Open command palette"
+                aria-label={t("shell.openPalette")}
                 className={`${iconButtonClass} sm:hidden`}
               >
                 <Icon name="search" size={18} />

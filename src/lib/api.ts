@@ -1,3 +1,4 @@
+import { i18n } from "../i18n";
 import { decodeJwtClaims } from "./jwt";
 
 // VITE_API_BASE_URL is baked in at BUILD time (Vite convention), not read at
@@ -263,13 +264,13 @@ export class ApiError extends Error {
  * treatment without each one re-deriving it. */
 export function friendlyErrorMessage(e: unknown): string {
   if (e instanceof ApiError && e.status === 401) {
-    return "Your session expired — log in again.";
+    return i18n().t("errors.sessionExpired");
   }
   if (e instanceof ApiError && isWorkspaceRequired(e)) {
-    return "You don't have a workspace yet.";
+    return i18n().t("errors.noWorkspace");
   }
   if (isEmailVerificationRequired(e)) {
-    return "Confirm your email address to continue.";
+    return i18n().t("errors.confirmEmail");
   }
   return e instanceof Error ? e.message : String(e);
 }
@@ -318,7 +319,11 @@ function errorDetail(data: unknown, status: number): string {
       : d.error;
   }
   if (detail !== undefined) return JSON.stringify(detail);
-  return `Request failed (${status})`;
+  // No detail from the server: say what the status means where it's clear.
+  const { t } = i18n();
+  if (status === 403) return t("errors.forbidden");
+  if (status === 404) return t("errors.notFound");
+  return t("errors.requestFailed", { status: String(status) });
 }
 
 export interface ApiOptions {
