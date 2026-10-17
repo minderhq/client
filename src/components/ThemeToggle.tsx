@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { useI18n } from "../i18n";
 import { getTheme, setTheme, type Theme } from "../lib/theme";
 import { iconButtonClass } from "../lib/ui";
 import { Icon, type IconName } from "./Icon";
@@ -10,7 +11,6 @@ const ICON: Record<Theme, IconName> = {
   light: "theme-light",
   dark: "theme-dark",
 };
-const LABEL: Record<Theme, string> = { system: "System", light: "Light", dark: "Dark" };
 
 /** One button, cycling system -> light -> dark -> system. A 3-way toggle
  * (rather than a plain light/dark switch) keeps "follow my OS" available as
@@ -18,6 +18,8 @@ const LABEL: Record<Theme, string> = { system: "System", light: "Light", dark: "
  * into." */
 export function ThemeToggle() {
   const [theme, setThemeState] = useState<Theme>(() => getTheme());
+  const { t } = useI18n();
+  const label = t(`theme.${theme}`);
 
   function cycle() {
     const next = ORDER[(ORDER.indexOf(theme) + 1) % ORDER.length];
@@ -29,8 +31,8 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={cycle}
-      title={`Theme: ${LABEL[theme]} (click to change)`}
-      aria-label={`Theme: ${LABEL[theme]}. Click to switch.`}
+      title={t("theme.toggleTitle", { theme: label })}
+      aria-label={t("theme.toggleLabel", { theme: label })}
       className={iconButtonClass}
     >
       <Icon name={ICON[theme]} size={18} />

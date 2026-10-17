@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import { StatusLine } from "../components/StatusLine";
+import { useI18n } from "../i18n";
 import { friendlyErrorMessage, oidcLoginUrl } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { passwordResetOffered, useAuthCapabilities } from "../lib/passwordReset";
@@ -39,6 +40,7 @@ export function LoginPage() {
   const { isAuthenticated, login, register } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useI18n();
 
   const routeState = location.state as
     | { oidcError?: string; notice?: string; username?: string; from?: string }
@@ -128,12 +130,10 @@ export function LoginPage() {
   return (
     <div className="mx-auto max-w-sm">
       <h1 className="mb-1 text-2xl font-bold text-gray-900 dark:text-gray-100">
-        {mode === "login" ? "Log in" : "Create an account"}
+        {mode === "login" ? t("auth.login.titleLogin") : t("auth.login.titleRegister")}
       </h1>
       <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-        {mode === "login"
-          ? "Sign in with your Minder account to make changes. Browsing stays open without logging in."
-          : "Create a local Minder account, then you'll be signed in."}
+        {mode === "login" ? t("auth.login.introLogin") : t("auth.login.introRegister")}
       </p>
 
       <form onSubmit={handleSubmit} className={`flex flex-col gap-3 ${cardClass}`}>
@@ -142,7 +142,7 @@ export function LoginPage() {
             htmlFor="login-username"
             className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
           >
-            Username
+            {t("common.username")}
           </label>
           <input
             id="login-username"
@@ -162,7 +162,7 @@ export function LoginPage() {
               htmlFor="login-email"
               className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
             >
-              Email
+              {t("common.email")}
             </label>
             <input
               id="login-email"
@@ -181,7 +181,7 @@ export function LoginPage() {
             htmlFor="login-password"
             className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
           >
-            Password
+            {t("common.password")}
           </label>
           <input
             id="login-password"
@@ -199,7 +199,7 @@ export function LoginPage() {
                 to="/forgot-password"
                 className="text-gray-600 underline hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400"
               >
-                Forgot password?
+                {t("auth.login.forgotLink")}
               </Link>
             </p>
           )}
@@ -207,17 +207,17 @@ export function LoginPage() {
               dead-end link, just who can help. */}
           {mode === "login" && !capabilitiesLoading && !passwordResetAvailable && (
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Forgot your password? Ask your administrator to reset it.
+              {t("auth.login.forgotAskAdmin")}
             </p>
           )}
         </div>
 
         <button type="submit" disabled={busy} className={primaryButtonClass}>
           {busy
-            ? "Please wait…"
+            ? t("common.pleaseWait")
             : mode === "login"
-              ? "Log in"
-              : "Create account & log in"}
+              ? t("common.logIn")
+              : t("auth.login.submitRegister")}
         </button>
 
         <StatusLine>{notice}</StatusLine>
@@ -226,18 +226,14 @@ export function LoginPage() {
 
       {mode === "login" && signUpMode === "invite" && (
         <p className="mt-3 text-center text-sm text-gray-600 dark:text-gray-400">
-          No account yet? Accounts on this instance are created by invitation.
-          If you were invited, open the link in your invitation. Otherwise, ask
-          an administrator of your organization to invite you.
+          {t("auth.login.inviteOnly")}
         </p>
       )}
 
       {mode === "login" && signUpMode === "sso_only" && (
         <p className="mt-3 text-center text-sm text-gray-600 dark:text-gray-400">
-          No account yet? Sign-up is turned off on this instance.{" "}
-          {oidcLoginUrl
-            ? "Sign in with SSO below; your account is set up the first time you do."
-            : "Ask an administrator to create an account for you."}
+          {t("auth.login.ssoOnly")}{" "}
+          {oidcLoginUrl ? t("auth.login.ssoOnlyUseSso") : t("auth.login.ssoOnlyAskAdmin")}
         </p>
       )}
 
@@ -250,7 +246,7 @@ export function LoginPage() {
         <p className="mt-3 text-center text-sm text-gray-600 dark:text-gray-400">
           {mode === "login" ? (
             <>
-              No account yet?{" "}
+              {t("auth.login.noAccount")}{" "}
               <button
                 type="button"
                 onClick={() => {
@@ -259,12 +255,12 @@ export function LoginPage() {
                 }}
                 className="underline hover:text-indigo-600 dark:hover:text-indigo-400"
               >
-                Create one
+                {t("auth.login.createOne")}
               </button>
             </>
           ) : (
             <>
-              Already have an account?{" "}
+              {t("auth.login.haveAccount")}{" "}
               <button
                 type="button"
                 onClick={() => {
@@ -273,7 +269,7 @@ export function LoginPage() {
                 }}
                 className="underline hover:text-indigo-600 dark:hover:text-indigo-400"
               >
-                Log in
+                {t("common.logIn")}
               </button>
             </>
           )}
@@ -289,7 +285,7 @@ export function LoginPage() {
         <>
           <div className="my-5 flex items-center gap-3 text-xs text-gray-400">
             <span className="h-px flex-1 bg-gray-200 dark:bg-gray-800" />
-            or
+            {t("common.or")}
             <span className="h-px flex-1 bg-gray-200 dark:bg-gray-800" />
           </div>
 
@@ -304,14 +300,13 @@ export function LoginPage() {
             }}
             className={`block text-center ${secondaryButtonClass}`}
           >
-            Sign in with SSO (Authelia)
+            {t("auth.login.ssoButton")}
           </a>
           <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
-            SSO requires reaching Minder through its Traefik hostname with a real
-            domain + TLS.
+            {t("auth.login.ssoNeedsDomain")}
           </p>
           <p className="mt-1 text-center text-xs text-gray-500 dark:text-gray-400">
-            SSO accounts reset their password at their identity provider.
+            {t("auth.login.ssoResetNote")}
           </p>
         </>
       )}

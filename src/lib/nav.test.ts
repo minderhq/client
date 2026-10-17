@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 
+import { tr } from "../i18n/messages/tr";
 import {
   NAV_DESTINATIONS,
   NAV_SECTIONS,
   entryIsActive,
   leafVisible,
+  localizeNav,
+  navDestinations,
   tabGroupForPath,
   visibleEntry,
   type NavAccess,
@@ -252,5 +255,41 @@ describe("nav — command palette destinations", () => {
     expect(find("review queue", MEMBER)).toEqual([]);
     expect(find("subscription", MEMBER)).not.toContain(ROUTES.billing);
     expect(find("licenses", MEMBER)).toContain(ROUTES.licenses);
+  });
+});
+
+describe("nav — localized copy (i18n)", () => {
+  const routes = (sections: ReturnType<typeof localizeNav>) =>
+    sections.map((s) => s.items.map((i) => [i.to, (i.tabs ?? []).map((t) => t.to)]));
+  const turkish = localizeNav(tr);
+
+  it("has the same structure in every language", () => {
+    expect(routes(turkish)).toEqual(routes(NAV_SECTIONS));
+  });
+
+  it("labels sections, entries, tabs and palette destinations in the language", () => {
+    expect(turkish.map((s) => s.label)).toEqual([
+      undefined,
+      "Bilgi",
+      "Pazar yeri",
+      "Platform",
+      "Kuruluş",
+      "Kurulum ayarları",
+    ]);
+    expect(turkish[0].items.map((i) => i.label)).toEqual(["Ana sayfa", "Sor"]);
+    expect(tabGroupForPath(ROUTES.installedAiTools, turkish)?.tabs?.map((t) => t.label)).toEqual([
+      "Eklentiler",
+      "Yapay zekâ araçları",
+      "Hizmet paketleri",
+    ]);
+    const destinations = navDestinations(turkish, tr);
+    expect(destinations.find((d) => d.to === ROUTES.installedAiTools)?.label).toBe(
+      "Kurulu yapay zekâ araçları",
+    );
+    // A tab without a page title of its own reads "<entry>: <tab>".
+    expect(destinations.find((d) => d.to === "/rag/taxonomy-review")?.label).toBe(
+      "Bilgi grafiği: Sınıflandırma incelemesi",
+    );
+    expect(destinations.find((d) => d.to === "/")?.group).toBe("Genel");
   });
 });

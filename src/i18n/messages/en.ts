@@ -1,0 +1,268 @@
+/**
+ * English messages: the source of truth for the catalog's shape (see
+ * ../types.ts). Add a key here first; `tsc` then fails until every other
+ * catalog has it too.
+ *
+ * Placeholders are `{name}`; a plural message is an object of CLDR forms
+ * (`one`, `other`, optionally `=0`) and gets `{count}`.
+ */
+import type { MessageTree } from "../types";
+
+export const en = {
+  common: {
+    loading: "Loading…",
+    pleaseWait: "Please wait…",
+    saving: "Saving…",
+    sending: "Sending…",
+    retry: "Retry",
+    retryLoading: "loading {what}",
+    tryAgain: "Try again",
+    reload: "Reload",
+    cancel: "Cancel",
+    logIn: "Log in",
+    logOut: "Log out",
+    signOut: "Sign out",
+    email: "Email",
+    username: "Username",
+    password: "Password",
+    or: "or",
+    empty: "Nothing here yet.",
+    results: { "=0": "No results", one: "{count} result", other: "{count} results" },
+  },
+
+  errors: {
+    sessionExpired: "Your session expired — log in again.",
+    noWorkspace: "You don't have a workspace yet.",
+    confirmEmail: "Confirm your email address to continue.",
+    requestFailed: "Request failed ({status})",
+    forbidden: "You don't have permission to do this.",
+    notFound: "We couldn't find what you were looking for.",
+    crashTitle: "This page hit an unexpected error",
+    crashBody:
+      "The rest of the app still works — pick another page from the menu, or reload to try again.",
+  },
+
+  shell: {
+    tagline: "Control Center",
+    mainNav: "Main",
+    toggleNav: "Toggle navigation",
+    openPalette: "Open command palette",
+    searchOrJump: "Search or jump to…",
+    tabsLabel: "{group} sections",
+  },
+
+  theme: {
+    system: "System",
+    light: "Light",
+    dark: "Dark",
+    matchSystem: "Match system",
+    toggleTitle: "Theme: {theme} (click to change)",
+    toggleLabel: "Theme: {theme}. Click to switch.",
+  },
+
+  palette: {
+    dialog: "Command palette",
+    search: "Search pages and actions",
+    placeholder: "Search pages and actions…",
+    results: "Results",
+    noMatches: "No matches for “{query}”.",
+    goTo: "Go to {group}",
+    escape: "Esc",
+    groupActions: "Actions",
+    groupKnowledgeBase: "Knowledge base",
+    groupPipeline: "Pipeline",
+    groupPlugin: "Plugin",
+    openInKnowledgeBases: "Open in Knowledge Bases",
+    openInPipelines: "Open in Pipelines",
+    openInDiscoverPlugins: "Open in Discover plugins",
+    actions: {
+      ask: { label: "Ask a question", sublabel: "Query your knowledge", keywords: "chat rag query" },
+      kb: { label: "New knowledge base", sublabel: "Upload documents", keywords: "create add upload" },
+      pipeline: { label: "New pipeline", sublabel: "Combine knowledge bases", keywords: "create add" },
+      model: { label: "Pull a model", sublabel: "Ollama model lifecycle", keywords: "download install ollama" },
+      theme: { label: "Toggle theme", sublabel: "System / light / dark", keywords: "dark light mode appearance" },
+    },
+  },
+
+  nav: {
+    /** A tab's palette label when it has no page title of its own. */
+    tabInGroup: "{group}: {tab}",
+    sections: {
+      overview: "Overview",
+      knowledge: "Knowledge",
+      marketplace: "Marketplace",
+      platform: "Platform",
+      organization: "Organization",
+      installationSettings: "Installation settings",
+    },
+    items: {
+      home: { label: "Home", description: "Your workspace at a glance", keywords: "dashboard overview start" },
+      ask: { label: "Ask", description: "Chat with your knowledge", keywords: "chat query question rag answer" },
+      knowledgeBases: { label: "Knowledge Bases", description: "Upload & manage your documents", keywords: "documents kb corpus upload files" },
+      pipelines: { label: "Pipelines", description: "Set up question-answering over your documents", keywords: "retrieval query hyde self-rag q&a" },
+      conversations: { label: "Conversations", description: "Revisit your past chats", keywords: "history threads chat" },
+      publicChat: { label: "Public Chat", description: "Publish a public chatbot over a pipeline (admin)", keywords: "public chatbot widget endpoint slug anonymous embed share rate limit" },
+      knowledgeGraph: { label: "Knowledge Graph", description: "Entities, categories & merges from your documents", keywords: "neo4j entities relationships correlation taxonomy categories merge same_as dedup" },
+      graph: { label: "Graph", description: "Entities and how they connect" },
+      taxonomyReview: { label: "Taxonomy Review", description: "Approve AI-suggested entity categories" },
+      entityMerges: { label: "Entity Merge Review", description: "Approve cross-org SAME_AS entity links (dual-control)" },
+      discover: { label: "Discover", description: "Find plugins, AI tools and service bundles to add", keywords: "marketplace catalog browse store available install extensions" },
+      discoverPlugins: { label: "Plugins", title: "Discover plugins", description: "The plugin catalog, filterable by source", keywords: "plugin connectors source first-party private git submitted mindhub" },
+      discoverAiTools: { label: "AI tools", title: "Discover AI tools", description: "Every AI tool plugins offer, running or not", keywords: "ai tool function calling ollama actions" },
+      discoverServiceBundles: { label: "Service bundles", title: "Discover service bundles", description: "Service bundles you can turn on", keywords: "bundle services capabilities enable monitoring inference voice" },
+      installed: { label: "Installed", description: "Everything on this installation: version, health and settings", keywords: "marketplace running runtime enabled manage configure" },
+      installedPlugins: { label: "Plugins", title: "Installed plugins", description: "What runs on this installation, plus your installs", keywords: "plugin running runtime version health first-party config settings enable disable uninstall" },
+      installedAiTools: { label: "AI tools", title: "Installed AI tools", description: "AI tools the assistant can call right now", keywords: "ai tool live callable function calling" },
+      installedServiceBundles: { label: "Service bundles", title: "Installed service bundles", description: "Service bundles turned on, their images, export and import", keywords: "bundle services enabled reconcile export import docker" },
+      publish: { label: "Publish", description: "Submit your own plugins; review submissions (admin)", keywords: "marketplace plugins publish developer author" },
+      submissions: { label: "Submissions", title: "Plugin submissions", description: "Submit a plugin and follow its review", keywords: "submit draft upload" },
+      submissionReview: { label: "Submission review", title: "Submission review", description: "Approve or reject submitted plugins (admin)", keywords: "review queue approve reject moderation" },
+      models: { label: "Models", description: "Local LLMs (Ollama): pull, test, remove", keywords: "ollama llm pull download" },
+      providers: { label: "Providers & defaults", description: "Default models per task; connect OpenAI-compatible or Anthropic providers (admin)", keywords: "openai anthropic cloud remote provider api key credential default models answer chat extraction utility" },
+      voice: { label: "Voice", description: "Text-to-speech & speech-to-text", keywords: "tts stt speech piper transcribe" },
+      backups: { label: "Backups", description: "Snapshot & restore the platform", keywords: "restore archive snapshot" },
+      status: { label: "Status", description: "Service health & recent logs", keywords: "health services uptime logs" },
+      orgOverview: { label: "Overview", description: "Your org, its invites & switching", keywords: "organization tenant workspace switch invites" },
+      orgUsers: { label: "Users", description: "This org's members: roles, suspend, remove, account resets", keywords: "users members people accounts suspend remove reset password deactivate roles" },
+      billingAndLicenses: { label: "Billing & licenses", description: "Your plan, subscription and plugin licenses", keywords: "subscription plan payment license entitlement" },
+      billing: { label: "Billing", title: "Billing", description: "Your plan, subscription & upgrades", keywords: "subscription plan upgrade payment tier pricing invoice" },
+      licenses: { label: "Licenses", title: "Plugin licenses", description: "The plugin tiers licensed to your account (display-only)", keywords: "my licenses tier plugin" },
+      teams: { label: "Teams", description: "Group people & share resources", keywords: "groups members sharing collaborate" },
+      allOrganizations: { label: "All Organizations", description: "Every org on the instance + provisioning (admin)", keywords: "organizations tenants provision create admin" },
+      allUsers: { label: "All Users", description: "Every account on the installation, across orgs (Platform Admin)", keywords: "users accounts roles platform admin people members instance" },
+      audit: { label: "Audit Log", description: "Append-only record of privileged actions (admin)", keywords: "audit log security history who did what siem" },
+      sources: { label: "MindHub & sources", title: "MindHub & sources", description: "Where this installation's plugins come from (operators)", keywords: "mindhub sources plugin source repositories git private mirror connect operator platform admin" },
+    },
+  },
+
+  auth: {
+    login: {
+      titleLogin: "Log in",
+      titleRegister: "Create an account",
+      introLogin:
+        "Sign in with your Minder account to make changes. Browsing stays open without logging in.",
+      introRegister: "Create a local Minder account, then you'll be signed in.",
+      forgotLink: "Forgot password?",
+      forgotAskAdmin: "Forgot your password? Ask your administrator to reset it.",
+      submitRegister: "Create account & log in",
+      inviteOnly:
+        "No account yet? Accounts on this instance are created by invitation. If you were invited, open the link in your invitation. Otherwise, ask an administrator of your organization to invite you.",
+      ssoOnly: "No account yet? Sign-up is turned off on this instance.",
+      ssoOnlyUseSso: "Sign in with SSO below; your account is set up the first time you do.",
+      ssoOnlyAskAdmin: "Ask an administrator to create an account for you.",
+      noAccount: "No account yet?",
+      createOne: "Create one",
+      haveAccount: "Already have an account?",
+      ssoButton: "Sign in with SSO (Authelia)",
+      ssoNeedsDomain:
+        "SSO requires reaching Minder through its Traefik hostname with a real domain + TLS.",
+      ssoResetNote: "SSO accounts reset their password at their identity provider.",
+    },
+    callback: {
+      completing: "Completing sign-in…",
+      incomplete: "Sign-in did not complete — please try again.",
+    },
+    forgot: {
+      title: "Reset your password",
+      intro:
+        "Enter the email address of your Minder account and we'll send you a link to choose a new password.",
+      askAdmin:
+        "Password reset by email isn't available on this server. Ask your administrator to reset your password.",
+      ssoNote:
+        "If you sign in with SSO, your password is managed by your identity provider: reset it there. Requesting a link here sends an SSO account a reminder email instead of a reset link.",
+      backToLogin: "Back to log in",
+    },
+    resetRequest: {
+      sent:
+        "If an account exists for that address, we've sent it a link to reset your password. Check your inbox and spam folder. The link works once and expires within an hour.",
+      rateLimited: "Too many requests. Wait a minute, then try again.",
+      invalidEmail: "Enter a valid email address.",
+      failed: "The request could not be sent right now. Try again later.",
+      submit: "Send reset link",
+    },
+    reset: {
+      title: "Choose a new password",
+      done: "Your password has been reset. Log in with your new password.",
+      hint:
+        "Use at least {min} characters. The limit is {max} bytes: that's {max} plain letters or digits, fewer with accents or emoji.",
+      tooLong:
+        "This password is too long. Keep it under {max} bytes: accented letters, other scripts and emoji count as 2 to 4 each.",
+      tooShort: {
+        one: "Password must be at least {count} character.",
+        other: "Password must be at least {count} characters.",
+      },
+      mismatch: "The two passwords don't match.",
+      rateLimited: "Too many attempts. Wait a minute, then try again.",
+      rejected:
+        "The server rejected this password. Use at least {min} characters and at most {max} bytes.",
+      failed: "The password could not be reset right now. Try again later.",
+      expired:
+        "This reset link is invalid or has expired. Each link works once and only for a limited time, and requesting a new one cancels the older ones. Send yourself a new link below.",
+      newLink: "Send me a new link",
+      needsLink: "This page needs the link from a password reset email.",
+      requestNewLink: "Request a new link",
+      signedIn: "You're signed in.",
+      signedInAs: "You're signed in as {username}.",
+      signOutFirst:
+        "Resetting a password signs that account out everywhere, so sign out first to continue.",
+      signOutAndContinue: "Sign out and continue",
+      newPassword: "New password",
+      confirmPassword: "Confirm new password",
+      showPasswords: "Show passwords",
+      hidePasswords: "Hide passwords",
+      submit: "Set new password",
+    },
+    forceChange: {
+      title: "Change your password",
+      subtitle: "An administrator reset your password. Choose a new one to continue.",
+      callout:
+        "Enter the password your administrator gave you as the current password, then choose a new one that only you know.",
+    },
+  },
+
+  settings: {
+    title: "Settings",
+    intro: "Your account, as Minder currently sees it.",
+    account: "Account",
+    role: "Role",
+    identityNote:
+      "Signed in via Authelia SSO or a local Minder account. A local account can change its password below; for an SSO account, change your password or group membership in {portal} — that's the actual identity source for SSO logins, not this page.",
+    portalLink: "Authelia's own portal",
+    portalPlain: "your identity provider's portal (Authelia)",
+    profile: {
+      heading: "Minder profile",
+      intro:
+        "Minder's own per-user preferences — separate from your Authelia identity above. These are saved to your account, so they follow you across devices.",
+      displayName: "Display name",
+      displayNameHint:
+        "How Minder addresses you in its own UI. Leave blank to use your username ({username}). This does not change your Authelia identity.",
+      theme: "Theme",
+      themeHint: "Applied immediately and remembered on your account.",
+      saved: "Profile saved.",
+      save: "Save profile",
+    },
+    language: {
+      heading: "Language",
+      label: "Display language",
+      hint: "Applied immediately and remembered in this browser.",
+    },
+    password: {
+      heading: "Change password",
+      intro:
+        "For local Minder accounts. Accounts that sign in via Authelia SSO change their password in the Authelia portal instead.",
+      current: "Current password",
+      new: "New password",
+      confirm: "Confirm new password",
+      minHint: { one: "At least {count} character.", other: "At least {count} characters." },
+      tooShort: {
+        one: "New password must be at least {count} character.",
+        other: "New password must be at least {count} characters.",
+      },
+      mismatch: "New passwords don't match.",
+      unchanged: "New password must differ from the current password.",
+      changed: "Password changed.",
+      changing: "Changing…",
+      submit: "Change password",
+    },
+  },
+} satisfies MessageTree;

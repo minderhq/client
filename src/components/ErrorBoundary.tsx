@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
+import { useI18n } from "../i18n";
 import { primaryButtonClass, secondaryButtonClass } from "../lib/ui";
 
 interface Props {
@@ -35,39 +36,44 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     const { error } = this.state;
     if (!error) return this.props.children;
-
-    return (
-      <div
-        role="alert"
-        className="mx-auto max-w-lg rounded-xl border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-950"
-      >
-        <h1 className="mb-1 text-lg font-semibold text-red-800 dark:text-red-200">
-          This page hit an unexpected error
-        </h1>
-        <p className="mb-4 text-sm text-red-700 dark:text-red-300">
-          The rest of the app still works — pick another page from the menu, or
-          reload to try again.
-        </p>
-        <pre className="mb-4 max-h-40 overflow-auto rounded-md bg-white/60 p-3 text-xs text-red-900 dark:bg-black/30 dark:text-red-200">
-          {error.message || String(error)}
-        </pre>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => this.setState({ error: null })}
-            className={secondaryButtonClass}
-          >
-            Try again
-          </button>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className={primaryButtonClass}
-          >
-            Reload
-          </button>
-        </div>
-      </div>
-    );
+    return <CrashFallback error={error} onRetry={() => this.setState({ error: null })} />;
   }
+}
+
+/** The fallback itself: a function component, so it can follow the active
+ * language with useI18n (a class component can't call hooks). */
+function CrashFallback({ error, onRetry }: { error: Error; onRetry: () => void }) {
+  const { t } = useI18n();
+  return (
+    <div
+      role="alert"
+      className="mx-auto max-w-lg rounded-xl border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-950"
+    >
+      <h1 className="mb-1 text-lg font-semibold text-red-800 dark:text-red-200">
+        {t("errors.crashTitle")}
+      </h1>
+      <p className="mb-4 text-sm text-red-700 dark:text-red-300">
+        {t("errors.crashBody")}
+      </p>
+      <pre className="mb-4 max-h-40 overflow-auto rounded-md bg-white/60 p-3 text-xs text-red-900 dark:bg-black/30 dark:text-red-200">
+        {error.message || String(error)}
+      </pre>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={onRetry}
+          className={secondaryButtonClass}
+        >
+          {t("common.tryAgain")}
+        </button>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className={primaryButtonClass}
+        >
+          {t("common.reload")}
+        </button>
+      </div>
+    </div>
+  );
 }

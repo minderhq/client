@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { i18n, useI18n } from "../i18n";
 import { ApiError } from "../lib/api";
 import {
   rememberedResetEmail,
@@ -9,21 +10,13 @@ import {
 import { inputClass, primaryButtonClass } from "../lib/ui";
 import { StatusLine } from "./StatusLine";
 
-/** Shown after every accepted request, whatever happened server-side: it
- * never says whether the address has an account. The server lets operators
- * set the link lifetime between 15 and 60 minutes, so "within an hour" holds
- * for any setting; the email itself states the exact time. */
-export const RESET_REQUEST_SENT =
-  "If an account exists for that address, we've sent it a link to reset your password. Check your inbox and spam folder. The link works once and expires within an hour.";
-
-const RATE_LIMITED = "Too many requests. Wait a minute, then try again.";
-
 function requestErrorMessage(e: unknown): string {
+  const { t } = i18n();
   if (e instanceof ApiError) {
-    if (e.status === 429) return RATE_LIMITED;
-    if (e.status === 422) return "Enter a valid email address.";
+    if (e.status === 429) return t("auth.resetRequest.rateLimited");
+    if (e.status === 422) return t("auth.resetRequest.invalidEmail");
   }
-  return "The request could not be sent right now. Try again later.";
+  return t("auth.resetRequest.failed");
 }
 
 /** Email field that asks for a password reset link. Used by the forgot-password
@@ -33,11 +26,12 @@ function requestErrorMessage(e: unknown): string {
  * resubmitted by accident. */
 export function PasswordResetRequestForm({
   idPrefix,
-  submitLabel = "Send reset link",
+  submitLabel,
 }: {
   idPrefix: string;
   submitLabel?: string;
 }) {
+  const { t } = useI18n();
   const [email, setEmail] = useState(rememberedResetEmail);
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
@@ -70,7 +64,12 @@ export function PasswordResetRequestForm({
   if (sent) {
     return (
       <div ref={sentRef} tabIndex={-1} className="outline-none">
-        <StatusLine>{RESET_REQUEST_SENT}</StatusLine>
+        {/* Shown after every accepted request, whatever happened server-side:
+          it never says whether the address has an account. The server lets
+          operators set the link lifetime between 15 and 60 minutes, so
+          "within an hour" holds for any setting; the email itself states the
+          exact time. */}
+        <StatusLine>{t("auth.resetRequest.sent")}</StatusLine>
       </div>
     );
   }
@@ -84,7 +83,7 @@ export function PasswordResetRequestForm({
           htmlFor={inputId}
           className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
         >
-          Email
+          {t("common.email")}
         </label>
         <input
           ref={inputRef}
@@ -101,7 +100,7 @@ export function PasswordResetRequestForm({
         />
       </div>
       <button type="submit" disabled={busy} className={primaryButtonClass}>
-        {busy ? "Sending…" : submitLabel}
+        {busy ? t("common.sending") : (submitLabel ?? t("auth.resetRequest.submit"))}
       </button>
       <div id={errorId}>
         <StatusLine isError>{error}</StatusLine>

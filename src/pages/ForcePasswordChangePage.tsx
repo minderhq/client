@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 
 import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
+import { useI18n } from "../i18n";
 import { useAuth } from "../lib/auth";
 import { isGateExemptPath } from "../lib/recoveryRoutes";
 import { secondaryButtonClass } from "../lib/ui";
@@ -15,24 +16,24 @@ import { ChangePasswordSection } from "./SettingsPage";
  * flag server-side and here. */
 export function ForcePasswordChangePage() {
   const { token, clearMustChangePassword, logout } = useAuth();
+  const { t } = useI18n();
 
   return (
     <>
       <PageHeader
         icon="lock"
-        title="Change your password"
-        subtitle="An administrator reset your password. Choose a new one to continue."
+        title={t("auth.forceChange.title")}
+        subtitle={t("auth.forceChange.subtitle")}
       />
       <InfoCallout icon="lock" tone="warn">
-        Enter the password your administrator gave you as the current password,
-        then choose a new one that only you know.
+        {t("auth.forceChange.callout")}
       </InfoCallout>
       <ChangePasswordSection
         token={token}
         onChanged={clearMustChangePassword}
       />
       <button type="button" onClick={logout} className={secondaryButtonClass}>
-        Sign out
+        {t("common.signOut")}
       </button>
     </>
   );

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { useI18n } from "../i18n";
 import { ghostButtonClass, secondaryButtonClass } from "../lib/ui";
 import { Icon } from "./Icon";
 
@@ -36,6 +37,7 @@ export function LoadError({
   quiet?: boolean;
   className?: string;
 }) {
+  const { t } = useI18n();
   const retry = (
     <button
       type="button"
@@ -43,7 +45,11 @@ export function LoadError({
       className={quiet ? `${ghostButtonClass} px-2 py-1 text-xs` : secondaryButtonClass}
     >
       <Icon name="reset" size={quiet ? 13 : 15} />
-      Retry<span className="sr-only">{` loading ${what}`}</span>
+      {t("common.retry")}
+      <span className="sr-only">
+        {" "}
+        {t("common.retryLoading", { what })}
+      </span>
     </button>
   );
 

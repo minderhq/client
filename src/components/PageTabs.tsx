@@ -1,7 +1,8 @@
 import { NavLink, useLocation } from "react-router-dom";
 
+import { useI18n } from "../i18n";
 import { useAuth } from "../lib/auth";
-import { tabGroupForPath, visibleEntry } from "../lib/nav";
+import { tabGroupForPath, useNav, visibleEntry } from "../lib/nav";
 import { useBillingAccess } from "../lib/useBillingAccess";
 import { Icon } from "./Icon";
 
@@ -22,7 +23,9 @@ export function PageTabs() {
   const { pathname } = useLocation();
   const { role, isPlatformAdmin } = useAuth();
   const billing = useBillingAccess();
-  const entry = tabGroupForPath(pathname);
+  const { t } = useI18n();
+  const { sections } = useNav();
+  const entry = tabGroupForPath(pathname, sections);
   const group =
     entry && visibleEntry(entry, { isAdmin: role === "admin", isPlatformAdmin, billing });
   const tabs = group?.tabs ?? [];
@@ -30,7 +33,7 @@ export function PageTabs() {
 
   return (
     <nav
-      aria-label={`${group.label} sections`}
+      aria-label={t("shell.tabsLabel", { group: group.label })}
       className="mb-5 flex flex-wrap gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-gray-800 dark:bg-gray-900/60"
     >
       {tabs.map((tab) => (

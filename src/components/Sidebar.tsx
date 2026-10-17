@@ -1,8 +1,9 @@
 import { useId } from "react";
 import { Link, useLocation } from "react-router-dom";
 
+import { useI18n } from "../i18n";
 import { useAuth } from "../lib/auth";
-import { entryIsActive, NAV_SECTIONS, visibleEntry, type NavEntry } from "../lib/nav";
+import { entryIsActive, useNav, visibleEntry, type NavEntry } from "../lib/nav";
 import { useBillingAccess } from "../lib/useBillingAccess";
 import { sectionLabelClass } from "../lib/ui";
 import { BrandMark } from "./BrandMark";
@@ -17,7 +18,7 @@ const inactiveItemClass =
 /** The platform's persistent nav — a single always-visible tree, grouped by
  * what the user is trying to DO (Knowledge / Marketplace / Platform /
  * Organization / Installation settings) rather than by backend service. Renders from the
- * shared NAV_SECTIONS model (lib/nav.ts) the ⌘K palette also uses. The repetitive
+ * shared nav model (lib/nav.ts) the ⌘K palette also uses. The repetitive
  * Available/Installed pages collapse into one entry each (their siblings are
  * in-page tabs), and every row carries a plain-language tooltip so "what does
  * this do" is answerable without clicking. */
@@ -32,6 +33,8 @@ export function Sidebar({
   const access = { isAdmin: role === "admin", isPlatformAdmin, billing: useBillingAccess() };
   const { pathname } = useLocation();
   const sectionIdPrefix = useId();
+  const { t } = useI18n();
+  const { sections } = useNav();
 
   return (
     <aside
@@ -50,7 +53,7 @@ export function Sidebar({
         <span className="flex flex-col leading-none">
           <span className="font-mono text-lg font-bold tracking-tight">Minder</span>
           <span className="mt-0.5 text-[10px] font-medium uppercase tracking-widest text-gray-400 dark:text-gray-500">
-            Control Center
+            {t("shell.tagline")}
           </span>
         </span>
       </Link>
@@ -62,8 +65,8 @@ export function Sidebar({
         <OrgSwitcher />
       </div>
 
-      <nav aria-label="Main" className="flex flex-1 flex-col gap-5 px-3 pb-6">
-        {NAV_SECTIONS.map((section, i) => {
+      <nav aria-label={t("shell.mainNav")} className="flex flex-1 flex-col gap-5 px-3 pb-6">
+        {sections.map((section, i) => {
           const items = section.items
             .map((item) => visibleEntry(item, access))
             .filter((item): item is NavEntry => item !== null);

@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { InfoCallout } from "../components/InfoCallout";
 import { PasswordResetRequestForm } from "../components/PasswordResetRequestForm";
 import { StatusLine } from "../components/StatusLine";
+import { i18n, useI18n } from "../i18n";
 import { ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import {
@@ -27,21 +28,15 @@ import {
 } from "../lib/ui";
 import { useNoReferrer } from "../lib/useNoReferrer";
 
-export const PASSWORD_RESET_DONE =
-  "Your password has been reset. Log in with your new password.";
-
-const PASSWORD_HINT = `Use at least ${MIN_PASSWORD_LENGTH} characters. The limit is ${MAX_PASSWORD_BYTES} bytes: that's ${MAX_PASSWORD_BYTES} plain letters or digits, fewer with accents or emoji.`;
-
-const TOO_LONG = `This password is too long. Keep it under ${MAX_PASSWORD_BYTES} bytes: accented letters, other scripts and emoji count as 2 to 4 each.`;
+const LIMITS = { min: MIN_PASSWORD_LENGTH, max: MAX_PASSWORD_BYTES };
 
 function confirmErrorMessage(e: unknown): string {
+  const { t } = i18n();
   if (e instanceof ApiError) {
-    if (e.status === 429) return "Too many attempts. Wait a minute, then try again.";
-    if (e.status === 422) {
-      return `The server rejected this password. Use at least ${MIN_PASSWORD_LENGTH} characters and at most ${MAX_PASSWORD_BYTES} bytes.`;
-    }
+    if (e.status === 429) return t("auth.reset.rateLimited");
+    if (e.status === 422) return t("auth.reset.rejected", LIMITS);
   }
-  return "The password could not be reset right now. Try again later.";
+  return t("auth.reset.failed");
 }
 
 const labelClass = "mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300";
@@ -59,7 +54,9 @@ export function ResetPasswordPage() {
   const { isAuthenticated, username, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { t, plural, rich } = useI18n();
   useNoReferrer();
+  const tooLongMessage = t("auth.reset.tooLong", LIMITS);
 
   const [token, setToken] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
@@ -132,15 +129,15 @@ export function ResetPasswordPage() {
     if (!token || busy) return;
     setError({ text: "", field: null });
     if (passwordLength(password) < MIN_PASSWORD_LENGTH) {
-      fail(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`, "password");
+      fail(plural("auth.reset.tooShort", MIN_PASSWORD_LENGTH), "password");
       return;
     }
     if (tooLong) {
-      fail(TOO_LONG, "password");
+      fail(tooLongMessage, "password");
       return;
     }
     if (password !== confirm) {
-      fail("The two passwords don't match.", "confirm");
+      fail(t("auth.reset.mismatch"), "confirm");
       return;
     }
     setBusy(true);
@@ -162,13 +159,13 @@ export function ResetPasswordPage() {
     navigate("/login", {
       replace: true,
       state: {
-        notice: PASSWORD_RESET_DONE,
+        notice: t("auth.reset.done"),
         ...(signedOutAs ? { username: signedOutAs } : {}),
       },
     });
   }
 
-  const passwordError = tooLong ? TOO_LONG : error.text;
+  const passwordError = tooLong ? tooLongMessage : error.text;
   const describedBy = (field: "password" | "confirm") =>
     [
       field === "password" ? "reset-password-hint" : "",
@@ -182,29 +179,27 @@ export function ResetPasswordPage() {
   return (
     <div className="mx-auto w-full max-w-sm">
       <h1 className="mb-4 text-2xl font-bold text-gray-900 dark:text-gray-100">
-        Choose a new password
+        {t("auth.reset.title")}
       </h1>
 
       {expired && (
         <>
           <div ref={expiredRef} tabIndex={-1} className="outline-none">
             <InfoCallout icon="warning">
-              This reset link is invalid or has expired. Each link works once
-              and only for a limited time, and requesting a new one cancels the
-              older ones. Send yourself a new link below.
+              {t("auth.reset.expired")}
             </InfoCallout>
           </div>
           <div className={`mt-3 ${cardClass}`}>
-            <PasswordResetRequestForm idPrefix="reset-new-link" submitLabel="Send me a new link" />
+            <PasswordResetRequestForm idPrefix="reset-new-link" submitLabel={t("auth.reset.newLink")} />
           </div>
         </>
       )}
 
       {!expired && checked && !token && (
         <InfoCallout icon="warning">
-          This page needs the link from a password reset email.{" "}
+          {t("auth.reset.needsLink")}{" "}
           <Link to="/forgot-password" className="underline">
-            Request a new link
+            {t("auth.reset.requestNewLink")}
           </Link>
         </InfoCallout>
       )}
@@ -212,16 +207,17 @@ export function ResetPasswordPage() {
       {signedIn && (
         <div className={cardClass}>
           <p className="mb-3 text-sm text-gray-700 dark:text-gray-300">
-            You're signed in{username ? <> as <strong>{username}</strong></> : null}.
-            Resetting a password signs that account out everywhere, so sign
-            out first to continue.
+            {username
+              ? rich("auth.reset.signedInAs", { username: <strong>{username}</strong> })
+              : t("auth.reset.signedIn")}{" "}
+            {t("auth.reset.signOutFirst")}
           </p>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={signOutAndContinue} className={primaryButtonClass}>
-              Sign out and continue
+              {t("auth.reset.signOutAndContinue")}
             </button>
             <Link to="/" className={secondaryButtonClass}>
-              Cancel
+              {t("common.cancel")}
             </Link>
           </div>
         </div>
@@ -231,7 +227,7 @@ export function ResetPasswordPage() {
         <form onSubmit={handleSubmit} noValidate className={`flex flex-col gap-3 ${cardClass}`}>
           <div>
             <label htmlFor="reset-new-password" className={labelClass}>
-              New password
+              {t("auth.reset.newPassword")}
             </label>
             <input
               ref={passwordRef}
@@ -246,12 +242,12 @@ export function ResetPasswordPage() {
               required
             />
             <p id="reset-password-hint" className={fieldHintClass}>
-              {PASSWORD_HINT}
+              {t("auth.reset.hint", LIMITS)}
             </p>
           </div>
           <div>
             <label htmlFor="reset-confirm-password" className={labelClass}>
-              Confirm new password
+              {t("auth.reset.confirmPassword")}
             </label>
             <input
               ref={confirmRef}
@@ -273,10 +269,10 @@ export function ResetPasswordPage() {
             aria-controls="reset-new-password reset-confirm-password"
             className="self-start text-sm text-gray-600 underline hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400"
           >
-            {showPassword ? "Hide passwords" : "Show passwords"}
+            {showPassword ? t("auth.reset.hidePasswords") : t("auth.reset.showPasswords")}
           </button>
           <button type="submit" disabled={busy || tooLong} className={primaryButtonClass}>
-            {busy ? "Please wait…" : "Set new password"}
+            {busy ? t("common.pleaseWait") : t("auth.reset.submit")}
           </button>
           <div id="reset-password-error">
             <StatusLine isError>{passwordError}</StatusLine>
