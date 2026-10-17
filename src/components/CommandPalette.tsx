@@ -100,12 +100,14 @@ export function CommandPalette({
   }, [isAdmin, isPlatformAdmin, billing, destinations, messages, t]);
 
   const staticResults = useMemo(() => {
-    // Locale-aware case folding: Turkish "İ" lowercases to "i", not "i̇".
-    const q = query.trim().toLocaleLowerCase(locale);
+    // Fold every dotted/dotless I to plain "i" before lowercasing, so a Turkish
+    // "İ"/"ı" query matches English labels and "API" still matches "api" under tr.
+    const fold = (s: string) => s.replace(/[İIı]/g, "i").toLocaleLowerCase(locale);
+    const q = fold(query.trim());
     if (!q) return commands;
     const terms = q.split(/\s+/);
     return commands.filter((c) => {
-      const hay = `${c.label} ${c.sublabel} ${c.group} ${c.keywords}`.toLocaleLowerCase(locale);
+      const hay = fold(`${c.label} ${c.sublabel} ${c.group} ${c.keywords}`);
       return terms.every((term) => hay.includes(term));
     });
   }, [commands, query, locale]);

@@ -14,7 +14,7 @@ export const tr: Messages = {
     saving: "Kaydediliyor…",
     sending: "Gönderiliyor…",
     retry: "Yeniden dene",
-    retryLoading: "({what})",
+    retryLoading: "({what} yüklenemedi)",
     tryAgain: "Tekrar dene",
     reload: "Sayfayı yenile",
     cancel: "İptal",

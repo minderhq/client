@@ -3,6 +3,7 @@ import { StrictMode, useRef, useState } from "react";
 import { MemoryRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { setLocale } from "../i18n/locale";
 import { useRouteFocus } from "../lib/useRouteFocus";
 import { CommandPalette } from "./CommandPalette";
 import { useConfirm } from "./ConfirmDialog";
@@ -56,6 +57,19 @@ describe("CommandPalette — marketplace entries (#2197)", () => {
     mockBilling = true;
   });
   afterEach(cleanup);
+
+  it("matches dotted and dotless I either way under Turkish", () => {
+    setLocale("tr");
+    try {
+      open();
+      for (const q of ["işlem hat", "İŞLEM HAT", "IŞLEM HAT"]) {
+        search(q);
+        expect(resultLabels()).toContain("İşlem hatları");
+      }
+    } finally {
+      act(() => setLocale("en"));
+    }
+  });
 
   it("lists the marketplace pages by their page titles", () => {
     open();

@@ -29,7 +29,7 @@ function withReactHelpers(translator: Translator): I18n {
           null,
           ...parts.map((part, i) =>
             i % 2 === 1
-              ? createElement(Fragment, { key: i }, part in nodes ? nodes[part] : `{${part}}`)
+              ? createElement(Fragment, { key: i }, Object.hasOwn(nodes, part) ? nodes[part] : `{${part}}`)
               : part,
           ),
         );
