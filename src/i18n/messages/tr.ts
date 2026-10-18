@@ -268,7 +268,7 @@ export const tr: Messages = {
     profile: {
       heading: "Minder profili",
       intro:
-        "Minder'e özgü kişisel tercihleriniz; yukarıdaki Authelia kimliğinizden ayrıdır. Hesabınıza kaydedilir, böylece tüm cihazlarınızda sizinle gelir.",
+        "Minder'e özgü kişisel tercihleriniz; yukarıdaki Authelia kimliğinizden ayrıdır. Hesabınıza kaydedilir, böylece tüm cihazlarınızda geçerli olur.",
       displayName: "Görünen ad",
       displayNameHint:
         "Minder'in arayüzünde size nasıl hitap edileceği. Kullanıcı adınızı ({username}) kullanmak için boş bırakın. Authelia kimliğinizi değiştirmez.",
@@ -280,7 +280,7 @@ export const tr: Messages = {
     language: {
       heading: "Dil",
       label: "Arayüz dili",
-      hint: "Hemen uygulanır ve hesabınıza kaydedilir; böylece tüm cihazlarınızda sizinle gelir.",
+      hint: "Hemen uygulanır ve hesabınıza kaydedilir; böylece tüm cihazlarınızda geçerli olur.",
       saveFailed: "Dil tercihiniz kaydedilemedi, önceki dile geri dönüldü. {error}",
     },
     password: {
