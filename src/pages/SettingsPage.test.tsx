@@ -18,6 +18,7 @@ let autheliaPortalUrl: string | null = "https://auth.minder.local/";
 
 const fetchMyProfile = vi.fn();
 const updateMyProfile = vi.fn();
+const saveMyLocale = vi.fn();
 const setTheme = vi.fn();
 const changePassword = vi.fn();
 
@@ -47,6 +48,7 @@ vi.mock("../lib/api", () => ({
 vi.mock("../lib/profile", () => ({
   fetchMyProfile: (...args: unknown[]) => fetchMyProfile(...args),
   updateMyProfile: (...args: unknown[]) => updateMyProfile(...args),
+  saveMyLocale: (...args: unknown[]) => saveMyLocale(...args),
 }));
 vi.mock("../lib/password", () => ({
   MIN_PASSWORD_LENGTH: 8,
@@ -73,6 +75,8 @@ describe("SettingsPage", () => {
     logout.mockClear();
     fetchMyProfile.mockReset();
     updateMyProfile.mockReset();
+    saveMyLocale.mockReset();
+    saveMyLocale.mockResolvedValue(profileFixture({ locale: "tr" }));
     setTheme.mockReset();
     changePassword.mockReset();
     changePassword.mockResolvedValue(undefined);
@@ -86,7 +90,7 @@ describe("SettingsPage", () => {
     setLocale("en");
   });
 
-  it("switches the UI language from the Language section, at once", () => {
+  it("switches the UI language from the Language section, at once, and saves it to the profile", async () => {
     render(<SettingsPage />);
     const select = screen.getByLabelText("Display language") as HTMLSelectElement;
     expect(select.value).toBe("en");
@@ -103,8 +107,49 @@ describe("SettingsPage", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Ayarlar");
     expect(screen.getByRole("button", { name: "Çıkış yap" })).toBeTruthy();
     expect((screen.getByLabelText("Arayüz dili") as HTMLSelectElement).value).toBe("tr");
-    // Switching doesn't touch the server profile (local for now).
+    // Saved to the account (#133), and only the language: the profile form's
+    // own save is separate.
+    expect(saveMyLocale).toHaveBeenCalledWith("tr", "tok");
     expect(updateMyProfile).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect((screen.getByLabelText("Arayüz dili") as HTMLSelectElement).disabled).toBe(false),
+    );
+    expect(getLocale()).toBe("tr");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("rolls the language back with a clear error when saving it fails", async () => {
+    let reject: (e: Error) => void = () => {};
+    saveMyLocale.mockReturnValue(new Promise((_, r) => (reject = r)));
+    render(<SettingsPage />);
+    act(() => {
+      fireEvent.change(screen.getByLabelText("Display language"), { target: { value: "tr" } });
+    });
+    // Applied optimistically while the save is in flight.
+    expect(getLocale()).toBe("tr");
+    expect((screen.getByLabelText("Arayüz dili") as HTMLSelectElement).disabled).toBe(true);
+
+    await act(async () => reject(new Error("Service unavailable")));
+    expect(getLocale()).toBe("en");
+    const select = screen.getByLabelText("Display language") as HTMLSelectElement;
+    expect(select.value).toBe("en");
+    expect(select.disabled).toBe(false);
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Couldn't save your language, so the previous one is back. Service unavailable",
+    );
+  });
+
+  it("shows the language save error in Turkish too", async () => {
+    setLocale("tr");
+    saveMyLocale.mockRejectedValue(new Error("Hizmet kullanılamıyor"));
+    render(<SettingsPage />);
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("Arayüz dili"), { target: { value: "en" } });
+    });
+    expect(getLocale()).toBe("tr");
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Dil tercihiniz kaydedilemedi, önceki dile geri dönüldü. Hizmet kullanılamıyor",
+    );
   });
 
   it("redirects home when not authenticated", () => {

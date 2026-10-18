@@ -245,6 +245,17 @@ export const tr: Messages = {
     },
   },
 
+  organization: {
+    defaultLanguage: {
+      heading: "Varsayılan dil",
+      label: "Üyeler için varsayılan dil",
+      none: "Yok (her üyenin tarayıcı dili)",
+      hint: "Kendi ayarlarında bir dil seçmemiş üyeler Minder'i bu dilde görür.",
+      saved: "Varsayılan dil kaydedildi.",
+      saveFailed: "Varsayılan dil kaydedilemedi, önceki değere geri dönüldü. {error}",
+    },
+  },
+
   settings: {
     title: "Ayarlar",
     intro: "Minder'in şu anda gördüğü hâliyle hesabınız.",
@@ -257,7 +268,7 @@ export const tr: Messages = {
     profile: {
       heading: "Minder profili",
       intro:
-        "Minder'e özgü kişisel tercihleriniz; yukarıdaki Authelia kimliğinizden ayrıdır. Hesabınıza kaydedilir, böylece tüm cihazlarınızda sizinle gelir.",
+        "Minder'e özgü kişisel tercihleriniz; yukarıdaki Authelia kimliğinizden ayrıdır. Hesabınıza kaydedilir, böylece tüm cihazlarınızda geçerli olur.",
       displayName: "Görünen ad",
       displayNameHint:
         "Minder'in arayüzünde size nasıl hitap edileceği. Kullanıcı adınızı ({username}) kullanmak için boş bırakın. Authelia kimliğinizi değiştirmez.",
@@ -269,7 +280,8 @@ export const tr: Messages = {
     language: {
       heading: "Dil",
       label: "Arayüz dili",
-      hint: "Hemen uygulanır ve bu tarayıcıda hatırlanır.",
+      hint: "Hemen uygulanır ve hesabınıza kaydedilir; böylece tüm cihazlarınızda geçerli olur.",
+      saveFailed: "Dil tercihiniz kaydedilemedi, önceki dile geri dönüldü. {error}",
     },
     password: {
       heading: "Parolayı değiştir",

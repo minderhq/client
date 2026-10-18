@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom";
 import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
+import { adoptProfileLocale } from "../i18n";
 import {
   ApiError,
   EMAIL_VERIFICATION_REQUIRED_EVENT,
@@ -230,12 +231,17 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
   const continueAfterVerification = useContinueAfterVerification();
 
   // `token` changes on every silent refresh; the session (sessionKey) doesn't.
+  // The same read switches the UI to the account's language (#133): on
+  // sign-in, and on an org switch, whose default may differ.
   useEffect(() => {
     const token = tokenRef.current;
     if (!isAuthenticated || !token) return;
     const ctrl = new AbortController();
     fetchMyProfile(token, ctrl.signal)
-      .then((data) => setProfile({ key: sessionKey, data }))
+      .then((data) => {
+        adoptProfileLocale(data);
+        setProfile({ key: sessionKey, data });
+      })
       .catch(() => {
         if (!ctrl.signal.aborted) setProfile({ key: sessionKey, data: null });
       });

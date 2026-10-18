@@ -132,6 +132,28 @@ describe("OrganizationPage", () => {
     expect(within(orgSection).getByText("owner")).toBeTruthy();
   });
 
+  it("offers the org's default language to an owner/admin only (#133)", async () => {
+    mockAuth = { isAuthenticated: true, token: "tok", role: "user", activeTenantId: "1", orgRole: "member" };
+    routeApiFetch({ orgs: [org({ default_locale: "tr" })] });
+    const { unmount } = render(<OrganizationPage />);
+    await screen.findByText("Acme Corporation");
+    expect(screen.queryByLabelText("Default language for members")).toBeNull();
+    unmount();
+
+    mockAuth = { ...mockAuth, orgRole: "admin" };
+    render(<OrganizationPage />);
+    await screen.findByText("Acme Corporation");
+    const field = (await screen.findByLabelText("Default language for members")) as HTMLSelectElement;
+    expect(field.value).toBe("tr");
+    fireEvent.change(field, { target: { value: "en" } });
+    await screen.findByText("Default language saved.");
+    expect(apiFetch).toHaveBeenCalledWith("/v1/organizations/1", {
+      method: "PATCH",
+      body: { default_locale: "en" },
+      token: "tok",
+    });
+  });
+
   it("mentions the org switcher once the user belongs to more than one organization", async () => {
     mockAuth = { isAuthenticated: true, token: "tok", role: "user", activeTenantId: "1", orgRole: "member" };
     routeApiFetch({ orgs: [org(), org({ id: 2, name: "Beta Inc", is_home: false })] });

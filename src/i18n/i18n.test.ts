@@ -2,12 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CATALOGS, type Messages } from "./catalog";
 import {
+  adoptProfileLocale,
   browserLocale,
   detectLocale,
   getLocale,
   i18n,
   LOCALE_STORAGE_KEY,
+  profileLocale,
   readStoredLocale,
+  setAccountLocale,
   setLocale,
 } from "./locale";
 import { createTranslator } from "./translator";
@@ -200,5 +203,58 @@ describe("setLocale", () => {
     setLocale("en");
     expect(document.documentElement.lang).toBe("en");
     expect(i18n().t("common.retry")).toBe("Retry");
+  });
+});
+
+describe("the account's language (#133)", () => {
+  it("is the user's choice, then the org default, then the browser, then English", () => {
+    const languages = vi.spyOn(navigator, "languages", "get");
+    languages.mockReturnValue(["tr-TR"]);
+    const base = { locale: null, organization_default_locale: null, effective_locale: "en" };
+
+    expect(profileLocale({ ...base, locale: "en", organization_default_locale: "tr" })).toBe("en");
+    expect(profileLocale({ ...base, organization_default_locale: "tr" })).toBe("tr");
+    // Neither set: the browser's languages, which the server can't see.
+    expect(profileLocale(base)).toBe("tr");
+    languages.mockReturnValue(["de-DE"]);
+    expect(profileLocale(base)).toBe("en");
+  });
+
+  it("leaves the browser's choice alone for a profile without the fields", () => {
+    expect(profileLocale({})).toBeNull();
+    expect(profileLocale(null)).toBeNull();
+    // Only the resolved value: take it.
+    expect(profileLocale({ effective_locale: "tr" })).toBe("tr");
+  });
+
+  it("outranks a choice saved in this browser once the profile loads", () => {
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(["en-US"]);
+    setLocale("en");
+    expect(localStorage.getItem(LOCALE_STORAGE_KEY)).toBe("en");
+
+    adoptProfileLocale({ locale: "tr", organization_default_locale: null, effective_locale: "tr" });
+    expect(getLocale()).toBe("tr");
+    expect(document.documentElement.lang).toBe("tr");
+    // Remembered so the next load starts in it before the profile arrives.
+    expect(localStorage.getItem(LOCALE_STORAGE_KEY)).toBe("tr");
+
+    adoptProfileLocale({});
+    expect(getLocale()).toBe("tr");
+  });
+
+  it("is applied at once and kept when the save succeeds", async () => {
+    const save = vi.fn().mockResolvedValue({});
+    const pending = setAccountLocale("tr", save);
+    expect(getLocale()).toBe("tr");
+    await pending;
+    expect(save).toHaveBeenCalledWith("tr");
+    expect(getLocale()).toBe("tr");
+  });
+
+  it("rolls back and rethrows when the save fails", async () => {
+    const failure = new Error("boom");
+    await expect(setAccountLocale("tr", () => Promise.reject(failure))).rejects.toBe(failure);
+    expect(getLocale()).toBe("en");
+    expect(localStorage.getItem(LOCALE_STORAGE_KEY)).toBe("en");
   });
 });

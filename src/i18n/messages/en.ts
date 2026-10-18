@@ -247,6 +247,17 @@ export const en = {
     },
   },
 
+  organization: {
+    defaultLanguage: {
+      heading: "Default language",
+      label: "Default language for members",
+      none: "None (each member's browser language)",
+      hint: "Members who haven't chosen a language in their own settings see Minder in this one.",
+      saved: "Default language saved.",
+      saveFailed: "Couldn't save the default language, so the previous one is back. {error}",
+    },
+  },
+
   settings: {
     title: "Settings",
     intro: "Your account, as Minder currently sees it.",
@@ -271,7 +282,8 @@ export const en = {
     language: {
       heading: "Language",
       label: "Display language",
-      hint: "Applied immediately and remembered in this browser.",
+      hint: "Applied immediately and saved to your account, so it follows you across devices.",
+      saveFailed: "Couldn't save your language, so the previous one is back. {error}",
     },
     password: {
       heading: "Change password",

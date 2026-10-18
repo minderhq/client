@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { getLocale, setLocale } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { AuthProvider } from "../lib/auth";
 import { WorkspaceGate } from "./WaitingRoomPage";
@@ -72,6 +73,43 @@ describe("WorkspaceGate / waiting room (#116)", () => {
     });
     renderGate();
     expect(await screen.findByText("app routes")).toBeTruthy();
+  });
+
+  it("adopts the profile's language on sign-in (#133)", async () => {
+    sessionStorage.setItem(TOKEN_KEY, tenanted);
+    setLocale("en");
+    mockApi({
+      "GET /v1/profile/me": () =>
+        json({
+          user_id: 7,
+          workspace_state: "ready",
+          locale: null,
+          organization_default_locale: "tr",
+          effective_locale: "tr",
+        }),
+    });
+    try {
+      renderGate();
+      expect(await screen.findByText("app routes")).toBeTruthy();
+      await waitFor(() => expect(getLocale()).toBe("tr"));
+    } finally {
+      setLocale("en");
+    }
+  });
+
+  it("keeps the browser's language for a profile without locale fields", async () => {
+    sessionStorage.setItem(TOKEN_KEY, tenanted);
+    setLocale("tr");
+    mockApi({
+      "GET /v1/profile/me": () => json({ user_id: 7, workspace_state: "ready" }),
+    });
+    try {
+      renderGate();
+      expect(await screen.findByText("app routes")).toBeTruthy();
+      expect(getLocale()).toBe("tr");
+    } finally {
+      setLocale("en");
+    }
   });
 
   it("offers Create my workspace when workspace_state is none and allowed", async () => {

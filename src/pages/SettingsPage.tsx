@@ -1,11 +1,19 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 
-import { isLocale, LOCALE_NAMES, LOCALES, useI18n, type MessageKey } from "../i18n";
-import { autheliaPortalUrl } from "../lib/api";
+import { StatusLine } from "../components/StatusLine";
+import {
+  isLocale,
+  LOCALE_NAMES,
+  LOCALES,
+  setAccountLocale,
+  useI18n,
+  type MessageKey,
+} from "../i18n";
+import { autheliaPortalUrl, friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { changePassword, MIN_PASSWORD_LENGTH } from "../lib/password";
-import { fetchMyProfile, updateMyProfile } from "../lib/profile";
+import { fetchMyProfile, saveMyLocale, updateMyProfile } from "../lib/profile";
 import { getTheme, setTheme, type Theme } from "../lib/theme";
 import {
   badgeClass,
@@ -212,7 +220,7 @@ export function SettingsPage() {
         </form>
       </section>
 
-      <LanguageSection />
+      <LanguageSection token={token} />
 
       <ChangePasswordSection token={token} />
 
@@ -223,11 +231,27 @@ export function SettingsPage() {
   );
 }
 
-/** The UI language switch. It applies at once (every component re-renders in
- * the new language) and is remembered in this browser; see i18n/locale.ts for
- * the seam where a per-user, server-side preference plugs in. */
-function LanguageSection() {
-  const { t, locale, setLocale } = useI18n();
+/** The UI language switch (#133). It applies at once (every component
+ * re-renders in the new language) and is saved to the account, so it follows
+ * the user across devices. A failed save switches back and says why. */
+function LanguageSection({ token }: { token: string }) {
+  const { t, locale } = useI18n();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function choose(next: string) {
+    if (!isLocale(next) || next === locale) return;
+    setSaving(true);
+    setError("");
+    try {
+      await setAccountLocale(next, (l) => saveMyLocale(l, token));
+    } catch (err) {
+      setError(friendlyErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <section className={`mb-6 ${cardClass}`}>
       <h2 className="mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">
@@ -242,9 +266,8 @@ function LanguageSection() {
       <select
         id="language-pref"
         value={locale}
-        onChange={(e) => {
-          if (isLocale(e.target.value)) setLocale(e.target.value);
-        }}
+        onChange={(e) => void choose(e.target.value)}
+        disabled={saving}
         aria-describedby="language-pref-hint"
         className={inputClass}
       >
@@ -257,6 +280,11 @@ function LanguageSection() {
       <p id="language-pref-hint" className={fieldHintClass}>
         {t("settings.language.hint")}
       </p>
+      {error && (
+        <StatusLine isError className="mb-0 mt-2">
+          {t("settings.language.saveFailed", { error })}
+        </StatusLine>
+      )}
     </section>
   );
 }

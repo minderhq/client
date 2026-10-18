@@ -14,13 +14,17 @@ export {
   type PluralMessageKey,
 } from "./catalog";
 export {
+  adoptProfileLocale,
   browserLocale,
   detectLocale,
   getLocale,
   i18n,
   initLocale,
   LOCALE_STORAGE_KEY,
+  profileLocale,
+  type ProfileLocaleFields,
   readStoredLocale,
+  setAccountLocale,
   setLocale,
   subscribeLocale,
 } from "./locale";
