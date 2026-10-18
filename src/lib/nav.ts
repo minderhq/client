@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import type { IconName } from "../components/Icon";
 import { en, useI18n, type Messages } from "../i18n";
 import { ORG_USERS_PATH } from "./orgs";
+import { allows, MEMBER, PLATFORM_ADMIN, type Access, type Requirement } from "./permissions";
 import { ROUTES } from "./routes";
 
 /** A navigable destination (a real route). */
@@ -17,13 +18,10 @@ export interface NavLeaf {
    * Discover strip, the page and the palette say "Discover plugins". Tests
    * hold every page's rendered title to this value. */
   title?: string;
-  /** Hidden for non-admins (the destination 403s them anyway). */
-  adminOnly?: boolean;
-  /** Shown only to a Platform Admin: the installation-wide, cross-org views
-   * the API serves to Platform Admins alone. */
-  platformAdminOnly?: boolean;
-  /** Shown only when the caller may view this org's billing (#64). */
-  requiresBilling?: boolean;
+  /** Who sees this leaf (sidebar row, tab or palette entry): a permission
+   * key, any signed-in member, or the Platform Admin (lib/permissions.ts,
+   * useCan). The one gate; there are no role flags. */
+  requires: Requirement;
   /** Extra search terms for the command palette (synonyms not in the label). */
   keywords?: string;
   /** One-line "what you do here", shown as a sidebar tooltip, on the page
@@ -52,6 +50,9 @@ export interface NavEntry extends NavLeaf {
 export interface NavSection {
   /** Omitted for the top (Home/Ask) group, which needs no heading. */
   label?: string;
+  /** An administration section (Organization, Platform): drawn below a
+   * divider, apart from the sections everyone uses. */
+  admin?: boolean;
   items: NavEntry[];
 }
 
@@ -78,19 +79,21 @@ type NavEntryDef = Omit<NavEntry, "label" | "title" | "description" | "keywords"
 interface NavSectionDef {
   /** Omitted for the top (Home/Ask) group, which needs no heading. */
   id?: NavSectionId;
+  admin?: boolean;
   items: NavEntryDef[];
 }
 
 /**
- * The app's information architecture, grouped by what the user is trying to DO
- * rather than by which backend service powers it. Plain-language labels, a
- * short description on every entry, and one sidebar entry per task: the
- * Marketplace is Discover / Installed / Publish, each showing its item types
- * (plugins, AI tools, service bundles) as in-page tabs (#2197).
+ * The app's information architecture (#126, #131): one panel for everyone,
+ * grouped by what the user is trying to DO rather than by which backend
+ * service powers it. Everyone gets the sections they work in (Knowledge,
+ * Marketplace, AI & system, Team, My account); the administration sections
+ * (Organization, Platform) sit below a divider and appear only to callers
+ * who hold their permissions. Each row names the permission it needs; the
+ * sidebar, tabs and palette filter through useCan, never through role names.
  *
- * "Organization" is intentionally its own section: member/team management —
- * and the org/workspace administration coming next — belong together and read
- * as account administration, distinct from operating the platform itself.
+ * Read-only system views (Models, Status, Installed) stay open to every
+ * member; changing them is gated on the pages and by the API.
  *
  * Labels, page titles, descriptions and palette keywords are not here: each
  * entry's `id` names its copy in the message catalogs (`nav.items.<id>`), so
@@ -99,39 +102,39 @@ interface NavSectionDef {
 const NAV_MODEL: NavSectionDef[] = [
   {
     items: [
-      { to: "/", id: "home", icon: "home", end: true },
-      { to: "/ask", id: "ask", icon: "ask" },
+      { to: "/", id: "home", icon: "home", end: true, requires: MEMBER },
+      { to: "/ask", id: "ask", icon: "ask", requires: MEMBER },
     ],
   },
   {
     id: "knowledge",
     items: [
-      { to: "/rag", id: "knowledgeBases", icon: "knowledge-bases", end: true },
-      { to: "/rag/pipelines", id: "pipelines", icon: "pipelines" },
-      { to: "/rag/conversations", id: "conversations", icon: "conversations" },
-      { to: "/rag/public-chat", id: "publicChat", icon: "ask", adminOnly: true },
+      { to: "/rag", id: "knowledgeBases", icon: "knowledge-bases", end: true, requires: MEMBER },
+      { to: "/rag/pipelines", id: "pipelines", icon: "pipelines", requires: MEMBER },
+      { to: "/rag/conversations", id: "conversations", icon: "conversations", requires: MEMBER },
       // Graph / Taxonomy Review / Entity Merge Review are advanced surfaces a
       // first-timer has no data for — nested under one "Knowledge Graph" entry
       // as in-page tabs (#1230) so top-level Knowledge is just the golden path
       // (KB · Pipelines · Conversations). They don't share a path prefix, hence
-      // the match[] array.
+      // the match[] array. Taxonomy review is per owner: every member reviews
+      // the suggestions on their own entities.
       {
         to: "/rag/graph",
         id: "knowledgeGraph",
         icon: "graph",
+        requires: MEMBER,
         match: ["/rag/graph", "/rag/taxonomy-review", "/rag/entity-merges"],
         tabs: [
-          { to: "/rag/graph", id: "graph", icon: "graph", end: true },
-          { to: "/rag/taxonomy-review", id: "taxonomyReview", icon: "taxonomy" },
-          { to: "/rag/entity-merges", id: "entityMerges", icon: "merge" },
+          { to: "/rag/graph", id: "graph", icon: "graph", end: true, requires: MEMBER },
+          { to: "/rag/taxonomy-review", id: "taxonomyReview", icon: "taxonomy", requires: MEMBER },
+          { to: "/rag/entity-merges", id: "entityMerges", icon: "merge", requires: MEMBER },
         ],
       },
     ],
   },
   {
-    // Marketplace (#2197, epic #2192 decision A): ONE Discover catalog, ONE
-    // Installed view, ONE Publish area, instead of separate Plugins / AI Tools /
-    // Bundles stores. The item type is the tab; a plugin's source (first-party,
+    // Marketplace (#2197): ONE Discover catalog, ONE Installed view, ONE
+    // Publish area. The item type is the tab; a plugin's source (first-party,
     // private git, submitted, later MindHub) is a filter and badge on Discover.
     id: "marketplace",
     items: [
@@ -139,80 +142,83 @@ const NAV_MODEL: NavSectionDef[] = [
         to: ROUTES.discoverPlugins,
         id: "discover",
         icon: "available-plugins",
+        requires: MEMBER,
         match: "/marketplace/discover",
         tabs: [
-          { to: ROUTES.discoverPlugins, id: "discoverPlugins", icon: "plugins" },
-          { to: ROUTES.discoverAiTools, id: "discoverAiTools", icon: "ai-tools" },
-          { to: ROUTES.discoverServiceBundles, id: "discoverServiceBundles", icon: "bundles" },
+          { to: ROUTES.discoverPlugins, id: "discoverPlugins", icon: "plugins", requires: MEMBER },
+          { to: ROUTES.discoverAiTools, id: "discoverAiTools", icon: "ai-tools", requires: MEMBER },
+          { to: ROUTES.discoverServiceBundles, id: "discoverServiceBundles", icon: "bundles", requires: MEMBER },
         ],
       },
       {
         to: ROUTES.installedPlugins,
         id: "installed",
         icon: "installed",
+        requires: MEMBER,
         match: "/marketplace/installed",
         tabs: [
-          { to: ROUTES.installedPlugins, id: "installedPlugins", icon: "plugins" },
-          { to: ROUTES.installedAiTools, id: "installedAiTools", icon: "ai-tools" },
-          { to: ROUTES.installedServiceBundles, id: "installedServiceBundles", icon: "bundles" },
+          { to: ROUTES.installedPlugins, id: "installedPlugins", icon: "plugins", requires: MEMBER },
+          { to: ROUTES.installedAiTools, id: "installedAiTools", icon: "ai-tools", requires: MEMBER },
+          { to: ROUTES.installedServiceBundles, id: "installedServiceBundles", icon: "bundles", requires: MEMBER },
         ],
       },
       {
         to: ROUTES.publishSubmissions,
         id: "publish",
         icon: "submit",
+        requires: MEMBER,
         match: "/marketplace/publish",
         tabs: [
-          { to: ROUTES.publishSubmissions, id: "submissions", icon: "submit" },
-          { to: ROUTES.publishSubmissionReview, id: "submissionReview", icon: "review", adminOnly: true },
+          { to: ROUTES.publishSubmissions, id: "submissions", icon: "submit", requires: MEMBER },
+          { to: ROUTES.publishSubmissionReview, id: "submissionReview", icon: "review", requires: PLATFORM_ADMIN },
         ],
       },
     ],
   },
   {
-    id: "platform",
+    // What every member may look at (read-only for most): the models they can
+    // use and the platform's health.
+    id: "ai",
     items: [
-      { to: "/platform", id: "models", icon: "models", end: true },
-      { to: "/platform/providers", id: "providers", icon: "globe" },
-      { to: "/platform/voice", id: "voice", icon: "voice" },
-      { to: "/platform/backups", id: "backups", icon: "backups" },
-      { to: "/platform/status", id: "status", icon: "status" },
+      { to: "/platform", id: "models", icon: "models", end: true, requires: MEMBER },
+      { to: "/platform/status", id: "status", icon: "status", requires: MEMBER },
     ],
   },
   {
+    id: "team",
+    items: [{ to: "/platform/teams", id: "teams", icon: "teams", requires: MEMBER }],
+  },
+  {
+    // Personal settings live together: profile, voice, your own licenses.
+    id: "account",
+    items: [
+      { to: "/settings", id: "account", icon: "settings", end: true, requires: MEMBER },
+      { to: "/platform/voice", id: "voice", icon: "voice", requires: MEMBER },
+      { to: ROUTES.licenses, id: "licenses", icon: "licenses", requires: MEMBER },
+    ],
+  },
+  {
+    // Running the organization: people, AI providers, public chatbots, plan.
     id: "organization",
+    admin: true,
     items: [
-      { to: "/organization", id: "orgOverview", icon: "org", end: true },
-      { to: ORG_USERS_PATH, id: "orgUsers", icon: "users" },
-      {
-        to: ROUTES.billing,
-        id: "billingAndLicenses",
-        icon: "billing",
-        match: ROUTES.billing,
-        tabs: [
-          // Billing keeps its #64 gate; Licenses is open to every signed-in
-          // user, so the entry stays visible (linking to Licenses) without it.
-          { to: ROUTES.billing, id: "billing", icon: "billing", end: true, requiresBilling: true },
-          { to: ROUTES.licenses, id: "licenses", icon: "licenses" },
-        ],
-      },
-      { to: "/platform/teams", id: "teams", icon: "teams" },
-      { to: "/organizations", id: "allOrganizations", icon: "org", adminOnly: true },
-      { to: "/platform/users", id: "allUsers", icon: "users", platformAdminOnly: true },
-      { to: "/audit", id: "audit", icon: "audit", adminOnly: true },
+      { to: "/organization", id: "orgOverview", icon: "org", end: true, requires: "org.settings.manage" },
+      { to: ORG_USERS_PATH, id: "orgUsers", icon: "users", requires: "org.members.manage" },
+      { to: "/rag/public-chat", id: "publicChat", icon: "ask", requires: "org.chatbots.manage" },
+      { to: "/platform/providers", id: "providers", icon: "globe", requires: "org.ai.manage" },
+      { to: ROUTES.billing, id: "billing", icon: "billing", end: true, requires: "org.billing.view" },
+      { to: "/audit", id: "audit", icon: "audit", requires: "org.audit.view" },
     ],
   },
   {
-    // Operator-only configuration of the installation itself (#2192 decision
-    // A). Today: the read-only plugin source repositories, plus a placeholder
-    // for the MindHub connection (#2201). Gated on role === "admin" like every
-    // other operator item until #2200 refines the roles.
-    // "Installation settings", not "Settings": the user menu's Settings is
-    // your own account; this is the installation's (glossary: "installation",
-    // not "instance", for the deployment).
-    id: "installationSettings",
+    // Operating the installation itself ("installation", not "instance").
+    id: "platform",
+    admin: true,
     items: [
-      { to: ROUTES.sources, id: "sources", icon: "sources", match: ROUTES.sources, adminOnly: true },
+      { to: "/organizations", id: "allOrganizations", icon: "org", requires: PLATFORM_ADMIN },
+      { to: "/platform/users", id: "allUsers", icon: "users", requires: PLATFORM_ADMIN },
+      { to: "/platform/backups", id: "backups", icon: "backups", requires: PLATFORM_ADMIN },
+      { to: ROUTES.sources, id: "sources", icon: "sources", match: ROUTES.sources, requires: PLATFORM_ADMIN },
     ],
   },
 ];
@@ -233,6 +239,7 @@ export function localizeNav(messages: Messages): NavSection[] {
   };
   return NAV_MODEL.map((section) => ({
     ...(section.id ? { label: messages.nav.sections[section.id] } : {}),
+    ...(section.admin ? { admin: true } : {}),
     items: section.items.map((item) => {
       const { tabs, ...entry } = item;
       return tabs ? { ...leaf(entry), tabs: tabs.map(leaf) } : leaf(entry);
@@ -244,33 +251,33 @@ export function localizeNav(messages: Messages): NavSection[] {
  * Components use useNavSections(), which follows the active language. */
 export const NAV_SECTIONS: NavSection[] = localizeNav(en);
 
-/** Who is looking: the gates nav items use today. */
-export interface NavAccess {
-  isAdmin: boolean;
-  /** A Platform Admin (the `is_platform_admin` token claim). */
-  isPlatformAdmin: boolean;
-  /** May view this org's billing (#64, useBillingAccess). */
-  billing: boolean;
-}
-
 /** May this caller see this leaf (sidebar row, tab or palette entry)? */
-export function leafVisible(leaf: NavLeaf, access: NavAccess): boolean {
-  return (
-    (!leaf.adminOnly || access.isAdmin) &&
-    (!leaf.platformAdminOnly || access.isPlatformAdmin) &&
-    (!leaf.requiresBilling || access.billing)
-  );
+export function leafVisible(leaf: NavLeaf, access: Access): boolean {
+  return allows(access, leaf.requires);
 }
 
 /** The entry as this caller should see it: its tabs filtered to the visible
  * ones and its link pointed at the first of those, or null when nothing in
- * it is visible. The one place Sidebar and PageTabs take role gating from. */
-export function visibleEntry(entry: NavEntry, access: NavAccess): NavEntry | null {
+ * it is visible. The one place Sidebar and PageTabs take gating from. */
+export function visibleEntry(entry: NavEntry, access: Access): NavEntry | null {
   if (!leafVisible(entry, access)) return null;
   if (!entry.tabs) return entry;
   const tabs = entry.tabs.filter((t) => leafVisible(t, access));
   if (tabs.length === 0) return null;
   return { ...entry, to: tabs[0].to, tabs };
+}
+
+/** The sections as this caller should see them: hidden entries dropped, and
+ * sections left with nothing dropped too (no empty headings). */
+export function visibleSections(sections: NavSection[], access: Access): NavSection[] {
+  return sections
+    .map((section) => ({
+      ...section,
+      items: section.items
+        .map((item) => visibleEntry(item, access))
+        .filter((item): item is NavEntry => item !== null),
+    }))
+    .filter((section) => section.items.length > 0);
 }
 
 /** Does `pathname` sit under `prefix` (exact, or a `prefix/…` descendant)? */
@@ -308,6 +315,30 @@ export function tabGroupForPath(
   return null;
 }
 
+/** Where a path sits in the navigation, for the breadcrumb trail: its
+ * section (unlabelled for the top group), its entry and, on a grouped page,
+ * the tab. Null off the menu (home, sign-in pages, an unknown path). Ungated:
+ * the trail describes the page, and route guards decide who may see it. */
+export interface NavTrail {
+  section?: string;
+  entry: NavEntry;
+  tab?: NavLeaf;
+}
+
+export function navTrailForPath(pathname: string, sections: NavSection[]): NavTrail | null {
+  if (pathname === "/") return null;
+  for (const section of sections) {
+    for (const entry of section.items) {
+      if (!entryIsActive(entry, pathname)) continue;
+      const tab = entry.tabs?.find((t) =>
+        t.end ? pathname === t.to : underPrefix(t.to, pathname),
+      );
+      return { ...(section.label ? { section: section.label } : {}), entry, ...(tab ? { tab } : {}) };
+    }
+  }
+  return null;
+}
+
 /** Flat list of every jump-to destination for the command palette — expands
  * grouped entries into their individual tabs so "Installed plugins" is directly
  * reachable, and drops the group parent (its route equals the first tab). A
@@ -335,7 +366,7 @@ export function navDestinations(
           keywords: `${item.label} ${item.keywords ?? ""} ${tab.keywords ?? ""}`,
         }));
       }
-      return [{ ...item, group }];
+      return [{ ...item, label: item.title ?? item.label, group }];
     });
   });
 }

@@ -51,18 +51,22 @@ const TIER_LITERAL_EXEMPT = [
 // "Minder" is allowed as-is.
 export const I18N_MIGRATED_FILES = [
   "src/App.tsx",
+  "src/components/Breadcrumbs.tsx",
   "src/components/CommandPalette.tsx",
   "src/components/ErrorBoundary.tsx",
   "src/components/LoadError.tsx",
   "src/components/PageTabs.tsx",
   "src/components/PasswordResetRequestForm.tsx",
+  "src/components/RequirePermission.tsx",
   "src/components/Sidebar.tsx",
   "src/components/ThemeToggle.tsx",
   "src/components/UserMenu.tsx",
   "src/pages/AuthCallbackPage.tsx",
+  "src/pages/ForbiddenPage.tsx",
   "src/pages/ForcePasswordChangePage.tsx",
   "src/pages/ForgotPasswordPage.tsx",
   "src/pages/LoginPage.tsx",
+  "src/pages/NotFoundPage.tsx",
   "src/pages/ResetPasswordPage.tsx",
   "src/pages/SettingsPage.tsx",
 ];

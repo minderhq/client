@@ -6,7 +6,12 @@ import { Sidebar } from "./Sidebar";
 
 // Mutable per test (like AvailablePluginsPage.test.tsx's mockAuth) so both
 // the non-admin (default) and admin (Review Queue visible) paths are covered.
-let mockAuth: { role: string; isPlatformAdmin?: boolean } = { role: "" };
+let mockAuth: {
+  isAuthenticated: boolean;
+  role: string;
+  orgRole?: string;
+  isPlatformAdmin?: boolean;
+} = { isAuthenticated: true, role: "" };
 vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
 }));
@@ -18,31 +23,52 @@ vi.mock("../lib/useBillingAccess", () => ({
 
 describe("Sidebar", () => {
   beforeEach(() => {
-    mockAuth = { role: "" };
+    mockAuth = { isAuthenticated: true, role: "" };
     mockBilling = true;
   });
 
-  it("opens Billing & licenses on Billing only for callers who may view billing (#64)", () => {
+  it("shows Billing only to callers who may view billing (#64), Licenses to everyone", () => {
     const { unmount } = render(
       <MemoryRouter>
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
-    expect(
-      screen.getByText("Billing & licenses").closest("a")?.getAttribute("href"),
-    ).toBe("/billing");
+    expect(screen.getByText("Billing").closest("a")?.getAttribute("href")).toBe("/billing");
+    expect(screen.getByText("Licenses").closest("a")?.getAttribute("href")).toBe("/billing/licenses");
     unmount();
-    // Without billing access the entry stays (Licenses is open to everyone)
-    // but skips the Billing page the caller can't see.
     mockBilling = false;
     render(
       <MemoryRouter>
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
-    expect(
-      screen.getByText("Billing & licenses").closest("a")?.getAttribute("href"),
-    ).toBe("/billing/licenses");
+    expect(screen.queryByText("Billing")).toBeNull();
+    expect(screen.getByText("Licenses").closest("a")?.getAttribute("href")).toBe("/billing/licenses");
+  });
+
+  it("shows a signed-out visitor no menu", () => {
+    mockAuth = { isAuthenticated: false, role: "" };
+    render(
+      <MemoryRouter>
+        <Sidebar open={false} onNavigate={() => {}} />
+      </MemoryRouter>,
+    );
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(within(nav).queryAllByRole("link")).toEqual([]);
+  });
+
+  it("draws one divider above the administration sections", () => {
+    mockAuth = { isAuthenticated: true, role: "admin", isPlatformAdmin: true };
+    render(
+      <MemoryRouter>
+        <Sidebar open={false} onNavigate={() => {}} />
+      </MemoryRouter>,
+    );
+    const divided = screen
+      .getAllByRole("group")
+      .filter((g) => g.className.includes("border-t"))
+      .map((g) => g.getAttribute("aria-labelledby") && g.querySelector("p")?.textContent);
+    expect(divided).toEqual(["Organization"]);
   });
   afterEach(cleanup);
 
@@ -81,7 +107,8 @@ describe("Sidebar", () => {
       </MemoryRouter>,
     );
 
-    for (const label of ["Knowledge", "Marketplace", "Platform", "Organization"]) {
+    // Billing is visible (mockBilling), so the Organization section shows.
+    for (const label of ["Knowledge", "Marketplace", "AI & system", "Team", "My account", "Organization"]) {
       expect(screen.getByText(label)).toBeTruthy();
     }
   });
@@ -159,28 +186,28 @@ describe("Sidebar", () => {
       expect(screen.queryByText(old)).toBeNull();
     }
     expect(
-      within(screen.getByRole("group", { name: "Platform" })).queryByText(/bundles/i),
+      within(screen.getByRole("group", { name: "AI & system" })).queryByText(/bundles/i),
     ).toBeNull();
   });
 
-  it("shows Installation settings › MindHub & sources to an admin only", () => {
+  it("shows Platform › MindHub & sources to an operator only", () => {
     const { unmount } = render(
       <MemoryRouter>
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
-    // A non-admin sees no Installation settings section at all, not an empty heading.
-    expect(screen.queryByRole("group", { name: "Installation settings" })).toBeNull();
+    // A non-operator sees no Platform section at all, not an empty heading.
+    expect(screen.queryByRole("group", { name: "Platform" })).toBeNull();
     expect(screen.queryByText("MindHub & sources")).toBeNull();
     unmount();
 
-    mockAuth = { role: "admin" };
+    mockAuth = { isAuthenticated: true, role: "admin" };
     render(
       <MemoryRouter>
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
-    const settings = screen.getByRole("group", { name: "Installation settings" });
+    const settings = screen.getByRole("group", { name: "Platform" });
     expect(
       within(settings).getByText("MindHub & sources").closest("a")?.getAttribute("href"),
     ).toBe("/settings/sources");
@@ -230,7 +257,7 @@ describe("Sidebar", () => {
   });
 
   it("marks MindHub & sources 'page' on the list and 'true' on a repository's detail", () => {
-    mockAuth = { role: "admin" };
+    mockAuth = { isAuthenticated: true, role: "admin" };
     const { unmount } = render(
       <MemoryRouter initialEntries={["/settings/sources"]}>
         <Sidebar open={false} onNavigate={() => {}} />
@@ -247,7 +274,17 @@ describe("Sidebar", () => {
   });
 
 
-  it("shows All Users to a Platform Admin only, and the org Users page to everyone", () => {
+  it("shows All Users to the operator only, and the org Users page to org owners/admins", () => {
+    const first = render(
+      <MemoryRouter>
+        <Sidebar open={false} onNavigate={() => {}} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByText("All Users")).toBeNull();
+    expect(screen.queryByText("Users", { selector: "a *, a" })).toBeNull();
+    first.unmount();
+
+    mockAuth = { isAuthenticated: true, role: "user", orgRole: "admin" };
     const { unmount } = render(
       <MemoryRouter>
         <Sidebar open={false} onNavigate={() => {}} />
@@ -259,17 +296,19 @@ describe("Sidebar", () => {
     ).toBe("/organization/users");
     unmount();
 
-    // The legacy "admin" role alone is not enough.
-    mockAuth = { role: "admin", isPlatformAdmin: false };
+    // Operator screens gate on the Platform Admin, which today also counts the
+    // legacy instance "admin" role (the operator APIs still accept it). Since
+    // #131 that includes All Users; see the KNOWN GAP in the matrix.
+    mockAuth = { isAuthenticated: true, role: "admin", isPlatformAdmin: false };
     const third = render(
       <MemoryRouter>
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
-    expect(screen.queryByText("All Users")).toBeNull();
+    expect(screen.getByText("All Users").closest("a")?.getAttribute("href")).toBe("/platform/users");
     third.unmount();
 
-    mockAuth = { role: "admin", isPlatformAdmin: true };
+    mockAuth = { isAuthenticated: true, role: "admin", isPlatformAdmin: true };
     render(
       <MemoryRouter>
         <Sidebar open={false} onNavigate={() => {}} />

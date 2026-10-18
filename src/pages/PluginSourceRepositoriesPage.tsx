@@ -291,7 +291,7 @@ function RepositoryDetail({ repositoryId }: { repositoryId: string }) {
   );
 }
 
-/** Installation settings › MindHub & sources (#2197): where this installation's plugins
+/** Platform › MindHub & sources (#2197, #131): where this installation's plugins
  * come from. Operator-only per epic #2192 decision A, gated on the same
  * role === "admin" check as every other operator item until #2200 refines the
  * roles. Holds the MindHub connection placeholder (#2201) above the read-only

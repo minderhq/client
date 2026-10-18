@@ -5,7 +5,6 @@ import { resolvePath, useLocation, useNavigate } from "react-router-dom";
 import { useI18n } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { searchCatalogPlugins } from "../lib/marketplace";
-import { useBillingAccess } from "../lib/useBillingAccess";
 import { useAuth } from "../lib/auth";
 import { leafVisible, useNav } from "../lib/nav";
 import { ROUTES } from "../lib/routes";
@@ -14,6 +13,7 @@ import { kbdClass } from "../lib/ui";
 import { useDebouncedValue } from "../lib/useDebouncedValue";
 import { useModal } from "../lib/useModal";
 import { focusPageStartIfLost } from "../lib/useRouteFocus";
+import { useAccess } from "../lib/useCan";
 import { useTokenRef } from "../lib/useTokenRef";
 import { Icon, type IconName } from "./Icon";
 
@@ -47,10 +47,9 @@ export function CommandPalette({
 }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const { role, sessionKey, isPlatformAdmin } = useAuth();
+  const { sessionKey } = useAuth();
   const tokenRef = useTokenRef();
-  const isAdmin = role === "admin";
-  const billing = useBillingAccess();
+  const access = useAccess();
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const listRef = useRef<HTMLUListElement>(null);
@@ -60,9 +59,7 @@ export function CommandPalette({
   const { destinations } = useNav();
 
   const commands = useMemo<Command[]>(() => {
-    const nav: Command[] = destinations.filter((dest) =>
-      leafVisible(dest, { isAdmin, isPlatformAdmin, billing }),
-    ).map((dest) => ({
+    const nav: Command[] = destinations.filter((dest) => leafVisible(dest, access)).map((dest) => ({
       id: `nav:${dest.to}:${dest.label}`,
       label: dest.label,
       sublabel: dest.description ?? t("palette.goTo", { group: dest.group }),
@@ -89,15 +86,21 @@ export function CommandPalette({
       group: t("palette.groupActions"),
       ...target,
     });
+    // The shortcuts into the product need what its pages need; the theme
+    // toggle is for anyone.
     const actions: Command[] = [
-      action("ask", "ask", { to: "/ask" }),
-      action("kb", "knowledge-bases", { to: "/rag" }),
-      action("pipeline", "pipelines", { to: "/rag/pipelines" }),
-      action("model", "models", { to: "/platform" }),
+      ...(access.isMember
+        ? [
+            action("ask", "ask", { to: "/ask" }),
+            action("kb", "knowledge-bases", { to: "/rag" }),
+            action("pipeline", "pipelines", { to: "/rag/pipelines" }),
+            action("model", "models", { to: "/platform" }),
+          ]
+        : []),
       action("theme", "theme-dark", { run: cycleTheme }),
     ];
     return [...actions, ...nav];
-  }, [isAdmin, isPlatformAdmin, billing, destinations, messages, t]);
+  }, [access, destinations, messages, t]);
 
   const staticResults = useMemo(() => {
     // Fold every dotted/dotless I to plain "i" before lowercasing, so a Turkish

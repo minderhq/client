@@ -2,10 +2,9 @@ import { useId } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import { useI18n } from "../i18n";
-import { useAuth } from "../lib/auth";
-import { entryIsActive, useNav, visibleEntry, type NavEntry } from "../lib/nav";
-import { useBillingAccess } from "../lib/useBillingAccess";
+import { entryIsActive, useNav, visibleSections } from "../lib/nav";
 import { sectionLabelClass } from "../lib/ui";
+import { useAccess } from "../lib/useCan";
 import { BrandMark } from "./BrandMark";
 import { Icon } from "./Icon";
 import { OrgSwitcher } from "./OrgSwitcher";
@@ -16,8 +15,11 @@ const inactiveItemClass =
   "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100";
 
 /** The platform's persistent nav — a single always-visible tree, grouped by
- * what the user is trying to DO (Knowledge / Marketplace / Platform /
- * Organization / Installation settings) rather than by backend service. Renders from the
+ * what the user is trying to DO (Knowledge / Marketplace / AI & system / Team /
+ * My account, then the Organization and Platform administration sections below
+ * a divider) rather than by backend service. Every row is filtered through
+ * useCan: a caller sees only what they hold the permission for, and a signed-out
+ * visitor sees no menu at all. Renders from the
  * shared nav model (lib/nav.ts) the ⌘K palette also uses. The repetitive
  * Available/Installed pages collapse into one entry each (their siblings are
  * in-page tabs), and every row carries a plain-language tooltip so "what does
@@ -29,8 +31,7 @@ export function Sidebar({
   open: boolean;
   onNavigate: () => void;
 }) {
-  const { role, isPlatformAdmin } = useAuth();
-  const access = { isAdmin: role === "admin", isPlatformAdmin, billing: useBillingAccess() };
+  const access = useAccess();
   const { pathname } = useLocation();
   const sectionIdPrefix = useId();
   const { t } = useI18n();
@@ -66,16 +67,16 @@ export function Sidebar({
       </div>
 
       <nav aria-label={t("shell.mainNav")} className="flex flex-1 flex-col gap-5 px-3 pb-6">
-        {sections.map((section, i) => {
-          const items = section.items
-            .map((item) => visibleEntry(item, access))
-            .filter((item): item is NavEntry => item !== null);
-          if (items.length === 0) return null;
+        {visibleSections(sections, access).map((section, i, shown) => {
+          const { items } = section;
+          // One divider above the first administration section.
+          const divider = section.admin && !shown[i - 1]?.admin;
           return (
             <div
               key={section.label ?? `top-${i}`}
               role={section.label ? "group" : undefined}
               aria-labelledby={section.label ? `${sectionIdPrefix}-${i}` : undefined}
+              className={divider ? "border-t border-gray-200 pt-5 dark:border-gray-800" : undefined}
             >
               {section.label && (
                 <p id={`${sectionIdPrefix}-${i}`} className={`mb-1.5 px-3 ${sectionLabelClass}`}>

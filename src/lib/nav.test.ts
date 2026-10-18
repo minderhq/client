@@ -9,11 +9,13 @@ import {
   localizeNav,
   navDestinations,
   tabGroupForPath,
+  navTrailForPath,
   visibleEntry,
-  type NavAccess,
+  visibleSections,
   type NavEntry,
 } from "./nav";
 import { ORG_USERS_PATH } from "./orgs";
+import { accessFrom, effectivePermissionsFromRoles, type Access, type RoleFacts } from "./permissions";
 import { ROUTES } from "./routes";
 
 const graphEntry = NAV_SECTIONS.flatMap((s) => s.items).find(
@@ -56,7 +58,6 @@ describe("nav — Knowledge Graph grouping (#1230)", () => {
       "/rag",
       "/rag/pipelines",
       "/rag/conversations",
-      "/rag/public-chat",
       "/rag/graph",
     ]);
     // …Taxonomy Review / Entity Merge Review are reachable only as tabs.
@@ -65,18 +66,43 @@ describe("nav — Knowledge Graph grouping (#1230)", () => {
   });
 });
 
-const MEMBER: NavAccess = { isAdmin: false, isPlatformAdmin: false, billing: false };
-const BILLING_MEMBER: NavAccess = { isAdmin: false, isPlatformAdmin: false, billing: true };
-const ADMIN: NavAccess = { isAdmin: true, isPlatformAdmin: true, billing: true };
+function can(facts: Partial<RoleFacts>): Access {
+  return access({
+    authenticated: true,
+    role: "user",
+    orgRole: "member",
+    isPlatformAdmin: false,
+    activeOrgId: "1",
+    billingVisible: false,
+    ...facts,
+  });
+}
+
+function access(facts: RoleFacts): Access {
+  return accessFrom(effectivePermissionsFromRoles(facts));
+}
+
+const MEMBER = can({});
+const BILLING_MEMBER = can({ billingVisible: true });
+const ORG_OWNER = can({ orgRole: "owner", billingVisible: true });
+const ADMIN = can({ role: "admin", isPlatformAdmin: true, billingVisible: true });
 /** The legacy instance "admin" role without the Platform Admin claim. */
-const ORG_ADMIN: NavAccess = { isAdmin: true, isPlatformAdmin: false, billing: true };
+const LEGACY_ADMIN = can({ role: "admin", billingVisible: true });
+const SIGNED_OUT = access({
+  authenticated: false,
+  role: "",
+  orgRole: "",
+  isPlatformAdmin: false,
+  activeOrgId: "",
+  billingVisible: true,
+});
 
 function section(label: string) {
   return NAV_SECTIONS.find((s) => s.label === label)!;
 }
 
 /** What the sidebar shows for a section: entry label → link target. */
-function visibleRows(label: string, access: NavAccess): Record<string, string> {
+function visibleRows(label: string, access: Access): Record<string, string> {
   return Object.fromEntries(
     section(label)
       .items.map((i) => visibleEntry(i, access))
@@ -85,7 +111,7 @@ function visibleRows(label: string, access: NavAccess): Record<string, string> {
   );
 }
 
-function tabLabels(path: string, access: NavAccess): string[] {
+function tabLabels(path: string, access: Access): string[] {
   const entry = tabGroupForPath(path);
   return (entry && visibleEntry(entry, access)?.tabs?.map((t) => t.label)) ?? [];
 }
@@ -101,9 +127,16 @@ describe("nav — marketplace IA (#2197)", () => {
       undefined,
       "Knowledge",
       "Marketplace",
-      "Platform",
+      "AI & system",
+      "Team",
+      "My account",
       "Organization",
-      "Installation settings",
+      "Platform",
+    ]);
+    // Only the administration sections sit below the divider.
+    expect(NAV_SECTIONS.filter((s) => s.admin).map((s) => s.label)).toEqual([
+      "Organization",
+      "Platform",
     ]);
   });
 
@@ -128,7 +161,7 @@ describe("nav — marketplace IA (#2197)", () => {
     expect(platform.some((to) => to.includes("bundles"))).toBe(false);
   });
 
-  it("shows Submission review in Publish to admins only, leaving members the Submissions page", () => {
+  it("shows Submission review in Publish to operators only, leaving members the Submissions page", () => {
     expect(tabLabels(ROUTES.publishSubmissions, MEMBER)).toEqual(["Submissions"]);
     expect(tabLabels(ROUTES.publishSubmissionReview, ADMIN)).toEqual([
       "Submissions",
@@ -137,52 +170,63 @@ describe("nav — marketplace IA (#2197)", () => {
     expect(visibleRows("Marketplace", MEMBER).Publish).toBe(ROUTES.publishSubmissions);
   });
 
-  it("puts Licenses next to Billing, keeping Billing's #64 gate", () => {
-    expect(tabLabels(ROUTES.licenses, BILLING_MEMBER)).toEqual(["Billing", "Licenses"]);
-    // Licenses alone: one tab, so PageTabs shows no strip.
-    expect(tabLabels(ROUTES.licenses, MEMBER)).toEqual(["Licenses"]);
-    expect(visibleRows("Organization", BILLING_MEMBER)["Billing & licenses"]).toBe(ROUTES.billing);
-    expect(visibleRows("Organization", MEMBER)["Billing & licenses"]).toBe(ROUTES.licenses);
+  it("puts Licenses in My account for everyone and Billing in Organization behind the billing gate", () => {
+    expect(visibleRows("My account", MEMBER).Licenses).toBe(ROUTES.licenses);
+    expect(visibleRows("Organization", MEMBER).Billing).toBeUndefined();
+    expect(visibleRows("Organization", BILLING_MEMBER).Billing).toBe(ROUTES.billing);
+    // Billing no longer owns /billing/licenses.
+    const billing = section("Organization").items.find((i) => i.to === ROUTES.billing)!;
+    expect(entryIsActive(billing, ROUTES.licenses)).toBe(false);
+    expect(tabGroupForPath(ROUTES.licenses)).toBeNull();
   });
 
-  it("shows Installation settings › MindHub & sources to admins only", () => {
-    expect(visibleRows("Installation settings", MEMBER)).toEqual({});
-    expect(visibleRows("Installation settings", BILLING_MEMBER)).toEqual({});
-    expect(visibleRows("Installation settings", ADMIN)).toEqual({ "MindHub & sources": ROUTES.sources });
-    const entry = section("Installation settings").items[0];
+  it("shows Platform › MindHub & sources to operators only", () => {
+    expect(visibleRows("Platform", MEMBER)).toEqual({});
+    expect(visibleRows("Platform", ORG_OWNER)).toEqual({});
+    expect(visibleRows("Platform", ADMIN)["MindHub & sources"]).toBe(ROUTES.sources);
+    const entry = section("Platform").items.find((i) => i.to === ROUTES.sources)!;
     expect(entryIsActive(entry, `${ROUTES.sources}/r1`)).toBe(true);
     expect(entryIsActive(entry, "/settings")).toBe(false);
+    // My account › Profile & settings is not active on the sources pages.
+    const account = section("My account").items.find((i) => i.to === "/settings")!;
+    expect(entryIsActive(account, ROUTES.sources)).toBe(false);
   });
 
-  it("keeps the other role gates exactly as before", () => {
-    const adminOnly = NAV_SECTIONS.flatMap((s) => s.items)
-      .flatMap((i) => [i, ...(i.tabs ?? [])])
-      .filter((l) => l.adminOnly)
-      .map((l) => l.to);
-    expect(adminOnly).toEqual([
-      "/rag/public-chat",
-      ROUTES.publishSubmissionReview,
-      "/organizations",
-      "/audit",
-      ROUTES.sources,
-    ]);
-    const platformAdminOnly = NAV_SECTIONS.flatMap((s) => s.items)
-      .flatMap((i) => [i, ...(i.tabs ?? [])])
-      .filter((l) => l.platformAdminOnly)
-      .map((l) => l.to);
-    expect(platformAdminOnly).toEqual(["/platform/users"]);
-    const billingOnly = NAV_SECTIONS.flatMap((s) => s.items)
-      .flatMap((i) => [i, ...(i.tabs ?? [])])
-      .filter((l) => l.requiresBilling)
-      .map((l) => l.to);
-    expect(billingOnly).toEqual([ROUTES.billing]);
+  it("gates every entry and tab: org screens on catalogue keys, operator screens on the Platform Admin", () => {
+    const permissions = Object.fromEntries(
+      NAV_SECTIONS.flatMap((s) => s.items)
+        .flatMap((i) => [i, ...(i.tabs ?? [])])
+        .filter((l) => l.requires !== "member")
+        .map((l) => [l.to, l.requires]),
+    );
+    expect(permissions).toEqual({
+      [ROUTES.publishSubmissionReview]: "platform-admin",
+      "/organization": "org.settings.manage",
+      [ORG_USERS_PATH]: "org.members.manage",
+      "/rag/public-chat": "org.chatbots.manage",
+      "/platform/providers": "org.ai.manage",
+      [ROUTES.billing]: "org.billing.view",
+      "/audit": "org.audit.view",
+      "/organizations": "platform-admin",
+      "/platform/users": "platform-admin",
+      "/platform/backups": "platform-admin",
+      [ROUTES.sources]: "platform-admin",
+    });
   });
 
-  it("shows the org Users page to everyone and All Users to Platform Admins only", () => {
-    expect(visibleRows("Organization", MEMBER).Users).toBe(ORG_USERS_PATH);
-    expect(visibleRows("Organization", MEMBER)["All Users"]).toBeUndefined();
-    expect(visibleRows("Organization", ORG_ADMIN)["All Users"]).toBeUndefined();
-    expect(visibleRows("Organization", ADMIN)["All Users"]).toBe("/platform/users");
+  it("shows the Organization section to org owners/admins and All Users to Platform Admins only", () => {
+    expect(visibleRows("Organization", MEMBER)).toEqual({});
+    expect(visibleRows("Organization", ORG_OWNER).Users).toBe(ORG_USERS_PATH);
+    expect(visibleRows("Organization", ORG_OWNER)["Audit Log"]).toBeUndefined();
+    // Operator screens accept the legacy instance admin role today, as their
+    // APIs do; All Users included (its page body still wants the claim).
+    expect(visibleRows("Platform", LEGACY_ADMIN).Backups).toBe("/platform/backups");
+    expect(visibleRows("Platform", LEGACY_ADMIN)["All Users"]).toBe("/platform/users");
+    expect(visibleRows("Platform", ADMIN)["All Users"]).toBe("/platform/users");
+  });
+
+  it("shows a signed-out visitor no sections at all", () => {
+    expect(visibleSections(NAV_SECTIONS, SIGNED_OUT)).toEqual([]);
   });
 
   it("titles every tab with a phrase that contains its tab label", () => {
@@ -196,7 +240,7 @@ describe("nav — marketplace IA (#2197)", () => {
 
   it("only links to routes declared in lib/routes.ts for the moved pages", () => {
     const declared = new Set<string>(Object.values(ROUTES));
-    const marketplaceLinks = [...section("Marketplace").items, ...section("Installation settings").items]
+    const marketplaceLinks = [...section("Marketplace").items, section("Platform").items.at(-1)!]
       .flatMap((i) => [i, ...(i.tabs ?? [])])
       .map((l) => l.to);
     for (const to of marketplaceLinks) expect(declared.has(to)).toBe(true);
@@ -204,7 +248,7 @@ describe("nav — marketplace IA (#2197)", () => {
 });
 
 describe("nav — command palette destinations", () => {
-  function find(query: string, access: NavAccess = ADMIN): string[] {
+  function find(query: string, access: Access = ADMIN): string[] {
     const terms = query.toLowerCase().split(/\s+/);
     return NAV_DESTINATIONS.filter((d) => leafVisible(d, access))
       .filter((d) => {
@@ -272,9 +316,11 @@ describe("nav — localized copy (i18n)", () => {
       undefined,
       "Bilgi",
       "Pazar yeri",
-      "Platform",
+      "Yapay zekâ ve sistem",
+      "Ekip",
+      "Hesabım",
       "Kuruluş",
-      "Kurulum ayarları",
+      "Platform",
     ]);
     expect(turkish[0].items.map((i) => i.label)).toEqual(["Ana sayfa", "Sor"]);
     expect(tabGroupForPath(ROUTES.installedAiTools, turkish)?.tabs?.map((t) => t.label)).toEqual([
@@ -291,5 +337,30 @@ describe("nav — localized copy (i18n)", () => {
       "Bilgi grafiği: Sınıflandırma incelemesi",
     );
     expect(destinations.find((d) => d.to === "/")?.group).toBe("Genel");
+  });
+});
+
+describe("nav — breadcrumb trail (#131)", () => {
+  const trail = (path: string) => {
+    const t = navTrailForPath(path, NAV_SECTIONS);
+    return t && [t.section ?? null, t.entry.label, t.tab?.label ?? null];
+  };
+
+  it("names the section, entry and tab of a page", () => {
+    expect(trail("/rag/taxonomy-review")).toEqual(["Knowledge", "Knowledge Graph", "Taxonomy Review"]);
+    expect(trail(ROUTES.installedAiTools)).toEqual(["Marketplace", "Installed", "AI tools"]);
+    expect(trail("/rag/pipelines")).toEqual(["Knowledge", "Pipelines", null]);
+    expect(trail(`${ROUTES.sources}/r1`)).toEqual(["Platform", "MindHub & sources", null]);
+    expect(trail(ROUTES.licenses)).toEqual(["My account", "Licenses", null]);
+  });
+
+  it("puts the heading-less top group directly under Home", () => {
+    expect(trail("/ask")).toEqual([null, "Ask", null]);
+  });
+
+  it("has no trail on Home, sign-in pages or unknown paths", () => {
+    expect(trail("/")).toBeNull();
+    expect(trail("/login")).toBeNull();
+    expect(trail("/no-such-page")).toBeNull();
   });
 });
