@@ -214,7 +214,7 @@ describe("UploadWidget", () => {
     );
     expect(apiFetch).toHaveBeenCalledWith(
       "/v1/rag/knowledge-bases/kb-1/documents/doc-1/status",
-      { token: "tok" },
+      expect.objectContaining({ token: "tok", signal: expect.any(AbortSignal) }),
     );
   });
 
@@ -340,6 +340,34 @@ describe("UploadWidget", () => {
       expect(screen.queryByText(/error/)).toBeNull();
       expect(onUploaded).toHaveBeenCalledTimes(1);
       expect(Object.values(statusCalls)).toEqual(Array(10).fill(4));
+      expect(documentStatusPoller.size).toBe(0);
+    });
+
+    it("stops uploading the remaining files after unmount", async () => {
+      let releaseUpload: (v: unknown) => void = () => {};
+      apiFetch.mockImplementation((url: string) =>
+        url.endsWith("/upload")
+          ? new Promise((resolve) => {
+              releaseUpload = resolve;
+            })
+          : new Promise(() => {}),
+      );
+      const { unmount } = render(
+        <UploadWidget kb={kb()} token="tok" onUploaded={vi.fn()} />,
+      );
+      fireEvent.change(screen.getByLabelText(/Upload documents/), {
+        target: { files: [fakeFile("a.pdf"), fakeFile("b.pdf"), fakeFile("c.pdf")] },
+      });
+      fireEvent.click(screen.getByText("Upload all"));
+      expect(apiFetch).toHaveBeenCalledTimes(1);
+
+      unmount();
+      releaseUpload({ message: "accepted", document_id: "doc-a", filename: "a.pdf", status: "processing" });
+      await new Promise((r) => setTimeout(r, 0));
+
+      // a.pdf was already uploading; b.pdf and c.pdf never start, and a.pdf's
+      // status is never polled.
+      expect(apiFetch).toHaveBeenCalledTimes(1);
       expect(documentStatusPoller.size).toBe(0);
     });
 

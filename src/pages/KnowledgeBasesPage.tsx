@@ -155,10 +155,10 @@ function pollDocumentStatus(
   signal: AbortSignal,
 ): Promise<UploadResponse> {
   return documentStatusPoller.watch(
-    () =>
+    (requestSignal) =>
       apiFetch<UploadResponse>(
         `/v1/rag/knowledge-bases/${kbId}/documents/${documentId}/status`,
-        { token },
+        { token, signal: requestSignal },
       ),
     (res) => res.status !== "processing",
     signal,
@@ -204,6 +204,7 @@ export function UploadWidget({
     // shared status poll loop while the next file uploads (#136).
     const pending: Promise<void>[] = [];
     for (let i = 0; i < queue.length; i++) {
+      if (signal.aborted) break; // unmounted: don't start the rest
       setItem(i, { status: "uploading" });
       const form = new FormData();
       form.append("file", queue[i].file);

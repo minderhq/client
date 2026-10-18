@@ -12,8 +12,11 @@ import { ApiError } from "./api";
  * Per item:
  * - the wait grows 3 s -> 6 s -> 12 s -> 15 s (capped) while the response
  *   stays the same, and drops back to 3 s when it changes;
- * - a 429 is "still working": wait `Retry-After` seconds (or the current
- *   wait when the header is missing) and try again -- never a failure;
+ * - a 429 is "still working": wait `Retry-After` seconds, clamped to
+ *   [3 s, 60 s] (or the current wait when the header is missing), and try
+ *   again -- never a failure;
+ * - each request gets a timeout (10 s): a hung request is aborted and counts
+ *   as a transient error, so it can't stall the loop for other documents;
  * - a 404 stops polling at once and rejects (the document is gone);
  * - any other error is retried with the same backoff, and rejects only after
  *   `maxErrorRetries` failures in a row.
@@ -22,11 +25,17 @@ import { ApiError } from "./api";
 export const STATUS_POLL_BASE_MS = 3000;
 export const STATUS_POLL_MAX_MS = 15000;
 export const STATUS_POLL_MAX_ERROR_RETRIES = 3;
+export const STATUS_POLL_TIMEOUT_MS = 10000;
+export const STATUS_POLL_RETRY_AFTER_MAX_MS = 60000;
 
 export interface StatusPollOptions {
   baseMs?: number;
   maxMs?: number;
   maxErrorRetries?: number;
+  /** Per-request timeout. */
+  timeoutMs?: number;
+  /** Upper bound for a server-sent `Retry-After` (the lower bound is baseMs). */
+  retryAfterMaxMs?: number;
 }
 
 /** Rejection reason for a watch cancelled through its AbortSignal. */
@@ -37,8 +46,17 @@ export class PollCancelledError extends Error {
   }
 }
 
+/** Rejection reason for a single poll request that took too long. */
+export class PollTimeoutError extends Error {
+  constructor() {
+    super("Status request timed out");
+    this.name = "PollTimeoutError";
+  }
+}
+
 interface Entry {
-  fetch: () => Promise<unknown>;
+  fetch: (signal: AbortSignal) => Promise<unknown>;
+  signal: AbortSignal | undefined;
   isDone: (res: unknown) => boolean;
   nextAt: number;
   delayMs: number;
@@ -53,6 +71,8 @@ export class StatusPollScheduler {
   private readonly baseMs: number;
   private readonly maxMs: number;
   private readonly maxErrorRetries: number;
+  private readonly timeoutMs: number;
+  private readonly retryAfterMaxMs: number;
   private readonly entries = new Map<number, Entry>();
   private nextId = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -62,6 +82,8 @@ export class StatusPollScheduler {
     this.baseMs = opts.baseMs ?? STATUS_POLL_BASE_MS;
     this.maxMs = opts.maxMs ?? STATUS_POLL_MAX_MS;
     this.maxErrorRetries = opts.maxErrorRetries ?? STATUS_POLL_MAX_ERROR_RETRIES;
+    this.timeoutMs = opts.timeoutMs ?? STATUS_POLL_TIMEOUT_MS;
+    this.retryAfterMaxMs = opts.retryAfterMaxMs ?? STATUS_POLL_RETRY_AFTER_MAX_MS;
   }
 
   /** Number of items still being polled. */
@@ -71,9 +93,10 @@ export class StatusPollScheduler {
 
   /** Polls `fetch` (first call right away) until `isDone` accepts a response,
    * which the promise resolves with. Rejects on 404, after too many non-429
-   * errors in a row, or with PollCancelledError when `signal` aborts. */
+   * errors in a row, or with PollCancelledError when `signal` aborts.
+   * `fetch` gets a per-request signal that aborts on timeout or cancel. */
   watch<T>(
-    fetch: () => Promise<T>,
+    fetch: (signal: AbortSignal) => Promise<T>,
     isDone: (res: T) => boolean,
     signal?: AbortSignal,
   ): Promise<T> {
@@ -88,6 +111,7 @@ export class StatusPollScheduler {
       signal?.addEventListener("abort", onAbort);
       this.entries.set(id, {
         fetch,
+        signal,
         isDone: isDone as (res: unknown) => boolean,
         nextAt: Date.now(),
         delayMs: this.baseMs,
@@ -148,10 +172,42 @@ export class StatusPollScheduler {
     return Math.min(delayMs * 2, this.maxMs);
   }
 
+  /** One request, settled by whichever comes first: the response, the
+   * timeout, or the watch's cancel. Timeout and cancel also abort the request
+   * itself, and the race means a fetch that ignores its signal still can't
+   * hold up the loop. */
+  private fetchOnce(entry: Entry): Promise<unknown> {
+    const controller = new AbortController();
+    return new Promise((resolve, reject) => {
+      const finish = () => {
+        clearTimeout(timer);
+        entry.signal?.removeEventListener("abort", onAbort);
+      };
+      const fail = (err: Error) => {
+        finish();
+        controller.abort(err);
+        reject(err);
+      };
+      const onAbort = () => fail(new PollCancelledError());
+      const timer = setTimeout(() => fail(new PollTimeoutError()), this.timeoutMs);
+      entry.signal?.addEventListener("abort", onAbort);
+      entry.fetch(controller.signal).then(
+        (res) => {
+          finish();
+          resolve(res);
+        },
+        (err: unknown) => {
+          finish();
+          reject(err);
+        },
+      );
+    });
+  }
+
   private async pollOnce(id: number, entry: Entry) {
     let res: unknown;
     try {
-      res = await entry.fetch();
+      res = await this.fetchOnce(entry);
     } catch (err) {
       if (!this.entries.has(id)) return; // cancelled while in flight
       if (err instanceof ApiError && err.status === 429) {
@@ -159,7 +215,12 @@ export class StatusPollScheduler {
         // when the server says, else after the current wait, which then
         // grows so repeated 429s back off.
         if (err.retryAfterSeconds !== null) {
-          entry.nextAt = Date.now() + err.retryAfterSeconds * 1000;
+          // Clamped: 0 must not mean "hammer it", nor a huge value "stall".
+          const waitMs = Math.min(
+            Math.max(err.retryAfterSeconds * 1000, this.baseMs),
+            this.retryAfterMaxMs,
+          );
+          entry.nextAt = Date.now() + waitMs;
         } else {
           entry.nextAt = Date.now() + entry.delayMs;
           entry.delayMs = this.grow(entry.delayMs);

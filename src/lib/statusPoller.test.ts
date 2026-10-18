@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "./api";
-import { PollCancelledError, StatusPollScheduler } from "./statusPoller";
+import {
+  PollCancelledError,
+  PollTimeoutError,
+  StatusPollScheduler,
+} from "./statusPoller";
 
 type Res = { status: string; n?: number };
 const done = (r: Res) => r.status !== "processing";
@@ -64,6 +68,34 @@ describe("StatusPollScheduler", () => {
 
     await expect(result).resolves.toEqual({ status: "completed" });
     expect(times).toEqual([0, 7000, 10000]);
+  });
+
+  it("clamps Retry-After: 0 waits the base interval, not an instant repoll", async () => {
+    const poller = new StatusPollScheduler();
+    const { fetch, times } = recorder(async (call) => {
+      if (call === 1) throw tooMany(0);
+      return { status: "completed" };
+    });
+    const result = poller.watch(fetch, done);
+
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await expect(result).resolves.toEqual({ status: "completed" });
+    expect(times).toEqual([0, 3000]);
+  });
+
+  it("clamps a huge Retry-After to 60 s", async () => {
+    const poller = new StatusPollScheduler();
+    const { fetch, times } = recorder(async (call) => {
+      if (call === 1) throw tooMany(86_400);
+      return { status: "completed" };
+    });
+    const result = poller.watch(fetch, done);
+
+    await vi.advanceTimersByTimeAsync(70_000);
+
+    await expect(result).resolves.toEqual({ status: "completed" });
+    expect(times).toEqual([0, 60_000]);
   });
 
   it("never fails on repeated 429s", async () => {
@@ -142,6 +174,61 @@ describe("StatusPollScheduler", () => {
     fetches.forEach((f) => expect(f).toHaveBeenCalledTimes(3)); // 0, 3 s, 9 s
     // One shared timer for all ten items, not one per item.
     expect(vi.getTimerCount()).toBe(1);
+  });
+
+  it("times out a hung request without stalling other documents", async () => {
+    const poller = new StatusPollScheduler({ timeoutMs: 10_000 });
+    const signals: AbortSignal[] = [];
+    let hungCalls = 0;
+    // Ignores its signal on purpose: the race alone must free the loop.
+    const hung = vi.fn((signal: AbortSignal) => {
+      signals.push(signal);
+      hungCalls += 1;
+      return hungCalls === 1
+        ? new Promise<Res>(() => {})
+        : Promise.resolve({ status: "completed" });
+    });
+    const { fetch: healthy, times } = recorder(async (call) =>
+      call >= 2 ? { status: "completed" } : { status: "processing" },
+    );
+    const hungResult = poller.watch(hung, done);
+    const healthyResult = poller.watch(healthy, done);
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    // The healthy document got its first poll right after the 10 s timeout,
+    // and the hung request's signal was aborted with a timeout.
+    expect(times).toEqual([10_000]);
+    expect(signals[0].aborted).toBe(true);
+    expect(signals[0].reason).toBeInstanceOf(PollTimeoutError);
+
+    await vi.advanceTimersByTimeAsync(20_000);
+    // A timeout is a transient error: retried, and both finish.
+    await expect(hungResult).resolves.toEqual({ status: "completed" });
+    await expect(healthyResult).resolves.toEqual({ status: "completed" });
+    expect(poller.size).toBe(0);
+  });
+
+  it("settles cleanly when aborted while a request is in flight", async () => {
+    const poller = new StatusPollScheduler();
+    const controller = new AbortController();
+    let requestSignal: AbortSignal | undefined;
+    const fetch = vi.fn((signal: AbortSignal) => {
+      requestSignal = signal;
+      return new Promise<Res>(() => {});
+    });
+    const result = poller.watch(fetch, done, controller.signal);
+    const settled = expect(result).rejects.toBeInstanceOf(PollCancelledError);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    controller.abort();
+    await settled;
+
+    expect(requestSignal?.aborted).toBe(true);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(poller.size).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it("stops polling when the signal aborts", async () => {
