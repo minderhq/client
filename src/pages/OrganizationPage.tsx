@@ -5,6 +5,7 @@ import { useConfirm } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 import { Icon } from "../components/Icon";
 import { InfoCallout } from "../components/InfoCallout";
+import { OrgDefaultLanguage } from "../components/OrgDefaultLanguage";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
 import { friendlyErrorMessage } from "../lib/api";
@@ -278,6 +279,10 @@ export function OrganizationPage() {
               </form>
             </section>
           )}
+
+          {/* #133: the language members see until they pick their own. Gated
+            inside on useCan("org.settings.manage"). */}
+          <OrgDefaultLanguage org={active} token={token} onSaved={() => void orgsRes.reload()} />
 
           {/* Members live on their own org-scoped Users page, with actions
             shown per the caller's permissions in this org. */}

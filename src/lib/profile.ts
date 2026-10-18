@@ -1,3 +1,4 @@
+import type { Locale } from "../i18n";
 import { apiFetch } from "./api";
 import type { Theme } from "./theme";
 
@@ -29,6 +30,16 @@ export interface UserProfile {
    * used: every request outside the verification allowlist answers `403
    * email_verification_required`. Null/absent: unknown. */
   email_verification_required?: boolean | null;
+  /** The account's chosen UI language (#133); null when it hasn't picked one.
+   * Absent from an older gateway. The published OpenAPI snapshot doesn't
+   * describe these three fields yet, so they are declared here. */
+  locale?: Locale | null;
+  /** The active organization's default language; null when it has none. */
+  organization_default_locale?: Locale | null;
+  /** The server's resolution: `locale`, else the org default, else its own
+   * default. The client adds the browser's languages before that last step
+   * (i18n/locale.ts, profileLocale). */
+  effective_locale?: Locale | null;
 }
 
 export type WorkspaceState = "ready" | "none" | "pending_request";
@@ -78,11 +89,19 @@ export interface ProfilePreferences {
 export interface UpdateProfileBody {
   display_name?: string | null;
   preferences?: ProfilePreferences;
+  /** The account's UI language; null clears it (then the org default
+   * applies). Any other value is rejected with a 422. */
+  locale?: Locale | null;
 }
 
 /** Fetch the authenticated caller's own Minder profile/preferences. */
 export function fetchMyProfile(token: string, signal?: AbortSignal) {
   return apiFetch<UserProfile>("/v1/profile/me", { token, signal });
+}
+
+/** Save the caller's UI language to their account (#133). */
+export function saveMyLocale(locale: Locale | null, token: string) {
+  return updateMyProfile({ locale }, token);
 }
 
 /** Edit the authenticated caller's own Minder profile/preferences. */

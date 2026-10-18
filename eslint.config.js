@@ -55,6 +55,7 @@ export const I18N_MIGRATED_FILES = [
   "src/components/CommandPalette.tsx",
   "src/components/ErrorBoundary.tsx",
   "src/components/LoadError.tsx",
+  "src/components/OrgDefaultLanguage.tsx",
   "src/components/PageTabs.tsx",
   "src/components/PasswordResetRequestForm.tsx",
   "src/components/RequirePermission.tsx",

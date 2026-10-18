@@ -1,3 +1,4 @@
+import type { Locale } from "../i18n";
 import { ApiError, apiFetch, friendlyErrorMessage } from "./api";
 import type { components } from "./api-types.gen";
 
@@ -11,6 +12,10 @@ export interface MyOrg {
   org_role: string;
   /** Their primary (home) org — the tenant their data is created under by default. */
   is_home: boolean;
+  /** The org's default UI language for members who haven't picked one
+   * (#133); null when it has none. Absent from an older gateway (and from
+   * the published OpenAPI snapshot, which hasn't been re-synced yet). */
+  default_locale?: Locale | null;
 }
 
 export interface MyOrgsResponse {
@@ -75,6 +80,8 @@ export function fetchOrgMembers(orgId: number, token: string, signal?: AbortSign
 export interface UpdateOrgBody {
   name?: string;
   description?: string;
+  /** The org's default UI language; null clears it. Owner/admin only. */
+  default_locale?: Locale | null;
 }
 
 /** An updated org's own details (PATCH /v1/organizations/{id} response). */
@@ -84,6 +91,7 @@ export interface OrgDetail {
   slug: string;
   description?: string | null;
   created_at?: string | null;
+  default_locale?: Locale | null;
 }
 
 /** Edit an org's own name/description. Owner/admin of the org (or an

@@ -7,7 +7,10 @@ import { createTranslator, type Translator } from "./translator";
  * friendlyErrorMessage).
  *
  * Detection order on load: the user's stored preference, then the browser's
- * languages (navigator.languages), then English.
+ * languages (navigator.languages), then English. Once a signed-in account's
+ * profile loads, its language wins (adoptProfileLocale): the account's own
+ * choice, then its organization's default, then the browser, then English.
+ * Signed-out pages only ever use this browser's choice.
  */
 
 /** localStorage key of the chosen language. */
@@ -24,13 +27,9 @@ export function readStoredLocale(): Locale | null {
   }
 }
 
-/** Saves the choice for this browser.
- *
- * TODO(per-user preference): the language should follow the account across
- * devices. Once the API serves a per-user language preference, read it after
- * sign-in (it outranks this browser's stored value and the browser language)
- * and write it from the Settings language switch next to this local copy. This
- * function and readStoredLocale are the seam: callers don't need to change. */
+/** Saves the choice for this browser. A signed-in account's language lives
+ * on its profile (see adoptProfileLocale / setAccountLocale); this local copy
+ * is what the next page load shows until that profile has loaded. */
 function writeStoredLocale(locale: Locale): void {
   try {
     localStorage.setItem(LOCALE_STORAGE_KEY, locale);
@@ -102,6 +101,57 @@ export function setLocale(locale: Locale): void {
 export function subscribeLocale(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
+}
+
+/** The language-related fields of the profile (GET /v1/profile/me). */
+export interface ProfileLocaleFields {
+  /** The account's own choice; null when it hasn't picked one. */
+  locale?: string | null;
+  /** The active organization's default; null when it has none. */
+  organization_default_locale?: string | null;
+  /** The server's resolution of the two above. */
+  effective_locale?: string | null;
+}
+
+/** The language a signed-in account sees: its own choice, then its
+ * organization's default, then the browser's languages, then English. This
+ * is the server's `effective_locale` plus the browser step the server can't
+ * know about. Null when the profile predates these fields (an older
+ * gateway): the browser's choice stays. */
+export function profileLocale(profile: ProfileLocaleFields | null | undefined): Locale | null {
+  if (!profile) return null;
+  if (isLocale(profile.locale)) return profile.locale;
+  if (isLocale(profile.organization_default_locale)) return profile.organization_default_locale;
+  if (profile.locale === undefined && profile.organization_default_locale === undefined) {
+    return isLocale(profile.effective_locale) ? profile.effective_locale : null;
+  }
+  return browserLocale() ?? DEFAULT_LOCALE;
+}
+
+/** After sign-in (and on every org switch): switch to the profile's language.
+ * It outranks a choice saved in this browser, which only covers the moments
+ * before the profile loads. */
+export function adoptProfileLocale(profile: ProfileLocaleFields | null | undefined): void {
+  const locale = profileLocale(profile);
+  if (locale) setLocale(locale);
+}
+
+/** The signed-in language switch: applies `next` at once, then saves it to
+ * the account with `save`. If the save fails the previous language comes
+ * back (unless the user has picked another one meanwhile) and the error is
+ * rethrown for the caller to show. */
+export async function setAccountLocale(
+  next: Locale,
+  save: (locale: Locale) => Promise<unknown>,
+): Promise<void> {
+  const previous = current;
+  setLocale(next);
+  try {
+    await save(next);
+  } catch (err) {
+    if (current === next) setLocale(previous);
+    throw err;
+  }
 }
 
 /** Call once at startup: puts the detected language on `<html lang>` (the

@@ -175,11 +175,14 @@ catalogs, not in components:
   `plural(key, count)`; `rich(key, { link: <a…/> })` fills a placeholder with a
   React node. Dates and numbers go through `Intl` in the active locale.
 - Outside React (e.g. `friendlyErrorMessage`): `i18n().t(…)`.
-- Language on first visit: the saved choice (`localStorage` `minder-locale`),
-  then the browser's languages, then English. Users switch it in
-  **Settings › Language**; `<html lang>` follows. The choice is stored in the
-  browser for now; `src/i18n/locale.ts` marks where a per-user preference from
-  the API will plug in.
+- Language on load: the saved choice (`localStorage` `minder-locale`), then
+  the browser's languages, then English. Once a signed-in account's profile
+  loads, its language wins: the user's own `locale`, then the org's
+  `default_locale`, then the browser's languages, then English
+  (`adoptProfileLocale`). **Settings › Language** applies the choice at once and
+  saves it to the profile, switching back with an error if the save fails;
+  signed-out pages stay browser-only. Org owners/admins set the org default on
+  the Organization page. `<html lang>` follows.
 - **Lint:** files listed in `I18N_MIGRATED_FILES` (`eslint.config.js`) may not
   contain hard-coded user-facing text (JSX text, string children, `aria-label`,
   `title`, `placeholder`, …). When you move a file's copy into the catalogs,
