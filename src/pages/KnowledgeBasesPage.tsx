@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { Link } from "react-router-dom";
@@ -16,6 +16,7 @@ import { filterByText } from "../lib/filterByText";
 import { kbReady } from "../lib/journey";
 import type { ChunkInfo } from "../lib/ragDocuments";
 import type { KnowledgeBase, TeamOption } from "../lib/types";
+import { documentStatusPoller, PollCancelledError } from "../lib/statusPoller";
 import { useAsyncResource } from "../lib/useAsyncResource";
 import { useAuth } from "../lib/auth";
 import {
@@ -142,25 +143,26 @@ interface QueueItem {
   detail: string;
 }
 
-const STATUS_POLL_INTERVAL_MS = 3000;
-
 /** Polls GET .../documents/{document_id}/status (#1081) until ingestion
  * leaves "processing" -- upload itself only kicks the job off in the
  * background, so a large document's real chunk/vector counts only show up
- * once this resolves. */
-async function pollDocumentStatus(
+ * once this resolves. Goes through the page-wide shared scheduler (#136):
+ * one poll loop for every pending document, with backoff and 429 handling. */
+function pollDocumentStatus(
   kbId: string,
   documentId: string,
   token: string,
+  signal: AbortSignal,
 ): Promise<UploadResponse> {
-  for (;;) {
-    const res = await apiFetch<UploadResponse>(
-      `/v1/rag/knowledge-bases/${kbId}/documents/${documentId}/status`,
-      { token },
-    );
-    if (res.status !== "processing") return res;
-    await new Promise((resolve) => setTimeout(resolve, STATUS_POLL_INTERVAL_MS));
-  }
+  return documentStatusPoller.watch(
+    () =>
+      apiFetch<UploadResponse>(
+        `/v1/rag/knowledge-bases/${kbId}/documents/${documentId}/status`,
+        { token },
+      ),
+    (res) => res.status !== "processing",
+    signal,
+  );
 }
 
 export function UploadWidget({
@@ -183,51 +185,67 @@ export function UploadWidget({
     e.target.value = "";
   }
 
+  // Stops this widget's status polling when it unmounts (#136).
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    return () => controller.abort();
+  }, []);
+
+  function setItem(i: number, patch: Partial<QueueItem>) {
+    setQueue((q) => q.map((item, idx) => (idx === i ? { ...item, ...patch } : item)));
+  }
+
   async function handleUploadAll() {
+    const signal = abortRef.current?.signal ?? new AbortController().signal;
     setUploading(true);
+    // Uploads go one at a time; each accepted document then joins the
+    // shared status poll loop while the next file uploads (#136).
+    const pending: Promise<void>[] = [];
     for (let i = 0; i < queue.length; i++) {
-      setQueue((q) =>
-        q.map((item, idx) => (idx === i ? { ...item, status: "uploading" } : item)),
-      );
+      setItem(i, { status: "uploading" });
       const form = new FormData();
       form.append("file", queue[i].file);
       if (buildTree) form.append("build_tree", "true");
+      let accepted: UploadResponse;
       try {
-        const accepted = await apiFetch<UploadResponse>(
+        accepted = await apiFetch<UploadResponse>(
           `/v1/rag/knowledge-bases/${kb.id}/upload`,
           { method: "POST", body: form, token },
         );
-        setQueue((q) =>
-          q.map((item, idx) => (idx === i ? { ...item, status: "processing" } : item)),
-        );
-        const res = await pollDocumentStatus(kb.id, accepted.document_id, token);
-        if (res.status === "failed") {
-          throw new Error(res.error || "Ingestion failed");
-        }
-        const treeNote = res.tree_nodes_created
-          ? `, ${res.tree_nodes_created} tree nodes`
-          : "";
-        setQueue((q) =>
-          q.map((item, idx) =>
-            idx === i
-              ? {
-                  ...item,
-                  status: "done",
-                  detail: `${res.chunks_processed} chunks, ${res.vectors_created} vectors${treeNote}`,
-                }
-              : item,
-          ),
-        );
       } catch (e) {
-        setQueue((q) =>
-          q.map((item, idx) =>
-            idx === i
-              ? { ...item, status: "error", detail: friendlyErrorMessage(e) }
-              : item,
-          ),
-        );
+        setItem(i, { status: "error", detail: friendlyErrorMessage(e) });
+        continue;
       }
+      setItem(i, { status: "processing" });
+      pending.push(
+        pollDocumentStatus(kb.id, accepted.document_id, token, signal).then(
+          (res) => {
+            if (res.status === "failed") {
+              setItem(i, {
+                status: "error",
+                detail: res.error || "Ingestion failed",
+              });
+              return;
+            }
+            const treeNote = res.tree_nodes_created
+              ? `, ${res.tree_nodes_created} tree nodes`
+              : "";
+            setItem(i, {
+              status: "done",
+              detail: `${res.chunks_processed} chunks, ${res.vectors_created} vectors${treeNote}`,
+            });
+          },
+          (e) => {
+            if (e instanceof PollCancelledError) return;
+            setItem(i, { status: "error", detail: friendlyErrorMessage(e) });
+          },
+        ),
+      );
     }
+    await Promise.all(pending);
+    if (signal.aborted) return;
     setUploading(false);
     onUploaded();
   }
