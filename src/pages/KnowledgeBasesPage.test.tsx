@@ -1,8 +1,9 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../lib/api";
+import { documentStatusPoller } from "../lib/statusPoller";
 import type { KnowledgeBase } from "../lib/types";
 import {
   ChunkViewer,
@@ -213,7 +214,7 @@ describe("UploadWidget", () => {
     );
     expect(apiFetch).toHaveBeenCalledWith(
       "/v1/rag/knowledge-bases/kb-1/documents/doc-1/status",
-      { token: "tok" },
+      expect.objectContaining({ token: "tok", signal: expect.any(AbortSignal) }),
     );
   });
 
@@ -298,6 +299,105 @@ describe("UploadWidget", () => {
     fireEvent.click(screen.getByText("Upload all"));
 
     await screen.findByText(/empty.pdf — error: No text content extracted/);
+  });
+
+  describe("status polling under rate limits (#136)", () => {
+    afterEach(() => vi.useRealTimers());
+
+    const statusUrl = /\/documents\/([^/]+)\/status$/;
+
+    it("finishes 10 simultaneous uploads despite injected 429s", async () => {
+      vi.useFakeTimers();
+      const statusCalls: Record<string, number> = {};
+      let uploads = 0;
+      apiFetch.mockImplementation(async (url: string) => {
+        if (url.endsWith("/upload")) {
+          const n = uploads++;
+          return { message: "accepted", document_id: `doc-${n}`, filename: `f${n}.txt`, status: "processing" };
+        }
+        const docId = statusUrl.exec(url)![1];
+        const n = (statusCalls[docId] = (statusCalls[docId] ?? 0) + 1);
+        // Every document is rate limited twice (once with Retry-After, once
+        // without), then reports progress, then completes.
+        if (n === 1) throw new ApiError("Too many requests", 429, { retryAfterSeconds: 2 });
+        if (n === 2) throw new ApiError("Too many requests", 429);
+        if (n === 3) return { status: "processing" };
+        return { status: "completed", chunks_processed: 5, vectors_created: 5 };
+      });
+      const onUploaded = vi.fn();
+      render(<UploadWidget kb={kb()} token="tok" onUploaded={onUploaded} />);
+      const files = Array.from({ length: 10 }, (_, i) => fakeFile(`f${i}.txt`));
+      fireEvent.change(screen.getByLabelText(/Upload documents/), {
+        target: { files },
+      });
+      fireEvent.click(screen.getByText("Upload all"));
+
+      await act(() => vi.advanceTimersByTimeAsync(30_000));
+
+      for (let i = 0; i < 10; i++) {
+        expect(screen.getByText(`f${i}.txt — done: 5 chunks, 5 vectors`)).toBeTruthy();
+      }
+      expect(screen.queryByText(/error/)).toBeNull();
+      expect(onUploaded).toHaveBeenCalledTimes(1);
+      expect(Object.values(statusCalls)).toEqual(Array(10).fill(4));
+      expect(documentStatusPoller.size).toBe(0);
+    });
+
+    it("stops uploading the remaining files after unmount", async () => {
+      let releaseUpload: (v: unknown) => void = () => {};
+      apiFetch.mockImplementation((url: string) =>
+        url.endsWith("/upload")
+          ? new Promise((resolve) => {
+              releaseUpload = resolve;
+            })
+          : new Promise(() => {}),
+      );
+      const { unmount } = render(
+        <UploadWidget kb={kb()} token="tok" onUploaded={vi.fn()} />,
+      );
+      fireEvent.change(screen.getByLabelText(/Upload documents/), {
+        target: { files: [fakeFile("a.pdf"), fakeFile("b.pdf"), fakeFile("c.pdf")] },
+      });
+      fireEvent.click(screen.getByText("Upload all"));
+      expect(apiFetch).toHaveBeenCalledTimes(1);
+
+      unmount();
+      releaseUpload({ message: "accepted", document_id: "doc-a", filename: "a.pdf", status: "processing" });
+      await new Promise((r) => setTimeout(r, 0));
+
+      // a.pdf was already uploading; b.pdf and c.pdf never start, and a.pdf's
+      // status is never polled.
+      expect(apiFetch).toHaveBeenCalledTimes(1);
+      expect(documentStatusPoller.size).toBe(0);
+    });
+
+    it("stops polling when the widget unmounts", async () => {
+      vi.useFakeTimers();
+      apiFetch.mockImplementation(async (url: string) =>
+        url.endsWith("/upload")
+          ? { message: "accepted", document_id: "doc-1", filename: "a.pdf", status: "processing" }
+          : { status: "processing" },
+      );
+      const onUploaded = vi.fn();
+      const { unmount } = render(
+        <UploadWidget kb={kb()} token="tok" onUploaded={onUploaded} />,
+      );
+      fireEvent.change(screen.getByLabelText(/Upload documents/), {
+        target: { files: [fakeFile("a.pdf")] },
+      });
+      fireEvent.click(screen.getByText("Upload all"));
+      await act(() => vi.advanceTimersByTimeAsync(10_000));
+      const callsBefore = apiFetch.mock.calls.length;
+      expect(callsBefore).toBeGreaterThan(1);
+
+      unmount();
+      await vi.advanceTimersByTimeAsync(120_000);
+
+      expect(apiFetch.mock.calls.length).toBe(callsBefore);
+      expect(documentStatusPoller.size).toBe(0);
+      expect(vi.getTimerCount()).toBe(0);
+      expect(onUploaded).not.toHaveBeenCalled();
+    });
   });
 });
 
