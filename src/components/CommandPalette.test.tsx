@@ -8,7 +8,7 @@ import { useRouteFocus } from "../lib/useRouteFocus";
 import { CommandPalette } from "./CommandPalette";
 import { useConfirm } from "./ConfirmDialog";
 
-let mockAuth = { role: "", sessionKey: "" };
+let mockAuth = { isAuthenticated: true, role: "", sessionKey: "" };
 vi.mock("../lib/auth", () => ({ useAuth: () => mockAuth }));
 
 let mockBilling = true;
@@ -53,7 +53,7 @@ function resultLabels(): string[] {
 
 describe("CommandPalette — marketplace entries (#2197)", () => {
   beforeEach(() => {
-    mockAuth = { role: "", sessionKey: "" };
+    mockAuth = { isAuthenticated: true, role: "", sessionKey: "" };
     mockBilling = true;
   });
   afterEach(cleanup);
@@ -105,7 +105,7 @@ describe("CommandPalette — marketplace entries (#2197)", () => {
     expect(screen.queryByText("Submission review")).toBeNull();
     cleanup();
 
-    mockAuth = { role: "admin", sessionKey: "" };
+    mockAuth = { isAuthenticated: true, role: "admin", sessionKey: "" };
     open();
     search("mindhub");
     expect(screen.getByText("MindHub & sources")).toBeTruthy();
@@ -117,7 +117,11 @@ describe("CommandPalette — marketplace entries (#2197)", () => {
     mockBilling = false;
     open();
     search("billing");
-    expect(resultLabels()).not.toContain("Billing");
+    expect(screen.queryAllByRole("option").map((o) => o.textContent)).not.toContain(
+      expect.stringContaining("Billing"),
+    );
+    // Licenses is a My account page of its own now (#131), not a Billing tab.
+    search("licenses");
     expect(resultLabels()).toContain("Plugin licenses");
   });
 });
@@ -179,7 +183,7 @@ function openFromTrigger(trigger: HTMLElement) {
 
 describe("CommandPalette — shared modal layer (#97)", () => {
   beforeEach(() => {
-    mockAuth = { role: "", sessionKey: "" };
+    mockAuth = { isAuthenticated: true, role: "", sessionKey: "" };
     mockBilling = true;
   });
   afterEach(cleanup);

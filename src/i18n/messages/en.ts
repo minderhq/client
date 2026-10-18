@@ -49,6 +49,31 @@ export const en = {
     openPalette: "Open command palette",
     searchOrJump: "Search or jump to…",
     tabsLabel: "{group} sections",
+    breadcrumb: "Breadcrumb",
+  },
+
+  access: {
+    forbiddenTitle: "You don't have access to this page",
+    forbiddenBody: "This page is open to {audience}.",
+    audience: {
+      members: "members of this organization",
+      orgAdmins: "organization owners and admins",
+      teamAdmins: "the team's admins",
+      billing: "people who can see this organization's billing",
+      platformAdmins: "platform admins",
+    },
+    requestAccess: "Request access",
+    requestAccessSoon: "Access requests are coming soon. Until then, ask an organization admin.",
+    signInTitle: "Sign in to continue",
+    signInBody: "You need to be signed in to see this page.",
+    backHome: "Back to home",
+  },
+
+  notFound: {
+    title: "Page not found",
+    body: "There is no page at {path}. It may have moved, or the link may be wrong.",
+    search: "Search pages",
+    backHome: "Back to home",
   },
 
   theme: {
@@ -91,9 +116,11 @@ export const en = {
       overview: "Overview",
       knowledge: "Knowledge",
       marketplace: "Marketplace",
-      platform: "Platform",
+      ai: "AI & system",
+      team: "Team",
+      account: "My account",
       organization: "Organization",
-      installationSettings: "Installation settings",
+      platform: "Platform",
     },
     items: {
       home: { label: "Home", description: "Your workspace at a glance", keywords: "dashboard overview start" },
@@ -124,9 +151,9 @@ export const en = {
       status: { label: "Status", description: "Service health & recent logs", keywords: "health services uptime logs" },
       orgOverview: { label: "Overview", description: "Your org, its invites & switching", keywords: "organization tenant workspace switch invites" },
       orgUsers: { label: "Users", description: "This org's members: roles, suspend, remove, account resets", keywords: "users members people accounts suspend remove reset password deactivate roles" },
-      billingAndLicenses: { label: "Billing & licenses", description: "Your plan, subscription and plugin licenses", keywords: "subscription plan payment license entitlement" },
       billing: { label: "Billing", title: "Billing", description: "Your plan, subscription & upgrades", keywords: "subscription plan upgrade payment tier pricing invoice" },
       licenses: { label: "Licenses", title: "Plugin licenses", description: "The plugin tiers licensed to your account (display-only)", keywords: "my licenses tier plugin" },
+      account: { label: "Profile & settings", description: "Your profile, password and preferences", keywords: "account profile password settings preferences me" },
       teams: { label: "Teams", description: "Group people & share resources", keywords: "groups members sharing collaborate" },
       allOrganizations: { label: "All Organizations", description: "Every org on the instance + provisioning (admin)", keywords: "organizations tenants provision create admin" },
       allUsers: { label: "All Users", description: "Every account on the installation, across orgs (Platform Admin)", keywords: "users accounts roles platform admin people members instance" },

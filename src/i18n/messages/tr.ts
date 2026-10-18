@@ -48,6 +48,31 @@ export const tr: Messages = {
     openPalette: "Komut paletini aç",
     searchOrJump: "Ara ya da bir sayfaya git…",
     tabsLabel: "{group} bölümleri",
+    breadcrumb: "Bulunduğunuz yer",
+  },
+
+  access: {
+    forbiddenTitle: "Bu sayfaya erişiminiz yok",
+    forbiddenBody: "Bu sayfa {audience} açık.",
+    audience: {
+      members: "bu kuruluşun üyelerine",
+      orgAdmins: "kuruluş sahiplerine ve yöneticilerine",
+      teamAdmins: "ekibin yöneticilerine",
+      billing: "bu kuruluşun faturalandırmasını görebilen kişilere",
+      platformAdmins: "platform yöneticilerine",
+    },
+    requestAccess: "Erişim iste",
+    requestAccessSoon: "Erişim istekleri yakında geliyor. O zamana kadar bir kuruluş yöneticisine başvurun.",
+    signInTitle: "Devam etmek için giriş yapın",
+    signInBody: "Bu sayfayı görmek için giriş yapmanız gerekiyor.",
+    backHome: "Ana sayfaya dön",
+  },
+
+  notFound: {
+    title: "Sayfa bulunamadı",
+    body: "{path} adresinde bir sayfa yok. Sayfa taşınmış ya da bağlantı yanlış olabilir.",
+    search: "Sayfalarda ara",
+    backHome: "Ana sayfaya dön",
   },
 
   theme: {
@@ -89,9 +114,11 @@ export const tr: Messages = {
       overview: "Genel",
       knowledge: "Bilgi",
       marketplace: "Pazar yeri",
-      platform: "Platform",
+      ai: "Yapay zekâ ve sistem",
+      team: "Ekip",
+      account: "Hesabım",
       organization: "Kuruluş",
-      installationSettings: "Kurulum ayarları",
+      platform: "Platform",
     },
     items: {
       home: { label: "Ana sayfa", description: "Çalışma alanınıza bir bakışta göz atın", keywords: "pano özet başlangıç dashboard home" },
@@ -122,9 +149,9 @@ export const tr: Messages = {
       status: { label: "Durum", description: "Hizmetlerin sağlık durumu ve son günlükler", keywords: "sağlık hizmetler çalışma süresi günlük kayıt health logs status" },
       orgOverview: { label: "Genel bakış", description: "Kuruluşunuz, davetleri ve kuruluş değiştirme", keywords: "kuruluş çalışma alanı değiştir davetler organization workspace invites" },
       orgUsers: { label: "Kullanıcılar", description: "Bu kuruluşun üyeleri: roller, askıya alma, çıkarma, hesap sıfırlama", keywords: "kullanıcılar üyeler kişiler hesaplar askıya al çıkar parola sıfırla roller users members" },
-      billingAndLicenses: { label: "Faturalandırma ve lisanslar", description: "Planınız, aboneliğiniz ve eklenti lisanslarınız", keywords: "abonelik plan ödeme lisans fatura billing subscription license" },
       billing: { label: "Faturalandırma", title: "Faturalandırma", description: "Planınız, aboneliğiniz ve yükseltmeler", keywords: "abonelik plan yükselt ödeme fiyat fatura billing upgrade invoice" },
       licenses: { label: "Lisanslar", title: "Eklenti lisansları", description: "Hesabınıza lisanslanan eklenti seviyeleri (yalnızca görüntüleme)", keywords: "lisanslarım seviye eklenti licenses tier" },
+      account: { label: "Profil ve ayarlar", description: "Profiliniz, parolanız ve tercihleriniz", keywords: "hesap profil parola ayarlar tercihler account profile password settings" },
       teams: { label: "Ekipler", description: "Kişileri gruplayın ve kaynakları paylaşın", keywords: "ekip grup üyeler paylaşım iş birliği teams groups" },
       allOrganizations: { label: "Tüm kuruluşlar", description: "Bu kurulumdaki tüm kuruluşlar ve oluşturma (yönetici)", keywords: "kuruluşlar oluştur yönetici organizations tenants provision" },
       allUsers: { label: "Tüm kullanıcılar", description: "Kurulumdaki tüm hesaplar, kuruluşlar genelinde (platform yöneticisi)", keywords: "kullanıcılar hesaplar roller platform yöneticisi users accounts admin" },

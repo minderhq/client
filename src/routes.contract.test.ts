@@ -40,8 +40,7 @@ const AUTH_ROUTES = [
 
 /** Routes outside the main nav for another stated reason. */
 const UTILITY_ROUTES: Record<string, string> = {
-  "/settings": "your own account settings, reached from the user menu",
-  "*": "unmatched paths redirect home",
+  "*": "unmatched paths get the 404 page",
 };
 
 /** The JSX expression in `path={…}` that maps the redirect tables to routes;

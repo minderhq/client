@@ -1,13 +1,12 @@
 import { NavLink, useLocation } from "react-router-dom";
 
 import { useI18n } from "../i18n";
-import { useAuth } from "../lib/auth";
 import { tabGroupForPath, useNav, visibleEntry } from "../lib/nav";
-import { useBillingAccess } from "../lib/useBillingAccess";
+import { useAccess } from "../lib/useCan";
 import { Icon } from "./Icon";
 
 /** In-page sub-navigation for the grouped pages (Marketplace › Discover /
- * Installed / Publish, Billing & licenses, Knowledge Graph). The old nav
+ * Installed / Publish, Knowledge Graph). The old nav
  * listed every Available/Installed/Submit/… page as its own sidebar row, so
  * users couldn't tell they were facets of one thing. Now the sidebar shows one
  * entry per family and this segmented strip sits at the top of each of its
@@ -21,13 +20,11 @@ import { Icon } from "./Icon";
  * sets it) is the correct pattern, not role="tab" panels. */
 export function PageTabs() {
   const { pathname } = useLocation();
-  const { role, isPlatformAdmin } = useAuth();
-  const billing = useBillingAccess();
+  const access = useAccess();
   const { t } = useI18n();
   const { sections } = useNav();
   const entry = tabGroupForPath(pathname, sections);
-  const group =
-    entry && visibleEntry(entry, { isAdmin: role === "admin", isPlatformAdmin, billing });
+  const group = entry && visibleEntry(entry, access);
   const tabs = group?.tabs ?? [];
   if (!group || tabs.length <= 1) return null;
 

@@ -1,19 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Route, Routes, useLocation } from "react-router-dom";
 
 import { BrandMark } from "./components/BrandMark";
+import { Breadcrumbs } from "./components/Breadcrumbs";
 import { CommandPalette } from "./components/CommandPalette";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Icon } from "./components/Icon";
 import { OrgSwitcher } from "./components/OrgSwitcher";
 import { PageTabs } from "./components/PageTabs";
 import { RedirectWithQuery } from "./components/RedirectWithQuery";
+import { RequirePermission } from "./components/RequirePermission";
 import { Sidebar } from "./components/Sidebar";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { UserMenu } from "./components/UserMenu";
 import { useI18n } from "./i18n";
 import { AuthProvider } from "./lib/auth";
 import { isModalOpen } from "./lib/modalLayer";
+import { PLATFORM_ADMIN } from "./lib/permissions";
 import { ORG_USERS_PATH } from "./lib/orgs";
 import { LEGACY_REDIRECTS, ROUTES, SECTION_REDIRECTS } from "./lib/routes";
 import { iconButtonClass, kbdClass, pageEnterClass } from "./lib/ui";
@@ -41,6 +44,7 @@ import { KnowledgeBasesPage } from "./pages/KnowledgeBasesPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ModelManagementPage } from "./pages/ModelManagementPage";
 import { MyLicensesPage } from "./pages/MyLicensesPage";
+import { NotFoundPage } from "./pages/NotFoundPage";
 import { OrganizationPage } from "./pages/OrganizationPage";
 import { OrgUsersPage } from "./pages/OrgUsersPage";
 import { PluginSourceRepositoriesPage } from "./pages/PluginSourceRepositoriesPage";
@@ -163,6 +167,7 @@ export function App() {
             <ErrorBoundary key={location.pathname}>
               <div className={pageEnterClass}>
                 <ForcePasswordChangeGate>
+                  <Breadcrumbs />
                   <PageTabs />
                   <Routes>
                     <Route path="/" element={<HomePage />} />
@@ -188,17 +193,33 @@ export function App() {
                       element={<EntityMergeReviewPage />}
                     />
                     <Route path="/rag/conversations" element={<ConversationsPage />} />
+                    {/* Route guards (#131): a caller who doesn't meet the requirement
+                      gets the forbidden page at the same URL. Each guard asks
+                      what the page itself already checks; operator screens
+                      check the Platform Admin, never a permission key. */}
                     <Route
                       path="/rag/public-chat"
-                      element={<PublicChatEndpointsPage />}
+                      element={
+                        <RequirePermission requires="org.chatbots.manage">
+                          <PublicChatEndpointsPage />
+                        </RequirePermission>
+                      }
                     />
                     <Route
                       path="/rag/public-chat/:endpointId/conversations"
-                      element={<PublicChatConversationsPage />}
+                      element={
+                        <RequirePermission requires="org.chatbots.manage">
+                          <PublicChatConversationsPage />
+                        </RequirePermission>
+                      }
                     />
                     <Route
                       path="/rag/public-chat/:endpointId/conversations/:sessionId"
-                      element={<PublicChatConversationsPage />}
+                      element={
+                        <RequirePermission requires="org.chatbots.manage">
+                          <PublicChatConversationsPage />
+                        </RequirePermission>
+                      }
                     />
 
                     {/* Marketplace (#2197): Discover / Installed / Publish, each
@@ -218,28 +239,71 @@ export function App() {
                     <Route path={ROUTES.publishSubmissions} element={<SubmissionsPage />} />
                     <Route
                       path={ROUTES.publishSubmissionReview}
-                      element={<ReviewQueuePage />}
+                      element={
+                        <RequirePermission requires={PLATFORM_ADMIN}>
+                          <ReviewQueuePage />
+                        </RequirePermission>
+                      }
                     />
 
-                    {/* Organization › Billing & licenses, Installation settings › MindHub & sources. */}
+                    {/* My account › Licenses, Platform › MindHub & sources. */}
                     <Route path={ROUTES.licenses} element={<MyLicensesPage />} />
-                    <Route path={ROUTES.sources} element={<PluginSourceRepositoriesPage />} />
+                    <Route
+                      path={ROUTES.sources}
+                      element={
+                        <RequirePermission requires={PLATFORM_ADMIN}>
+                          <PluginSourceRepositoriesPage />
+                        </RequirePermission>
+                      }
+                    />
                     <Route
                       path={`${ROUTES.sources}/:repositoryId`}
-                      element={<PluginSourceRepositoriesPage />}
+                      element={
+                        <RequirePermission requires={PLATFORM_ADMIN}>
+                          <PluginSourceRepositoriesPage />
+                        </RequirePermission>
+                      }
                     />
 
                     <Route path="/platform" element={<ModelManagementPage />} />
                     <Route path="/platform/providers" element={<CloudProvidersPage />} />
                     <Route path="/platform/status" element={<StatusPage />} />
                     <Route path="/platform/voice" element={<VoicePage />} />
-                    <Route path="/platform/backups" element={<BackupsPage />} />
-                    <Route path="/platform/users" element={<UsersPage />} />
+                    <Route
+                      path="/platform/backups"
+                      element={
+                        <RequirePermission requires={PLATFORM_ADMIN}>
+                          <BackupsPage />
+                        </RequirePermission>
+                      }
+                    />
+                    <Route
+                      path="/platform/users"
+                      element={
+                        <RequirePermission requires={PLATFORM_ADMIN}>
+                          <UsersPage />
+                        </RequirePermission>
+                      }
+                    />
                     <Route path="/platform/teams" element={<TeamsPage />} />
                     <Route path="/organization" element={<OrganizationPage />} />
                     <Route path={ORG_USERS_PATH} element={<OrgUsersPage />} />
-                    <Route path="/organizations" element={<AllOrganizationsPage />} />
-                    <Route path="/audit" element={<AuditLogPage />} />
+                    <Route
+                      path="/organizations"
+                      element={
+                        <RequirePermission requires={PLATFORM_ADMIN}>
+                          <AllOrganizationsPage />
+                        </RequirePermission>
+                      }
+                    />
+                    <Route
+                      path="/audit"
+                      element={
+                        <RequirePermission requires="org.audit.view">
+                          <AuditLogPage />
+                        </RequirePermission>
+                      }
+                    />
 
                     {/* Section indexes and every pre-restructure URL redirect to
                       the current page, keeping the query string (?source=, ?q=)
@@ -250,8 +314,8 @@ export function App() {
 
                     {/* Unmatched paths (including the removed /model-management, still
                       served 200 by nginx's SPA fallback since it can't tell client-side
-                      routes apart) redirect home instead of rendering a blank page. */}
-                    <Route path="*" element={<Navigate to="/" replace />} />
+                      routes apart) get a real 404 page instead of a blank one. */}
+                    <Route path="*" element={<NotFoundPage onSearch={() => setPaletteOpen(true)} />} />
                   </Routes>
                 </ForcePasswordChangeGate>
               </div>

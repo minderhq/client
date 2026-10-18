@@ -6,7 +6,7 @@ import {
   type Location,
   type NavigateFunction,
 } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
 import { useConfirm } from "./components/ConfirmDialog";
@@ -124,9 +124,33 @@ describe("App", () => {
     }
   });
 
-  it("redirects an unmatched path home", () => {
+  it("shows the 404 page for an unmatched path, with search and the way home (#131)", () => {
     renderAt("/this-route-does-not-exist");
-    expect(screen.getByRole("heading", { name: "Minder" })).toBeTruthy();
+    expect(currentLocation?.pathname).toBe("/this-route-does-not-exist");
+    expect(screen.getByRole("heading", { level: 1, name: "Page not found" })).toBeTruthy();
+    expect(screen.getByText(/There is no page at \/this-route-does-not-exist/)).toBeTruthy();
+    const main = screen.getByRole("main");
+    expect(within(main).getByRole("link", { name: "Back to home" }).getAttribute("href")).toBe("/");
+    fireEvent.click(within(main).getByRole("button", { name: "Search pages" }));
+    expect(screen.getByRole("dialog", { name: "Command palette" })).toBeTruthy();
+  });
+
+  it("shows breadcrumbs above a page on the menu, and none on Home (#131)", () => {
+    signIn("member");
+    renderAt("/rag/taxonomy-review");
+    const crumbs = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(within(crumbs).getAllByRole("listitem").map((li) => li.textContent).filter(Boolean)).toEqual([
+      "Home",
+      "Knowledge",
+      "Knowledge Graph",
+      "Taxonomy Review",
+    ]);
+    expect(within(crumbs).getByRole("link", { name: "Home" }).getAttribute("href")).toBe("/");
+    expect(within(crumbs).getByRole("link", { name: "Knowledge Graph" }).getAttribute("href")).toBe("/rag/graph");
+    expect(within(crumbs).getByText("Taxonomy Review").getAttribute("aria-current")).toBe("page");
+    cleanup();
+    renderAt("/");
+    expect(screen.queryByRole("navigation", { name: "Breadcrumb" })).toBeNull();
   });
 
   it("redirects the old /marketplace path to Discover plugins", () => {
@@ -171,6 +195,7 @@ describe("App", () => {
   });
 
   it("closes the mobile sidebar overlay when a nav link is clicked", () => {
+    signIn("member");
     const { container } = renderAt("/");
 
     fireEvent.click(screen.getByLabelText("Toggle navigation"));
@@ -296,7 +321,7 @@ describe("App — page titles match the nav (#2197)", () => {
     expect(links.map((a) => a.getAttribute("aria-current"))).toEqual([null, "page", null]);
   });
 
-  it.each([ROUTES.discoverPlugins, ROUTES.installedAiTools, ROUTES.billing])(
+  it.each([ROUTES.discoverPlugins, ROUTES.installedAiTools, ROUTES.publishSubmissionReview])(
     "marks exactly one link as the current page on %s (the tab; its sidebar entry is 'true')",
     (path) => {
       signIn("admin");
@@ -326,17 +351,20 @@ describe("App — Installation settings › MindHub & sources gating", () => {
     expect(await screen.findByText(/No plugin source repositories yet/)).toBeTruthy();
   });
 
-  it("tells a non-admin the page is for operators instead of showing it", () => {
+  it("shows a non-admin the forbidden page instead of the page (#131 route guard)", () => {
     signIn("member");
     renderAt(ROUTES.sources);
-    expect(screen.getByRole("heading", { level: 1, name: "MindHub & sources" })).toBeTruthy();
-    expect(screen.getByText(/Only a Platform Admin/)).toBeTruthy();
+    expect(currentLocation?.pathname).toBe(ROUTES.sources);
+    expect(screen.getByRole("heading", { level: 1, name: "You don't have access to this page" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { level: 1, name: "MindHub & sources" })).toBeNull();
     expect(screen.queryByRole("region", { name: "MindHub connection" })).toBeNull();
     expect(screen.queryByText(/No plugin source repositories yet/)).toBeNull();
   });
 });
 
 describe("App — focus after navigation", () => {
+  // Signed in: a signed-out visitor has no menu or tab strips to follow.
+  beforeEach(() => signIn("member"));
   afterEach(() => {
     sessionStorage.clear();
     cleanup();
@@ -427,6 +455,7 @@ function palette() {
 }
 
 describe("App — ⌘K and the modal layer (#97)", () => {
+  beforeEach(() => signIn("member"));
   afterEach(() => {
     sessionStorage.clear();
     cleanup();

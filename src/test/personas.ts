@@ -14,13 +14,13 @@
  *
  * Instance role vs org role: `role` is the installation-level role
  * ("admin" | "user") and `org_role` the role inside the active org
- * ("owner" | "admin" | "member"). Today's nav gates only on `role` and
- * `is_platform_admin`, never on `org_role` -- see navigation.matrix.test.tsx.
+ * ("owner" | "admin" | "member"). The shell's gates (useCan, lib/permissions.ts)
+ * read `role`, `org_role` and `is_platform_admin` -- see navigation.matrix.test.tsx.
  *
  * Fixtures only build state; renderApp.tsx turns one into a rendered app.
  */
 import { DEFAULT_SUBMISSION_TIER, UPGRADE_TIERS } from "../lib/billing";
-import type { NavAccess } from "../lib/nav";
+import { accessFrom, effectivePermissionsFromRoles, type Access } from "../lib/permissions";
 
 export type PersonaId =
   | "platformAdmin"
@@ -205,16 +205,20 @@ export function personaToken(persona: Persona, now: number = Date.now()): string
   })}.sig`;
 }
 
-/** The NavAccess today's Sidebar/PageTabs/CommandPalette derive for this
- * persona. It MIRRORS Sidebar.tsx (`role === "admin"`, the platform-admin
- * claim, and the billing probe; a logged-out visitor's probe never runs, so it
- * reads as visible) and can drift from it: the rendered-sidebar test in
- * navigation.matrix.test.tsx is the real check, this only cross-checks the
- * expected tables against nav.ts. */
-export function personaNavAccess(persona: Persona): NavAccess {
-  return {
-    isAdmin: persona.claims?.role === "admin",
-    isPlatformAdmin: persona.claims?.is_platform_admin === true,
-    billing: persona.claims ? persona.billing.view : true,
-  };
+/** The gates the shell derives for this persona: the same derivation useCan
+ * runs (lib/permissions.ts), fed the persona's claims and billing verdict. A
+ * logged-out visitor's billing probe never runs, so it reads as visible, but
+ * a signed-out caller holds no permission anyway. The rendered-sidebar test in
+ * navigation.matrix.test.tsx is the real check; this cross-checks the expected
+ * tables against nav.ts. */
+export function personaAccess(persona: Persona): Access {
+  const claims = persona.claims;
+  return accessFrom(effectivePermissionsFromRoles({
+    authenticated: !!claims,
+    role: claims?.role ?? "",
+    orgRole: claims?.org_role ?? "",
+    isPlatformAdmin: claims?.is_platform_admin === true,
+    activeOrgId: claims?.active_tenant_id ?? claims?.tenant_id ?? "",
+    billingVisible: claims ? persona.billing.view : true,
+  }));
 }
