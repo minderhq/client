@@ -8,6 +8,7 @@ import {
   TOKEN_REFRESHED_EVENT,
 } from "./api";
 import { AuthProvider, useAuth } from "./auth";
+import { cachedRead } from "./readCache";
 
 const TOKEN_KEY = "minder_jwt";
 
@@ -374,6 +375,26 @@ describe("AuthProvider / useAuth", () => {
     expect(result.current.token).toBe("");
     expect(result.current.isAuthenticated).toBe(false);
     expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
+  });
+
+  it("logout drops the shared read cache (#141)", async () => {
+    const jwt = makeJwt({
+      username: "ada",
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    });
+    sessionStorage.setItem(TOKEN_KEY, jwt);
+    const { result } = renderAuth();
+    const load = vi.fn().mockResolvedValue("ada's teams");
+    await cachedRead(jwt, "/v1/teams", load);
+    await cachedRead(jwt, "/v1/teams", load);
+    expect(load).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      result.current.logout();
+    });
+
+    await cachedRead(jwt, "/v1/teams", load);
+    expect(load).toHaveBeenCalledTimes(2);
   });
 
   describe(`${SESSION_EXPIRED_EVENT} window event (#46)`, () => {

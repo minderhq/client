@@ -212,12 +212,17 @@ export function HomePage() {
         apiFetch<Paginated<KbReadiness>>("/v1/rag/knowledge-bases?limit=100", {
           signal,
           token,
+          cache: true,
         }),
         // JWT-gated (owner-scoped): 401s without the token, which would reject
         // the whole stats Promise.all and blank every count on the dashboard.
-        apiFetch<Paginated<unknown>>("/v1/rag/pipeline?limit=1", { signal, token }),
-        apiFetch<BundlesResponse>("/v1/bundles", { signal }),
-        apiFetch<Paginated<unknown>>("/v1/models?limit=1", { signal }),
+        apiFetch<Paginated<unknown>>("/v1/rag/pipeline?limit=1", {
+          signal,
+          token,
+          cache: true,
+        }),
+        apiFetch<BundlesResponse>("/v1/bundles", { signal, cache: true }),
+        apiFetch<Paginated<unknown>>("/v1/models?limit=1", { signal, cache: true }),
       ]).then(([kbs, pipelines, bundles, models]) => ({
         kbCount: kbs.total,
         readyKbCount: kbs.items.filter(kbReady).length,

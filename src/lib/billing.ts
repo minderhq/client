@@ -22,7 +22,11 @@ export interface Subscription {
 }
 
 export function fetchSubscription(token: string, signal?: AbortSignal) {
-  return apiFetch<Subscription>("/v1/billing/subscription", { token, signal });
+  return apiFetch<Subscription>("/v1/billing/subscription", {
+    token,
+    signal,
+    cache: true,
+  });
 }
 
 export interface CheckoutResponse {

@@ -248,7 +248,7 @@ export function InstalledBundlesPage() {
   const adminNoteId = useId();
   const adminReason = bundleAdminReason(isAdmin, !!token, BUNDLE_TOGGLE_ACTION);
   const bundlesRes = useAsyncResource((signal) =>
-    apiFetch<BundlesResponse>("/v1/bundles", { signal }),
+    apiFetch<BundlesResponse>("/v1/bundles", { signal, cache: true }),
   );
   const bundles = bundlesRes.data?.bundles ?? [];
   const installed = bundles.filter((b) => b.enabled);

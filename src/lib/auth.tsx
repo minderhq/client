@@ -22,6 +22,7 @@ import {
   tokenReceivedAt,
 } from "./api";
 import { decodeJwtClaims, localExpiryMs, refreshDelayMs } from "./jwt";
+import { clearReadCache } from "./readCache";
 
 interface AuthContextValue {
   /** The current access token. Changes on every silent refresh (#53), so
@@ -192,6 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     else sessionStorage.removeItem(EMAIL_VERIFICATION_REQUIRED_KEY);
     setToken(data.access_token);
     setAdoption((n) => n + 1);
+    clearReadCache(); // a new session never sees the old one's reads (#141)
     storeToken(data.access_token, sentAt);
   }, []);
 
@@ -228,6 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithToken = useCallback((jwt: string, sentAt: number) => {
     setToken(jwt);
     setAdoption((n) => n + 1);
+    clearReadCache(); // a new session never sees the old one's reads (#141)
     storeToken(jwt, sentAt);
   }, []);
 
@@ -246,6 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = (await res.json()) as { access_token: string };
       setToken(data.access_token);
       setAdoption((n) => n + 1);
+      clearReadCache(); // a new session never sees the old one's reads (#141)
       storeToken(data.access_token, sentAt);
     },
     [token],
@@ -254,6 +258,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     setToken("");
     setAdoption((n) => n + 1);
+    clearReadCache(); // a new session never sees the old one's reads (#141)
     clearStoredToken();
     setMustChangePassword(false);
     sessionStorage.removeItem(MUST_CHANGE_PASSWORD_KEY);

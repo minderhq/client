@@ -75,7 +75,7 @@ export function TeamsPage() {
   const isInstanceAdmin = role === "admin";
 
   const teamsRes = useAsyncResource(
-    (signal) => apiFetch<TeamsResponse>("/v1/teams", { token, signal }),
+    (signal) => apiFetch<TeamsResponse>("/v1/teams", { token, signal, cache: true }),
     { enabled: !!token },
   );
 

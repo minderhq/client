@@ -1464,7 +1464,7 @@ export function GraphExplorerPage() {
     // Same "list every team, let sharing with a non-member team fail
     // server-side" convention as KnowledgeBasesPage -- no "my teams" filter
     // endpoint exists yet.
-    apiFetch<{ teams: TeamOption[] }>("/v1/teams?limit=500", { token })
+    apiFetch<{ teams: TeamOption[] }>("/v1/teams?limit=500", { token, cache: true })
       .then((res) => setMyTeams(res.teams))
       .catch(() => setMyTeams([]));
   }, [sessionKey, tokenRef]);

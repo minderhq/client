@@ -129,6 +129,7 @@ export function listModels(
   return apiFetch<Paginated<CatalogModel>>("/v1/models?limit=500", {
     token: token || undefined,
     signal,
+    cache: true,
   }).then((res) => res?.items ?? []);
 }
 

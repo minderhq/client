@@ -25,7 +25,7 @@ export function AvailableBundlesPage() {
   // Single whole-object read -> useAsyncResource (cancels on unmount, drops a
   // stale response). Enabling a bundle refreshes via reload(). #502
   const bundlesRes = useAsyncResource((signal) =>
-    apiFetch<BundlesResponse>("/v1/bundles", { signal }),
+    apiFetch<BundlesResponse>("/v1/bundles", { signal, cache: true }),
   );
   const available = (bundlesRes.data?.bundles ?? []).filter((b) => !b.enabled);
 

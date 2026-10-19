@@ -1,5 +1,6 @@
 import { i18n } from "../i18n";
 import { decodeJwtClaims } from "./jwt";
+import { cachedRead, clearReadCache, invalidateReads } from "./readCache";
 
 // VITE_API_BASE_URL is baked in at BUILD time (Vite convention), not read at
 // container start like every Python service's env vars -- changing it means
@@ -82,6 +83,7 @@ export const TOKEN_REFRESHED_EVENT = "minder:token-refreshed";
  * repeatedly. */
 export function handleUnauthorized(): void {
   clearStoredToken();
+  clearReadCache();
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
   }
@@ -272,6 +274,13 @@ export function friendlyErrorMessage(e: unknown): string {
   if (isEmailVerificationRequired(e)) {
     return i18n().t("errors.confirmEmail");
   }
+  // Still rate limited after apiFetch's own wait-and-retry (#141): say so
+  // plainly instead of showing the gateway's raw text.
+  if (e instanceof ApiError && e.status === 429) {
+    return e.retryAfterSeconds !== null
+      ? i18n().t("errors.rateLimitedRetryIn", { seconds: String(e.retryAfterSeconds) })
+      : i18n().t("errors.rateLimited");
+  }
   return e instanceof Error ? e.message : String(e);
 }
 
@@ -334,6 +343,14 @@ export interface ApiOptions {
   // in-flight request on unmount / supersession / timeout. When the signal
   // aborts, fetch rejects with an AbortError the caller is expected to swallow.
   signal?: AbortSignal;
+  /** GET only (ignored otherwise): serve this read from the shared short-TTL
+   * cache and share an identical in-flight request (#141, see readCache.ts).
+   * Opt in for reads many pages repeat; leave it off for anything polled or
+   * reloaded to see a change no mutation through apiFetch announces. */
+  cache?: boolean;
+  /** GET only: on a 429, wait `Retry-After` and retry once (default true).
+   * Set false where the caller runs its own 429 back-off (statusPoller). */
+  retryOn429?: boolean;
 }
 
 /** The shared list envelope every Minder `list` endpoint returns (#501):
@@ -412,20 +429,98 @@ async function sendWithRefresh(
   return { res: await send(candidate), logoutOn401: true, bearer: candidate };
 }
 
-/** Thin fetch wrapper: prefixes the gateway base URL, injects the bearer
- * token when present, and centralizes JSON parsing + error handling --
- * replacing the copy-pasted try/catch blocks the old plugin_config.html and
- * model_management.html each carried independently. */
-export async function apiFetch<T>(
+/** Longest `Retry-After` a GET waits out before its one retry (#141). A
+ * longer one isn't worth blocking the page for: the 429 surfaces at once. */
+export const RATE_LIMIT_RETRY_MAX_SECONDS = 15;
+
+/** The wait before retrying a 429 that carries no readable `Retry-After`. */
+export const RATE_LIMIT_DEFAULT_WAIT_SECONDS = 2;
+
+function isRead(method: string | undefined): boolean {
+  return (method ?? "GET").toUpperCase() === "GET";
+}
+
+/** Resolves after `ms`, or rejects with an AbortError when `signal` aborts. */
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const abortError = () =>
+      signal?.reason instanceof Error
+        ? signal.reason
+        : new DOMException("The operation was aborted.", "AbortError");
+    if (signal?.aborted) {
+      reject(abortError());
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(abortError());
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+/** sendWithRefresh plus the GET-only 429 handling (#141): wait `Retry-After`
+ * (at most RATE_LIMIT_RETRY_MAX_SECONDS) and retry exactly once. A write is
+ * never retried -- it may already have taken effect. */
+async function sendWithRateLimitRetry(
   path: string,
-  options: ApiOptions = {},
-): Promise<T> {
-  const { res, logoutOn401, bearer } = await sendWithRefresh(path, options);
+  options: ApiOptions,
+): Promise<{ res: Response; logoutOn401: boolean; bearer: string }> {
+  const sent = await sendWithRefresh(path, options);
+  if (
+    sent.res.status !== 429 ||
+    !isRead(options.method) ||
+    options.retryOn429 === false
+  ) {
+    return sent;
+  }
+  const wait = retryAfterSeconds(sent.res) ?? RATE_LIMIT_DEFAULT_WAIT_SECONDS;
+  if (wait > RATE_LIMIT_RETRY_MAX_SECONDS) return sent;
+  await sleep(wait * 1000, options.signal);
+  return sendWithRefresh(path, options);
+}
+
+async function fetchJson<T>(path: string, options: ApiOptions): Promise<T> {
+  const { res, logoutOn401, bearer } = await sendWithRateLimitRetry(path, options);
 
   if (!res.ok) return throwApiError(res, { logoutOn401, bearer });
 
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
+}
+
+/** Thin fetch wrapper: prefixes the gateway base URL, injects the bearer
+ * token when present, and centralizes JSON parsing + error handling --
+ * replacing the copy-pasted try/catch blocks the old plugin_config.html and
+ * model_management.html each carried independently.
+ *
+ * A GET with `cache: true` goes through the shared read cache; any other
+ * method invalidates the cached reads under the same resource, both before it
+ * is sent and once it settles (so a read racing the write can't keep stale
+ * data). */
+export async function apiFetch<T>(
+  path: string,
+  options: ApiOptions = {},
+): Promise<T> {
+  if (isRead(options.method)) {
+    if (!options.cache) return fetchJson<T>(path, options);
+    const { signal, ...shared } = options;
+    // The shared request runs without any one caller's signal; `signal` only
+    // detaches this caller from it.
+    return cachedRead<T>(options.token ?? "", path, () => fetchJson<T>(path, shared), {
+      signal,
+    });
+  }
+  invalidateReads(path);
+  try {
+    return await fetchJson<T>(path, options);
+  } finally {
+    invalidateReads(path);
+  }
 }
 
 /** Like apiFetch, but for endpoints that return a binary body (e.g. tts-stt's
@@ -437,6 +532,7 @@ export async function apiFetchBlob(
   path: string,
   options: ApiOptions = {},
 ): Promise<{ blob: Blob; headers: Headers }> {
+  if (!isRead(options.method)) invalidateReads(path);
   const { res, logoutOn401, bearer } = await sendWithRefresh(path, options);
 
   if (!res.ok) return throwApiError(res, { logoutOn401, bearer });

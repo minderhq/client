@@ -35,6 +35,8 @@ export const tr: Messages = {
     confirmEmail: "Devam etmek için e-posta adresinizi doğrulayın.",
     requestFailed: "İstek başarısız oldu ({status})",
     forbidden: "Bu işlem için yetkiniz yok.",
+    rateLimited: "Sunucu şu anda yoğun. Biraz bekleyip tekrar deneyin.",
+    rateLimitedRetryIn: "Sunucu şu anda yoğun. {seconds} sn sonra tekrar deneyin.",
     notFound: "Aradığınızı bulamadık.",
     crashTitle: "Bu sayfada beklenmeyen bir hata oluştu",
     crashBody:

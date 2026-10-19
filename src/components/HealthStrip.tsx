@@ -40,7 +40,7 @@ export function HealthStrip() {
     // `data === null` guards below (both stay false) and crashes on
     // `.length`/`.filter` -- exactly the outage-looking failure this
     // component exists to avoid (see the "deliberately quiet" doc above).
-    apiFetch<StatusResponse>("/v1/status", { signal }).then((r) => r.services ?? []),
+    apiFetch<StatusResponse>("/v1/status", { signal, cache: true }).then((r) => r.services ?? []),
   );
 
   if (services.error) return null;

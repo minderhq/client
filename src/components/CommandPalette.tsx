@@ -133,13 +133,13 @@ export function CommandPalette({
       token
         ? apiFetch<{ items: { id: string; name: string }[] }>(
             "/v1/rag/knowledge-bases?limit=100",
-            { token, signal: ctrl.signal },
+            { token, signal: ctrl.signal, cache: true },
           )
         : noToken,
       token
         ? apiFetch<{ items: { id: string; name: string }[] }>(
             "/v1/rag/pipeline?limit=100",
-            { token, signal: ctrl.signal },
+            { token, signal: ctrl.signal, cache: true },
           )
         : noToken,
       searchCatalogPlugins(debouncedQuery, 5, ctrl.signal),

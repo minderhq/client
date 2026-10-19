@@ -855,3 +855,131 @@ describe("apiFetchBlob", () => {
     });
   });
 });
+
+describe("apiFetch read cache and rate limits (#141)", () => {
+  const ok = (body: unknown) =>
+    ({ ok: true, status: 200, json: async () => body, headers: new Headers() }) as Response;
+  const tooMany = (retryAfter?: string) =>
+    ({
+      ok: false,
+      status: 429,
+      json: async () => ({ detail: "Rate limit exceeded" }),
+      headers: new Headers(retryAfter ? { "Retry-After": retryAfter } : {}),
+    }) as Response;
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+    sessionStorage.clear();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("serves a cached GET from memory and keeps uncached GETs live", async () => {
+    vi.mocked(fetch).mockResolvedValue(ok({ items: [] }));
+    await apiFetch("/v1/models", { cache: true });
+    await apiFetch("/v1/models", { cache: true });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await apiFetch("/v1/models");
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("keys the cache by the caller's token", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(ok({ who: "a" }))
+      .mockResolvedValueOnce(ok({ who: "b" }));
+    expect(await apiFetch("/v1/teams", { token: "a", cache: true })).toEqual({ who: "a" });
+    expect(await apiFetch("/v1/teams", { token: "b", cache: true })).toEqual({ who: "b" });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("shares one request between concurrent cached GETs", async () => {
+    vi.mocked(fetch).mockResolvedValue(ok({ total: 3 }));
+    const [a, b] = await Promise.all([
+      apiFetch("/v1/rag/pipeline?limit=100", { token: "t", cache: true }),
+      apiFetch("/v1/rag/pipeline?limit=100", { token: "t", cache: true }),
+    ]);
+    expect(a).toEqual({ total: 3 });
+    expect(b).toEqual({ total: 3 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("invalidates cached reads of the same resource on a write", async () => {
+    vi.mocked(fetch).mockResolvedValue(ok({ items: [] }));
+    await apiFetch("/v1/rag/knowledge-bases?limit=100", { token: "t", cache: true });
+    await apiFetch("/v1/rag/knowledge-bases", { method: "POST", body: {}, token: "t" });
+    await apiFetch("/v1/rag/knowledge-bases?limit=100", { token: "t", cache: true });
+    expect(fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it("drops the cache when the session expires (401)", async () => {
+    sessionStorage.setItem(TOKEN_KEY, "");
+    vi.mocked(fetch).mockResolvedValueOnce(ok({ v: 1 }));
+    await apiFetch("/v1/status", { cache: true });
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: async () => ({}),
+      headers: new Headers(),
+    } as Response);
+    await expect(apiFetch("/v1/profile/me", { token: "t" })).rejects.toBeInstanceOf(ApiError);
+    vi.mocked(fetch).mockResolvedValueOnce(ok({ v: 2 }));
+    expect(await apiFetch("/v1/status", { cache: true })).toEqual({ v: 2 });
+  });
+
+  it("waits Retry-After on a GET 429 and retries once", async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetch).mockResolvedValueOnce(tooMany("3")).mockResolvedValueOnce(ok({ ok: 1 }));
+    const result = apiFetch("/v1/models");
+    await vi.advanceTimersByTimeAsync(2_999);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await result).toEqual({ ok: 1 });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("surfaces a friendly message when the retry is rate limited too", async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetch).mockResolvedValueOnce(tooMany("1")).mockResolvedValueOnce(tooMany("5"));
+    const result = apiFetch("/v1/models").catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(1_000);
+    const err = await result;
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).status).toBe(429);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(friendlyErrorMessage(err)).toBe("The server is busy right now. Try again in 5 s.");
+  });
+
+  it("does not wait out a Retry-After longer than the cap", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(tooMany("60"));
+    await expect(apiFetch("/v1/models")).rejects.toMatchObject({ status: 429 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("never retries a non-GET on 429", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(tooMany("1"));
+    await expect(
+      apiFetch("/v1/rag/pipeline", { method: "POST", body: {}, token: "t" }),
+    ).rejects.toMatchObject({ status: 429 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips the retry when the caller opts out", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(tooMany("1"));
+    await expect(apiFetch("/v1/status", { retryOn429: false })).rejects.toMatchObject({
+      status: 429,
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops waiting when the caller aborts", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(tooMany("10"));
+    const ctrl = new AbortController();
+    const result = apiFetch("/v1/models", { signal: ctrl.signal });
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    ctrl.abort();
+    await expect(result).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+});

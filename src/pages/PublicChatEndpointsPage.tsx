@@ -614,6 +614,7 @@ export function PublicChatEndpointsPage() {
       apiFetch<Paginated<PipelineOption>>("/v1/rag/pipeline?limit=100", {
         token,
         signal,
+        cache: true,
       }),
     { enabled: isAdmin },
   );
