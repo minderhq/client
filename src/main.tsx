@@ -7,9 +7,9 @@ import { initLocale } from "./i18n";
 import "./index.css";
 import { initTheme } from "./lib/theme";
 
-// index.html's inline script already applied the right class before first
+// index.html's theme-init.js already applied the right class before first
 // paint (see its comment); this call adds the "system" live-update listener
-// for the rest of the tab's lifetime, which a one-shot inline script can't.
+// for the rest of the tab's lifetime, which a one-shot script can't.
 initTheme();
 // Puts the detected language (saved choice, then browser, then English) on
 // <html lang> before the first render.
