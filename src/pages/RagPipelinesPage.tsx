@@ -893,13 +893,16 @@ export function RagPipelinesPage() {
     setStatusMsg("Loading…");
     try {
       const [kbList, pipelineList, stats] = await Promise.all([
+        // Cached (#141): shared with the GoldenPathStepper's own reads.
         apiFetch<Paginated<KnowledgeBase>>("/v1/rag/knowledge-bases?limit=100", {
           token: tokenRef.current,
+          cache: true,
         }),
         // JWT-gated (owner-scoped under tenancy): 401s without the token, which
         // failed the whole page load with a misleading "session expired".
         apiFetch<Paginated<RagPipeline>>("/v1/rag/pipeline?limit=100", {
           token: tokenRef.current,
+          cache: true,
         }),
         // Newer endpoint (auto-router analytics) — degrade gracefully rather than
         // failing the whole page load against a backend that predates it.
@@ -928,7 +931,7 @@ export function RagPipelinesPage() {
     // there's no "my teams" filter endpoint yet, so the picker shows all of
     // them; sharing with one the caller isn't a member of just fails
     // server-side with a clear message. Same pattern as KnowledgeBasesPage.
-    apiFetch<{ teams: TeamOption[] }>("/v1/teams?limit=500", { token })
+    apiFetch<{ teams: TeamOption[] }>("/v1/teams?limit=500", { token, cache: true })
       .then((res) => setMyTeams(res.teams))
       .catch(() => setMyTeams([]));
   }, [sessionKey, tokenRef]);

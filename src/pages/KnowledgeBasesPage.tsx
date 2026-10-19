@@ -15,6 +15,7 @@ import { useAutoClearTimeout } from "../lib/browser";
 import { filterByText } from "../lib/filterByText";
 import { kbReady } from "../lib/journey";
 import type { ChunkInfo } from "../lib/ragDocuments";
+import { invalidateReads } from "../lib/readCache";
 import type { KnowledgeBase, TeamOption } from "../lib/types";
 import { documentStatusPoller, PollCancelledError } from "../lib/statusPoller";
 import { useAsyncResource } from "../lib/useAsyncResource";
@@ -158,7 +159,8 @@ function pollDocumentStatus(
     (requestSignal) =>
       apiFetch<UploadResponse>(
         `/v1/rag/knowledge-bases/${kbId}/documents/${documentId}/status`,
-        { token, signal: requestSignal },
+        // statusPoller runs its own 429 back-off: no extra wait in apiFetch.
+        { token, signal: requestSignal, retryOn429: false },
       ),
     (res) => res.status !== "processing",
     signal,
@@ -615,6 +617,8 @@ export function KnowledgeBaseCard({
   }
 
   async function refreshCounts() {
+    // Ingestion finished: cached KB lists (#141) predate the new counts.
+    invalidateReads("/v1/rag/knowledge-bases");
     try {
       const fresh = await apiFetch<KnowledgeBase>(`/v1/rag/knowledge-bases/${kb.id}`, {
         token,
@@ -1129,7 +1133,8 @@ export function KnowledgeBasesPage() {
     try {
       const list = await apiFetch<Paginated<KnowledgeBase>>(
         "/v1/rag/knowledge-bases?limit=100",
-        { token: tokenRef.current },
+        // Cached (#141): the GoldenPathStepper above asks for the same list.
+        { token: tokenRef.current, cache: true },
       );
       setKbs(list.items);
       setStatusMsg("");
@@ -1152,7 +1157,7 @@ export function KnowledgeBasesPage() {
     // openness), not just the caller's -- there's no "my teams" filter
     // endpoint yet, so the picker shows all of them; sharing with one the
     // caller isn't a member of just fails server-side with a clear message.
-    apiFetch<{ teams: TeamOption[] }>("/v1/teams?limit=500", { token })
+    apiFetch<{ teams: TeamOption[] }>("/v1/teams?limit=500", { token, cache: true })
       .then((res) => setMyTeams(res.teams))
       .catch(() => setMyTeams([]));
   }, [sessionKey, tokenRef]);
@@ -1171,7 +1176,11 @@ export function KnowledgeBasesPage() {
           </>
         }
       />
-      <GoldenPathStepper refreshKey={kbs} />
+      {/* A count-based key, not the array (#141): a new array identity with the
+          same counts must not refetch the stepper's lists. */}
+      <GoldenPathStepper
+        refreshKey={kbs ? `${kbs.length}:${kbs.filter(kbReady).length}` : undefined}
+      />
       {createdName && (
         <div className="mb-4">
           <InfoCallout icon="check">

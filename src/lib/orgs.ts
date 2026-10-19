@@ -65,7 +65,11 @@ export function orgMemberErrorMessage(e: unknown): string {
 }
 
 export function fetchMyOrgs(token: string, signal?: AbortSignal) {
-  return apiFetch<MyOrgsResponse>("/v1/organizations/mine", { token, signal });
+  return apiFetch<MyOrgsResponse>("/v1/organizations/mine", {
+    token,
+    signal,
+    cache: true,
+  });
 }
 
 export function fetchOrgMembers(orgId: number, token: string, signal?: AbortSignal) {

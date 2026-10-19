@@ -8,10 +8,15 @@ import { type AsyncResource, useAsyncResource } from "./useAsyncResource";
  * "am I ready to query?" arithmetic. Owner-scoped endpoints, so it needs the
  * token; while logged out it stays idle (the stepper is about creating things).
  *
- * `refreshKey` lets a page force a re-fetch after it mutates state on the same
- * page (e.g. bumps when a KB or pipeline is created/deleted) — otherwise the
- * counts are as of mount, which is enough for the cross-page hand-off this
- * feature is really about. */
+ * Both reads go through the shared read cache (#141) with the exact paths the
+ * Knowledge Bases / Pipelines / Ask pages and the command palette use, so the
+ * stepper shares their requests instead of sending its own.
+ *
+ * `refreshKey` lets a page force a re-run after it mutates state on the same
+ * page (e.g. bumps when a KB or pipeline is created/deleted). Pass something
+ * stable such as a count -- never an array whose identity changes on every
+ * reload. The mutation itself (through apiFetch) invalidates the cached lists,
+ * so the re-run reads fresh data; a re-run without one is served from cache. */
 export function useJourney(refreshKey?: unknown): AsyncResource<JourneyCounts> {
   const { token, sessionKey } = useAuth();
   return useAsyncResource<JourneyCounts>(
@@ -20,9 +25,15 @@ export function useJourney(refreshKey?: unknown): AsyncResource<JourneyCounts> {
         apiFetch<Paginated<KbReadiness>>("/v1/rag/knowledge-bases?limit=100", {
           signal,
           token,
+          cache: true,
         }),
-        // limit=1: we only want the `total`, not the rows.
-        apiFetch<Paginated<unknown>>("/v1/rag/pipeline?limit=1", { signal, token }),
+        // Only `total` is used; limit=100 matches the other pages' read so the
+        // cached response is shared.
+        apiFetch<Paginated<unknown>>("/v1/rag/pipeline?limit=100", {
+          signal,
+          token,
+          cache: true,
+        }),
       ]).then(([kbs, pipelines]) => ({
         kbCount: kbs.total,
         readyKbCount: kbs.items.filter(kbReady).length,

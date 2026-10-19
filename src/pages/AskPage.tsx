@@ -225,6 +225,7 @@ export function AskPage() {
         // misleading "session expired" even while logged in.
         apiFetch<Paginated<RagPipeline>>("/v1/rag/pipeline?limit=100", {
           token: tokenRef.current,
+          cache: true,
         }),
       ]);
       setCapabilities(caps);

@@ -142,7 +142,7 @@ export function TextToSpeechCard({
     // For the regional-style rewrite's model picker below -- fetched once
     // (not per-click) and reused, since the pulled-model list rarely
     // changes mid-session and re-fetching on every click was wasteful.
-    apiFetch<Paginated<RewriteModelInfo>>("/v1/models?limit=500")
+    apiFetch<Paginated<RewriteModelInfo>>("/v1/models?limit=500", { cache: true })
       .then((res) => {
         setRewriteModels(res.items);
         setRewriteModel(pickDefaultRewriteModel(res.items));

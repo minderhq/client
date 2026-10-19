@@ -36,6 +36,8 @@ export const en = {
     confirmEmail: "Confirm your email address to continue.",
     requestFailed: "Request failed ({status})",
     forbidden: "You don't have permission to do this.",
+    rateLimited: "The server is busy right now. Wait a moment and try again.",
+    rateLimitedRetryIn: "The server is busy right now. Try again in {seconds} s.",
     notFound: "We couldn't find what you were looking for.",
     crashTitle: "This page hit an unexpected error",
     crashBody:
