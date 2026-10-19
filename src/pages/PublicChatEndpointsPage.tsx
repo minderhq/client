@@ -7,6 +7,7 @@ import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
 import { useConfirm } from "../components/ConfirmDialog";
+import { useI18n } from "../i18n";
 import { apiBaseUrl, apiFetch, friendlyErrorMessage } from "../lib/api";
 import type { Paginated } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -83,11 +84,11 @@ function ragConfigForMethod(method: string): Record<string, unknown> {
   return method ? { method } : {};
 }
 
-/** The shareable public base for a slug. Built from the configured gateway base
- * URL (VITE_API_BASE_URL) rather than any hardcoded host — the anonymous chat
- * routes live on the gateway at /public/chat/{slug}. The embeddable widget that
- * will consume this is a separate follow-up; for now an admin can copy the base
- * to share/verify the slug is live. */
+/** The API base for a slug's anonymous chat routes. Built from the configured
+ * gateway base URL (VITE_API_BASE_URL) rather than any hardcoded host — the
+ * routes live on the gateway at /public/chat/{slug}. It is NOT a page: opening
+ * it in a browser 404s, so it is shown as a copyable developer address, never
+ * as a link (#142). The hosted visitor page and embed code are follow-ups. */
 function publicUrlForSlug(slug: string): string {
   return `${apiBaseUrl}/public/chat/${slug}`;
 }
@@ -314,6 +315,7 @@ function EndpointRow({
   const [isError, setIsError] = useState(false);
   const [copied, setCopied] = useState(false);
   const scheduleTimeout = useAutoClearTimeout();
+  const { t } = useI18n();
 
   const pipelineName =
     pipelines.find((p) => p.id === endpoint.pipeline_id)?.name ??
@@ -562,19 +564,24 @@ function EndpointRow({
             </span>
             <span aria-hidden="true">·</span>
             <span className="flex items-center gap-1">
-              <Icon name="link" size={13} />
-              <span className="font-mono">{publicUrl}</span>
+              {t("publicChat.apiAddressLabel")}:{" "}
+              <span className="font-mono" data-testid="public-chat-api-address">
+                {publicUrl}
+              </span>
               <button
                 type="button"
                 onClick={handleCopy}
-                title="Copy public URL"
-                aria-label="Copy public URL"
+                title={t("publicChat.copyApiAddress")}
+                aria-label={t("publicChat.copyApiAddress")}
                 className="underline hover:text-gray-700 dark:hover:text-gray-200"
               >
                 {copied ? "copied" : "copy"}
               </button>
             </span>
           </div>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {t("publicChat.apiAddressHint")}
+          </p>
         </>
       )}
       {status && (

@@ -2,6 +2,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { setLocale } from "../i18n";
+import { copyText } from "../lib/browser";
 import {
   PublicChatEndpointsPage,
   type PipelineOption,
@@ -167,6 +169,54 @@ describe("PublicChatEndpointsPage", () => {
     expect(
       screen.getByText("http://gateway.test/public/chat/support"),
     ).toBeTruthy();
+  });
+
+  // #142: /public/chat/{slug} is an API base (404s in a browser), so it's
+  // labelled as a developer address and must never be a clickable link.
+  it("labels the endpoint address as an API address, not a link", async () => {
+    mockAuth = ADMIN;
+    installApi({ endpoints: [endpoint({ slug: "support" })] });
+    renderPage();
+
+    const value = await screen.findByTestId("public-chat-api-address");
+    expect(value.textContent).toBe("http://gateway.test/public/chat/support");
+    expect(value.tagName).not.toBe("A");
+    expect(value.closest("a")).toBeNull();
+    expect(screen.queryByRole("link", { name: /public\/chat/ })).toBeNull();
+    expect(screen.getByText(/API address \(for developers\)/)).toBeTruthy();
+    expect(
+      screen.getByText("The visitor chat page and embed code are coming soon."),
+    ).toBeTruthy();
+  });
+
+  it("copies the API address with the copy button", async () => {
+    mockAuth = ADMIN;
+    installApi({ endpoints: [endpoint({ slug: "support" })] });
+    vi.mocked(copyText).mockClear();
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Copy API address" }));
+    await waitFor(() =>
+      expect(copyText).toHaveBeenCalledWith("http://gateway.test/public/chat/support"),
+    );
+    expect(await screen.findByText("copied")).toBeTruthy();
+  });
+
+  it("shows the API address label and hint in Turkish", async () => {
+    setLocale("tr");
+    try {
+      mockAuth = ADMIN;
+      installApi({ endpoints: [endpoint({ slug: "support" })] });
+      renderPage();
+
+      expect(await screen.findByText(/API adresi \(geliştiriciler için\)/)).toBeTruthy();
+      expect(
+        screen.getByText("Ziyaretçi sohbet sayfası ve yerleştirme kodu yakında geliyor."),
+      ).toBeTruthy();
+      expect(screen.getByRole("button", { name: "API adresini kopyala" })).toBeTruthy();
+    } finally {
+      setLocale("en");
+    }
   });
 
   it("shows an empty state when there are no endpoints", async () => {

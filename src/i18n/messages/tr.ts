@@ -256,6 +256,12 @@ export const tr: Messages = {
     },
   },
 
+  publicChat: {
+    apiAddressLabel: "API adresi (geliştiriciler için)",
+    apiAddressHint: "Ziyaretçi sohbet sayfası ve yerleştirme kodu yakında geliyor.",
+    copyApiAddress: "API adresini kopyala",
+  },
+
   settings: {
     title: "Ayarlar",
     intro: "Minder'in şu anda gördüğü hâliyle hesabınız.",
