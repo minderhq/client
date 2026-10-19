@@ -258,6 +258,12 @@ export const en = {
     },
   },
 
+  publicChat: {
+    apiAddressLabel: "API address (for developers)",
+    apiAddressHint: "The visitor chat page and embed code are coming soon.",
+    copyApiAddress: "Copy API address",
+  },
+
   settings: {
     title: "Settings",
     intro: "Your account, as Minder currently sees it.",
