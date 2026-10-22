@@ -1,12 +1,15 @@
 import { useId, useState } from "react";
 
+import { useConfirm } from "./ConfirmDialog";
 import { InfoCallout } from "./InfoCallout";
+import { ModelFitBadge } from "./ModelFitBadge";
 import { StatusLine } from "./StatusLine";
 import {
   MODEL_ROLES,
   ROLE_HELP,
   ROLE_LABEL,
   changedRoles,
+  fitConfirmOptions,
   getModelDefaults,
   isCloudModel,
   generationModels,
@@ -50,6 +53,7 @@ export function ModelDefaultsPanel({
   localProviders?: LocalProviderIds;
 }) {
   const baseId = useId();
+  const { confirm, dialog } = useConfirm();
   const defaultsRes = useAsyncResource((signal) => getModelDefaults(token, signal), {
     enabled: !!token,
     deps: [sessionKey],
@@ -76,6 +80,11 @@ export function ModelDefaultsPanel({
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (saving || !canEdit || !dirty) return;
+    // A model that doesn't fit the GPU spills into host RAM: confirm each one.
+    for (const id of new Set(Object.values(pending))) {
+      const warning = fitConfirmOptions(models.find((m) => m.id === id));
+      if (warning && !(await confirm(warning))) return;
+    }
     setSaving(true);
     setIsError(false);
     setStatus("Saving…");
@@ -98,6 +107,7 @@ export function ModelDefaultsPanel({
 
   return (
     <section className={cardClass} aria-label="Default models">
+      {dialog}
       <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
         Default models
       </h2>
@@ -153,6 +163,7 @@ export function ModelDefaultsPanel({
                     </option>
                   ))}
                 </select>
+                <ModelFitBadge model={models.find((m) => m.id === value)} />
                 <p className={fieldHintClass}>{ROLE_HELP[role]}</p>
               </div>
             );

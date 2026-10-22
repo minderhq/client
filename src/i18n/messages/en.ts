@@ -313,6 +313,24 @@ export const en = {
     },
   },
 
+  models: {
+    size: "{size} GB",
+    fit: {
+      fits: "Fits the GPU",
+      partial: "Partial offload (slow, uses RAM)",
+      tooLarge: "Too large",
+    },
+    fitLabel: "GPU fit",
+    confirm: {
+      title: "This model doesn't fit in the GPU",
+      partial:
+        "This model ({model}, ~{size} GB) does not fit in the GPU; layers will run from system RAM and the host may slow down or freeze.",
+      tooLarge:
+        "This model ({model}, ~{size} GB) is too large for this host; layers will run from system RAM, so loading it may fail or freeze the host.",
+      useAnyway: "Use it anyway",
+    },
+  },
+
   onboarding: {
     model: {
       step: "Model",

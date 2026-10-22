@@ -11,6 +11,7 @@
 // marked `is_local`); anything uncertain is treated as cloud, the same rule the
 // backend enforces.
 
+import { i18n, type Translator } from "../i18n";
 import { ApiError, apiFetch } from "./api";
 import type { Paginated } from "./api";
 import { isEmbeddingModelName } from "./modelClassification";
@@ -118,6 +119,62 @@ export interface CatalogModel {
   type?: "local" | "remote" | (string & {});
   provider?: string;
   status?: string;
+  /** Local models only, and only from servers that estimate it: the memory
+   * the model needs at `num_ctx_assumed` (weights + KV cache), and whether
+   * that fits the GPU. Older servers omit all three. */
+  estimated_bytes?: number | null;
+  num_ctx_assumed?: number | null;
+  fit?: "fits" | "partial" | "too_large" | "unknown" | (string & {}) | null;
+}
+
+const KNOWN_FITS = ["fits", "partial", "too_large"] as const;
+export type KnownFit = (typeof KNOWN_FITS)[number];
+
+/** The model's GPU fit and size, or null when unknown (an `unknown` verdict,
+ * a missing field from an older server, a remote model): no badge then. */
+export function modelFit(
+  m: CatalogModel | null | undefined,
+): { fit: KnownFit; bytes: number } | null {
+  const fit = KNOWN_FITS.find((f) => f === m?.fit);
+  const bytes = m?.estimated_bytes;
+  if (!fit || typeof bytes !== "number" || !(bytes > 0)) return null;
+  return { fit, bytes };
+}
+
+/** "11.1" for 11.1 GiB, in the active locale. GiB, like the GPU sizes the
+ * server compares against (a "16 GB" card is 16 GiB). */
+export function formatModelGb(bytes: number, tr: Translator = i18n()): string {
+  return tr.formatNumber(bytes / 1024 ** 3, { maximumFractionDigits: 1 });
+}
+
+const FIT_KEY = { fits: "fits", partial: "partial", too_large: "tooLarge" } as const;
+
+/** "11.1 GB · Fits the GPU", or null when the fit is unknown. */
+export function modelFitLabel(
+  m: CatalogModel | null | undefined,
+  tr: Translator = i18n(),
+): string | null {
+  const known = modelFit(m);
+  if (!known) return null;
+  return `${tr.t("models.size", { size: formatModelGb(known.bytes, tr) })} · ${tr.t(`models.fit.${FIT_KEY[known.fit]}`)}`;
+}
+
+/** ConfirmDialog options for saving a model that doesn't fit the GPU, naming
+ * the RAM impact; null when no confirmation is needed. */
+export function fitConfirmOptions(
+  m: CatalogModel | null | undefined,
+  tr: Translator = i18n(),
+): { title: string; message: string; confirmLabel: string } | null {
+  const known = modelFit(m);
+  if (!m || !known || known.fit === "fits") return null;
+  return {
+    title: tr.t("models.confirm.title"),
+    message: tr.t(known.fit === "too_large" ? "models.confirm.tooLarge" : "models.confirm.partial", {
+      model: m.name,
+      size: formatModelGb(known.bytes, tr),
+    }),
+    confirmLabel: tr.t("models.confirm.useAnyway"),
+  };
 }
 
 /** Every GET /v1/models entry this caller can see. Pass the token: remote
@@ -187,7 +244,8 @@ export function modelOptionLabel(
   const name = isRemoteModelId(m.id)
     ? `${m.name}${m.provider ? ` (${m.provider})` : ""}`
     : m.id;
-  return `${name} · ${where}`;
+  const fit = modelFitLabel(m);
+  return `${name} · ${where}${fit ? ` · ${fit}` : ""}`;
 }
 
 /** The label of a model id for display, resolved through the catalog when

@@ -133,3 +133,76 @@ describe("ModelDefaultsPanel", () => {
     expect(screen.getByRole("option", { name: /remote:gone:old-model · Cloud \(not available\)/ })).toBeTruthy();
   });
 });
+
+describe("ModelDefaultsPanel GPU fit", () => {
+  const GIB = 1024 ** 3;
+  const FIT_MODELS = [
+    { id: "llama3", name: "llama3", status: "ready" },
+    { id: "small", name: "small", status: "ready", estimated_bytes: 11.1 * GIB, fit: "fits" },
+    { id: "big", name: "big", status: "ready", estimated_bytes: 19 * GIB, fit: "too_large" },
+    { id: "odd", name: "odd", status: "ready", estimated_bytes: 5 * GIB, fit: "unknown" },
+  ];
+
+  afterEach(() => {
+    cleanup();
+    apiFetch.mockReset();
+  });
+
+  function installFitApi() {
+    apiFetch.mockImplementation((path: string, opts: { method?: string } = {}) => {
+      if (path === "/v1/model-defaults" && opts.method === "PUT") return Promise.resolve(DEFAULTS);
+      if (path === "/v1/model-defaults") return Promise.resolve(DEFAULTS);
+      return Promise.resolve({ items: FIT_MODELS });
+    });
+  }
+
+  function puts() {
+    return apiFetch.mock.calls.filter(([, o]) => (o as { method?: string })?.method === "PUT");
+  }
+
+  it("labels each option with its size and fit, and nothing for an unknown fit", async () => {
+    installFitApi();
+    render(<ModelDefaultsPanel token="tok" canEdit />);
+    await waitFor(() => expect(select("Answer").value).toBe("llama3"));
+    expect(Array.from(select("Chat").options).map((o) => o.textContent)).toEqual([
+      "None (use install default)",
+      "llama3 · Local",
+      "small · Local · 11.1 GB · Fits the GPU",
+      "big · Local · 19 GB · Too large",
+      "odd · Local",
+    ]);
+    fireEvent.change(select("Chat"), { target: { value: "big" } });
+    expect(screen.getByText("19 GB · Too large")).toBeTruthy();
+  });
+
+  it("saves a model that fits without asking", async () => {
+    installFitApi();
+    render(<ModelDefaultsPanel token="tok" canEdit />);
+    await waitFor(() => expect(select("Answer").value).toBe("llama3"));
+    fireEvent.change(select("Chat"), { target: { value: "small" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save defaults" }));
+    await screen.findByText("Saved.");
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(puts()).toHaveLength(1);
+  });
+
+  it("asks before saving a model that is too large, naming the RAM impact", async () => {
+    installFitApi();
+    render(<ModelDefaultsPanel token="tok" canEdit />);
+    await waitFor(() => expect(select("Answer").value).toBe("llama3"));
+    fireEvent.change(select("Chat"), { target: { value: "big" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save defaults" }));
+
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog.textContent).toMatch(/big, ~19 GB/);
+    expect(dialog.textContent).toMatch(/system RAM/);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(puts()).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Save defaults" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use it anyway" }));
+    await screen.findByText("Saved.");
+    expect(puts()).toHaveLength(1);
+  });
+});

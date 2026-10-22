@@ -5,15 +5,19 @@ import {
   ROLE_HELP,
   changedRoles,
   dataPolicyErrorMessage,
+  fitConfirmOptions,
   generationModels,
   isCloudModel,
   isLocalOnlyRefusal,
   modelDefaultsErrorMessage,
+  modelFit,
+  modelFitLabel,
   modelOptionLabel,
   modelShortName,
   modelSourceLabel,
   pickerValue,
   remoteProviderId,
+  type CatalogModel,
 } from "./modelDefaults";
 
 const NONE = new Set<string>();
@@ -102,5 +106,37 @@ describe("data policy", () => {
     expect(modelSourceLabel("install_default")).toBe("install default");
     expect(modelSourceLabel("something_new")).toBe("something new");
     expect(modelSourceLabel(null)).toBeNull();
+  });
+});
+
+describe("GPU fit", () => {
+  const GIB = 1024 ** 3;
+  const model = (fit: unknown, estimated_bytes: unknown = 11.1 * GIB) =>
+    ({ id: "m", name: "m", fit, estimated_bytes }) as CatalogModel;
+
+  it("maps each known verdict to a size + label", () => {
+    expect(modelFitLabel(model("fits"))).toBe("11.1 GB · Fits the GPU");
+    expect(modelFitLabel(model("partial", 19 * GIB))).toBe("19 GB · Partial offload (slow, uses RAM)");
+    expect(modelFitLabel(model("too_large", 40 * GIB))).toBe("40 GB · Too large");
+  });
+
+  it("shows nothing for an unknown verdict or an older server's missing fields", () => {
+    expect(modelFit(model("unknown"))).toBeNull();
+    expect(modelFit(model(undefined, undefined))).toBeNull();
+    expect(modelFit({ id: "m", name: "m" })).toBeNull();
+    expect(modelFit(model("fits", null))).toBeNull();
+    expect(modelFit(model("something-new"))).toBeNull();
+    expect(modelFit(undefined)).toBeNull();
+    expect(modelOptionLabel(model("unknown"), NONE)).toBe("m · Local");
+  });
+
+  it("asks for confirmation only for a model that does not fit", () => {
+    expect(fitConfirmOptions(model("fits"))).toBeNull();
+    expect(fitConfirmOptions(model("unknown"))).toBeNull();
+    expect(fitConfirmOptions(undefined)).toBeNull();
+    expect(fitConfirmOptions(model("partial", 19 * GIB))?.message).toBe(
+      "This model (m, ~19 GB) does not fit in the GPU; layers will run from system RAM and the host may slow down or freeze.",
+    );
+    expect(fitConfirmOptions(model("too_large", 40 * GIB))?.message).toMatch(/system RAM/);
   });
 });
