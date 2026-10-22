@@ -31,6 +31,9 @@ const KNOWN_MISSING: Record<string, string> = {
   // email is configured); the published spec hasn't been re-synced yet.
   "POST /v1/auth/verify-email": "gateway routes it; published spec not re-synced yet",
   "POST /v1/auth/verify-email/resend": "gateway routes it; published spec not re-synced yet",
+  // Onboarding readiness (model / pipeline / knowledge-base / email checks):
+  // routed by the gateway; the published spec hasn't been re-synced yet.
+  "GET /v1/readiness": "gateway routes it; published spec not re-synced yet",
 };
 
 // Where the concrete values of an interpolated action segment are read from:

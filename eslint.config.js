@@ -53,6 +53,7 @@ export const I18N_MIGRATED_FILES = [
   "src/App.tsx",
   "src/components/Breadcrumbs.tsx",
   "src/components/CommandPalette.tsx",
+  "src/components/ConnectModelCard.tsx",
   "src/components/ErrorBoundary.tsx",
   "src/components/LoadError.tsx",
   "src/components/OrgDefaultLanguage.tsx",

@@ -310,4 +310,18 @@ export const tr: Messages = {
       submit: "Parolayı değiştir",
     },
   },
+
+  onboarding: {
+    model: {
+      step: "Model",
+      title: "Bir model bağlayın",
+      noModel:
+        "Henüz kullanılabilir bir dil modeli yok; bu yüzden yüklenen belgeler vektöre dönüştürülemez ve Sor yanıt veremez. Önce Ollama'ya bir model indirin ya da bir vLLM veya bulut sağlayıcısı bağlayın.",
+      unavailable:
+        "Model servisi yanıt vermiyor; bu yüzden yüklenen belgeler vektöre dönüştürülemez ve Sor yanıt veremez. Model altyapısını kontrol edin ya da bir vLLM veya bulut sağlayıcısı bağlayın.",
+      providers: "Sağlayıcılar ve varsayılanlar sayfasını aç",
+      docs: "Modellerinizi nasıl bağlarsınız",
+      askAdmin: "Henüz bağlı bir model yok. Bir model bağlaması için bir yöneticiye başvurun.",
+    },
+  },
 };

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import { ConnectModelCard } from "../components/ConnectModelCard";
 import { HealthStrip } from "../components/HealthStrip";
 import { Icon, type IconName } from "../components/Icon";
 import { InfoCallout } from "../components/InfoCallout";
@@ -254,6 +255,7 @@ export function HomePage() {
       </div>
 
       <HealthStrip />
+      <ConnectModelCard />
       <PrimaryActionCard stats={stats.data} loading={stats.loading} />
 
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">

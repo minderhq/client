@@ -43,6 +43,11 @@ vi.mock("../lib/api", async () => {
 vi.mock("../lib/auth", () => ({
   useAuth: () => ({ token: "test-token" }),
 }));
+// The page's GoldenPathStepper reads readiness; these tests route apiFetch per
+// path and cover the page itself (the stepper has its own tests).
+vi.mock("../lib/readiness", () => ({
+  useReadiness: () => ({ data: null, error: null, loading: false, reload: () => {} }),
+}));
 vi.mock("../components/ConfirmDialog", () => ({
   useConfirm: () => ({ confirm: vi.fn(), dialog: null }),
 }));

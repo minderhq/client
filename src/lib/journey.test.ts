@@ -4,8 +4,10 @@ import {
   type JourneyCounts,
   completedStepCount,
   kbReady,
+  JOURNEY_STEPS,
   primaryAction,
   stepStatus,
+  withModelStep,
 } from "./journey";
 
 function counts(overrides: Partial<JourneyCounts> = {}): JourneyCounts {
@@ -64,6 +66,37 @@ describe("stepStatus", () => {
     const c = counts({ kbCount: 1, readyKbCount: 1, pipelineCount: 1 });
     expect(stepStatus(c, 2)).toBe("done"); // pipeline
     expect(stepStatus(c, 3)).toBe("current"); // ask stays current
+  });
+});
+
+describe("the Model step", () => {
+  const ready = counts({ kbCount: 1, readyKbCount: 1, pipelineCount: 1 });
+
+  it("prepends a Model step pointing at the providers page", () => {
+    const steps = withModelStep("Model");
+    expect(steps.map((s) => s.key)).toEqual(["model", "kb", "upload", "pipeline", "ask"]);
+    expect(steps[0]).toMatchObject({ label: "Model", to: "/platform/providers" });
+    expect(steps.slice(1)).toEqual(JOURNEY_STEPS);
+  });
+
+  it("is the current step while the model check fails, whatever else exists", () => {
+    expect(completedStepCount(ready, false)).toBe(0);
+    expect(stepStatus(ready, 0, false)).toBe("current"); // model
+    expect(stepStatus(ready, 1, false)).toBe("upcoming"); // kb
+  });
+
+  it("shifts the other steps by one once the model check passes", () => {
+    expect(completedStepCount(null, true)).toBe(1);
+    expect(completedStepCount(counts({ kbCount: 1 }), true)).toBe(2);
+    expect(completedStepCount(ready, true)).toBe(4);
+    expect(stepStatus(counts(), 0, true)).toBe("done"); // model
+    expect(stepStatus(counts(), 1, true)).toBe("current"); // kb
+    expect(stepStatus(ready, 4, true)).toBe("current"); // ask
+  });
+
+  it("leaves the four-step path unchanged without it", () => {
+    expect(completedStepCount(ready, undefined)).toBe(completedStepCount(ready));
+    expect(completedStepCount(ready)).toBe(3);
   });
 });
 

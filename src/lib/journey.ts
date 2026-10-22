@@ -34,7 +34,7 @@ export interface JourneyCounts {
   pipelineCount: number;
 }
 
-export type JourneyStepKey = "kb" | "upload" | "pipeline" | "ask";
+export type JourneyStepKey = "model" | "kb" | "upload" | "pipeline" | "ask";
 
 export interface JourneyStep {
   key: JourneyStepKey;
@@ -57,12 +57,25 @@ export const JOURNEY_STEPS: JourneyStep[] = [
 /** How many leading steps are DONE — which is also the index of the current
  * (first incomplete) step. 0 = no KB yet, 1 = KB but empty (Upload is next),
  * 2 = has documents (Pipeline is next), 3 = has a pipeline (ready to Ask).
- * `null` counts (not loaded yet) read as the very start. */
-export function completedStepCount(counts: JourneyCounts | null): number {
-  if (!counts || counts.kbCount === 0) return 0;
-  if (counts.readyKbCount === 0) return 1;
-  if (counts.pipelineCount === 0) return 2;
-  return 3;
+ * `null` counts (not loaded yet) read as the very start.
+ *
+ * `modelReady` is given only when the path starts with the Model step (see
+ * {@link withModelStep}): the readiness endpoint's `model` check. Nothing
+ * after it works without a model, so while it fails it is the current step. */
+export function completedStepCount(counts: JourneyCounts | null, modelReady?: boolean): number {
+  if (modelReady === false) return 0;
+  const offset = modelReady === undefined ? 0 : 1;
+  if (!counts || counts.kbCount === 0) return offset;
+  if (counts.readyKbCount === 0) return offset + 1;
+  if (counts.pipelineCount === 0) return offset + 2;
+  return offset + 3;
+}
+
+/** The path with a leading Model step, for a caller who can connect a model
+ * (an org owner/admin or an instance admin). `label` comes from the caller's
+ * i18n catalog. */
+export function withModelStep(label: string): JourneyStep[] {
+  return [{ key: "model", label, to: "/platform/providers", icon: "models" }, ...JOURNEY_STEPS];
 }
 
 /** Per-step status relative to the current position, for the stepper's styling.
@@ -73,8 +86,9 @@ export type JourneyStepStatus = "done" | "current" | "upcoming";
 export function stepStatus(
   counts: JourneyCounts | null,
   index: number,
+  modelReady?: boolean,
 ): JourneyStepStatus {
-  const done = completedStepCount(counts);
+  const done = completedStepCount(counts, modelReady);
   if (index < done) return "done";
   if (index === done) return "current";
   return "upcoming";
