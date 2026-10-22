@@ -189,10 +189,10 @@ describe("docker/security-headers.sh", () => {
 describe("index.html", () => {
   // script-src 'self' blocks inline scripts: every <script> must load a file.
   it("has no inline script", () => {
-    const scripts = [...indexHtml.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)];
+    const scripts = [...indexHtml.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi)];
     expect(scripts.length).toBeGreaterThan(0);
     for (const [, attrs, body] of scripts) {
-      expect(attrs).toMatch(/\ssrc=/);
+      expect(attrs).toMatch(/\ssrc=/i);
       expect(body.trim()).toBe("");
     }
   });
