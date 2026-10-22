@@ -172,6 +172,6 @@ export function bundleAdminReason(
 ): string | null {
   if (isAdmin) return null;
   return isLoggedIn
-    ? `Only an admin can ${action}.`
-    : `Log in as an admin to ${action}.`;
+    ? `Only a Platform Admin can ${action}.`
+    : `Log in as a Platform Admin to ${action}.`;
 }

@@ -18,8 +18,8 @@ import { useAsyncResource } from "../lib/useAsyncResource";
  * gets enabled here disappears from this list and reappears on Installed
  * service bundles, mirroring how Discover and Installed plugins behave. */
 export function AvailableBundlesPage() {
-  const { token, role } = useAuth();
-  const isAdmin = role === "admin";
+  const { token, isPlatformAdmin } = useAuth();
+  const isAdmin = isPlatformAdmin;
   const adminNoteId = useId();
   const adminReason = bundleAdminReason(isAdmin, !!token, BUNDLE_TOGGLE_ACTION);
   // Single whole-object read -> useAsyncResource (cancels on unmount, drops a
@@ -34,7 +34,7 @@ export function AvailableBundlesPage() {
       <PageHeader
         icon="bundles"
         title="Discover service bundles"
-        subtitle="Optional service bundles you haven't turned on yet — each claims a set of services shared with other bundles where needed. Browsing is open for everyone; enabling requires an admin account."
+        subtitle="Optional service bundles you haven't turned on yet — each claims a set of services shared with other bundles where needed. Browsing is open for everyone; enabling requires a Platform Admin."
       />
       <InfoCallout icon="info">
         Enabling only starts containers that already exist. A service that

@@ -16,7 +16,7 @@ vi.mock("../lib/api", () => ({
 
 // The page is operator-only (#2197): tests run as an admin unless they say
 // otherwise.
-const ADMIN = { token: "", isAuthenticated: true, role: "admin" };
+const ADMIN = { token: "", isAuthenticated: true, role: "admin", isPlatformAdmin: true };
 let mockAuth = { ...ADMIN };
 vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
@@ -142,7 +142,7 @@ describe("PluginSourceRepositoriesPage", () => {
   });
 
   it("shows a non-admin an operators-only notice and loads nothing", () => {
-    mockAuth = { token: "t", isAuthenticated: true, role: "member" };
+    mockAuth = { token: "t", isAuthenticated: true, role: "member", isPlatformAdmin: false };
     installApi({ repositories: [repository({ name: "Weather Tools" })] });
     renderAt("/settings/sources");
 
@@ -152,8 +152,17 @@ describe("PluginSourceRepositoriesPage", () => {
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
+  it("locks out the admin role without the Platform Admin claim", () => {
+    mockAuth = { token: "t", isAuthenticated: true, role: "admin", isPlatformAdmin: false };
+    installApi({ repositories: [repository({ name: "Weather Tools" })] });
+    renderAt("/settings/sources");
+
+    expect(screen.getByText(/Only a Platform Admin/)).toBeTruthy();
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
   it("gates a repository's detail view the same way", () => {
-    mockAuth = { token: "", isAuthenticated: false, role: "" };
+    mockAuth = { token: "", isAuthenticated: false, role: "", isPlatformAdmin: false };
     renderAt("/settings/sources/r1");
 
     expect(screen.getByText(/Only a Platform Admin/)).toBeTruthy();

@@ -214,8 +214,8 @@ function ArchiveRow({
 }
 
 export function BackupsPage() {
-  const { token, role } = useAuth();
-  const isAdmin = role === "admin";
+  const { token, isPlatformAdmin } = useAuth();
+  const isAdmin = isPlatformAdmin;
 
   const backupsRes = useAsyncResource(
     (signal) => apiFetch<BackupsResponse>("/v1/backups", { token, signal }),
@@ -262,8 +262,8 @@ export function BackupsPage() {
       {!isAdmin && (
         <InfoCallout icon="lock">
           {token
-            ? "Admin role required to view or manage backups."
-            : "Log in as an admin to view or manage backups."}
+            ? "Platform Admin required to view or manage backups."
+            : "Log in as a Platform Admin to view or manage backups."}
         </InfoCallout>
       )}
 

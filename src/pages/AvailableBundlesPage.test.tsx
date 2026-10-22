@@ -11,7 +11,7 @@ vi.mock("../lib/api", () => ({
   apiFetch: (...args: unknown[]) => apiFetch(...args),
   friendlyErrorMessage: (e: unknown) => (e instanceof Error ? e.message : "error"),
 }));
-let mockAuth = { token: "tok", role: "admin" };
+let mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true };
 vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
 }));
@@ -30,7 +30,7 @@ function bundle(overrides: Partial<Bundle> = {}): Bundle {
 afterEach(() => {
   cleanup();
   apiFetch.mockReset();
-  mockAuth = { token: "tok", role: "admin" };
+  mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true };
 });
 
 describe("AvailableBundlesPage", () => {
@@ -83,7 +83,7 @@ describe("AvailableBundlesPage", () => {
   });
 
   it("tells a non-admin once, for the whole list, and every card's button points at that note", async () => {
-    mockAuth = { token: "tok", role: "member" };
+    mockAuth = { token: "tok", role: "member", isPlatformAdmin: false };
     apiFetch.mockResolvedValue({
       bundles: [bundle({ name: "voice" }), bundle({ name: "monitoring" }), bundle({ name: "rag" })],
       count: 3,
@@ -91,7 +91,7 @@ describe("AvailableBundlesPage", () => {
     render(<AvailableBundlesPage />, { wrapper: MemoryRouter });
 
     await screen.findByRole("heading", { level: 3, name: "rag" });
-    const notes = screen.getAllByText("Only an admin can enable or disable bundles.");
+    const notes = screen.getAllByText("Only a Platform Admin can enable or disable bundles.");
     expect(notes).toHaveLength(1);
     for (const name of ["voice", "monitoring", "rag"]) {
       const button = screen.getByRole("button", { name: `Enable ${name}` });
@@ -106,6 +106,16 @@ describe("AvailableBundlesPage", () => {
 
     const button = await screen.findByRole("button", { name: "Enable voice" });
     expect(button.getAttribute("aria-describedby")).toBeNull();
-    expect(screen.queryByText(/Only an admin can/)).toBeNull();
+    expect(screen.queryByText(/Only a Platform Admin can/)).toBeNull();
+  });
+
+  it("disables Enable for the admin role without the Platform Admin claim", async () => {
+    mockAuth = { token: "tok", role: "admin", isPlatformAdmin: false };
+    apiFetch.mockResolvedValue({ bundles: [bundle({ name: "voice" })], count: 1 });
+    render(<AvailableBundlesPage />, { wrapper: MemoryRouter });
+
+    const button = await screen.findByRole("button", { name: "Enable voice" });
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(screen.getByText("Only a Platform Admin can enable or disable bundles.")).toBeTruthy();
   });
 });

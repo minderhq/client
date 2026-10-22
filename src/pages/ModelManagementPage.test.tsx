@@ -15,7 +15,7 @@ vi.mock("../lib/api", () => ({
   friendlyErrorMessage: (e: unknown) => (e instanceof Error ? e.message : "error"),
 }));
 
-let mockAuth = { token: "", role: "" };
+let mockAuth = { token: "", role: "", isPlatformAdmin: false };
 vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
 }));
@@ -115,7 +115,7 @@ describe("ModelCard delete", () => {
 
     const button = screen.getByRole("button", { name: "Delete" });
     expect(button.hasAttribute("disabled")).toBe(true);
-    expect(button.getAttribute("title")).toBe("Admin role required");
+    expect(button.getAttribute("title")).toBe("Platform Admin required");
   });
 });
 
@@ -210,7 +210,7 @@ describe("PullModelForm", () => {
   it("disables the form with a login/role hint when not an admin", () => {
     render(<PullModelForm token="" isAdmin={false} onPulled={vi.fn()} />);
     expect(
-      screen.getByText("Log in as an admin to pull a model."),
+      screen.getByText("Log in as a Platform Admin to pull a model."),
     ).toBeTruthy();
   });
 });
@@ -234,7 +234,7 @@ describe("ModelManagementPage", () => {
   afterEach(() => {
     cleanup();
     apiFetch.mockReset();
-    mockAuth = { token: "", role: "" };
+    mockAuth = { token: "", role: "", isPlatformAdmin: false };
   });
 
   it("shows an empty state when no models are pulled", async () => {
@@ -288,8 +288,21 @@ describe("ModelManagementPage", () => {
     await screen.findByText('No pulled models match "does-not-exist".');
   });
 
+  it.each([
+    [{ token: "tok", role: "admin", isPlatformAdmin: false }, true],
+    [{ token: "tok", role: "user", isPlatformAdmin: true }, false],
+  ])("gates pull and delete on the Platform Admin claim, not the role (%o)", async (auth, locked) => {
+    mockAuth = auth;
+    routeApiFetch([model()]);
+    render(<ModelManagementPage />);
+    await screen.findByText("llama3.2:latest");
+
+    expect(screen.getByRole("button", { name: "Delete" }).hasAttribute("disabled")).toBe(locked);
+    expect(!!screen.queryByText("Platform Admin required to pull a model.")).toBe(locked);
+  });
+
   it("refreshes the list after a successful delete (admin)", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true };
     routeApiFetch([model()]);
     render(<ModelManagementPage />);
     await screen.findByText("llama3.2:latest");

@@ -71,12 +71,12 @@ function renderAt(path: string) {
 }
 
 /** Sign in (sessionStorage JWT) with the given instance role. */
-function signIn(role: string) {
+function signIn(role: string, isPlatformAdmin = false) {
   const b64 = (o: object) => btoa(JSON.stringify(o)).replace(/=+$/, "");
   const now = Math.floor(Date.now() / 1000);
   sessionStorage.setItem(
     TOKEN_KEY,
-    `${b64({ alg: "HS256" })}.${b64({ sub: "7", username: "alice", role, iat: now, exp: now + 3600 })}.sig`,
+    `${b64({ alg: "HS256" })}.${b64({ sub: "7", username: "alice", role, is_platform_admin: isPlatformAdmin, iat: now, exp: now + 3600 })}.sig`,
   );
 }
 
@@ -258,7 +258,7 @@ describe("App — redirects (#2197)", () => {
   it.each(Object.entries(EXPECTED_REDIRECTS))(
     "redirects %s to %s, keeping the query string and hash",
     (from, to) => {
-      signIn("admin");
+      signIn("admin", true);
       renderAt(`${from}?source=private&q=crm#top`);
       expect(currentLocation?.pathname).toBe(to);
       expect(currentLocation?.search).toBe("?source=private&q=crm");
@@ -274,7 +274,7 @@ describe("App — redirects (#2197)", () => {
   ])(
     "keeps an unusual repository id (%s) encoded across the sources redirect",
     (encoded, decoded) => {
-      signIn("admin");
+      signIn("admin", true);
       renderAt(`/plugins/sources/${encoded}?q=x`);
       // Same single encoding as sourceRepositoryRoute(): no "/" splitting the
       // segment, no double encoding.
@@ -307,13 +307,13 @@ describe("App — page titles match the nav (#2197)", () => {
   });
 
   it.each(titled)("renders %s with the heading %s", (to, title) => {
-    signIn("admin");
+    signIn("admin", true);
     renderAt(to);
     expect(screen.getByRole("heading", { level: 1, name: title })).toBeTruthy();
   });
 
   it("labels each grouped page's tab strip with its tab labels, current tab marked", () => {
-    signIn("admin");
+    signIn("admin", true);
     renderAt(ROUTES.installedAiTools);
     const tabs = screen.getByRole("navigation", { name: "Installed sections" });
     const links = within(tabs).getAllByRole("link");
@@ -324,7 +324,7 @@ describe("App — page titles match the nav (#2197)", () => {
   it.each([ROUTES.discoverPlugins, ROUTES.installedAiTools, ROUTES.publishSubmissionReview])(
     "marks exactly one link as the current page on %s (the tab; its sidebar entry is 'true')",
     (path) => {
-      signIn("admin");
+      signIn("admin", true);
       renderAt(path);
       const pages = document.querySelectorAll('a[aria-current="page"]');
       expect(pages).toHaveLength(1);
@@ -342,7 +342,7 @@ describe("App — Installation settings › MindHub & sources gating", () => {
   });
 
   it("shows an admin the sources list and the MindHub placeholder, with no fake controls", async () => {
-    signIn("admin");
+    signIn("admin", true);
     renderAt(ROUTES.sources);
     const panel = screen.getByRole("region", { name: "MindHub connection" });
     expect(within(panel).queryByRole("button")).toBeNull();
@@ -360,6 +360,17 @@ describe("App — Installation settings › MindHub & sources gating", () => {
     expect(screen.queryByRole("region", { name: "MindHub connection" })).toBeNull();
     expect(screen.queryByText(/No plugin source repositories yet/)).toBeNull();
   });
+
+  // The operator APIs want the Platform Admin claim; role "admin" alone (an org
+  // owner, an SSO admin) gets the forbidden page, not a page that 403s.
+  it.each([ROUTES.sources, ROUTES.publishSubmissionReview, "/platform/backups"])(
+    "shows an admin without the Platform Admin claim the forbidden page on %s",
+    (path) => {
+      signIn("admin");
+      renderAt(path);
+      expect(screen.getByRole("heading", { level: 1, name: "You don't have access to this page" })).toBeTruthy();
+    },
+  );
 });
 
 describe("App — focus after navigation", () => {

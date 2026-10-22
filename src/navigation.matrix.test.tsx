@@ -318,13 +318,10 @@ describe("known gaps (client#126)", APP_TEST, () => {
     },
   );
 
-  // KNOWN GAP (client#126), narrowed by #131: the shell now treats the
-  // Platform Admin claim as an operator, so a Platform Admin whose token
-  // carries role "user" gets the full operator nav and passes the route
-  // guards. But the operator page bodies still check the legacy instance role
-  // (`role === "admin"`), so MindHub & sources -- whose copy says "Only a
-  // Platform Admin" -- still locks them out from inside the page.
-  it("a Platform Admin without the legacy admin role passes the guard but the page body locks", async () => {
+  // CLOSED: a Platform Admin whose token carries role "user" used to pass the
+  // guard and then be locked out by the page body, which checked
+  // `role === "admin"`. The operator pages read the claim now.
+  it("a Platform Admin without the instance admin role gets the operator nav and pages", async () => {
     const persona = withPersona("orgOwner", {
       label: "platform admin, role user",
       claims: { is_platform_admin: true },
@@ -335,22 +332,22 @@ describe("known gaps (client#126)", APP_TEST, () => {
     resetApp();
     renderApp(persona, ROUTES.sources);
     expect(screen.getByRole("heading", { level: 1, name: "MindHub & sources" })).toBeTruthy();
-    expect(screen.getByText(/Only a Platform Admin can see this installation/)).toBeTruthy();
+    expect(screen.queryByText(/Only a Platform Admin can see this installation/)).toBeNull();
   });
 
-  // KNOWN GAP (client#126), new with #131: operator screens gate on the
-  // Platform Admin, which the role-backed permissions take as the claim OR the
-  // legacy instance role "admin" (the operator APIs accept either). The All
-  // users page body still wants the claim, so a legacy admin without it sees
-  // the entry and passes the guard, then the page locks them out.
-  it("a legacy instance admin without the Platform Admin claim is locked out of All users by the page", async () => {
-    const persona = withPersona("orgOwner", { label: "legacy admin, no claim", claims: { role: "admin" } });
-    expect(navShows(persona, "/platform/users")).toBe(true);
-    renderApp(persona, "/platform/users");
-    await settleApp();
-    expect(screen.getByRole("heading", { level: 1, name: "All users" })).toBeTruthy();
-    expect(screen.getByText(/Only a Platform Admin can view every account/)).toBeTruthy();
-  });
+  // CLOSED: the instance role "admin" without the claim (an org owner, an SSO
+  // admin) used to count as the operator here, though the operator APIs
+  // refuse it. Now it gets neither the entries nor the pages.
+  it.each(["/platform/users", "/platform/backups", ROUTES.sources, ROUTES.publishSubmissionReview])(
+    "an instance admin without the Platform Admin claim gets no nav entry and no page for %s",
+    async (path) => {
+      const persona = withPersona("orgOwner", { label: "instance admin, no claim", claims: { role: "admin" } });
+      expect(navShows(persona, path)).toBe(false);
+      renderApp(persona, path);
+      await settleApp();
+      expect(screen.getByRole("heading", { level: 1, name: "You don't have access to this page" })).toBeTruthy();
+    },
+  );
 
   it.todo(
     // KNOWN GAP (client#126): TeamsPage lets only an instance admin or the

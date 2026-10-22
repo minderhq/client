@@ -16,7 +16,7 @@ vi.mock("../lib/api", () => ({
   friendlyErrorMessage: (e: unknown) => (e instanceof Error ? e.message : "error"),
 }));
 
-let mockAuth = { token: "", role: "" };
+let mockAuth = { token: "", role: "", isPlatformAdmin: false };
 vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
 }));
@@ -175,28 +175,38 @@ describe("BackupsPage", () => {
   afterEach(() => {
     cleanup();
     apiFetch.mockReset();
-    mockAuth = { token: "", role: "" };
+    mockAuth = { token: "", role: "", isPlatformAdmin: false };
   });
 
   it("shows an admin-required hint and never fetches when logged out", () => {
     render(<BackupsPage />);
     expect(
-      screen.getByText("Log in as an admin to view or manage backups."),
+      screen.getByText("Log in as a Platform Admin to view or manage backups."),
     ).toBeTruthy();
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
   it("shows an admin-required hint (different copy) when logged in as a non-admin", () => {
-    mockAuth = { token: "tok", role: "user" };
+    mockAuth = { token: "tok", role: "user", isPlatformAdmin: false };
     render(<BackupsPage />);
     expect(
-      screen.getByText("Admin role required to view or manage backups."),
+      screen.getByText("Platform Admin required to view or manage backups."),
     ).toBeTruthy();
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
+  it("locks out the admin role without the Platform Admin claim (the API refuses it)", () => {
+    mockAuth = { token: "tok", role: "admin", isPlatformAdmin: false };
+    render(<BackupsPage />);
+    expect(
+      screen.getByText("Platform Admin required to view or manage backups."),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Trigger Backup" })).toBeNull();
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
   it("fetches and renders archives and jobs for an admin", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true };
     apiFetch.mockImplementation((path: string) => {
       if (path === "/v1/backups") {
         return Promise.resolve({ archives: [archive()] });
@@ -213,7 +223,7 @@ describe("BackupsPage", () => {
   });
 
   it("shows empty states when there are no archives or jobs", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true };
     apiFetch.mockResolvedValue({ archives: [], jobs: [] });
     render(<BackupsPage />);
 
@@ -222,7 +232,7 @@ describe("BackupsPage", () => {
   });
 
   it("triggers a backup and reloads jobs", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true };
     apiFetch.mockImplementation((path: string, opts?: { method?: string }) => {
       if (opts?.method === "POST") return Promise.resolve(job());
       if (path === "/v1/backups") return Promise.resolve({ archives: [] });
@@ -241,7 +251,7 @@ describe("BackupsPage", () => {
   });
 
   it("ignores a double-click while a backup trigger is in flight", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true };
     let resolvePost: (value: unknown) => void = () => {};
     apiFetch.mockImplementation((path: string, opts?: { method?: string }) => {
       if (opts?.method === "POST") {

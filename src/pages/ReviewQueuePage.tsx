@@ -49,8 +49,8 @@ function emptyMessage(filter: ReviewStatusFilter): string {
 }
 
 export function ReviewQueuePage() {
-  const { token, sessionKey, role, isAuthenticated } = useAuth();
-  const isAdmin = role === "admin";
+  const { token, sessionKey, isPlatformAdmin, isAuthenticated } = useAuth();
+  const isAdmin = isPlatformAdmin;
   const [statusFilter, setStatusFilter] = useState<ReviewStatusFilter>("submitted");
   const [notice, setNotice] = useState("");
   // Focus target after a successful action: the acted-on card usually leaves
@@ -76,7 +76,7 @@ export function ReviewQueuePage() {
       <>
         <PageHeader icon="review" title="Submission review" />
         <InfoCallout icon="lock">
-          Admins only — log in with an admin account to review plugin
+          Platform Admins only — log in with a Platform Admin account to review plugin
           submissions.
         </InfoCallout>
       </>

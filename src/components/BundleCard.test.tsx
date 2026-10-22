@@ -78,8 +78,8 @@ describe("BundleCard accessibility (#2195)", () => {
     const button = screen.getByRole("button", { name: "Enable voice" });
     expect(button.hasAttribute("disabled")).toBe(true);
     expect(button.getAttribute("title")).toBeNull();
-    expect(screen.getByText("Only an admin can enable or disable bundles.")).toBeTruthy();
-    expect(reasonFor(button)).toBe("Only an admin can enable or disable bundles.");
+    expect(screen.getByText("Only a Platform Admin can enable or disable bundles.")).toBeTruthy();
+    expect(reasonFor(button)).toBe("Only a Platform Admin can enable or disable bundles.");
   });
 
   it("tells a logged-out visitor to log in as an admin", () => {
@@ -93,7 +93,7 @@ describe("BundleCard accessibility (#2195)", () => {
     );
 
     expect(reasonFor(screen.getByRole("button", { name: "Disable rag" }))).toBe(
-      "Log in as an admin to enable or disable bundles.",
+      "Log in as a Platform Admin to enable or disable bundles.",
     );
   });
 
@@ -112,7 +112,7 @@ describe("BundleCard accessibility (#2195)", () => {
   it("defers to a page-level note when given one, instead of repeating the reason", () => {
     render(
       <>
-        <p id="page-note">Only an admin can enable or disable bundles.</p>
+        <p id="page-note">Only a Platform Admin can enable or disable bundles.</p>
         <BundleCard
           bundle={makeBundle({ name: "voice", core: false, enabled: false })}
           token="tok"
@@ -123,9 +123,9 @@ describe("BundleCard accessibility (#2195)", () => {
       </>,
     );
 
-    expect(screen.getAllByText("Only an admin can enable or disable bundles.")).toHaveLength(1);
+    expect(screen.getAllByText("Only a Platform Admin can enable or disable bundles.")).toHaveLength(1);
     expect(reasonFor(screen.getByRole("button", { name: "Enable voice" }))).toBe(
-      "Only an admin can enable or disable bundles.",
+      "Only a Platform Admin can enable or disable bundles.",
     );
   });
 });

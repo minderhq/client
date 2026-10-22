@@ -604,11 +604,11 @@ function Recommendations({ recommendations }: { recommendations: Recommendation[
 }
 
 export function AvailablePluginsPage() {
-  const { token, sessionKey, isAuthenticated, role } = useAuth();
+  const { token, sessionKey, isAuthenticated, isPlatformAdmin } = useAuth();
   const tokenRef = useTokenRef();
-  // The install-from-git endpoint is admin-only; gate the affordance to admins
-  // the same way nav.ts hides admin-only destinations (the backend 403s others).
-  const isAdmin = role === "admin";
+  // The install-from-git endpoint is Platform Admin only; gate the affordance on
+  // the claim, not role === "admin" (the backend 403s an admin without it).
+  const isAdmin = isPlatformAdmin;
   const { confirm, dialog } = useConfirm();
   const featuredHeadingId = useId();
   const allPluginsHeadingId = useId();

@@ -88,9 +88,10 @@ describe("effective permissions from today's role checks (#131)", () => {
     expect(accessFor({ isPlatformAdmin: true }).can("org.audit.view")).toBe(true);
   });
 
-  it("counts the Platform Admin claim or the legacy instance admin role as the operator", () => {
+  it("counts only the Platform Admin claim as the operator, not the instance admin role", () => {
     expect(accessFor({ isPlatformAdmin: true }).isPlatformAdmin).toBe(true);
-    expect(accessFor({ role: "admin" }).isPlatformAdmin).toBe(true);
+    expect(accessFor({ role: "admin" }).isPlatformAdmin).toBe(false);
+    expect(accessFor({ role: "admin" }).can("org.audit.view")).toBe(false);
     expect(accessFor({ orgRole: "owner" }).isPlatformAdmin).toBe(false);
   });
 });

@@ -8,7 +8,7 @@ import { useRouteFocus } from "../lib/useRouteFocus";
 import { CommandPalette } from "./CommandPalette";
 import { useConfirm } from "./ConfirmDialog";
 
-let mockAuth = { isAuthenticated: true, role: "", sessionKey: "" };
+let mockAuth = { isAuthenticated: true, role: "", isPlatformAdmin: false, sessionKey: "" };
 vi.mock("../lib/auth", () => ({ useAuth: () => mockAuth }));
 
 let mockBilling = true;
@@ -53,7 +53,7 @@ function resultLabels(): string[] {
 
 describe("CommandPalette — marketplace entries (#2197)", () => {
   beforeEach(() => {
-    mockAuth = { isAuthenticated: true, role: "", sessionKey: "" };
+    mockAuth = { isAuthenticated: true, role: "", isPlatformAdmin: false, sessionKey: "" };
     mockBilling = true;
   });
   afterEach(cleanup);
@@ -97,7 +97,7 @@ describe("CommandPalette — marketplace entries (#2197)", () => {
     expect(pathname).toBe("/marketplace/discover/plugins");
   });
 
-  it("offers MindHub & sources and Submission review to admins only", () => {
+  it("offers MindHub & sources and Submission review to Platform Admins only", () => {
     open();
     search("mindhub");
     expect(screen.queryByText("MindHub & sources")).toBeNull();
@@ -105,7 +105,16 @@ describe("CommandPalette — marketplace entries (#2197)", () => {
     expect(screen.queryByText("Submission review")).toBeNull();
     cleanup();
 
-    mockAuth = { isAuthenticated: true, role: "admin", sessionKey: "" };
+    // The instance "admin" role without the Platform Admin claim is not enough.
+    mockAuth = { isAuthenticated: true, role: "admin", isPlatformAdmin: false, sessionKey: "" };
+    open();
+    search("mindhub");
+    expect(screen.queryByText("MindHub & sources")).toBeNull();
+    search("review queue");
+    expect(screen.queryByText("Submission review")).toBeNull();
+    cleanup();
+
+    mockAuth = { isAuthenticated: true, role: "admin", isPlatformAdmin: true, sessionKey: "" };
     open();
     search("mindhub");
     expect(screen.getByText("MindHub & sources")).toBeTruthy();
@@ -183,7 +192,7 @@ function openFromTrigger(trigger: HTMLElement) {
 
 describe("CommandPalette — shared modal layer (#97)", () => {
   beforeEach(() => {
-    mockAuth = { isAuthenticated: true, role: "", sessionKey: "" };
+    mockAuth = { isAuthenticated: true, role: "", isPlatformAdmin: false, sessionKey: "" };
     mockBilling = true;
   });
   afterEach(cleanup);
