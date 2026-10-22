@@ -76,7 +76,7 @@ describe("modelProviders", () => {
   });
 
   it.each([
-    [403, "Admin role required"],
+    [403, "owners and admins can fetch models"],
     [404, "no longer exists"],
     [429, "Too many fetch requests"],
     [504, "didn't answer in time"],

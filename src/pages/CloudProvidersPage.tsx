@@ -792,32 +792,32 @@ function AddProviderForm({
 
 export function CloudProvidersPage() {
   const { token, role, orgRole, sessionKey } = useAuth();
-  const isAdmin = role === "admin";
-  // #2523: PUT /v1/model-defaults is open to an org owner/admin as well as an
-  // instance admin; every other member sees the defaults read-only.
-  const canEditDefaults = isAdmin || orgRole === "owner" || orgRole === "admin";
+  // Defaults (#2523) and providers both sit behind model-management's
+  // require_admin_or_org_admin: an instance admin, or an owner/admin of the org
+  // being acted in. Every other member sees the defaults read-only and no
+  // providers.
+  const canManage = role === "admin" || orgRole === "owner" || orgRole === "admin";
   const { confirm, dialog } = useConfirm();
 
-  // Listed for an org owner/admin too (the endpoint allows it): only so the
-  // Defaults pickers can label self-hosted provider models Local, the same as
-  // the knowledge-base and Ask pickers. Managing providers stays admin-only.
+  // Also feeds the Defaults pickers, so self-hosted provider models are
+  // labelled Local there, the same as the knowledge-base and Ask pickers.
   const providersRes = useAsyncResource(
     (signal) => listProviders(token, signal),
-    { enabled: canEditDefaults },
+    { enabled: canManage },
   );
 
   // The add-provider dropdown is backend-driven (#1467/#1585): the preset list
   // -- including the first-class "vLLM (self-hosted)" entry -- comes from
   // GET /v1/model-providers/presets rather than being hardcoded here, so a new
-  // preset ships without a client change. Admin-only, like the endpoint itself.
+  // preset ships without a client change. Same gate as the endpoint itself.
   const presetsRes = useAsyncResource(
     (signal) =>
       listProviderPresets(token, signal),
-    { enabled: isAdmin },
+    { enabled: canManage },
   );
 
   // Self-hosted provider rows (`is_local`) serve Local models; every other
-  // `remote:` model is Cloud. Only an admin can list providers.
+  // `remote:` model is Cloud.
   const localProviders = useMemo(
     () =>
       new Set(
@@ -832,14 +832,14 @@ export function CloudProvidersPage() {
       <PageHeader
         icon="globe"
         title="Providers & defaults"
-        subtitle="Pick the default model for each task, and connect an external OpenAI-compatible/Anthropic provider or a self-hosted instance (e.g. vLLM) so models from it appear alongside your local Ollama models. Opt-in and per-organization — nothing here is on by default. Providers are admin-only: they hold the org's own API credentials."
+        subtitle="Pick the default model for each task, and connect an external OpenAI-compatible/Anthropic provider or a self-hosted instance (e.g. vLLM) so models from it appear alongside your local Ollama models. Opt-in and per-organization — nothing here is on by default. Providers hold the organization's own API credentials, so only its owners and admins can see or change them."
       />
 
       {token && (
         <div className="mb-6">
           <ModelDefaultsPanel
             token={token}
-            canEdit={canEditDefaults}
+            canEdit={canManage}
             sessionKey={sessionKey}
             localProviders={localProviders}
           />
@@ -850,15 +850,15 @@ export function CloudProvidersPage() {
         Providers
       </h2>
 
-      {!isAdmin && (
+      {!canManage && (
         <InfoCallout icon="lock">
           {token
-            ? "Admin role required to view or manage cloud providers."
-            : "Log in as an admin to view or manage cloud providers."}
+            ? "Only the organization's owners and admins can view or manage providers."
+            : "Log in as an organization owner or admin to view or manage providers."}
         </InfoCallout>
       )}
 
-      {isAdmin && (
+      {canManage && (
         <>
           <div className="mb-4">
             <AddProviderForm

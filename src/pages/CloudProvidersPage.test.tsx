@@ -187,18 +187,18 @@ describe("CloudProvidersPage", () => {
     mockConfirm.mockReset();
   });
 
-  it("shows an admin-required message and never fetches providers for a non-admin", () => {
+  it("shows an owner/admin-required message and never fetches providers for a plain member", () => {
     mockAuth = { token: "tok", role: "member" };
     render(<CloudProvidersPage />);
     expect(
-      screen.getByText("Admin role required to view or manage cloud providers."),
+      screen.getByText("Only the organization's owners and admins can view or manage providers."),
     ).toBeTruthy();
     expect(apiFetch).not.toHaveBeenCalled();
     // #2523: members still see the org's default models, read-only.
     expect(screen.getByTestId("defaults-panel").textContent).toBe("defaults: read-only");
   });
 
-  it("lets an org owner/admin edit the defaults without being an instance admin", async () => {
+  it("lets an org owner manage providers and defaults without being an instance admin", async () => {
     mockAuth = { token: "tok", role: "member", orgRole: "owner" };
     installApi({
       providers: [
@@ -208,13 +208,36 @@ describe("CloudProvidersPage", () => {
     });
     render(<CloudProvidersPage />);
     expect(screen.getByTestId("defaults-panel").textContent).toMatch(/^defaults: editable/);
-    // Providers are listed so self-hosted models are labelled Local, as on
-    // the knowledge-base and Ask pickers; managing them stays admin-only.
     await waitFor(() => expect(screen.getByTestId("local-providers").textContent).toBe("box"));
+    // model-management's require_admin_or_org_admin lets an org owner/admin
+    // manage the org's providers, so the client offers it too.
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith("/v1/model-providers/presets", expect.anything()),
+    );
     expect(
-      screen.getByText("Admin role required to view or manage cloud providers."),
+      screen.queryByText("Only the organization's owners and admins can view or manage providers."),
+    ).toBeNull();
+  });
+
+  it("lets an org admin manage providers too", async () => {
+    mockAuth = { token: "tok", role: "member", orgRole: "admin" };
+    installApi({ providers: [] });
+    render(<CloudProvidersPage />);
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith("/v1/model-providers/presets", expect.anything()),
+    );
+    expect(
+      screen.queryByText("Only the organization's owners and admins can view or manage providers."),
+    ).toBeNull();
+  });
+
+  it("keeps providers hidden from an org member", () => {
+    mockAuth = { token: "tok", role: "member", orgRole: "member" };
+    render(<CloudProvidersPage />);
+    expect(
+      screen.getByText("Only the organization's owners and admins can view or manage providers."),
     ).toBeTruthy();
-    expect(apiFetch).not.toHaveBeenCalledWith("/v1/model-providers/presets", expect.anything());
+    expect(apiFetch).not.toHaveBeenCalled();
   });
 
   it("hides the defaults section when signed out", () => {
@@ -278,7 +301,7 @@ describe("CloudProvidersPage", () => {
     mockAuth = { token: "", role: "" };
     render(<CloudProvidersPage />);
     expect(
-      screen.getByText("Log in as an admin to view or manage cloud providers."),
+      screen.getByText("Log in as an organization owner or admin to view or manage providers."),
     ).toBeTruthy();
   });
 
