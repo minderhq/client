@@ -208,8 +208,8 @@ export function ModelCard({
           title={
             !isAdmin
               ? token
-                ? "Admin role required"
-                : "Log in as an admin to delete models"
+                ? "Platform Admin required"
+                : "Log in as a Platform Admin to delete models"
               : undefined
           }
           className={destructiveButtonClass}
@@ -292,7 +292,7 @@ export function PullModelForm({
       </fieldset>
       {!isAdmin && (
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          {token ? "Admin role required to pull a model." : "Log in as an admin to pull a model."}
+          {token ? "Platform Admin required to pull a model." : "Log in as a Platform Admin to pull a model."}
         </p>
       )}
       {pulling && (
@@ -309,8 +309,8 @@ export function PullModelForm({
 }
 
 export function ModelManagementPage() {
-  const { token, role } = useAuth();
-  const isAdmin = role === "admin";
+  const { token, isPlatformAdmin } = useAuth();
+  const isAdmin = isPlatformAdmin;
   const { confirm, dialog } = useConfirm();
   // Single list read → useAsyncResource (cancels on unmount, stale-guard). Pull
   // and delete refresh via reload() rather than local optimistic edits, so the
@@ -339,7 +339,7 @@ export function ModelManagementPage() {
       <PageHeader
         icon="models"
         title="Model Management"
-        subtitle="Pull, delete, and test Ollama models on Minder's own model-management service. Browsing is open for everyone; log in to test a prompt. Pulling and deleting require an admin account."
+        subtitle="Pull, delete, and test Ollama models on Minder's own model-management service. Browsing is open for everyone; log in to test a prompt. Pulling and deleting require a Platform Admin."
       />
       <InfoCallout icon="models">
         {openWebUiUrl ? (

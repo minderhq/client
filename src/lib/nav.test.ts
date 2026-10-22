@@ -218,10 +218,11 @@ describe("nav — marketplace IA (#2197)", () => {
     expect(visibleRows("Organization", MEMBER)).toEqual({});
     expect(visibleRows("Organization", ORG_OWNER).Users).toBe(ORG_USERS_PATH);
     expect(visibleRows("Organization", ORG_OWNER)["Audit Log"]).toBeUndefined();
-    // Operator screens accept the legacy instance admin role today, as their
-    // APIs do; All Users included (its page body still wants the claim).
-    expect(visibleRows("Platform", LEGACY_ADMIN).Backups).toBe("/platform/backups");
-    expect(visibleRows("Platform", LEGACY_ADMIN)["All Users"]).toBe("/platform/users");
+    // Operator screens want the Platform Admin claim, as their APIs do; the
+    // instance admin role alone (an org owner, an SSO admin) is not enough.
+    expect(visibleRows("Platform", LEGACY_ADMIN)).toEqual({});
+    expect(visibleRows("Platform", ADMIN).Backups).toBe("/platform/backups");
+    expect(visibleRows("Platform", ADMIN)["MindHub & sources"]).toBe(ROUTES.sources);
     expect(visibleRows("Platform", ADMIN)["All Users"]).toBe("/platform/users");
   });
 

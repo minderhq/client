@@ -29,7 +29,7 @@ vi.mock("../lib/api", () => ({
   apiFetch: (...args: unknown[]) => apiFetch(...args),
   friendlyErrorMessage: (e: unknown) => (e instanceof Error ? e.message : "error"),
 }));
-let mockAuth = { token: "", isAuthenticated: false, role: null as string | null, sessionKey: 0 };
+let mockAuth = { token: "", isAuthenticated: false, role: null as string | null, isPlatformAdmin: false, sessionKey: 0 };
 vi.mock("../lib/auth", () => ({ useAuth: () => mockAuth }));
 vi.mock("../components/ConfirmDialog", () => ({
   useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true), dialog: null }),
@@ -162,7 +162,7 @@ afterEach(() => {
   cleanup();
   apiFetch.mockReset();
   location = "";
-  mockAuth = { token: "", isAuthenticated: false, role: null, sessionKey: 0 };
+  mockAuth = { token: "", isAuthenticated: false, role: null, isPlatformAdmin: false, sessionKey: 0 };
 });
 
 describe("Discover plugins: catalog states", () => {
@@ -313,7 +313,7 @@ describe("Discover plugins: secondary failures stay quiet and recoverable", () =
   });
 
   it("a recommendations failure shows a quiet notice with Retry", async () => {
-    mockAuth = { token: "tok", isAuthenticated: true, role: "user", sessionKey: 1 };
+    mockAuth = { token: "tok", isAuthenticated: true, role: "user", isPlatformAdmin: false, sessionKey: 1 };
     let failRecs = true;
     routeApi({
       catalog: () => ({ plugins: [WEATHER], total: 1 }),
@@ -337,7 +337,7 @@ describe("Discover plugins: secondary failures stay quiet and recoverable", () =
   });
 
   it("an installations failure says install state may be stale, with Retry", async () => {
-    mockAuth = { token: "tok", isAuthenticated: true, role: "user", sessionKey: 1 };
+    mockAuth = { token: "tok", isAuthenticated: true, role: "user", isPlatformAdmin: false, sessionKey: 1 };
     let failInstalls = true;
     routeApi({
       catalog: () => ({ plugins: [WEATHER], total: 1 }),
@@ -362,7 +362,7 @@ describe("Discover plugins: secondary failures stay quiet and recoverable", () =
 
 describe("Discover plugins: accessible names, badges and headings", () => {
   it("names every card action after its plugin", async () => {
-    mockAuth = { token: "tok", isAuthenticated: true, role: "admin", sessionKey: 1 };
+    mockAuth = { token: "tok", isAuthenticated: true, role: "admin", isPlatformAdmin: true, sessionKey: 1 };
     routeApi({
       catalog: () => ({
         plugins: [WEATHER, { ...NEWS, repository_url: "https://example.com/news" }],
@@ -403,8 +403,20 @@ describe("Discover plugins: accessible names, badges and headings", () => {
     expect(bare).toEqual([]);
   });
 
+  it("hides Install from this repo from the admin role without the Platform Admin claim", async () => {
+    mockAuth = { token: "tok", isAuthenticated: true, role: "admin", isPlatformAdmin: false, sessionKey: 1 };
+    routeApi({
+      catalog: () => ({ plugins: [{ ...NEWS, repository_url: "https://example.com/news" }], total: 1 }),
+      installations: () => ({ installations: [], count: 0 }),
+    });
+    renderAt();
+    await screen.findByRole("button", { name: "Install News" });
+
+    expect(screen.queryByText("Install from this repo")).toBeNull();
+  });
+
   it("uses text + icon badges for featured and install state, not emoji", async () => {
-    mockAuth = { token: "tok", isAuthenticated: true, role: "user", sessionKey: 1 };
+    mockAuth = { token: "tok", isAuthenticated: true, role: "user", isPlatformAdmin: false, sessionKey: 1 };
     routeApi({
       catalog: () => ({ plugins: [{ ...WEATHER, featured: true }], total: 1 }),
       installations: () => ({ installations: [installation("w", true)], count: 1 }),
@@ -471,7 +483,7 @@ describe("Discover plugins: aria-describedby targets", () => {
 
 describe("Discover plugins: recommendation links", () => {
   it("links each recommendation to Discover searched for it, and runs that search", async () => {
-    mockAuth = { token: "tok", isAuthenticated: true, role: "user", sessionKey: 1 };
+    mockAuth = { token: "tok", isAuthenticated: true, role: "user", isPlatformAdmin: false, sessionKey: 1 };
     routeApi({
       catalog: () => ({ plugins: [WEATHER], total: 1 }),
       search: (path) =>

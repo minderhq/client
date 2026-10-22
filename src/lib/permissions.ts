@@ -199,9 +199,9 @@ export interface RoleFacts {
   billingVisible: boolean;
 }
 
-/** Effective permissions as today's role checks see them. The operator
- * screens (and their APIs) accept the Platform Admin claim or the legacy
- * instance role "admin", so either counts as `is_platform_admin` here. */
+/** Effective permissions as today's role checks see them. Only the
+ * `is_platform_admin` claim makes a Platform Admin: the operator APIs refuse
+ * the instance role "admin" without it (an org owner or an SSO admin). */
 export function effectivePermissionsFromRoles(facts: RoleFacts): EffectivePermissions | null {
   if (!facts.authenticated) return null;
   const orgRole = facts.orgRole || "member";
@@ -211,7 +211,7 @@ export function effectivePermissionsFromRoles(facts: RoleFacts): EffectivePermis
   }));
   if (facts.billingVisible) permissions.push({ key: "org.billing.view", source: "billing" });
   return {
-    is_platform_admin: facts.isPlatformAdmin || facts.role === "admin",
+    is_platform_admin: facts.isPlatformAdmin,
     active_org: { id: facts.activeOrgId, org_role: orgRole, permissions },
     teams: [],
     permission_version: 0,

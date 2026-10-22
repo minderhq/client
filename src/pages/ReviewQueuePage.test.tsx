@@ -12,7 +12,7 @@ vi.mock("../lib/api", () => ({
 }));
 
 // Mutable per test, same convention as AvailablePluginsPage.test.tsx.
-let mockAuth = { token: "", role: "", isAuthenticated: false, sessionKey: 0 };
+let mockAuth = { token: "", role: "", isPlatformAdmin: false, isAuthenticated: false, sessionKey: 0 };
 vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
 }));
@@ -103,7 +103,7 @@ async function settle() {
 }
 
 function asAdmin() {
-  mockAuth = { token: "tok", role: "admin", isAuthenticated: true, sessionKey: 1 };
+  mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true, isAuthenticated: true, sessionKey: 1 };
 }
 
 describe("ReviewQueuePage", () => {
@@ -118,18 +118,26 @@ describe("ReviewQueuePage", () => {
 
   describe("admin gating (unchanged)", () => {
     it("tells a non-admin the page is admins-only and never fetches", () => {
-      mockAuth = { token: "tok", role: "user", isAuthenticated: true, sessionKey: 1 };
+      mockAuth = { token: "tok", role: "user", isPlatformAdmin: false, isAuthenticated: true, sessionKey: 1 };
       render(<ReviewQueuePage />);
 
-      expect(screen.getByText(/Admins only/)).toBeTruthy();
+      expect(screen.getByText(/Platform Admins only/)).toBeTruthy();
+      expect(apiFetch).not.toHaveBeenCalled();
+    });
+
+    it("locks out the admin role without the Platform Admin claim (the API refuses it)", () => {
+      mockAuth = { token: "tok", role: "admin", isPlatformAdmin: false, isAuthenticated: true, sessionKey: 1 };
+      render(<ReviewQueuePage />);
+
+      expect(screen.getByText(/Platform Admins only/)).toBeTruthy();
       expect(apiFetch).not.toHaveBeenCalled();
     });
 
     it("tells a logged-out visitor the page is admins-only and never fetches", () => {
-      mockAuth = { token: "", role: "", isAuthenticated: false, sessionKey: 0 };
+      mockAuth = { token: "", role: "", isPlatformAdmin: false, isAuthenticated: false, sessionKey: 0 };
       render(<ReviewQueuePage />);
 
-      expect(screen.getByText(/Admins only/)).toBeTruthy();
+      expect(screen.getByText(/Platform Admins only/)).toBeTruthy();
       expect(apiFetch).not.toHaveBeenCalled();
     });
   });

@@ -201,7 +201,7 @@ describe("Sidebar", () => {
     expect(screen.queryByText("MindHub & sources")).toBeNull();
     unmount();
 
-    mockAuth = { isAuthenticated: true, role: "admin" };
+    mockAuth = { isAuthenticated: true, role: "admin", isPlatformAdmin: true };
     render(
       <MemoryRouter>
         <Sidebar open={false} onNavigate={() => {}} />
@@ -257,7 +257,7 @@ describe("Sidebar", () => {
   });
 
   it("marks MindHub & sources 'page' on the list and 'true' on a repository's detail", () => {
-    mockAuth = { isAuthenticated: true, role: "admin" };
+    mockAuth = { isAuthenticated: true, role: "admin", isPlatformAdmin: true };
     const { unmount } = render(
       <MemoryRouter initialEntries={["/settings/sources"]}>
         <Sidebar open={false} onNavigate={() => {}} />
@@ -296,16 +296,16 @@ describe("Sidebar", () => {
     ).toBe("/organization/users");
     unmount();
 
-    // Operator screens gate on the Platform Admin, which today also counts the
-    // legacy instance "admin" role (the operator APIs still accept it). Since
-    // #131 that includes All Users; see the KNOWN GAP in the matrix.
+    // Operator screens gate on the Platform Admin claim only: the instance
+    // "admin" role without it (an org owner, an SSO admin) is not an operator.
     mockAuth = { isAuthenticated: true, role: "admin", isPlatformAdmin: false };
     const third = render(
       <MemoryRouter>
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
-    expect(screen.getByText("All Users").closest("a")?.getAttribute("href")).toBe("/platform/users");
+    expect(screen.queryByText("All Users")).toBeNull();
+    expect(screen.queryByRole("group", { name: "Platform" })).toBeNull();
     third.unmount();
 
     mockAuth = { isAuthenticated: true, role: "admin", isPlatformAdmin: true };

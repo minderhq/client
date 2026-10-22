@@ -12,7 +12,7 @@ vi.mock("../lib/api", () => ({
   apiFetch: (...args: unknown[]) => apiFetch(...args),
   friendlyErrorMessage: (e: unknown) => (e instanceof Error ? e.message : "error"),
 }));
-let mockAuth = { token: "tok", role: "admin" };
+let mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true };
 vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
 }));
@@ -56,7 +56,7 @@ describe("InstalledBundlesPage", () => {
   afterEach(() => {
     cleanup();
     apiFetch.mockReset();
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "admin", isPlatformAdmin: true };
   });
 
   it("shows only the enabled bundles", async () => {
@@ -139,35 +139,47 @@ describe("InstalledBundlesPage", () => {
   });
 
   it("disables Reconcile with a login hint when logged out", async () => {
-    mockAuth = { token: "", role: "" };
+    mockAuth = { token: "", role: "", isPlatformAdmin: false };
     apiFetch.mockResolvedValue({ bundles: [bundle({ name: "core", enabled: true })], count: 1 });
     render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
 
     const btn = await screen.findByRole("button", { name: /Reconcile/ });
     expect(btn.hasAttribute("disabled")).toBe(true);
     // Visible text associated with the button -- not a hover-only title.
-    expect(screen.getByText("Log in as an admin to reconcile.")).toBeTruthy();
-    expect(describedBy(btn)).toBe("Log in as an admin to reconcile.");
+    expect(screen.getByText("Log in as a Platform Admin to reconcile.")).toBeTruthy();
+    expect(describedBy(btn)).toBe("Log in as a Platform Admin to reconcile.");
     expect(btn.getAttribute("title")).toBeNull();
   });
 
   it("disables Reconcile with an admin-role hint when logged in but not admin", async () => {
-    mockAuth = { token: "tok", role: "member" };
+    mockAuth = { token: "tok", role: "member", isPlatformAdmin: false };
     apiFetch.mockResolvedValue({ bundles: [bundle({ name: "core", enabled: true })], count: 1 });
     render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
 
     const btn = await screen.findByRole("button", { name: /Reconcile/ });
     expect(btn.hasAttribute("disabled")).toBe(true);
-    expect(describedBy(btn)).toBe("Only an admin can reconcile.");
+    expect(describedBy(btn)).toBe("Only a Platform Admin can reconcile.");
     expect(btn.getAttribute("title")).toBeNull();
     // The import is admin-only too, with its reason shown the same way.
     const input = screen.getByLabelText("Import bundle state from a JSON file");
     expect(input.hasAttribute("disabled")).toBe(true);
-    expect(describedBy(input)).toBe("Only an admin can import bundle state.");
+    expect(describedBy(input)).toBe("Only a Platform Admin can import bundle state.");
+  });
+
+  it("disables Reconcile and import for the admin role without the Platform Admin claim", async () => {
+    mockAuth = { token: "tok", role: "admin", isPlatformAdmin: false };
+    apiFetch.mockResolvedValue({ bundles: [bundle({ name: "core", enabled: true })], count: 1 });
+    render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
+
+    const btn = await screen.findByRole("button", { name: /Reconcile/ });
+    expect(btn.hasAttribute("disabled")).toBe(true);
+    expect(describedBy(btn)).toBe("Only a Platform Admin can reconcile.");
+    expect(screen.getByRole("button", { name: "Disable core" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByLabelText("Import bundle state from a JSON file").hasAttribute("disabled")).toBe(true);
   });
 
   it("keeps aria-describedby targets unique and resolvable across several cards", async () => {
-    mockAuth = { token: "tok", role: "member" };
+    mockAuth = { token: "tok", role: "member", isPlatformAdmin: false };
     apiFetch.mockResolvedValue({
       bundles: ["voice", "rag", "chat"].map((name) => bundle({ name, enabled: true })),
       count: 3,
@@ -405,7 +417,7 @@ describe("ExportImportPanel import: preview, confirm, cancel (#2195)", () => {
 
     const input = screen.getByLabelText("Import bundle state from a JSON file");
     expect(input.hasAttribute("disabled")).toBe(true);
-    expect(describedBy(input)).toBe("Only an admin can import bundle state.");
+    expect(describedBy(input)).toBe("Only a Platform Admin can import bundle state.");
 
     // Even if a change event slips through, nothing is read, previewed or sent.
     importFile({ monitoring: { enabled: true } });

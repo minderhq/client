@@ -126,9 +126,9 @@ function RepositoryList() {
 }
 
 function RepositoryPluginList({ repositoryId }: { repositoryId: string }) {
-  const { token, sessionKey, isAuthenticated, role } = useAuth();
+  const { token, sessionKey, isAuthenticated, isPlatformAdmin } = useAuth();
   const tokenRef = useTokenRef();
-  const isAdmin = role === "admin";
+  const isAdmin = isPlatformAdmin;
   const { confirm, dialog } = useConfirm();
   const [myInstallations, setMyInstallations] = useState<Installation[]>([]);
 
@@ -293,12 +293,12 @@ function RepositoryDetail({ repositoryId }: { repositoryId: string }) {
 
 /** Platform › MindHub & sources (#2197, #131): where this installation's plugins
  * come from. Operator-only per epic #2192 decision A, gated on the same
- * role === "admin" check as every other operator item until #2200 refines the
- * roles. Holds the MindHub connection placeholder (#2201) above the read-only
+ * Platform Admin claim as every other operator item. Holds the MindHub
+ * connection placeholder (#2201) above the read-only
  * plugin source repositories that used to be Marketplace › Plugins › Sources. */
 export function PluginSourceRepositoriesPage() {
   const { repositoryId } = useParams();
-  const { role } = useAuth();
+  const { isPlatformAdmin } = useAuth();
 
   return (
     <>
@@ -312,7 +312,7 @@ export function PluginSourceRepositoriesPage() {
         }
       />
 
-      {role !== "admin" ? (
+      {!isPlatformAdmin ? (
         <InfoCallout icon="lock">
           Only a Platform Admin can see this installation's MindHub connection
           and plugin sources. Log in with a Platform Admin account to view them.

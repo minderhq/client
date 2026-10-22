@@ -241,8 +241,8 @@ export function ExportImportPanel({
  * per claimed service live here rather than on Discover service bundles, since both
  * are specifically about the bundles you're actually running. */
 export function InstalledBundlesPage() {
-  const { token, role } = useAuth();
-  const isAdmin = role === "admin";
+  const { token, isPlatformAdmin } = useAuth();
+  const isAdmin = isPlatformAdmin;
   const reconcileReasonId = useId();
   const reconcileReason = bundleAdminReason(isAdmin, !!token, "reconcile");
   const adminNoteId = useId();
@@ -284,7 +284,7 @@ export function InstalledBundlesPage() {
       <PageHeader
         icon="bundles"
         title="Installed service bundles"
-        subtitle="Service bundles currently turned on, the Docker image each claimed service actually runs, and export/import for the whole set. Disabling, reconciling or importing requires an admin account."
+        subtitle="Service bundles currently turned on, the Docker image each claimed service actually runs, and export/import for the whole set. Disabling, reconciling or importing requires a Platform Admin."
       />
 
       {bundlesRes.data && (
