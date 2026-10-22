@@ -10,7 +10,13 @@ import {
 /** An answer whose `[n]` markers (#2429) render as superscript citation chips.
  * Only markers listed in `citations` become chips; unknown markers, markdown
  * links and anything inside code stay plain text. Without `onCite` (or with
- * no citations) the answer renders exactly as plain text. */
+ * no citations) the answer renders exactly as plain text.
+ *
+ * Security: assistant text is model output and must stay inert. Never add a
+ * markdown/HTML renderer here (no rehype-raw, no dangerouslySetInnerHTML):
+ * a markdown image would make the browser fetch an attacker-chosen URL with
+ * no click. If markdown is ever wanted, block remote images and give links
+ * rel="noopener noreferrer nofollow". CitedAnswer.test.tsx pins this. */
 export function CitedAnswer({
   answer,
   sources,

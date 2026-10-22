@@ -145,3 +145,32 @@ describe("citation chips", () => {
     expect(within(card).queryByRole("button", { name: /open passage/i })).toBeNull();
   });
 });
+
+// Defence in depth: the server already strips external images from answers,
+// but the client must never turn assistant text into fetchable elements.
+describe("assistant content stays inert text", () => {
+  const hostile = [
+    "Look ![x](https://example.net/a.png?q=1) here [1].",
+    "Local ![y](/logo.svg) too.",
+    "[click](https://example.net/phish) and <https://example.net/auto>",
+    '<img src="https://example.net/b.png" onerror="alert(1)"> <a href="https://example.net">a</a>',
+    "<script>alert(1)</script>",
+  ].join("\n");
+
+  it.each([
+    ["with citation chips", {}],
+    ["as plain text", { compact: true }],
+  ])("renders no img, link or raw HTML element %s", (_label, props) => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const { container } = render(
+      <QueryResultCard response={response({ answer: hostile })} {...props} />,
+    );
+    const answer = container.querySelector("p.whitespace-pre-wrap")!;
+    expect(answer.querySelector("img, a, script, iframe, source, video, audio")).toBeNull();
+    expect(container.querySelector('img[src^="http"], [src*="example.net"], [href*="example.net"]')).toBeNull();
+    // The markdown and HTML show up literally, so nothing is hidden from the reader.
+    expect(answer.textContent).toContain("![x](https://example.net/a.png?q=1)");
+    expect(answer.textContent).toContain('<img src="https://example.net/b.png"');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});

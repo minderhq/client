@@ -260,6 +260,23 @@ describe("PublicChatConversationsPage", () => {
     expect(screen.getByText("Back to conversations")).toBeTruthy();
   });
 
+  it("renders an assistant answer's markdown images, links and HTML as plain text", async () => {
+    mockAuth = ADMIN;
+    const answer =
+      'See ![x](https://example.net/a.png?q=1) and [here](https://example.net/p) <img src="https://example.net/b.png">';
+    installApi({
+      detail: {
+        session: session({ session_id: "sess-inert0000000", turn_count: 1 }),
+        turns: [{ question: "Hi", answer, timestamp: "2026-02-01T10:00:00Z", metadata: {} }],
+      },
+    });
+    const { container } = renderAt(DETAIL_PATH("sess-inert0000000"));
+
+    const p = await screen.findByText(answer);
+    expect(p.querySelector("img, a")).toBeNull();
+    expect(container.querySelector('[src*="example.net"], [href*="example.net"]')).toBeNull();
+  });
+
   it("shows an empty state when a conversation has no turns", async () => {
     mockAuth = ADMIN;
     installApi({
