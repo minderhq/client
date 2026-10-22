@@ -311,6 +311,24 @@ export const tr: Messages = {
     },
   },
 
+  models: {
+    size: "{size} GB",
+    fit: {
+      fits: "GPU'ya sığıyor",
+      partial: "Kısmi yükleme (yavaş, RAM kullanır)",
+      tooLarge: "Çok büyük",
+    },
+    fitLabel: "GPU uyumu",
+    confirm: {
+      title: "Bu model GPU'ya sığmıyor",
+      partial:
+        "Bu model ({model}, ~{size} GB) GPU'ya sığmıyor; katmanlar sistem RAM'inden çalışacak ve ana makine yavaşlayabilir ya da donabilir.",
+      tooLarge:
+        "Bu model ({model}, ~{size} GB) bu ana makine için çok büyük; katmanlar sistem RAM'inden çalışacağından yüklenemeyebilir ya da ana makineyi dondurabilir.",
+      useAnyway: "Yine de kullan",
+    },
+  },
+
   onboarding: {
     model: {
       step: "Model",

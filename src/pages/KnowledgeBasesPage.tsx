@@ -7,6 +7,7 @@ import { useConfirm } from "../components/ConfirmDialog";
 import { GoldenPathStepper } from "../components/GoldenPathStepper";
 import { Icon } from "../components/Icon";
 import { InfoCallout } from "../components/InfoCallout";
+import { ModelFitBadge } from "../components/ModelFitBadge";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
 import { apiFetch, friendlyErrorMessage } from "../lib/api";
@@ -36,11 +37,13 @@ import {
   DATA_POLICY_LABEL,
   LOCAL_ONLY_MODEL_HINT,
   dataPolicyErrorMessage,
+  fitConfirmOptions,
   generationModels,
   isCloudModel,
   modelDisplayName,
   modelOptionLabel,
   pickerValue,
+  type CatalogModel,
   type DataPolicy,
 } from "../lib/modelDefaults";
 import { useModelChoices, type ModelChoices } from "../lib/useModelChoices";
@@ -428,6 +431,11 @@ function orgDefaultLabel(choices: ModelChoices): string {
   return `Org default (${answer ? modelDisplayName(answer, choices.models) : "install default"})`;
 }
 
+/** The catalog entry a picker value refers to, if listed. */
+function pickedModel(choices: ModelChoices, value: string): CatalogModel | undefined {
+  return value ? choices.models.find((m) => pickerValue(m) === value) : undefined;
+}
+
 /** The answer-model `<option>`s: "Org default (X)" first, then every
  * generation model with its Local/Cloud badge. On a Local only KB the cloud
  * ones are disabled (#2525) -- the backend would refuse them anyway. A pinned
@@ -566,6 +574,10 @@ export function KnowledgeBaseCard({
       setStatus("Choose a team to share this knowledge base with.");
       setIsError(true);
       return;
+    }
+    if (editLlm !== (kb.llm_model ?? "")) {
+      const warning = fitConfirmOptions(pickedModel(choices, editLlm));
+      if (warning && !(await confirm(warning))) return;
     }
     setSaving(true);
     setStatus("Saving…");
@@ -734,6 +746,7 @@ export function KnowledgeBaseCard({
                 localOnly={editPolicy === "local_only"}
               />
             </select>
+            <ModelFitBadge model={pickedModel(choices, editLlm)} />
             {editPolicy === "local_only" && (
               <LocalOnlyModelHint choices={choices} current={editLlm} />
             )}
@@ -867,6 +880,7 @@ export function CreateKbForm({
   const [status, setStatus] = useState("");
   const [creating, setCreating] = useState(false);
   const scheduleTimeout = useAutoClearTimeout();
+  const { confirm, dialog } = useConfirm();
 
   // Free-text model-name inputs made a user guess/copy-paste an exact
   // Ollama model string with zero validation, when the platform already
@@ -887,7 +901,11 @@ export function CreateKbForm({
     const body: Record<string, unknown> = { name };
     if (description) body.description = description;
     if (embeddingModel) body.embedding_model = embeddingModel;
-    if (llmModel) body.llm_model = llmModel;
+    if (llmModel) {
+      const warning = fitConfirmOptions(pickedModel(choices, llmModel));
+      if (warning && !(await confirm(warning))) return;
+      body.llm_model = llmModel;
+    }
     if (chunkSize) body.chunk_size = parseInt(chunkSize, 10);
     if (chunkOverlap) body.chunk_overlap = parseInt(chunkOverlap, 10);
     if (dataPolicy === "local_only") body.data_policy = dataPolicy;
@@ -919,6 +937,7 @@ export function CreateKbForm({
 
   return (
     <section className={`mb-6 ${cardClass}`}>
+      {dialog}
       <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
         <Icon name="plus" size={16} className="text-indigo-500 dark:text-indigo-400" />
         Create a knowledge base
@@ -1003,6 +1022,7 @@ export function CreateKbForm({
                 localOnly={dataPolicy === "local_only"}
               />
             </select>
+            <ModelFitBadge model={pickedModel(choices, llmModel)} />
             {dataPolicy === "local_only" ? (
               <LocalOnlyModelHint choices={choices} current={llmModel} />
             ) : (

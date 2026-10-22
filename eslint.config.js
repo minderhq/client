@@ -56,6 +56,7 @@ export const I18N_MIGRATED_FILES = [
   "src/components/ConnectModelCard.tsx",
   "src/components/ErrorBoundary.tsx",
   "src/components/LoadError.tsx",
+  "src/components/ModelFitBadge.tsx",
   "src/components/OrgDefaultLanguage.tsx",
   "src/components/PageTabs.tsx",
   "src/components/PasswordResetRequestForm.tsx",
