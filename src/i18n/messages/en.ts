@@ -312,4 +312,18 @@ export const en = {
       submit: "Change password",
     },
   },
+
+  onboarding: {
+    model: {
+      step: "Model",
+      title: "Connect a model",
+      noModel:
+        "No language model is available yet, so uploads can't be embedded and Ask can't answer. Pull a model into Ollama or connect a vLLM or cloud provider first.",
+      unavailable:
+        "The model service isn't answering, so uploads can't be embedded and Ask can't answer. Check the model backend, or connect a vLLM or cloud provider.",
+      providers: "Open Providers & defaults",
+      docs: "How to connect your models",
+      askAdmin: "No model is connected yet. Ask an administrator to connect a model.",
+    },
+  },
 } satisfies MessageTree;

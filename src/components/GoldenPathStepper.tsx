@@ -1,12 +1,16 @@
 import { Link } from "react-router-dom";
 
+import { useI18n } from "../i18n";
 import {
   JOURNEY_STEPS,
   type JourneyCounts,
   primaryAction,
   stepStatus,
+  withModelStep,
 } from "../lib/journey";
 import { useAuth } from "../lib/auth";
+import { useReadiness } from "../lib/readiness";
+import { useCan } from "../lib/useCan";
 import { useJourney } from "../lib/useJourney";
 import { cardClass } from "../lib/ui";
 import { Icon } from "./Icon";
@@ -20,17 +24,32 @@ import { Icon } from "./Icon";
  * breaks, and it reads readiness the #1227 way (empty KBs don't count).
  *
  * Self-fetches its counts; a page that mutates KB/pipeline state can pass a
- * `refreshKey` it bumps so the bar re-syncs without a navigation. */
+ * `refreshKey` it bumps so the bar re-syncs without a navigation.
+ *
+ * A caller who can connect a model (org owner/admin, instance admin) also gets
+ * a leading Model step, done when the readiness endpoint's `model` check
+ * passes. It appears once that check has been read; everyone else sees the
+ * four steps unchanged. */
 export function GoldenPathStepper({ refreshKey }: { refreshKey?: unknown }) {
   const { token } = useAuth();
   const journey = useJourney(refreshKey);
+  const readiness = useReadiness();
+  const canConnectModel = useCan("org.ai.manage");
+  const { t } = useI18n();
 
   // The golden path is about creating things, which needs a login — nothing to
   // guide an anonymous browser toward, so stay out of the way entirely.
   if (!token) return null;
 
   const counts: JourneyCounts | null = journey.data;
-  const next = primaryAction(counts);
+  const modelReady =
+    canConnectModel && readiness.data ? readiness.data.checks.model.ready : undefined;
+  const steps =
+    modelReady === undefined ? JOURNEY_STEPS : withModelStep(t("onboarding.model.step"));
+  const next =
+    modelReady === false
+      ? { to: "/platform/providers", title: t("onboarding.model.title") }
+      : primaryAction(counts);
 
   return (
     <nav
@@ -38,8 +57,8 @@ export function GoldenPathStepper({ refreshKey }: { refreshKey?: unknown }) {
       className={`mb-5 ${cardClass} !p-3.5`}
     >
       <ol className="flex flex-wrap items-center gap-y-2">
-        {JOURNEY_STEPS.map((step, i) => {
-          const status = stepStatus(counts, i);
+        {steps.map((step, i) => {
+          const status = stepStatus(counts, i, modelReady);
           const done = status === "done";
           const current = status === "current";
           return (
@@ -74,7 +93,7 @@ export function GoldenPathStepper({ refreshKey }: { refreshKey?: unknown }) {
                   {step.label}
                 </span>
               </Link>
-              {i < JOURNEY_STEPS.length - 1 && (
+              {i < steps.length - 1 && (
                 <Icon
                   name="chevron-right"
                   size={15}

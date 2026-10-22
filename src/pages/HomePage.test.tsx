@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -29,7 +29,12 @@ vi.mock("../lib/api", async () => {
   };
 });
 
-let mockAuth = { isAuthenticated: false, username: "", token: "" };
+// orgRole: what the "Connect a model" card is gated on (useCan).
+let mockAuth: { isAuthenticated: boolean; username: string; token: string; orgRole?: string } = {
+  isAuthenticated: false,
+  username: "",
+  token: "",
+};
 vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
 }));
@@ -43,12 +48,14 @@ function routeApiFetch(opts: {
   pipelineCount?: number;
   bundles?: { enabled: number; total: number };
   modelCount?: number;
+  modelReady?: boolean;
 }) {
   const {
     kbs = [],
     pipelineCount = 0,
     bundles = { enabled: 0, total: 0 },
     modelCount = 0,
+    modelReady = true,
   } = opts;
   apiFetch.mockImplementation((path: string) => {
     if (path.startsWith("/v1/rag/knowledge-bases"))
@@ -67,6 +74,14 @@ function routeApiFetch(opts: {
         orphaned: [],
         count: bundles.total,
       });
+    if (path === "/v1/readiness") {
+      const ok = { ready: true, reason: null };
+      const model = modelReady ? ok : { ready: false, reason: "no_model" };
+      return Promise.resolve({
+        ready: modelReady,
+        checks: { model, pipeline: ok, knowledge_base: ok, email: ok },
+      });
+    }
     if (path.startsWith("/v1/models"))
       return Promise.resolve({ items: [], total: modelCount });
     return Promise.reject(new Error(`unexpected path ${path}`));
@@ -89,6 +104,37 @@ describe("HomePage", () => {
       screen.getByText("Browsing is open for everyone — log in on any page to make changes."),
     ).toBeTruthy();
     await screen.findByText("Create your first knowledge base");
+  });
+
+  it("shows an org owner the Connect a model step when no model is available", async () => {
+    mockAuth = { isAuthenticated: true, username: "alice", token: "tok", orgRole: "owner" };
+    routeApiFetch({ modelReady: false });
+    render(<HomePage />);
+
+    await screen.findByRole("heading", { name: "Connect a model" });
+    expect(screen.getByRole("link", { name: /Open Providers & defaults/ }).getAttribute("href")).toBe(
+      "/platform/providers",
+    );
+  });
+
+  it("asks a member to contact an administrator when no model is available", async () => {
+    mockAuth = { isAuthenticated: true, username: "bob", token: "tok", orgRole: "member" };
+    routeApiFetch({ modelReady: false });
+    render(<HomePage />);
+
+    await screen.findByText(/Ask an administrator to connect a model/);
+    expect(screen.queryByRole("heading", { name: "Connect a model" })).toBeNull();
+  });
+
+  it("adds nothing when the model check passes", async () => {
+    mockAuth = { isAuthenticated: true, username: "alice", token: "tok", orgRole: "owner" };
+    routeApiFetch({ modelReady: true });
+    render(<HomePage />);
+
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/v1/readiness", expect.anything()));
+    await screen.findByText("Create your first knowledge base");
+    expect(screen.queryByText("Connect a model")).toBeNull();
+    expect(screen.queryByText(/Ask an administrator/)).toBeNull();
   });
 
   it("greets a logged-in user by name", async () => {
