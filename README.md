@@ -45,6 +45,30 @@ each also has a matching `ARG` default in the `Dockerfile`.
 > localhost dead-link class): render the link only when the deployment configures
 > it. See `src/lib/api.ts`.
 
+## Security response headers (runtime)
+
+nginx sends a `Content-Security-Policy`, `X-Frame-Options: DENY`,
+`X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` and, when the
+TLS front door forwarded an HTTPS request (`X-Forwarded-Proto: https`),
+`Strict-Transport-Security`. The default CSP:
+
+```
+default-src 'self'; script-src 'self'; style-src 'self';
+img-src 'self' data: blob: https:; media-src 'self' blob:; font-src 'self' data:;
+connect-src 'self' <origin of VITE_API_BASE_URL>; object-src 'none';
+base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+```
+
+`script-src 'self'` means no inline scripts: `index.html` loads
+`public/theme-init.js` instead (`src/nginxConfig.test.ts` checks this). The
+headers are written at container start by `docker/security-headers.sh`, so these
+env vars apply after a restart, no rebuild:
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `CLIENT_SECURITY_HEADERS` | `on` | `off` drops all of the headers above. Only when your own reverse proxy sets them. |
+| `CLIENT_CSP` | *(empty)* | Replaces the whole default CSP, e.g. to allow another API origin. |
+
 ## Layout
 
 ```

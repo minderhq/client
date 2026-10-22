@@ -61,6 +61,18 @@ RUN addgroup -g 1000 minderclient && adduser -D -u 1000 -G minderclient mindercl
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
+# Security response headers: the nginx image runs /docker-entrypoint.d/*.sh at
+# every start, so CLIENT_SECURITY_HEADERS / CLIENT_CSP apply on a restart. Run
+# once here too, so the snippets nginx.conf includes exist even without the
+# entrypoint. connect-src gets the gateway origin from the same build arg the
+# app's fetch() calls were built with.
+ARG VITE_API_BASE_URL=http://localhost:8000
+ENV MINDER_API_BASE_URL=$VITE_API_BASE_URL
+COPY docker/security-headers.sh /docker-entrypoint.d/15-minder-security-headers.sh
+RUN chmod 755 /docker-entrypoint.d/15-minder-security-headers.sh \
+    && /docker-entrypoint.d/15-minder-security-headers.sh \
+    && chown -R minderclient:minderclient /etc/nginx/minder
+
 USER minderclient
 
 EXPOSE 8009

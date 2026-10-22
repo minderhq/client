@@ -7,7 +7,7 @@
  * "system" is the default for anyone who never touches the toggle, so
  * behavior is unchanged unless a preference is explicitly set.
  *
- * STORAGE_KEY's literal value is duplicated in index.html's inline
+ * STORAGE_KEY's literal value is duplicated in public/theme-init.js, the
  * anti-flash script (it runs before any JS module loads, so it can't import
  * this file) -- keep the two in sync if this ever changes.
  */
