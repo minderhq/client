@@ -203,6 +203,8 @@ describe("nav — marketplace IA (#2197)", () => {
       [ROUTES.publishSubmissionReview]: "platform-admin",
       "/organization": "org.settings.manage",
       [ORG_USERS_PATH]: "org.members.manage",
+      [ROUTES.peopleInvites]: "org.members.manage",
+      [ROUTES.peopleDomains]: "org.settings.manage",
       "/rag/public-chat": "org.chatbots.manage",
       "/platform/providers": "org.ai.manage",
       [ROUTES.billing]: "org.billing.view",
@@ -216,7 +218,7 @@ describe("nav — marketplace IA (#2197)", () => {
 
   it("shows the Organization section to org owners/admins and All Users to Platform Admins only", () => {
     expect(visibleRows("Organization", MEMBER)).toEqual({});
-    expect(visibleRows("Organization", ORG_OWNER).Users).toBe(ORG_USERS_PATH);
+    expect(visibleRows("Organization", ORG_OWNER).People).toBe(ORG_USERS_PATH);
     expect(visibleRows("Organization", ORG_OWNER)["Audit Log"]).toBe("/audit");
     // Operator screens want the Platform Admin claim, as their APIs do; the
     // instance admin role alone (an org owner, an SSO admin) is not enough.

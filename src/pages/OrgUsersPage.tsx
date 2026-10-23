@@ -1,35 +1,27 @@
 import { useId, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { useConfirm } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 import { Icon } from "../components/Icon";
-import { InfoCallout } from "../components/InfoCallout";
-import { SeatBanner } from "../components/LimitNotice";
-import { PageHeader } from "../components/PageHeader";
+import { LoadError } from "../components/LoadError";
+import { PeopleHeader } from "../components/PeopleHeader";
 import { ResetPasswordControl } from "../components/ResetPasswordControl";
+import { Skeleton } from "../components/Skeleton";
 import { StatusLine } from "../components/StatusLine";
-import { ApiError } from "../lib/api";
+import { useI18n } from "../i18n";
 import { useAuth } from "../lib/auth";
+import { filterByText } from "../lib/filterByText";
 import {
   type DirectoryUser,
   fetchAllUsers,
-  fetchMyOrgPermissions,
-  fetchMyOrgs,
-  fetchOrgMembers,
-  type MyOrg,
-  ORG_PERMISSIONS,
   ORG_ROLES,
   type OrgMember,
   orgMemberErrorMessage,
   orgMemberResetPasswordPath,
   orgRoleTone,
-  pickActiveOrg,
-  removeOrgMember,
-  setOrgMember,
-  setOrgMemberAccountActive,
-  setOrgMemberSuspended,
 } from "../lib/orgs";
+import type { MemberTeam } from "../lib/people";
+import { personRoute, ROUTES } from "../lib/routes";
 import {
   badgeClass,
   badgeTone,
@@ -40,264 +32,128 @@ import {
   secondaryButtonClass,
 } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
-
-/** Why the member list couldn't load, in words. The list is gated on
- * permission to view members, so a plain 403 means exactly that (never a
- * logout); the caller's own pending password change gets its own message. */
-function memberListErrorMessage(e: unknown): string {
-  if (
-    e instanceof ApiError &&
-    e.status === 403 &&
-    !e.message.includes("password_change_required")
-  ) {
-    return "You don't have permission to see this organization's members.";
-  }
-  return orgMemberErrorMessage(e);
-}
+import { useMemberActions, usePeopleData, useRoleLabel } from "../lib/usePeople";
 
 /** Where a member whose password can't be reset from here gets a new one. */
 const SELF_SERVICE_RESET_PATH = "/forgot-password";
 
-/** What the caller may do on this page, from their resolved permissions in
- * the active org. If those can't be read, it falls back to the org role in
- * the token (owner/admin hold both permissions by default). Only decides which
- * controls to show: every action route checks again. */
-function useOrgPermissions(orgId: number | undefined) {
-  const { isAuthenticated, token, sessionKey, userId, orgRole, isPlatformAdmin } = useAuth();
-  const permsRes = useAsyncResource<Set<string>>(
-    (signal) =>
-      orgId !== undefined && userId
-        ? fetchMyOrgPermissions(orgId, userId, token, signal)
-        : Promise.resolve(new Set<string>()),
-    { deps: [sessionKey, orgId, userId], enabled: isAuthenticated && orgId !== undefined && !!userId },
-  );
-  const fallback = orgRole === "owner" || orgRole === "admin";
-  const has = (key: string) =>
-    isPlatformAdmin || (permsRes.data ? permsRes.data.has(key) : !!permsRes.error && fallback);
-  return {
-    canManage: has(ORG_PERMISSIONS.manage),
-    canSuspend: has(ORG_PERMISSIONS.suspend),
-  };
-}
-
-/** The Users page for the org the caller is acting in (topbar org switcher).
- * Org-level actions (role, suspend, remove) follow the caller's permissions in
- * this org; account-level actions (password reset, deactivate) appear only on
- * the members the API marks as managed by / resettable by the caller. Every
- * call goes to the org-scoped member routes: the installation-wide account
- * routes belong to the separate Platform Admin view (All Users). */
+/** Organization › People › Members (UX step 7): the active org's members
+ * with their role, teams and status, searchable, each linking to their
+ * person page. Org-level actions (role, suspend, remove) follow the caller's
+ * permissions in this org; account-level ones (password reset, deactivate)
+ * only the members the API marks as the caller's to manage. Every call goes
+ * to the org-scoped member routes; the installation-wide account routes
+ * belong to the Platform Admin's All users. */
 export function OrgUsersPage() {
-  const { isAuthenticated, token, sessionKey, userId, activeTenantId, isPlatformAdmin } =
-    useAuth();
-  const { confirm, dialog } = useConfirm();
+  const { token, sessionKey, userId, isPlatformAdmin } = useAuth();
+  const { t, plural } = useI18n();
+  const roleLabel = useRoleLabel();
   const addUserId = useId();
   const addRoleId = useId();
-
-  const [status, setStatus] = useState("");
-  const [isError, setIsError] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const searchId = useId();
+  const [query, setQuery] = useState("");
   const [addTarget, setAddTarget] = useState("");
   const [addRole, setAddRole] = useState("member");
 
-  const orgsRes = useAsyncResource<MyOrg[]>(
-    (signal) => fetchMyOrgs(token, signal).then((r) => r.organizations),
-    { deps: [sessionKey], enabled: isAuthenticated },
-  );
-  const orgs = orgsRes.data ?? [];
-  const active = pickActiveOrg(orgs, activeTenantId);
-
-  const { canManage, canSuspend } = useOrgPermissions(active?.id);
-
-  const membersRes = useAsyncResource<OrgMember[]>(
-    (signal) =>
-      active
-        ? fetchOrgMembers(active.id, token, signal).then(
-            (r) => r.members,
-            (e: unknown) => {
-              throw new Error(memberListErrorMessage(e));
-            },
-          )
-        : Promise.resolve([]),
-    { deps: [sessionKey, active?.id], enabled: isAuthenticated && !!active },
+  const { orgsRes, active, membersRes, rolesRes, teamsRes, canManage, canSuspend } = usePeopleData();
+  const actions = useMemberActions(
+    active,
+    rolesRes.data ?? [],
+    (m) => ({
+      roles: [roleLabel(m.org_role)],
+      teams: (teamsRes.data?.get(m.user_id) ?? []).map((team) => team.name),
+    }),
+    membersRes.reload,
   );
 
-  // Adding an EXISTING account by picking it needs the installation-wide user
-  // directory, which only a Platform Admin can read. Everyone else brings
-  // people in by invite (Organization overview).
+  // Adding an EXISTING account by picking it needs the installation-wide
+  // directory, which only a Platform Admin can read. Everyone else invites.
   const usersRes = useAsyncResource<DirectoryUser[]>(
     (signal) => fetchAllUsers(token, signal).then((r) => r.users),
-    { deps: [sessionKey], enabled: isAuthenticated && isPlatformAdmin === true },
+    { deps: [sessionKey], enabled: isPlatformAdmin === true },
   );
-
-  const memberIds = useMemo(
-    () => new Set((membersRes.data ?? []).map((m) => m.user_id)),
-    [membersRes.data],
-  );
+  const members = useMemo(() => membersRes.data ?? [], [membersRes.data]);
+  const memberIds = useMemo(() => new Set(members.map((m) => m.user_id)), [members]);
   const addableUsers = (usersRes.data ?? []).filter((u) => !memberIds.has(u.id));
-
-  function report(msg: string, err = false) {
-    setStatus(msg);
-    setIsError(err);
-  }
-
-  async function runMutation(fn: () => Promise<unknown>, okMsg: string) {
-    if (!active) return;
-    setBusy(true);
-    report("Working…");
-    try {
-      await fn();
-      await membersRes.reload();
-      report(okMsg);
-    } catch (e) {
-      report(orgMemberErrorMessage(e), true);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const shown = filterByText(members, query, (m) => [m.username, m.email]);
 
   async function handleAdd() {
-    if (!active || !addTarget) return;
-    await runMutation(
-      () => setOrgMember(active.id, Number(addTarget), addRole, token),
-      "Member added.",
-    );
+    if (!addTarget) return;
+    await actions.add(Number(addTarget), addRole);
     setAddTarget("");
     setAddRole("member");
   }
 
-  async function handleRoleChange(m: OrgMember, newRole: string) {
-    if (!active) return;
-    await runMutation(
-      () => setOrgMember(active.id, m.user_id, newRole, token),
-      "Role updated.",
-    );
-  }
-
-  async function handleRemove(m: OrgMember) {
-    if (!active) return;
-    const ok = await confirm({
-      title: "Remove member?",
-      message: `Remove ${m.username} from ${active.name}? They keep their account but lose access to this organization's resources.`,
-      danger: true,
-    });
-    if (!ok) return;
-    await runMutation(() => removeOrgMember(active.id, m.user_id, token), "Member removed.");
-  }
-
-  async function handleSuspend(m: OrgMember) {
-    if (!active) return;
-    const suspend = !m.suspended_at;
-    if (suspend) {
-      const ok = await confirm({
-        title: `Suspend ${m.username}?`,
-        message: `${m.username} loses access to ${active.name} until you restore it. Their account and any other organizations they belong to are not affected.`,
-        confirmLabel: "Suspend",
-        danger: true,
-      });
-      if (!ok) return;
-    }
-    await runMutation(
-      () => setOrgMemberSuspended(active.id, m.user_id, suspend, token),
-      suspend ? "Member suspended." : "Access restored.",
-    );
-  }
-
-  async function handleAccountActive(m: OrgMember) {
-    if (!active) return;
-    const activate = !m.is_active;
-    if (!activate) {
-      const ok = await confirm({
-        title: `Deactivate ${m.username}'s account?`,
-        message: `${m.username} will no longer be able to sign in anywhere. Their data is kept, and you can reactivate the account at any time.`,
-        confirmLabel: "Deactivate",
-        danger: true,
-      });
-      if (!ok) return;
-    }
-    await runMutation(
-      () => setOrgMemberAccountActive(active.id, m.user_id, activate, token),
-      activate ? "Account reactivated." : "Account deactivated.",
-    );
-  }
-
-  const header = (
-    <PageHeader
-      icon="users"
-      title="Users"
-      subtitle="The members of the organization you're working in: their roles, access to this organization, and — for accounts this organization manages — password resets and deactivation."
-    />
-  );
-
-  if (!isAuthenticated) {
-    return (
-      <>
-        {header}
-        <InfoCallout icon="lock">Log in to view your organization's users.</InfoCallout>
-      </>
-    );
-  }
-
-  const members = membersRes.data ?? [];
-
   return (
     <>
-      {dialog}
-      {header}
+      {actions.dialog}
+      <PeopleHeader
+        title={t("nav.items.people.title")}
+        subtitle={active ? t("people.subtitle", { org: active.name }) : undefined}
+      />
 
-      <StatusLine isError={!!orgsRes.error}>
-        {orgsRes.error ?? (orgsRes.loading && !orgsRes.data ? "Loading…" : "")}
-      </StatusLine>
-
-      {orgsRes.data && orgs.length === 0 && (
-        <EmptyState>
-          You don't belong to any organization yet. Organizations are provisioned
-          by an administrator.
-        </EmptyState>
+      {orgsRes.error && (
+        <LoadError
+          title={t("people.orgLoadError")}
+          message={orgsRes.error}
+          onRetry={orgsRes.reload}
+          what={t("nav.items.people.title")}
+        />
       )}
+      {orgsRes.data && !active && <EmptyState>{t("people.noOrg")}</EmptyState>}
 
       {active && (
         <section className={cardClass}>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
-              <Icon name="users" size={17} className="text-indigo-500 dark:text-indigo-400" />
-              Members of {active.name}
-            </h2>
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <div className="min-w-48 flex-1">
+              <label htmlFor={searchId} className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
+                {t("people.members.search")}
+              </label>
+              <input
+                id={searchId}
+                type="search"
+                className={inputClass}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("people.members.searchPlaceholder")}
+              />
+            </div>
             <div className="flex items-center gap-3">
               {isPlatformAdmin && (
                 <Link
                   to="/platform/users"
                   className="flex items-center gap-1 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400"
                 >
-                  All users (Platform Admin)
+                  {t("people.members.allUsers")}
                   <Icon name="arrow" size={14} />
                 </Link>
               )}
-              <button
-                type="button"
-                onClick={membersRes.reload}
-                className={secondaryButtonClass}
-              >
-                <Icon name="reset" size={15} /> Refresh
+              {canManage && (
+                <Link to={ROUTES.peopleInvites} className={primaryButtonClass}>
+                  <Icon name="mail" size={16} />
+                  {t("people.members.invite")}
+                </Link>
+              )}
+              <button type="button" onClick={membersRes.reload} className={secondaryButtonClass}>
+                <Icon name="reset" size={15} /> {t("people.members.refresh")}
               </button>
             </div>
           </div>
-
-          <SeatBanner />
 
           {isPlatformAdmin && (
             <div className="mb-3 flex flex-wrap items-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950/40">
               <div className="min-w-48 flex-1">
                 <label htmlFor={addUserId} className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
-                  Add a member
+                  {t("people.members.addLabel")}
                 </label>
                 <select
                   id={addUserId}
                   className={inputClass}
                   value={addTarget}
                   onChange={(e) => setAddTarget(e.target.value)}
-                  disabled={busy}
+                  disabled={actions.busy}
                 >
-                  <option value="">Choose a user…</option>
+                  <option value="">{t("people.members.addChoose")}</option>
                   {addableUsers.map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.username} ({u.email})
@@ -307,18 +163,18 @@ export function OrgUsersPage() {
               </div>
               <div>
                 <label htmlFor={addRoleId} className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
-                  Role
+                  {t("people.role")}
                 </label>
                 <select
                   id={addRoleId}
                   className={inputClass}
                   value={addRole}
                   onChange={(e) => setAddRole(e.target.value)}
-                  disabled={busy}
+                  disabled={actions.busy}
                 >
                   {ORG_ROLES.map((r) => (
                     <option key={r} value={r}>
-                      {r}
+                      {roleLabel(r)}
                     </option>
                   ))}
                 </select>
@@ -326,62 +182,64 @@ export function OrgUsersPage() {
               <button
                 type="button"
                 onClick={handleAdd}
-                disabled={busy || !addTarget}
+                disabled={actions.busy || !addTarget}
                 className={primaryButtonClass}
               >
                 <Icon name="plus" size={16} />
-                Add
+                {t("people.members.addSubmit")}
               </button>
             </div>
           )}
 
-          <StatusLine isError={isError}>{status}</StatusLine>
+          <StatusLine isError={actions.isError}>{actions.status}</StatusLine>
 
           {membersRes.error ? (
-            <p className="text-sm text-red-600 dark:text-red-400">
-              {membersRes.error}
-            </p>
+            <LoadError
+              title={t("people.members.loadError")}
+              message={membersRes.error}
+              onRetry={membersRes.reload}
+              what={t("nav.items.people.title")}
+            />
           ) : membersRes.loading && !membersRes.data ? (
-            <p className={mutedTextClass}>Loading members…</p>
+            <div aria-busy="true" className="flex flex-col gap-2">
+              <span className="sr-only">{t("common.loading")}</span>
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
           ) : members.length === 0 ? (
-            <EmptyState>No members found.</EmptyState>
+            <EmptyState>{t("people.members.empty")}</EmptyState>
+          ) : shown.length === 0 ? (
+            <EmptyState>{t("people.members.noMatch", { query })}</EmptyState>
           ) : (
-            <ul className="flex flex-col divide-y divide-gray-100 dark:divide-gray-800">
-              {members.map((m) => (
-                <MemberRow
-                  key={m.user_id}
-                  member={m}
-                  orgId={active.id}
-                  token={token}
-                  isSelf={String(m.user_id) === userId}
-                  canManage={canManage}
-                  canSuspend={canSuspend}
-                  busy={busy}
-                  onRoleChange={(r) => handleRoleChange(m, r)}
-                  onRemove={() => handleRemove(m)}
-                  onSuspend={() => handleSuspend(m)}
-                  onAccountActive={() => handleAccountActive(m)}
-                />
-              ))}
-            </ul>
+            <>
+              <p className="sr-only" role="status">
+                {plural("people.members.count", shown.length)}
+              </p>
+              <ul className="flex flex-col divide-y divide-gray-100 dark:divide-gray-800">
+                {shown.map((m) => (
+                  <MemberRow
+                    key={m.user_id}
+                    member={m}
+                    teams={teamsRes.data ? (teamsRes.data.get(m.user_id) ?? []) : undefined}
+                    orgId={active.id}
+                    token={token}
+                    isSelf={String(m.user_id) === userId}
+                    canManage={canManage}
+                    canSuspend={canSuspend}
+                    busy={actions.busy}
+                    onRoleChange={(r) => actions.changeRole(m, r)}
+                    onRemove={() => actions.remove(m)}
+                    onSuspend={() => actions.toggleSuspend(m)}
+                    onAccountActive={() => actions.toggleAccountActive(m)}
+                  />
+                ))}
+              </ul>
+            </>
           )}
 
           <p className={`mt-3 ${mutedTextClass}`}>
-            {canManage || canSuspend ? (
-              <>
-                Suspending or removing a member only affects this organization.
-                Resetting a password or deactivating an account is offered only
-                for accounts this organization manages; anyone else can reset
-                their own password by email from the sign-in page. To bring in
-                someone new, send an invite from the{" "}
-                <Link to="/organization" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
-                  Organization overview
-                </Link>
-                .
-              </>
-            ) : (
-              "Managing members is an owner/admin action. Day-to-day sharing is done through Teams."
-            )}
+            {canManage || canSuspend ? t("people.members.footerManage") : t("people.members.footerView")}
           </p>
         </section>
       )}
@@ -389,8 +247,26 @@ export function OrgUsersPage() {
   );
 }
 
+/** The member's state as badges: home org, suspended, deactivated, a
+ * pending password change, outside the allowed email domains. */
+export function MemberBadges({ member: m }: { member: OrgMember }) {
+  const { t } = useI18n();
+  return (
+    <>
+      {m.is_home && <span className={badgeClass}>{t("people.badges.home")}</span>}
+      {m.suspended_at && <span className={`${badgeClass} ${badgeTone.warn}`}>{t("people.badges.suspended")}</span>}
+      {!m.is_active && <span className={`${badgeClass} ${badgeTone.danger}`}>{t("people.badges.deactivated")}</span>}
+      {m.must_change_password && <span className={badgeClass}>{t("people.badges.mustChange")}</span>}
+      {m.outside_allowed_domains && (
+        <span className={`${badgeClass} ${badgeTone.warn}`}>{t("people.badges.outsideDomains")}</span>
+      )}
+    </>
+  );
+}
+
 function MemberRow({
   member: m,
+  teams,
   orgId,
   token,
   isSelf,
@@ -403,6 +279,8 @@ function MemberRow({
   onAccountActive,
 }: {
   member: OrgMember;
+  /** Undefined while unknown (loading, or not loaded for this caller). */
+  teams: MemberTeam[] | undefined;
   orgId: number;
   token: string;
   isSelf: boolean;
@@ -414,14 +292,15 @@ function MemberRow({
   onSuspend: () => void;
   onAccountActive: () => void;
 }) {
+  const { t, rich } = useI18n();
+  const roleLabel = useRoleLabel();
   // Account-level actions follow the API's per-member flags, never the
   // caller's role: an account that also belongs to another organization is
   // not this org's to reset or deactivate.
   const canReset = !isSelf && m.resettable_by_caller;
   const canDeactivate = !isSelf && m.managed_by_caller;
   // An admin who can't reset this account here is pointed at email
-  // self-service instead (an SSO account's password lives with the identity
-  // provider, so that hint names the provider instead).
+  // self-service instead (or told that single sign-on manages it).
   const showResetHint = canManage && !isSelf && !m.resettable_by_caller;
 
   return (
@@ -431,37 +310,33 @@ function MemberRow({
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-gray-100">
-          <span className="truncate">{m.username}</span>
-          {m.is_home && <span className={badgeClass}>home</span>}
-          {m.suspended_at && (
-            <span className={`${badgeClass} ${badgeTone.warn}`}>suspended</span>
-          )}
-          {!m.is_active && (
-            <span className={`${badgeClass} ${badgeTone.danger}`}>deactivated</span>
-          )}
-          {m.must_change_password && (
-            <span className={badgeClass}>must change password</span>
-          )}
+          <Link to={personRoute(m.user_id)} className="truncate hover:underline">
+            {m.username}
+          </Link>
+          <MemberBadges member={m} />
         </span>
-        <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
-          {m.email}
-        </span>
+        <span className="block truncate text-xs text-gray-500 dark:text-gray-400">{m.email}</span>
+        {teams && (
+          <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
+            {teams.length > 0
+              ? t("people.members.teams", { teams: teams.map((team) => team.name).join(", ") })
+              : t("people.members.noTeams")}
+          </span>
+        )}
         {showResetHint && (
           <span className="block text-xs text-gray-500 dark:text-gray-400">
-            {m.is_oidc_linked ? (
-              "Password is managed by single sign-on."
-            ) : (
-              <>
-                Password can't be reset here.{" "}
-                <Link
-                  to={SELF_SERVICE_RESET_PATH}
-                  className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
-                >
-                  {m.username} can reset it by email
-                </Link>
-                .
-              </>
-            )}
+            {m.is_oidc_linked
+              ? t("people.members.resetSso")
+              : rich("people.members.resetHint", {
+                  link: (
+                    <Link
+                      to={SELF_SERVICE_RESET_PATH}
+                      className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                    >
+                      {t("people.members.resetLink", { name: m.username })}
+                    </Link>
+                  ),
+                })}
           </span>
         )}
       </span>
@@ -469,20 +344,20 @@ function MemberRow({
       <div className="flex flex-wrap items-center gap-2">
         {canManage ? (
           <select
-            className="w-28 shrink-0 rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 outline-none focus:border-indigo-400 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            className="w-32 shrink-0 rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 outline-none focus:border-indigo-400 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             value={m.org_role}
             disabled={busy}
-            aria-label={`Role for ${m.username}`}
+            aria-label={t("people.members.roleFor", { name: m.username })}
             onChange={(e) => onRoleChange(e.target.value)}
           >
             {ORG_ROLES.map((r) => (
               <option key={r} value={r}>
-                {r}
+                {roleLabel(r)}
               </option>
             ))}
           </select>
         ) : (
-          <span className={`${badgeClass} ${orgRoleTone(m.org_role)}`}>{m.org_role}</span>
+          <span className={`${badgeClass} ${orgRoleTone(m.org_role)}`}>{roleLabel(m.org_role)}</span>
         )}
         {canSuspend && !isSelf && (
           <button
@@ -490,9 +365,9 @@ function MemberRow({
             onClick={onSuspend}
             disabled={busy}
             className={`${secondaryButtonClass} shrink-0`}
-            title={m.suspended_at ? "Restore access to this organization" : "Suspend access to this organization"}
+            title={m.suspended_at ? t("people.actions.unsuspendHint") : t("people.actions.suspendHint")}
           >
-            {m.suspended_at ? "Unsuspend" : "Suspend"}
+            {m.suspended_at ? t("people.actions.unsuspend") : t("people.actions.suspend")}
           </button>
         )}
         {canReset && (
@@ -509,9 +384,9 @@ function MemberRow({
             onClick={onAccountActive}
             disabled={busy}
             className={`${secondaryButtonClass} shrink-0`}
-            title={m.is_active ? "Deactivate this account everywhere" : "Reactivate this account"}
+            title={m.is_active ? t("people.actions.deactivateHint") : t("people.actions.reactivateHint")}
           >
-            {m.is_active ? "Deactivate" : "Reactivate"}
+            {m.is_active ? t("people.actions.deactivate") : t("people.actions.reactivate")}
           </button>
         )}
         {canManage && (
@@ -520,10 +395,11 @@ function MemberRow({
             onClick={onRemove}
             disabled={busy}
             className={`${secondaryButtonClass} shrink-0 text-red-600 dark:text-red-400`}
-            title="Remove from organization"
+            title={t("people.actions.removeHint")}
+            aria-label={t("people.actions.removeName", { name: m.username })}
           >
             <Icon name="delete" size={15} />
-            <span className="hidden sm:inline">Remove</span>
+            <span className="hidden sm:inline">{t("people.actions.remove")}</span>
           </button>
         )}
       </div>

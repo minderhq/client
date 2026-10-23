@@ -2,7 +2,7 @@ import { useMemo } from "react";
 
 import type { IconName } from "../components/Icon";
 import { en, useI18n, type Messages } from "../i18n";
-import { ORG_USERS_PATH } from "./orgs";
+import { type PlanTier, UPGRADE_TIERS } from "./billing";
 import { allows, MEMBER, PLATFORM_ADMIN, type Access, type Requirement } from "./permissions";
 import { ROUTES } from "./routes";
 
@@ -27,6 +27,10 @@ export interface NavLeaf {
   /** One-line "what you do here", shown as a sidebar tooltip, on the page
    * (PageTabs), and as the command-palette sublabel. */
   description?: string;
+  /** A plan feature (client#126 Q6.3): the tab stays in place for every
+   * plan and carries a plan badge while the org's plan lacks `feature` (a
+   * limit key). Only for admin settings tabs, never the main nav. */
+  plan?: { feature: string; tier: PlanTier };
 }
 
 /** A sidebar entry. Most are plain links; a few own several closely-related
@@ -205,7 +209,26 @@ const NAV_MODEL: NavSectionDef[] = [
     admin: true,
     items: [
       { to: "/organization", id: "orgOverview", icon: "org", end: true, requires: "org.settings.manage" },
-      { to: ORG_USERS_PATH, id: "orgUsers", icon: "users", requires: "org.members.manage" },
+      {
+        // Organization › People (UX step 7): members, invites and the
+        // allowed email domains; each person's page sits under it too.
+        to: ROUTES.people,
+        id: "orgUsers",
+        icon: "users",
+        requires: "org.members.manage",
+        match: ROUTES.people,
+        tabs: [
+          { to: ROUTES.people, id: "people", icon: "users", end: true, requires: "org.members.manage" },
+          { to: ROUTES.peopleInvites, id: "peopleInvites", icon: "mail", requires: "org.members.manage" },
+          {
+            to: ROUTES.peopleDomains,
+            id: "peopleDomains",
+            icon: "globe",
+            requires: "org.settings.manage",
+            plan: { feature: "policy.allowed_email_domains", tier: UPGRADE_TIERS[0] },
+          },
+        ],
+      },
       { to: "/rag/public-chat", id: "publicChat", icon: "ask", requires: "org.chatbots.manage" },
       { to: "/platform/providers", id: "providers", icon: "globe", requires: "org.ai.manage" },
       { to: ROUTES.billing, id: "billing", icon: "billing", end: true, requires: "org.billing.view" },

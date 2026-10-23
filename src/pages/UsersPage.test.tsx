@@ -71,8 +71,8 @@ describe("UsersPage", () => {
     render(<UsersPage />);
     expect(screen.getByText(/Only a Platform Admin can view every account/)).toBeTruthy();
     expect(
-      screen.getByRole("link", { name: "Organization › Users" }).getAttribute("href"),
-    ).toBe("/organization/users");
+      screen.getByRole("link", { name: "Organization › People" }).getAttribute("href"),
+    ).toBe("/organization/people");
     expect(apiFetch).not.toHaveBeenCalled();
   });
 

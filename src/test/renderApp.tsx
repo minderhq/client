@@ -99,6 +99,21 @@ export function personaResponse(persona: Persona, url: string): Response {
       active_organization_id: Number(claims.active_tenant_id),
     });
   }
+  // The org's plan (useEntitlement): the persona's tier, with the Pro
+  // "allowed email domains" knob on from Pro up, and no seat numbers.
+  const limits = /^\/v1\/organizations\/(\d+)\/limits$/.exec(path);
+  if (limits && claims) {
+    return json({
+      organization_id: Number(limits[1]),
+      view: "full",
+      tier: persona.tier,
+      enforced: true,
+      limits: [
+        { key: "policy.allowed_email_domains", kind: "knob", value: persona.tier !== BASELINE_TIER },
+      ],
+      seats: null,
+    });
+  }
   if (path === "/v1/teams") {
     return json({
       teams: persona.teams.map((t) => ({

@@ -1,6 +1,7 @@
-import type { Locale } from "../i18n";
+import { i18n, type Locale } from "../i18n";
 import { ApiError, apiFetch, friendlyErrorMessage } from "./api";
 import type { components } from "./api-types.gen";
+import { ROUTES } from "./routes";
 
 /** An organization the current user belongs to (GET /v1/organizations/mine). */
 export interface MyOrg {
@@ -23,9 +24,10 @@ export interface MyOrgsResponse {
   active_organization_id: number | null;
 }
 
-/** The active org's Users page (org-scoped member administration). The
- * installation-wide Platform Admin view stays at /platform/users. */
-export const ORG_USERS_PATH = "/organization/users";
+/** The active org's People area (org-scoped member administration; its old
+ * /organization/users URL redirects here). The installation-wide Platform
+ * Admin view stays at /platform/users. */
+export const ORG_USERS_PATH = ROUTES.people;
 
 /** A member of an organization (GET /v1/organizations/{id}/members).
  *
@@ -54,12 +56,15 @@ export function pickActiveOrg(orgs: MyOrg[], activeTenantId: string): MyOrg | un
  * user and one this org may not act on, so the message covers both. */
 export function orgMemberErrorMessage(e: unknown): string {
   if (e instanceof ApiError) {
+    const { t } = i18n();
     if (e.status === 403 && e.message.includes("password_change_required")) {
-      return "Change your own password first: your account has a pending password change, so other actions are blocked until you do.";
+      return t("people.errors.passwordChange");
     }
-    if (e.status === 404) {
-      return "That account isn't in this organization any more, or can't be managed from here. Refresh the list and try again.";
-    }
+    // Changing or removing an owner/admin needs owner authority (403), and
+    // the org's last active owner can't be demoted or removed (409).
+    if (e.status === 403 && e.message === "requires_owner") return t("people.errors.requiresOwner");
+    if (e.status === 409 && e.message === "last_owner") return t("people.errors.lastOwner");
+    if (e.status === 404) return t("people.errors.notFound");
   }
   return friendlyErrorMessage(e);
 }

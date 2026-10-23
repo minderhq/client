@@ -32,7 +32,15 @@ export const ROUTES = {
   licenses: "/billing/licenses",
   sources: "/settings/sources",
   requests: "/requests",
+  people: "/organization/people",
+  peopleInvites: "/organization/people/invites",
+  peopleDomains: "/organization/people/domains",
 } as const;
+
+/** One member's person page (Organization › People). */
+export function personRoute(userId: number | string): string {
+  return `${ROUTES.people}/${userId}`;
+}
 
 /** The detail view of one plugin source repository. */
 export function sourceRepositoryRoute(repositoryId: string): string {
@@ -87,4 +95,6 @@ export const LEGACY_REDIRECTS: Redirect[] = [
   { from: "/bundles", to: ROUTES.discoverServiceBundles },
   { from: "/bundles/available", to: ROUTES.discoverServiceBundles },
   { from: "/bundles/installed", to: ROUTES.installedServiceBundles },
+  // The org's member list before Organization › People (UX step 7).
+  { from: "/organization/users", to: ROUTES.people },
 ];

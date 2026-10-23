@@ -248,7 +248,7 @@ export function UsersPage() {
               Only a Platform Admin can view every account. To manage the
               members of your organization, open{" "}
               <Link to={ORG_USERS_PATH} className="font-medium underline">
-                Organization › Users
+                Organization › People
               </Link>
               .
             </>
