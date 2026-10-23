@@ -244,6 +244,26 @@ describe("ModelManagementPage", () => {
     await screen.findByText("No models pulled yet — use the form above.");
   });
 
+  it("lets a member request a model, and not whoever adds models (client#126 Q2)", async () => {
+    routeApiFetch([]);
+    mockAuth = Object.assign(
+      { token: "tok", role: "user", isPlatformAdmin: false },
+      { isAuthenticated: true, orgRole: "member", activeTenantId: "1", tenantId: "1" },
+    );
+    const { unmount } = render(<ModelManagementPage />);
+    await screen.findByText("No models pulled yet — use the form above.");
+    expect(screen.getByRole("button", { name: "Request a model" })).toBeTruthy();
+    unmount();
+
+    mockAuth = Object.assign(
+      { token: "tok", role: "user", isPlatformAdmin: false },
+      { isAuthenticated: true, orgRole: "admin", activeTenantId: "1", tenantId: "1" },
+    );
+    render(<ModelManagementPage />);
+    await screen.findByText("No models pulled yet — use the form above.");
+    expect(screen.queryByRole("button", { name: "Request a model" })).toBeNull();
+  });
+
   it("renders a ModelCard per pulled model", async () => {
     routeApiFetch([model({ id: "a", name: "a" }), model({ id: "b", name: "b" })]);
     render(<ModelManagementPage />);

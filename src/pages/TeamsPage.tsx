@@ -4,6 +4,7 @@ import { useConfirm } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
+import { RequestButton } from "../components/RequestButton";
 import { StatusLine } from "../components/StatusLine";
 import { apiFetch, friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -17,6 +18,7 @@ import {
   secondaryButtonClass,
 } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
+import { useCan } from "../lib/useCan";
 
 export interface Team {
   id: number;
@@ -272,6 +274,8 @@ function TeamDetailPanel({
 }) {
   const myMembership = detail.members.find((m) => m.username === currentUsername);
   const canManage = isInstanceAdmin || myMembership?.team_role === "team_admin";
+  // Who manages the org's teams adds people directly; others ask to join.
+  const canManageTeams = useCan("org.teams.manage");
 
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [newRole, setNewRole] = useState<"member" | "team_admin">("member");
@@ -388,6 +392,12 @@ function TeamDetailPanel({
           </div>
         </div>
       ))}
+
+      {!myMembership && !canManage && !canManageTeams && (
+        <div className="mt-3">
+          <RequestButton kind="team_join" teamId={detail.id} name={detail.name} />
+        </div>
+      )}
 
       {canManage && (
         <div className="mt-3 flex flex-wrap items-center gap-2">

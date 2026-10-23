@@ -9,12 +9,14 @@ import { LoadError } from "../components/LoadError";
 import { PageHeader } from "../components/PageHeader";
 import { PluginRatings } from "../components/PluginRatings";
 import { ListedVersion } from "../components/PluginVersion";
+import { RequestButton } from "../components/RequestButton";
 import { SourceBadge, SourceLegend } from "../components/SourceBadge";
 import { InstallStateBadge, StatusBadge } from "../components/StatusBadge";
 import { StatusLine } from "../components/StatusLine";
 import { friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useAutoClearTimeout } from "../lib/browser";
+import { useCan } from "../lib/useCan";
 import {
   fetchCatalogPage,
   fetchFeaturedPlugins,
@@ -341,6 +343,7 @@ export function PluginCard({
   token,
   isAuthenticated,
   isAdmin = false,
+  canInstall = true,
   onInstalled,
   onUninstalled,
   onToggleEnabled,
@@ -353,6 +356,9 @@ export function PluginCard({
   /** Whether the caller is a platform admin. The install-from-git endpoint is
    * admin-only, so the affordance is hidden for everyone else (default). */
   isAdmin?: boolean;
+  /** Whether the caller installs plugins (an org admin). A signed-in caller
+   * who doesn't gets "Request install" instead of Install. */
+  canInstall?: boolean;
   onInstalled: () => void;
   onUninstalled: (pluginId: string) => void;
   onToggleEnabled: (pluginId: string, enabled: boolean) => void;
@@ -436,7 +442,14 @@ export function PluginCard({
           />
         </div>
         <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
-          {!installation ? (
+          {!installation && isAuthenticated && !canInstall ? (
+            <RequestButton
+              kind="plugin_install"
+              subject={plugin.display_name}
+              name={plugin.display_name}
+              className={primaryButtonClass}
+            />
+          ) : !installation ? (
             <button
               onClick={handleInstall}
               disabled={!isAuthenticated || busy}
@@ -609,6 +622,8 @@ export function AvailablePluginsPage() {
   // The install-from-git endpoint is Platform Admin only; gate the affordance on
   // the claim, not role === "admin" (the backend 403s an admin without it).
   const isAdmin = isPlatformAdmin;
+  // Org admins install plugins; everyone else asks them (client#126 Q3).
+  const canInstall = useCan("org.settings.manage");
   const { confirm, dialog } = useConfirm();
   const featuredHeadingId = useId();
   const allPluginsHeadingId = useId();
@@ -893,6 +908,7 @@ export function AvailablePluginsPage() {
               token={token}
               isAuthenticated={isAuthenticated}
               isAdmin={isAdmin}
+              canInstall={canInstall}
               onInstalled={loadMyInstallations}
               onUninstalled={handleUninstalled}
               onToggleEnabled={handleToggleEnabled}
@@ -990,6 +1006,7 @@ export function AvailablePluginsPage() {
               token={token}
               isAuthenticated={isAuthenticated}
               isAdmin={isAdmin}
+              canInstall={canInstall}
               onInstalled={loadMyInstallations}
               onUninstalled={handleUninstalled}
               onToggleEnabled={handleToggleEnabled}

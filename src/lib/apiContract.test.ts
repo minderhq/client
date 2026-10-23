@@ -37,6 +37,12 @@ const KNOWN_MISSING: Record<string, string> = {
   // Onboarding state (intro answers, Getting started checklist): same.
   "GET /v1/onboarding": "gateway routes it; published spec not re-synced yet",
   "PATCH /v1/onboarding": "gateway routes it; published spec not re-synced yet",
+  // The request system (team join, plugin install, model requests): same.
+  "GET /v1/access-requests": "gateway routes it; published spec not re-synced yet",
+  "POST /v1/access-requests": "gateway routes it; published spec not re-synced yet",
+  "GET /v1/access-requests/inbox": "gateway routes it; published spec not re-synced yet",
+  "POST /v1/organizations/{}/access-requests/{}/approve": "gateway routes it; published spec not re-synced yet",
+  "POST /v1/organizations/{}/access-requests/{}/deny": "gateway routes it; published spec not re-synced yet",
 };
 
 // Where the concrete values of an interpolated action segment are read from:

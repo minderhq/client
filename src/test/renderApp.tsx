@@ -47,6 +47,7 @@ export const SAFE_EMPTY_RESPONSE = {
   jobs: [],
   users: [],
   invites: [],
+  requests: [],
 };
 
 function json(body: unknown, status = 200): Response {

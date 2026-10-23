@@ -11,6 +11,7 @@ import { cardClass, ghostButtonClass, iconButtonClass } from "../lib/ui";
 import { ExternalLink } from "./ExternalLink";
 import { Icon, type IconName } from "./Icon";
 import { InfoCallout } from "./InfoCallout";
+import { RequestButton } from "./RequestButton";
 import { Skeleton } from "./Skeleton";
 
 interface Step {
@@ -154,7 +155,12 @@ export function GettingStarted({
               </Link>
             </>
           ) : (
-            t("onboarding.model.askAdmin")
+            <>
+              {t("onboarding.model.askAdmin")}
+              <span className="mt-2 block">
+                <RequestButton kind="model_request" />
+              </span>
+            </>
           )}
         </InfoCallout>
       </div>

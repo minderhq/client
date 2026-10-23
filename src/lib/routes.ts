@@ -31,6 +31,7 @@ export const ROUTES = {
   billing: "/billing",
   licenses: "/billing/licenses",
   sources: "/settings/sources",
+  requests: "/requests",
 } as const;
 
 /** The detail view of one plugin source repository. */

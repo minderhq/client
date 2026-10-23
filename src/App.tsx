@@ -16,7 +16,7 @@ import { UserMenu } from "./components/UserMenu";
 import { useI18n } from "./i18n";
 import { AuthProvider } from "./lib/auth";
 import { isModalOpen } from "./lib/modalLayer";
-import { PLATFORM_ADMIN } from "./lib/permissions";
+import { MEMBER, PLATFORM_ADMIN } from "./lib/permissions";
 import { ORG_USERS_PATH } from "./lib/orgs";
 import { LEGACY_REDIRECTS, ROUTES, SECTION_REDIRECTS } from "./lib/routes";
 import { iconButtonClass, kbdClass, pageEnterClass } from "./lib/ui";
@@ -52,6 +52,7 @@ import { PublicChatConversationsPage } from "./pages/PublicChatConversationsPage
 import { PublicChatEndpointsPage } from "./pages/PublicChatEndpointsPage";
 import { RagPipelinesPage } from "./pages/RagPipelinesPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
+import { RequestsPage } from "./pages/RequestsPage";
 import { ReviewQueuePage } from "./pages/ReviewQueuePage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SubmissionsPage } from "./pages/SubmissionsPage";
@@ -178,6 +179,14 @@ export function App() {
                     <Route path="/reset-password" element={<ResetPasswordPage />} />
                     <Route path="/verify-email" element={<VerifyEmailPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
+                    <Route
+                      path={ROUTES.requests}
+                      element={
+                        <RequirePermission requires={MEMBER}>
+                          <RequestsPage />
+                        </RequirePermission>
+                      }
+                    />
                     <Route path="/billing" element={<BillingPage />} />
                     <Route path="/invite/:token" element={<InviteRedeemPage />} />
 

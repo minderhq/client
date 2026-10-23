@@ -4,6 +4,7 @@ import { useConfirm } from "../components/ConfirmDialog";
 import { Icon } from "../components/Icon";
 import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
+import { RequestButton } from "../components/RequestButton";
 import { StatusLine } from "../components/StatusLine";
 import { EmptyState } from "../components/EmptyState";
 import { apiFetch, friendlyErrorMessage } from "../lib/api";
@@ -11,6 +12,7 @@ import type { Paginated } from "../lib/api";
 import { filterByText } from "../lib/filterByText";
 import { useAsyncResource } from "../lib/useAsyncResource";
 import { useAuth } from "../lib/auth";
+import { useCan } from "../lib/useCan";
 import { openWebUiUrl } from "../lib/links";
 import { formatElapsed, useElapsedSeconds } from "../lib/useElapsedSeconds";
 import {
@@ -311,6 +313,9 @@ export function PullModelForm({
 export function ModelManagementPage() {
   const { token, isPlatformAdmin } = useAuth();
   const isAdmin = isPlatformAdmin;
+  // Who connects providers and default models adds models directly; everyone
+  // else asks them (client#126 Q2).
+  const canAddModels = useCan("org.ai.manage");
   const { confirm, dialog } = useConfirm();
   // Single list read → useAsyncResource (cancels on unmount, stale-guard). Pull
   // and delete refresh via reload() rather than local optimistic edits, so the
@@ -340,6 +345,7 @@ export function ModelManagementPage() {
         icon="models"
         title="Model Management"
         subtitle="Pull, delete, and test Ollama models on Minder's own model-management service. Browsing is open for everyone; log in to test a prompt. Pulling and deleting require a Platform Admin."
+        actions={canAddModels ? undefined : <RequestButton kind="model_request" />}
       />
       <InfoCallout icon="models">
         {openWebUiUrl ? (
