@@ -14,10 +14,10 @@ import type { PermissionKey, Requirement } from "./permissions";
 import { useAccess } from "./useCan";
 import { useAsyncResource } from "./useAsyncResource";
 
-/** The kinds a member files from the console. The API also knows `join`
- * (an account without a workspace) and `invite`, which come from elsewhere,
- * and `plan_request`, which the plan pages will send (step 11). */
-export type AccessRequestKind = "team_join" | "plugin_install" | "model_request";
+/** The kinds a member files from the console (`plan_request`: from a plan
+ * notice, `<LimitNotice>`). The API also knows `join` (an account without a
+ * workspace) and `invite`, which come from elsewhere. */
+export type AccessRequestKind = "team_join" | "plugin_install" | "model_request" | "plan_request";
 
 /** Every status the API sends today. Plain strings on the wire: render an
  * unknown one as-is rather than failing. */

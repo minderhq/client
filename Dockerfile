@@ -47,6 +47,11 @@ ENV VITE_AUTHELIA_PORTAL_URL=$VITE_AUTHELIA_PORTAL_URL
 ARG VITE_OPENWEBUI_URL=
 ENV VITE_OPENWEBUI_URL=$VITE_OPENWEBUI_URL
 
+# Where the console runs: saas | self-hosted | air-gapped. Decides which plan
+# actions appear (self-hosted: no buy buttons; air-gapped: no outside links).
+ARG VITE_DEPLOYMENT_MODE=self-hosted
+ENV VITE_DEPLOYMENT_MODE=$VITE_DEPLOYMENT_MODE
+
 RUN npm run build
 
 # Same pinned nginx:alpine already used for ollama-router elsewhere in this

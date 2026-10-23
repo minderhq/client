@@ -5,6 +5,7 @@ import { useConfirm } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 import { Icon } from "../components/Icon";
 import { InfoCallout } from "../components/InfoCallout";
+import { SeatBanner } from "../components/LimitNotice";
 import { PageHeader } from "../components/PageHeader";
 import { ResetPasswordControl } from "../components/ResetPasswordControl";
 import { StatusLine } from "../components/StatusLine";
@@ -280,6 +281,8 @@ export function OrgUsersPage() {
               </button>
             </div>
           </div>
+
+          <SeatBanner />
 
           {isPlatformAdmin && (
             <div className="mb-3 flex flex-wrap items-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950/40">
