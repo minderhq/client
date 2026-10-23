@@ -10,6 +10,7 @@ import {
 } from "../lib/journey";
 import { useAuth } from "../lib/auth";
 import { useReadiness } from "../lib/readiness";
+import { ROUTES } from "../lib/routes";
 import { useCan } from "../lib/useCan";
 import { useJourney } from "../lib/useJourney";
 import { cardClass } from "../lib/ui";
@@ -48,7 +49,7 @@ export function GoldenPathStepper({ refreshKey }: { refreshKey?: unknown }) {
     modelReady === undefined ? JOURNEY_STEPS : withModelStep(t("onboarding.model.step"));
   const next =
     modelReady === false
-      ? { to: "/platform/providers", title: t("onboarding.model.title") }
+      ? { to: ROUTES.orgAi, title: t("onboarding.model.title") }
       : primaryAction(counts);
 
   return (

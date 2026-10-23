@@ -248,6 +248,21 @@ describe("InstalledPluginsPage", () => {
     expect(screen.getByText("check Installed AI tools")).toBeTruthy();
   });
 
+  it("marks an install for the organization and gives a member no actions on it", async () => {
+    mockApi({
+      installations: [
+        installation({ tenant_id: "7" }),
+        installation({ installation_id: "inst-2", plugin_id: "plugin-2", name: "mine", display_name: "Mine" }),
+      ],
+    });
+    render(<InstalledPluginsPage />);
+    expect(await screen.findByText("Installed for your organization")).toBeTruthy();
+    expect(screen.getByText("Organization install: Enabled")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Uninstall My Plugin" })).toBeNull();
+    // Their own personal install keeps its actions.
+    expect(screen.getByRole("button", { name: "Uninstall Mine" })).toBeTruthy();
+  });
+
   it("lists a runtime-loaded first-party plugin that has no marketplace install (#2193)", async () => {
     mockApi({ runtime: [runtimePlugin()], catalog: [catalogRow()] });
     render(<InstalledPluginsPage />);

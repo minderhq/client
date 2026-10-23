@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { i18n } from "../i18n";
 import { friendlyErrorMessage } from "./api";
 import { installPlugin, setPluginEnabled, uninstallPlugin } from "./marketplace";
 import type { useConfirm } from "../components/ConfirmDialog";
@@ -29,6 +30,9 @@ export function usePluginLifecycle({
   const [status, setStatus] = useState("");
   const [isError, setIsError] = useState(false);
   const [busy, setBusy] = useState(false);
+  // The marketplace said only org admins install (403
+  // plugin_install_requires_admin): the card offers Request install instead.
+  const [installRefused, setInstallRefused] = useState(false);
 
   async function install(): Promise<boolean> {
     setBusy(true);
@@ -41,7 +45,9 @@ export function usePluginLifecycle({
       onInstalled?.();
       ok = true;
     } catch (e) {
-      setStatus(friendlyErrorMessage(e));
+      const refused = isInstallRequiresAdmin(e);
+      setInstallRefused(refused);
+      setStatus(refused ? i18n().t("orgPlugins.adminOnly") : friendlyErrorMessage(e));
       setIsError(true);
     }
     setBusy(false);
@@ -91,5 +97,14 @@ export function usePluginLifecycle({
     return ok;
   }
 
-  return { status, isError, busy, install, uninstall, toggleEnabled };
+  return { status, isError, busy, installRefused, install, uninstall, toggleEnabled };
+}
+
+/** The marketplace's 403 for a caller who may not install for the org. */
+export function isInstallRequiresAdmin(e: unknown): boolean {
+  return (
+    e instanceof Error &&
+    (e as { status?: unknown }).status === 403 &&
+    e.message === "plugin_install_requires_admin"
+  );
 }
