@@ -5,8 +5,10 @@ import { Icon } from "../components/Icon";
 import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
+import { useI18n } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { fetchMyOrgs, type MyOrg, pickActiveOrg } from "../lib/orgs";
 import { useDebouncedValue } from "../lib/useDebouncedValue";
 import {
   badgeClass,
@@ -65,20 +67,31 @@ function StatePeek({ label, value }: { label: string; value: unknown }) {
   );
 }
 
-/** Admin/security view of the append-only audit trail (GET /v1/audit-logs):
- * who did what, when, from where, with before/after state. Backend already
- * records every privileged mutation (role changes, org create/switch, member
- * add/remove, plugin review, …) and streams to SIEM — this makes it readable in
- * the app instead of only via the API. Admin-only. */
+/** Admin/security view of the append-only audit trail: who did what, when,
+ * from where, with before/after state. Backend already records every
+ * privileged mutation (role changes, org create/switch, member add/remove,
+ * plugin review, …) and streams to SIEM — this makes it readable in the app
+ * instead of only via the API. A Platform Admin reads the instance-wide log
+ * (GET /v1/audit-logs); anyone else reads their active org's log (GET
+ * /v1/organizations/{id}/audit-logs, org.audit.view — the route's gate). */
 export function AuditLogPage() {
-  const { isAuthenticated, token, sessionKey, role } = useAuth();
-  const isAdmin = role === "admin";
+  const { isAuthenticated, token, sessionKey, isPlatformAdmin, activeTenantId } = useAuth();
+  const { t } = useI18n();
   const [action, setAction] = useState("");
   const [targetType, setTargetType] = useState("");
   const [offset, setOffset] = useState(0);
   const [expanded, setExpanded] = useState<number | null>(null);
   const dAction = useDebouncedValue(action, 300);
   const dTarget = useDebouncedValue(targetType, 300);
+
+  const orgsRes = useAsyncResource<MyOrg[]>(
+    (signal) => fetchMyOrgs(token, signal).then((r) => r.organizations),
+    { deps: [sessionKey], enabled: isAuthenticated && !isPlatformAdmin },
+  );
+  const org = isPlatformAdmin ? undefined : pickActiveOrg(orgsRes.data ?? [], activeTenantId);
+  const basePath = isPlatformAdmin
+    ? "/v1/audit-logs"
+    : org && `/v1/organizations/${org.id}/audit-logs`;
 
   const res = useAsyncResource<AuditResponse>(
     (signal) => {
@@ -88,12 +101,12 @@ export function AuditLogPage() {
       });
       if (dAction.trim()) params.set("action", dAction.trim());
       if (dTarget.trim()) params.set("target_type", dTarget.trim());
-      return apiFetch<AuditResponse>(`/v1/audit-logs?${params}`, { token, signal });
+      return apiFetch<AuditResponse>(`${basePath}?${params}`, { token, signal });
     },
-    { deps: [sessionKey, offset, dAction, dTarget], enabled: isAuthenticated && isAdmin },
+    { deps: [sessionKey, basePath, offset, dAction, dTarget], enabled: isAuthenticated && !!basePath },
   );
 
-  if (!isAuthenticated || !isAdmin) {
+  if (!isAuthenticated) {
     return (
       <>
         <PageHeader
@@ -121,6 +134,14 @@ export function AuditLogPage() {
         title="Audit Log"
         subtitle="The append-only record of privileged actions — role changes, org & member management, plugin review, and more — with actor, time, source, and before/after state."
       />
+
+      <p className={`mb-3 ${mutedTextClass}`}>
+        {isPlatformAdmin
+          ? t("auditLog.scopeInstance")
+          : org
+            ? t("auditLog.scopeOrg", { org: org.name })
+            : orgsRes.data && t("auditLog.noOrg")}
+      </p>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <input
@@ -157,8 +178,8 @@ export function AuditLogPage() {
         </span>
       </div>
 
-      <StatusLine isError={!!res.error}>
-        {res.error ?? (res.loading && !res.data ? "Loading…" : "")}
+      <StatusLine isError={!!(res.error ?? orgsRes.error)}>
+        {res.error ?? orgsRes.error ?? (res.loading && !res.data ? "Loading…" : "")}
       </StatusLine>
 
       {data && entries.length === 0 ? (

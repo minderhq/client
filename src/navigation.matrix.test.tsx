@@ -85,12 +85,12 @@ const MEMBER_NAV: NavModel = {
  * hidden although its page lets them manage endpoints. */
 const ORG_ADMIN_NAV: NavModel = {
   ...MEMBER_NAV,
-  Organization: ["Overview", "Users", "Public Chat", "Providers & defaults", "Billing"],
+  Organization: ["Overview", "Users", "Public Chat", "Providers & defaults", "Billing", "Audit Log"],
 };
 
 const PLATFORM_ADMIN_NAV: NavModel = {
   ...MEMBER_NAV,
-  Organization: [...ORG_ADMIN_NAV.Organization, "Audit Log"],
+  Organization: ORG_ADMIN_NAV.Organization,
   Platform: ["All Organizations", "All Users", "Backups", "MindHub & sources"],
 };
 
@@ -224,7 +224,7 @@ const GATED_ROUTES: GatedRoute[] = [
   { path: "/rag/public-chat", heading: "Public Chat", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
   { path: "/platform/backups", heading: "Backups", open: ["platformAdmin"] },
   { path: "/organizations", heading: "All Organizations", open: ["platformAdmin"] },
-  { path: "/audit", heading: "Audit Log", open: ["platformAdmin"] },
+  { path: "/audit", heading: "Audit Log", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
   { path: ROUTES.publishSubmissionReview, heading: "Submission review", open: ["platformAdmin"] },
   { path: "/platform/users", heading: "All users", open: ["platformAdmin"] },
   { path: ROUTES.sources, heading: "MindHub & sources", open: ["platformAdmin"] },

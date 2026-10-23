@@ -258,6 +258,12 @@ export const tr: Messages = {
     },
   },
 
+  auditLog: {
+    scopeOrg: "{org} ve alt kuruluşlarının denetim kaydı gösteriliyor.",
+    scopeInstance: "Tüm kurulumun denetim kaydı gösteriliyor (Platform Yöneticisi).",
+    noOrg: "Bir kuruluşta değilsiniz, bu yüzden gösterilecek denetim kaydı yok.",
+  },
+
   publicChat: {
     apiAddressLabel: "API adresi (geliştiriciler için)",
     apiAddressHint: "Ziyaretçi sohbet sayfası ve yerleştirme kodu yakında geliyor.",
