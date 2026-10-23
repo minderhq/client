@@ -60,6 +60,7 @@ export const I18N_MIGRATED_FILES = [
   "src/components/OrgDefaultLanguage.tsx",
   "src/components/PageTabs.tsx",
   "src/components/PasswordResetRequestForm.tsx",
+  "src/components/RequestButton.tsx",
   "src/components/RequirePermission.tsx",
   "src/components/Sidebar.tsx",
   "src/components/ThemeToggle.tsx",
@@ -71,6 +72,7 @@ export const I18N_MIGRATED_FILES = [
   "src/pages/HomePage.tsx",
   "src/pages/LoginPage.tsx",
   "src/pages/NotFoundPage.tsx",
+  "src/pages/RequestsPage.tsx",
   "src/pages/ResetPasswordPage.tsx",
   "src/pages/SettingsPage.tsx",
 ];

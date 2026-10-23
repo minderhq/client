@@ -195,6 +195,8 @@ const NAV_MODEL: NavSectionDef[] = [
       { to: "/settings", id: "account", icon: "settings", end: true, requires: MEMBER },
       { to: "/platform/voice", id: "voice", icon: "voice", requires: MEMBER },
       { to: ROUTES.licenses, id: "licenses", icon: "licenses", requires: MEMBER },
+      // Everyone follows their own requests; deciders also find their inbox here.
+      { to: ROUTES.requests, id: "requests", icon: "send", requires: MEMBER },
     ],
   },
   {

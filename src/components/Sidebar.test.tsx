@@ -11,6 +11,8 @@ let mockAuth: {
   role: string;
   orgRole?: string;
   isPlatformAdmin?: boolean;
+  token?: string;
+  sessionKey?: string;
 } = { isAuthenticated: true, role: "" };
 vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
@@ -317,5 +319,53 @@ describe("Sidebar", () => {
     expect(
       screen.getByText("All Users").closest("a")?.getAttribute("href"),
     ).toBe("/platform/users");
+  });
+});
+
+describe("Sidebar: pending requests badge", () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  function stubApi(pending: number) {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const body = String(input).includes("/v1/access-requests/inbox")
+        ? { requests: [], total: pending, limit: 50, offset: 0 }
+        : { organizations: [], active_organization_id: null };
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("counts the requests waiting for an org admin on the Requests entry", async () => {
+    stubApi(3);
+    mockAuth = { isAuthenticated: true, role: "user", orgRole: "admin", token: "tok", sessionKey: "s1" };
+    render(
+      <MemoryRouter>
+        <Sidebar open={false} onNavigate={() => {}} />
+      </MemoryRouter>,
+    );
+    const link = await screen.findByRole("link", {
+      name: "Requests 3 requests waiting for your decision",
+    });
+    expect(link.getAttribute("href")).toBe("/requests");
+  });
+
+  it("never asks for a member who decides nothing", async () => {
+    const fetchMock = stubApi(3);
+    mockAuth = { isAuthenticated: true, role: "user", orgRole: "member", token: "tok", sessionKey: "s1" };
+    render(
+      <MemoryRouter>
+        <Sidebar open={false} onNavigate={() => {}} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("link", { name: "Requests" })).toBeTruthy();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("access-requests"))).toBe(false);
   });
 });

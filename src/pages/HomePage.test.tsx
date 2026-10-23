@@ -392,6 +392,9 @@ describe("model not connected", () => {
 
     expect(await screen.findByText(/Ask an administrator to connect a model/)).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Connect a model" })).toBeNull();
+    // ...and lets them ask from right there (client#126 Q2).
+    fireEvent.click(screen.getByRole("button", { name: "Request a model" }));
+    expect(screen.getByRole("dialog", { name: "Ask for a model" })).toBeTruthy();
   });
 
   it("still warns an admin who has hidden the checklist", async () => {
@@ -404,6 +407,8 @@ describe("model not connected", () => {
       "/platform/providers",
     );
     expect(screen.queryByRole("region", { name: "Getting started" })).toBeNull();
+    // An admin connects the model; there's nobody to ask.
+    expect(screen.queryByRole("button", { name: "Request a model" })).toBeNull();
   });
 
   it("adds no notice while the model check passes", async () => {

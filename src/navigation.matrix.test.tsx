@@ -77,7 +77,7 @@ const MEMBER_NAV: NavModel = {
   Marketplace: ["Discover", "Installed", "Publish"],
   "AI & system": ["Models", "Status"],
   Team: ["Teams"],
-  "My account": ["Profile & settings", "Voice", "Licenses"],
+  "My account": ["Profile & settings", "Voice", "Licenses", "Requests"],
 };
 
 /** An org owner or admin: the member nav plus the Organization section.

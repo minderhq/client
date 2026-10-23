@@ -59,8 +59,8 @@ export function ForbiddenPage({ requires }: { requires: Requirement }) {
         })}
       />
       <div className="flex flex-wrap gap-2">
-        {/* No request kind exists yet (lib/accessRequests.ts): the action is
-          shown, disabled, so the way to ask is visible where it will be. */}
+        {/* Page access is not a request kind the API knows (lib/accessRequests.ts):
+          the action is shown, disabled, so the way to ask is visible where it will be. */}
         <button
           type="button"
           className={primaryButtonClass}

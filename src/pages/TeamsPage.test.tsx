@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TeamsPage, type Team, type TeamDetail } from "./TeamsPage";
@@ -164,6 +165,53 @@ describe("TeamsPage", () => {
         expect.anything(),
       ),
     );
+  });
+
+  it("lets a member outside the team ask to join it (client#126 Q4)", async () => {
+    mockAuth = Object.assign(
+      { token: "tok", username: "carol", role: "user", loginWithToken },
+      { isAuthenticated: true, orgRole: "member", activeTenantId: "1", tenantId: "1" },
+    );
+    apiFetch.mockImplementation((path: string) => {
+      if (path === "/v1/teams/1") return Promise.resolve(detail());
+      if (path === "/v1/access-requests") return Promise.resolve({ id: 9, kind: "team_join", status: "pending" });
+      return Promise.resolve({ teams: [team()], total: 1, limit: 50, offset: 0 });
+    });
+    render(
+      <MemoryRouter>
+        <TeamsPage />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByText("Engineering"));
+    fireEvent.click(await screen.findByRole("button", { name: "Ask to join: Engineering" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send request" }));
+
+    expect(await screen.findByText(/Request sent/)).toBeTruthy();
+    expect(apiFetch).toHaveBeenCalledWith("/v1/access-requests", {
+      method: "POST",
+      body: { kind: "team_join", organization_id: 1, team_id: 1 },
+      token: "tok",
+    });
+  });
+
+  it("offers no join request to a team member or to whoever manages the org's teams", async () => {
+    apiFetch.mockImplementation((path: string) => {
+      if (path === "/v1/teams/1") return Promise.resolve(detail());
+      if (path.startsWith("/v1/invites"))
+        return Promise.resolve({ invites: [], total: 0, limit: 50, offset: 0 });
+      return Promise.resolve({ teams: [team()], total: 1, limit: 50, offset: 0 });
+    });
+    for (const [username, orgRole] of [["bob", "member"], ["carol", "admin"]]) {
+      mockAuth = Object.assign(
+        { token: "tok", username, role: "user", loginWithToken },
+        { isAuthenticated: true, orgRole, activeTenantId: "1", tenantId: "1" },
+      );
+      const { unmount } = render(<TeamsPage />);
+      fireEvent.click(await screen.findByText("Engineering"));
+      await screen.findByText("bob");
+      expect(screen.queryByRole("button", { name: /Ask to join/ })).toBeNull();
+      unmount();
+    }
   });
 
   it("a plain member only sees a Leave button for their own row", async () => {

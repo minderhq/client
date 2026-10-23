@@ -29,7 +29,8 @@ vi.mock("../lib/api", () => ({
   apiFetch: (...args: unknown[]) => apiFetch(...args),
   friendlyErrorMessage: (e: unknown) => (e instanceof Error ? e.message : "error"),
 }));
-let mockAuth = { token: "", isAuthenticated: false, role: null as string | null, isPlatformAdmin: false, sessionKey: 0 };
+let mockAuth: { token: string; isAuthenticated: boolean; role: string | null; isPlatformAdmin: boolean; sessionKey: number; orgRole?: string } =
+  { token: "", isAuthenticated: false, role: null, isPlatformAdmin: false, sessionKey: 0 };
 vi.mock("../lib/auth", () => ({ useAuth: () => mockAuth }));
 vi.mock("../components/ConfirmDialog", () => ({
   useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true), dialog: null }),
@@ -337,7 +338,7 @@ describe("Discover plugins: secondary failures stay quiet and recoverable", () =
   });
 
   it("an installations failure says install state may be stale, with Retry", async () => {
-    mockAuth = { token: "tok", isAuthenticated: true, role: "user", isPlatformAdmin: false, sessionKey: 1 };
+    mockAuth = { token: "tok", isAuthenticated: true, role: "user", isPlatformAdmin: false, sessionKey: 1, orgRole: "admin" };
     let failInstalls = true;
     routeApi({
       catalog: () => ({ plugins: [WEATHER], total: 1 }),
@@ -403,8 +404,40 @@ describe("Discover plugins: accessible names, badges and headings", () => {
     expect(bare).toEqual([]);
   });
 
+  it("offers a member Request install instead of Install (client#126 Q3)", async () => {
+    mockAuth = Object.assign(
+      { token: "tok", isAuthenticated: true, role: "user", isPlatformAdmin: false, sessionKey: 1, orgRole: "member" },
+      { activeTenantId: "1" },
+    );
+    routeApi({
+      catalog: () => ({ plugins: [WEATHER], total: 1 }),
+      installations: () => ({ installations: [], count: 0 }),
+    });
+    renderAt();
+
+    const card = (await screen.findByRole("heading", { name: "Weather" })).closest("section")!;
+    expect(await within(card).findByRole("button", { name: "Request install: Weather" })).toBeTruthy();
+    expect(within(card).queryByRole("button", { name: "Install Weather" })).toBeNull();
+  });
+
+  it("gives an org admin Install and no request", async () => {
+    mockAuth = Object.assign(
+      { token: "tok", isAuthenticated: true, role: "user", isPlatformAdmin: false, sessionKey: 1, orgRole: "owner" },
+      { activeTenantId: "1" },
+    );
+    routeApi({
+      catalog: () => ({ plugins: [WEATHER], total: 1 }),
+      installations: () => ({ installations: [], count: 0 }),
+    });
+    renderAt();
+
+    const card = (await screen.findByRole("heading", { name: "Weather" })).closest("section")!;
+    expect(await within(card).findByRole("button", { name: "Install Weather" })).toBeTruthy();
+    expect(within(card).queryByRole("button", { name: /Request install/ })).toBeNull();
+  });
+
   it("hides Install from this repo from the admin role without the Platform Admin claim", async () => {
-    mockAuth = { token: "tok", isAuthenticated: true, role: "admin", isPlatformAdmin: false, sessionKey: 1 };
+    mockAuth = { token: "tok", isAuthenticated: true, role: "admin", isPlatformAdmin: false, sessionKey: 1, orgRole: "admin" };
     routeApi({
       catalog: () => ({ plugins: [{ ...NEWS, repository_url: "https://example.com/news" }], total: 1 }),
       installations: () => ({ installations: [], count: 0 }),

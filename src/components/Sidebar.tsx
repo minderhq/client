@@ -2,7 +2,9 @@ import { useId } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import { useI18n } from "../i18n";
+import { usePendingRequestCount } from "../lib/accessRequests";
 import { entryIsActive, useNav, visibleSections } from "../lib/nav";
+import { ROUTES } from "../lib/routes";
 import { sectionLabelClass } from "../lib/ui";
 import { useAccess } from "../lib/useCan";
 import { BrandMark } from "./BrandMark";
@@ -34,8 +36,9 @@ export function Sidebar({
   const access = useAccess();
   const { pathname } = useLocation();
   const sectionIdPrefix = useId();
-  const { t } = useI18n();
+  const { t, plural } = useI18n();
   const { sections } = useNav();
+  const pending = usePendingRequestCount();
 
   return (
     <aside
@@ -120,6 +123,12 @@ export function Sidebar({
                         }
                       />
                       {item.label}
+                      {item.to === ROUTES.requests && pending > 0 && (
+                        <span className="ml-auto rounded-full bg-indigo-600 px-1.5 text-xs font-semibold text-white">
+                          <span aria-hidden="true">{pending}</span>
+                          <span className="sr-only">{plural("requests.pendingBadge", pending)}</span>
+                        </span>
+                      )}
                     </Link>
                   );
                 })}
