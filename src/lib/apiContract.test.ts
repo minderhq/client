@@ -34,6 +34,9 @@ const KNOWN_MISSING: Record<string, string> = {
   // Onboarding readiness (model / pipeline / knowledge-base / email checks):
   // routed by the gateway; the published spec hasn't been re-synced yet.
   "GET /v1/readiness": "gateway routes it; published spec not re-synced yet",
+  // Onboarding state (intro answers, Getting started checklist): same.
+  "GET /v1/onboarding": "gateway routes it; published spec not re-synced yet",
+  "PATCH /v1/onboarding": "gateway routes it; published spec not re-synced yet",
 };
 
 // Where the concrete values of an interpolated action segment are read from:

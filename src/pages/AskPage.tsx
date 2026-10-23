@@ -10,6 +10,7 @@ import { ApiError, apiFetch, friendlyErrorMessage } from "../lib/api";
 import type { Paginated } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { randomId } from "../lib/browser";
+import { markOnboardingStep } from "../lib/onboarding";
 import {
   generationModels,
   isCloudModel,
@@ -418,6 +419,8 @@ export function AskPage() {
         ),
       );
       setAppliedParameters(res.applied_parameters ?? null);
+      // Home's "Getting started" ticks "Ask your first question" off.
+      markOnboardingStep(token, sessionKey, "ask");
     } catch (e) {
       const msg =
         e instanceof ApiError && e.status === 404

@@ -360,5 +360,64 @@ export const tr: Messages = {
       docs: "Modellerinizi nasıl bağlarsınız",
       askAdmin: "Henüz bağlı bir model yok. Bir model bağlaması için bir yöneticiye başvurun.",
     },
+    checklist: {
+      title: "Başlarken",
+      progress: "{total} adımdan {done} tanesi tamam",
+      hide: "Başlarken listesini gizle",
+      done: "Tamamlandı",
+      notDone: "Henüz yapılmadı",
+      markDone: "Yapıldı olarak işaretle",
+      skip: "Atla",
+      skipStep: "Atla: {step}",
+      markStepDone: "Yapıldı olarak işaretle: {step}",
+      saveFailed: "Değişiklik kaydedilemedi. Tekrar deneyin.",
+      serviceUnavailable: "Bu adım şu an kontrol edilemiyor: ilgili servis yanıt vermiyor.",
+      notAuthorized: "Bunu henüz göremiyorsunuz. Bir yöneticiye başvurun.",
+      steps: {
+        knowledgeBase: {
+          title: "İlk bilgi tabanınızı oluşturun",
+          hint: "Bilgi tabanı, Minder'ın yanıt verirken kullandığı belgeleri tutar. Herkes soru sorabilsin diye kuruluşunuzla paylaşın.",
+        },
+        upload: {
+          title: "Bir belge yükleyin",
+          hint: "Aranacak bir şey olsun diye bir PDF, TXT ya da Markdown dosyası ekleyin.",
+        },
+        assistant: {
+          title: "Bir asistan kurun",
+          hint: "Asistan, bir ya da daha fazla bilgi tabanından gelen soruları yanıtlar. İşlem hatları sayfasında bulunur.",
+        },
+        ask: {
+          title: "İlk sorunuzu sorun",
+          hint: "Yanıtlar, dayandıkları metin parçalarını gösterir.",
+        },
+        invite: {
+          title: "Ekip arkadaşlarınızı davet edin",
+          hint: "Davetleri kuruluşunuzun sayfasından gönderin.",
+        },
+        email: {
+          title: "E-postayı ayarlayın",
+          hint: "Bu kurulum henüz e-posta göndermiyor; bu yüzden davetler ve parola sıfırlamaları bağlantı olarak paylaşılmak zorunda. Kurulum ayarlarından bir e-posta altyapısı yapılandırın.",
+        },
+        useKb: {
+          title: "Bir bilgi tabanı kullanın",
+          hint: "Sizinle paylaşılan bir bilgi tabanını açın ya da kendinizinkini oluşturup bir belge yükleyin.",
+        },
+        profile: {
+          title: "Profilinizi tamamlayın",
+          hint: "Dilinizi ve tercihlerinizi seçin. Bu ayarlar her cihazda sizinle gelir.",
+        },
+      },
+    },
+  },
+
+  home: {
+    greetingFirst: "Minder'a hoş geldiniz, {name}",
+    greetingReturning: "Tekrar hoş geldiniz, {name}",
+    greeting: "Merhaba, {name}",
+    introFirst: "Aşağıdaki birkaç kısa adım sizi ilk yanıtınıza götürür.",
+    introReturning: "Kaldığınız yerden devam edin.",
+    introAnonymous: "Göz atmak herkese açık. Değişiklik yapmak için herhangi bir sayfada giriş yapın.",
+    ask: "Bir soru sorun",
+    shortcuts: "Kısayollar",
   },
 };

@@ -26,6 +26,9 @@ vi.mock("../components/GoldenPathStepper", () => ({
   GoldenPathStepper: () => null,
 }));
 
+// The Getting started step it records after an answer has its own tests.
+vi.mock("../lib/onboarding", () => ({ markOnboardingStep: () => {} }));
+
 vi.mock("../lib/api", async () => {
   const actual = await vi.importActual<typeof import("../lib/api")>("../lib/api");
   return {
