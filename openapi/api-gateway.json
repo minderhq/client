@@ -1671,6 +1671,18 @@
             "title": "Installed At",
             "type": "string"
           },
+          "installed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installed By",
+            "description": "The user who installed it. Null for an installation made before this was recorded."
+          },
           "last_updated_at": {
             "format": "date-time",
             "title": "Last Updated At",
@@ -1694,6 +1706,18 @@
           },
           "status": {
             "$ref": "#/components/schemas/InstallationStatus"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id",
+            "description": "The organization this plugin is installed for: every member of it has the plugin. Null for a personal install."
           },
           "update_available": {
             "anyOf": [
@@ -1871,6 +1895,18 @@
           },
           "status": {
             "$ref": "#/components/schemas/InstallationStatus"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id",
+            "description": "The organization this plugin is installed for: every member of it has the plugin. Null for a personal install."
           },
           "update_available": {
             "anyOf": [

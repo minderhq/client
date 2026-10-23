@@ -5805,6 +5805,11 @@ export interface components {
              */
             installed_at: string;
             /**
+             * Installed By
+             * @description The user who installed it. Null for an installation made before this was recorded.
+             */
+            installed_by?: string | null;
+            /**
              * Last Updated At
              * Format: date-time
              */
@@ -5814,6 +5819,11 @@ export interface components {
             /** Plugin Id */
             plugin_id: string;
             status: components["schemas"]["InstallationStatus"];
+            /**
+             * Tenant Id
+             * @description The organization this plugin is installed for: every member of it has the plugin. Null for a personal install.
+             */
+            tenant_id?: string | null;
             /** Update Available */
             update_available?: boolean | null;
             /** User Id */
@@ -5887,6 +5897,11 @@ export interface components {
              */
             requires_services: string[];
             status: components["schemas"]["InstallationStatus"];
+            /**
+             * Tenant Id
+             * @description The organization this plugin is installed for: every member of it has the plugin. Null for a personal install.
+             */
+            tenant_id?: string | null;
             /**
              * Update Available
              * @description True when current_version is newer than version (semantic-version order). Null when either is unknown or they can't be ordered.
