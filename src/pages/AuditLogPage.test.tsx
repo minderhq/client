@@ -13,7 +13,8 @@ vi.mock("../lib/api", async () => {
   };
 });
 
-let mockAuth = { isAuthenticated: false, token: "", role: "" };
+const SIGNED_OUT = { isAuthenticated: false, token: "", isPlatformAdmin: false, activeTenantId: "" };
+let mockAuth = SIGNED_OUT;
 vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
 }));
@@ -55,11 +56,10 @@ describe("AuditLogPage", () => {
   afterEach(() => {
     cleanup();
     apiFetch.mockReset();
-    mockAuth = { isAuthenticated: false, token: "", role: "" };
+    mockAuth = SIGNED_OUT;
   });
 
-  it("gates the page behind admin and never fetches otherwise", () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "user" };
+  it("shows the admin-only gate when logged out and never fetches", () => {
     render(<AuditLogPage />);
     expect(
       screen.getByText("Admins only — log in with an admin account to view the audit log."),
@@ -67,16 +67,43 @@ describe("AuditLogPage", () => {
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
-  it("shows the same admin-only gate when logged out entirely", () => {
+  it("reads the active org's log for an org admin without the Platform Admin claim", async () => {
+    mockAuth = { ...SIGNED_OUT, isAuthenticated: true, token: "tok", activeTenantId: "5" };
+    apiFetch.mockImplementation((path: string) =>
+      Promise.resolve(
+        path === "/v1/organizations/mine"
+          ? {
+              organizations: [
+                { id: 3, name: "Home Org", is_home: true },
+                { id: 5, name: "Acme", is_home: false },
+              ],
+            }
+          : page([entry()]),
+      ),
+    );
     render(<AuditLogPage />);
-    expect(
-      screen.getByText("Admins only — log in with an admin account to view the audit log."),
-    ).toBeTruthy();
-    expect(apiFetch).not.toHaveBeenCalled();
+
+    await screen.findByText("ORG_MEMBER_ADDED");
+    expect(screen.getByText(/Acme/)).toBeTruthy();
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/v1/organizations/5/audit-logs?limit=50&offset=0",
+      { token: "tok", signal: expect.any(AbortSignal) },
+    );
+    // Never the instance-wide API, which answers 403 without the claim.
+    expect(apiFetch.mock.calls.some(([p]) => String(p).startsWith("/v1/audit-logs"))).toBe(false);
   });
 
-  it("fetches and renders audit entries for an admin", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin" };
+  it("says so and fetches no log when the caller has no organization", async () => {
+    mockAuth = { ...SIGNED_OUT, isAuthenticated: true, token: "tok" };
+    apiFetch.mockResolvedValue({ organizations: [] });
+    render(<AuditLogPage />);
+
+    await screen.findByText("You're not in an organization, so there's no audit log to show.");
+    expect(apiFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads the instance-wide log for a Platform Admin", async () => {
+    mockAuth = { ...SIGNED_OUT, isAuthenticated: true, token: "tok", isPlatformAdmin: true };
     apiFetch.mockResolvedValue(page([entry()]));
     render(<AuditLogPage />);
 
@@ -90,7 +117,7 @@ describe("AuditLogPage", () => {
   });
 
   it("shows an unfiltered empty state when there are no entries at all", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin" };
+    mockAuth = { ...SIGNED_OUT, isAuthenticated: true, token: "tok", isPlatformAdmin: true };
     apiFetch.mockResolvedValue(page([]));
     render(<AuditLogPage />);
 
@@ -98,7 +125,7 @@ describe("AuditLogPage", () => {
   });
 
   it("shows a filtered empty-state message once a filter is active", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin" };
+    mockAuth = { ...SIGNED_OUT, isAuthenticated: true, token: "tok", isPlatformAdmin: true };
     apiFetch.mockResolvedValue(page([]));
     render(<AuditLogPage />);
     await screen.findByText("No audit entries yet.");
@@ -111,7 +138,7 @@ describe("AuditLogPage", () => {
   });
 
   it("debounces the action/target filters and re-fetches with the right query params", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin" };
+    mockAuth = { ...SIGNED_OUT, isAuthenticated: true, token: "tok", isPlatformAdmin: true };
     apiFetch.mockResolvedValue(page([entry()]));
     render(<AuditLogPage />);
     await screen.findByText("ORG_MEMBER_ADDED");
@@ -135,7 +162,7 @@ describe("AuditLogPage", () => {
   });
 
   it("expands a row to show before/after state and user agent", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin" };
+    mockAuth = { ...SIGNED_OUT, isAuthenticated: true, token: "tok", isPlatformAdmin: true };
     apiFetch.mockResolvedValue(
       page([entry({ before_state: { role: "viewer" }, after_state: { role: "member" } })]),
     );
@@ -151,7 +178,7 @@ describe("AuditLogPage", () => {
   });
 
   it("hides the Details toggle when a row has no before/after/user-agent data", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin" };
+    mockAuth = { ...SIGNED_OUT, isAuthenticated: true, token: "tok", isPlatformAdmin: true };
     apiFetch.mockResolvedValue(
       page([entry({ before_state: null, after_state: null, user_agent: null })]),
     );
@@ -162,7 +189,7 @@ describe("AuditLogPage", () => {
   });
 
   it("paginates: Next advances the offset, Previous is disabled on the first page", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin" };
+    mockAuth = { ...SIGNED_OUT, isAuthenticated: true, token: "tok", isPlatformAdmin: true };
     const entries = Array.from({ length: 50 }, (_, i) => entry({ id: i + 1 }));
     apiFetch.mockResolvedValue(page(entries, 120));
     render(<AuditLogPage />);
@@ -184,7 +211,7 @@ describe("AuditLogPage", () => {
   });
 
   it("disables Next once the last page is reached", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin" };
+    mockAuth = { ...SIGNED_OUT, isAuthenticated: true, token: "tok", isPlatformAdmin: true };
     const firstPage = Array.from({ length: 50 }, (_, i) => entry({ id: i + 1 }));
     apiFetch.mockImplementation((path: string) => {
       if (path.includes("offset=50")) return Promise.resolve(page([entry({ id: 51 })], 51));
@@ -205,7 +232,7 @@ describe("AuditLogPage", () => {
   });
 
   it("hides pagination controls when everything fits on one page", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin" };
+    mockAuth = { ...SIGNED_OUT, isAuthenticated: true, token: "tok", isPlatformAdmin: true };
     apiFetch.mockResolvedValue(page([entry()], 1));
     render(<AuditLogPage />);
     await screen.findByText("ORG_MEMBER_ADDED");
@@ -215,7 +242,7 @@ describe("AuditLogPage", () => {
   });
 
   it("reloads on demand via the Refresh button", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin" };
+    mockAuth = { ...SIGNED_OUT, isAuthenticated: true, token: "tok", isPlatformAdmin: true };
     apiFetch.mockResolvedValue(page([entry()]));
     render(<AuditLogPage />);
     await screen.findByText("ORG_MEMBER_ADDED");

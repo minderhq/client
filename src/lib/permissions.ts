@@ -142,7 +142,7 @@ export function accessFrom(effective: EffectivePermissions | null): Access {
 /** The keys each org role holds today: the permission each page and API
  * actually checks, written once. Billing view is not here: the server
  * decides it (custom roles included), so it comes from the billing probe.
- * `org.audit.view` is absent too: the audit log is an operator screen today. */
+ * `org.audit.view` matches the API's seeded owner/admin grant (org audit log). */
 export const ORG_ROLE_PERMISSIONS: Record<string, readonly OrgPermissionKey[]> = {
   owner: [
     "org.members.view",
@@ -155,6 +155,7 @@ export const ORG_ROLE_PERMISSIONS: Record<string, readonly OrgPermissionKey[]> =
     "org.billing.manage",
     "org.ai.manage",
     "org.chatbots.manage",
+    "org.audit.view",
   ],
   admin: [
     "org.members.view",
@@ -166,6 +167,7 @@ export const ORG_ROLE_PERMISSIONS: Record<string, readonly OrgPermissionKey[]> =
     "org.settings.manage",
     "org.ai.manage",
     "org.chatbots.manage",
+    "org.audit.view",
   ],
   member: ["org.members.view"],
 };

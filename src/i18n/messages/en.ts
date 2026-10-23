@@ -260,6 +260,12 @@ export const en = {
     },
   },
 
+  auditLog: {
+    scopeOrg: "Showing the audit log of {org} and its sub-organizations.",
+    scopeInstance: "Showing the whole installation's audit log (Platform Admin).",
+    noOrg: "You're not in an organization, so there's no audit log to show.",
+  },
+
   publicChat: {
     apiAddressLabel: "API address (for developers)",
     apiAddressHint: "The visitor chat page and embed code are coming soon.",

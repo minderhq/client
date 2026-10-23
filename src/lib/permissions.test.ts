@@ -42,6 +42,7 @@ const ORG_ADMIN_KEYS: PermissionKey[] = [
   "org.roles.manage",
   "org.teams.manage",
   "org.settings.manage",
+  "org.audit.view",
   "org.ai.manage",
   "org.chatbots.manage",
 ];
@@ -83,8 +84,10 @@ describe("effective permissions from today's role checks (#131)", () => {
     expect(accessFor({ orgRole: "owner" }).can("org.billing.view")).toBe(false);
   });
 
-  it("keeps the audit log for the operator, as its page and API do today", () => {
-    expect(accessFor({ orgRole: "owner" }).can("org.audit.view")).toBe(false);
+  it("lets org owners/admins and the operator view the audit log, not plain members", () => {
+    expect(accessFor({ orgRole: "owner" }).can("org.audit.view")).toBe(true);
+    expect(accessFor({ orgRole: "admin" }).can("org.audit.view")).toBe(true);
+    expect(accessFor({ orgRole: "member" }).can("org.audit.view")).toBe(false);
     expect(accessFor({ isPlatformAdmin: true }).can("org.audit.view")).toBe(true);
   });
 
