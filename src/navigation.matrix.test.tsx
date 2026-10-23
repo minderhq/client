@@ -85,7 +85,7 @@ const MEMBER_NAV: NavModel = {
  * hidden although its page lets them manage endpoints. */
 const ORG_ADMIN_NAV: NavModel = {
   ...MEMBER_NAV,
-  Organization: ["Overview", "Users", "Public Chat", "Providers & defaults", "Billing", "Audit Log"],
+  Organization: ["Overview", "People", "Public Chat", "Providers & defaults", "Billing", "Audit Log"],
 };
 
 const PLATFORM_ADMIN_NAV: NavModel = {
@@ -161,6 +161,35 @@ describe("navigation matrix: in-page tab strips", APP_TEST, () => {
     },
   );
 
+  // Organization › People (UX step 7): Members, Invites and the plan tab
+  // Domains, which keeps its place on every plan and wears a Pro badge on a
+  // plan without it (Q6.3).
+  it.each(["orgOwner", "orgAdmin", "platformAdmin"] as const)(
+    "shows %s the People tabs, Domains badged on the free plan",
+    async (id) => {
+      renderApp(PERSONAS[id], ROUTES.people);
+      expect(await screen.findByRole("heading", { level: 1, name: "Members" }, SETTLE)).toBeTruthy();
+      const tabs = screen.getByRole("navigation", { name: "People sections" });
+      await within(tabs).findByText("Available on the Pro plan", {}, SETTLE);
+      expect(within(tabs).getAllByRole("link").map((a) => a.textContent)).toEqual([
+        "Members",
+        "Invites",
+        "DomainsProAvailable on the Pro plan",
+      ]);
+    },
+  );
+
+  it.each(tierVariants("orgOwner").map((p) => [p.tier, p] as const))(
+    "keeps the Domains tab on the %s plan, badged only without the feature",
+    async (tier, persona) => {
+      renderApp(persona, ROUTES.peopleDomains);
+      await settleApp();
+      const tabs = screen.getByRole("navigation", { name: "People sections" });
+      const domains = within(tabs).getByRole("link", { name: /Domains/ });
+      expect(!!within(domains).queryByText("Available on the Pro plan")).toBe(tier === "community");
+    },
+  );
+
   // Billing (Organization) and Licenses (My account) are separate entries
   // since #131, so neither page carries a tab strip.
   it.each(["orgOwner", "teamMember"] as const)("Licenses has no tab strip for %s", async (id) => {
@@ -227,6 +256,11 @@ const GATED_ROUTES: GatedRoute[] = [
   { path: "/audit", heading: "Audit Log", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
   { path: ROUTES.publishSubmissionReview, heading: "Submission review", open: ["platformAdmin"] },
   { path: "/platform/users", heading: "All users", open: ["platformAdmin"] },
+  // Organization › People is for org admins (ux-design §5); members get no
+  // people directory (the design's member menu has none).
+  { path: ROUTES.people, heading: "Members", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
+  { path: ROUTES.peopleInvites, heading: "Invites", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
+  { path: ROUTES.peopleDomains, heading: "Email domains", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
   { path: ROUTES.sources, heading: "MindHub & sources", open: ["platformAdmin"] },
 ];
 

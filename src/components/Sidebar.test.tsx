@@ -283,7 +283,7 @@ describe("Sidebar", () => {
       </MemoryRouter>,
     );
     expect(screen.queryByText("All Users")).toBeNull();
-    expect(screen.queryByText("Users", { selector: "a *, a" })).toBeNull();
+    expect(screen.queryByText("People", { selector: "a *, a" })).toBeNull();
     first.unmount();
 
     mockAuth = { isAuthenticated: true, role: "user", orgRole: "admin" };
@@ -294,8 +294,8 @@ describe("Sidebar", () => {
     );
     expect(screen.queryByText("All Users")).toBeNull();
     expect(
-      screen.getByText("Users", { selector: "a *, a" }).closest("a")?.getAttribute("href"),
-    ).toBe("/organization/users");
+      screen.getByText("People", { selector: "a *, a" }).closest("a")?.getAttribute("href"),
+    ).toBe("/organization/people");
     unmount();
 
     // Operator screens gate on the Platform Admin claim only: the instance

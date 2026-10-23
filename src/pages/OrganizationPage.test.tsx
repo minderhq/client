@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { MyOrg, OrgInvite } from "../lib/orgs";
+import type { MyOrg } from "../lib/orgs";
 import { OrganizationPage } from "./OrganizationPage";
 
 const apiFetch = vi.fn();
@@ -18,11 +18,6 @@ vi.mock("../lib/api", async () => {
     apiFetch: (...args: unknown[]) => apiFetch(...args),
   };
 });
-
-const copyText = vi.fn();
-vi.mock("../lib/browser", () => ({
-  copyText: (...args: unknown[]) => copyText(...args),
-}));
 
 const confirmMock = vi.fn().mockResolvedValue(true);
 vi.mock("../components/ConfirmDialog", () => ({
@@ -51,40 +46,18 @@ function org(overrides: Partial<MyOrg> = {}): MyOrg {
   };
 }
 
-function invite(overrides: Partial<OrgInvite> = {}): OrgInvite {
-  return {
-    id: 1,
-    email: "new@example.com",
-    org_role: "member",
-    token: "abc123",
-    status: "pending",
-    created_at: null,
-    expires_at: null,
-    max_uses: 1,
-    uses: 0,
-    ...overrides,
-  };
-}
-
 /** Routes apiFetch by method+path so each test only needs to say what's
- * different from the defaults (one org, no invites). */
+ * different from the defaults (one org). */
 function routeApiFetch(opts: {
   orgs?: MyOrg[];
-  invites?: OrgInvite[];
 } = {}) {
-  const { orgs = [org()], invites = [] } = opts;
+  const { orgs = [org()] } = opts;
   apiFetch.mockImplementation((path: string, init?: { method?: string; body?: unknown }) => {
     const method = init?.method ?? "GET";
     if (path === "/v1/organizations/mine")
       return Promise.resolve({ organizations: orgs, active_organization_id: orgs[0]?.id ?? null });
     if (/\/v1\/organizations\/\d+$/.test(path) && method === "PATCH")
       return Promise.resolve({ id: orgs[0]?.id ?? 1, ...(init?.body as object) });
-    if (/\/v1\/organizations\/\d+\/invites$/.test(path) && method === "GET")
-      return Promise.resolve({ invites, total: invites.length });
-    if (/\/v1\/organizations\/\d+\/invites$/.test(path) && method === "POST")
-      return Promise.resolve(invite());
-    if (/\/v1\/organizations\/\d+\/invites\/\d+\/revoke$/.test(path))
-      return Promise.resolve({ ...invite(), status: "revoked" });
     return Promise.reject(new Error(`unexpected ${method} ${path}`));
   });
 }
@@ -93,7 +66,6 @@ describe("OrganizationPage", () => {
   afterEach(() => {
     cleanup();
     apiFetch.mockReset();
-    copyText.mockReset();
     confirmMock.mockReset();
     confirmMock.mockResolvedValue(true);
     mockAuth = { isAuthenticated: false, token: "", role: "", activeTenantId: "", orgRole: "" };
@@ -163,68 +135,32 @@ describe("OrganizationPage", () => {
     expect(screen.getByText(/You belong to 2 organizations/)).toBeTruthy();
   });
 
-  it("links to the org Users page instead of listing members itself", async () => {
+  it("links to People and its invites instead of managing members or invites itself", async () => {
     mockAuth = { isAuthenticated: true, token: "tok", role: "user", activeTenantId: "1", orgRole: "owner" };
     routeApiFetch({});
     render(<OrganizationPage />);
 
     await screen.findByText("Acme Corporation");
-    expect(screen.getByRole("link", { name: /Manage users/ }).getAttribute("href")).toBe(
-      "/organization/users",
+    expect(screen.getByRole("link", { name: /Manage people/ }).getAttribute("href")).toBe(
+      "/organization/people",
     );
-    // The member list, its actions and the Platform Admin directory moved there.
-    expect(apiFetch).not.toHaveBeenCalledWith(
-      expect.stringMatching(/\/members$/),
-      expect.anything(),
+    expect(screen.getByRole("link", { name: /Invite people/ }).getAttribute("href")).toBe(
+      "/organization/people/invites",
     );
+    // Members, invites and the Platform Admin directory live in People now.
+    expect(apiFetch).not.toHaveBeenCalledWith(expect.stringMatching(/\/(members|invites)$/), expect.anything());
     expect(apiFetch).not.toHaveBeenCalledWith("/v1/auth/users", expect.anything());
   });
 
-  it("sends an org invite by email and lists it as pending", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "user", activeTenantId: "1", orgRole: "owner" };
-    routeApiFetch({});
-    render(<OrganizationPage />);
-    await screen.findByText("Invite by email");
-
-    fireEvent.change(screen.getByPlaceholderText("person@example.com"), {
-      target: { value: "new@example.com" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Send invite" }));
-
-    await vi.waitFor(() =>
-      expect(apiFetch).toHaveBeenCalledWith(
-        "/v1/organizations/1/invites",
-        { method: "POST", body: { email: "new@example.com", org_role: "member" }, token: "tok" },
-      ),
-    );
-    await screen.findByText("Invite sent to new@example.com.");
-  });
-
-  it("copies a pending invite's link and can revoke it", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "user", activeTenantId: "1", orgRole: "owner" };
-    routeApiFetch({ invites: [invite()] });
-    render(<OrganizationPage />);
-    await screen.findByText("new@example.com");
-
-    fireEvent.click(screen.getByRole("button", { name: /Copy link/ }));
-    expect(copyText).toHaveBeenCalledWith(expect.stringContaining("/invite/abc123"));
-
-    fireEvent.click(screen.getByRole("button", { name: /Revoke/ }));
-    await vi.waitFor(() =>
-      expect(apiFetch).toHaveBeenCalledWith(
-        "/v1/organizations/1/invites/1/revoke",
-        { method: "POST", token: "tok" },
-      ),
-    );
-  });
-
-  it("hides the invite section entirely for a plain member", async () => {
+  it("offers a plain member no People management links", async () => {
     mockAuth = { isAuthenticated: true, token: "tok", role: "user", activeTenantId: "1", orgRole: "member" };
     routeApiFetch({});
     render(<OrganizationPage />);
     await screen.findByText("Acme Corporation");
 
-    expect(screen.queryByText("Invite by email")).toBeNull();
+    expect(screen.queryByRole("link", { name: /Manage people/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /Invite people/ })).toBeNull();
+    expect(screen.getByRole("link", { name: /Manage teams/ })).toBeTruthy();
   });
 
   it("hides the organization-details edit form for a plain member", async () => {

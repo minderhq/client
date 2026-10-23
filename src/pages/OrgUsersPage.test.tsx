@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -90,6 +90,12 @@ function routeApiFetch(opts: {
   fail?: Record<string, Error>;
   /** GET /v1/organizations/1/limits (the seat banner); 403 when omitted. */
   limits?: unknown;
+  /** GET /v1/organizations/1/roles; 403 when omitted. */
+  roles?: unknown[];
+  /** The org's teams and their rosters (GET /v1/teams, /v1/teams/{id}). */
+  teams?: { id: number; name: string; members: { user_id: number; team_role: string }[] }[];
+  /** Hold GET /members unanswered (the loading state). */
+  membersPending?: boolean;
 } = {}) {
   const { members = [member()], perms = ["org.members.view"], users = [], fail = {} } = opts;
   apiFetch.mockImplementation((path: string, init?: { method?: string; body?: unknown }) => {
@@ -107,10 +113,20 @@ function routeApiFetch(opts: {
       });
     }
     if (path === "/v1/organizations/1/members" && method === "GET") {
+      if (opts.membersPending) return new Promise(() => {});
       if (opts.membersError) return Promise.reject(opts.membersError);
       return Promise.resolve({ members });
     }
     if (path === "/v1/auth/users" && method === "GET") return Promise.resolve({ users });
+    if (path === "/v1/organizations/1/roles")
+      return opts.roles ? Promise.resolve({ roles: opts.roles }) : Promise.reject(new ApiError("forbidden", 403));
+    if (path === "/v1/teams?limit=500")
+      return opts.teams
+        ? Promise.resolve({ teams: opts.teams.map((t) => ({ id: t.id, name: t.name })) })
+        : Promise.reject(new ApiError("forbidden", 403));
+    const teamDetail = /^\/v1\/teams\/(\d+)$/.exec(path);
+    if (teamDetail && opts.teams) return Promise.resolve(opts.teams.find((t) => t.id === Number(teamDetail[1])));
+    if (path.startsWith("/v1/access-requests")) return Promise.resolve({ requests: [], total: 0 });
     if (path === "/v1/organizations/1/limits")
       return opts.limits ? Promise.resolve(opts.limits) : Promise.reject(new ApiError("forbidden", 403));
     if (path.startsWith("/v1/organizations/1/members")) {
@@ -147,10 +163,54 @@ describe("OrgUsersPage", () => {
     mockAuth = { ...SIGNED_OUT };
   });
 
-  it("shows a login prompt and never fetches when logged out", () => {
+  it("shows a loading skeleton while the members load", async () => {
+    signIn({ orgRole: "admin" });
+    routeApiFetch({ perms: MANAGER, membersPending: true });
+    const { container } = render(<OrgUsersPage />);
+    await vi.waitFor(() => expect(container.querySelector('[aria-busy="true"]')).toBeTruthy());
+    expect(screen.queryByRole("list")).toBeNull();
+  });
+
+  it("invites people from an empty organization", async () => {
+    signIn({ orgRole: "admin" });
+    routeApiFetch({ perms: MANAGER, members: [] });
     render(<OrgUsersPage />);
-    expect(screen.getByText("Log in to view your organization's users.")).toBeTruthy();
-    expect(apiFetch).not.toHaveBeenCalled();
+    expect(await screen.findByText("No members yet. Invite people to get started.")).toBeTruthy();
+    // Offered once the caller's permissions say they may manage members.
+    expect((await screen.findByRole("link", { name: /Invite people/ })).getAttribute("href")).toBe(
+      "/organization/people/invites",
+    );
+  });
+
+  it("explains a failed member list and retries it", async () => {
+    signIn({ orgRole: "admin" });
+    routeApiFetch({ perms: MANAGER, membersError: new Error("gateway down") });
+    render(<OrgUsersPage />);
+    expect(await screen.findByText("Couldn't load the members.")).toBeTruthy();
+    const count = () => calledPaths().filter((p) => p === "/v1/organizations/1/members").length;
+    const before = count();
+    fireEvent.click(screen.getByRole("button", { name: /Retry/ }));
+    await vi.waitFor(() => expect(count()).toBe(before + 1));
+  });
+
+  it("shows each member's teams, links to their person page and filters by search", async () => {
+    signIn({ orgRole: "admin" });
+    routeApiFetch({
+      perms: MANAGER,
+      members: [member(), member({ user_id: 3, username: "carol", email: "carol@example.com" })],
+      teams: [{ id: 7, name: "Sales", members: [{ user_id: 2, team_role: "member" }] }],
+    });
+    render(<OrgUsersPage />);
+    const bob = await row("bob");
+    expect(await within(bob).findByText("Teams: Sales")).toBeTruthy();
+    expect(within(await row("carol")).getByText("No teams")).toBeTruthy();
+    expect(within(bob).getByRole("link", { name: "bob" }).getAttribute("href")).toBe("/organization/people/2");
+
+    fireEvent.change(screen.getByLabelText("Search people"), { target: { value: "carol" } });
+    expect(screen.queryByText("bob")).toBeNull();
+    expect(screen.getByText("carol")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Search people"), { target: { value: "nobody" } });
+    expect(screen.getByText("No one matches “nobody”.")).toBeTruthy();
   });
 
   it("lists the active org's members read-only for a caller who may only view", async () => {
@@ -159,8 +219,8 @@ describe("OrgUsersPage", () => {
     render(<OrgUsersPage />);
 
     const bob = await row("bob");
-    expect(screen.getByText("Members of Acme Corporation")).toBeTruthy();
-    expect(within(bob).getByText("admin")).toBeTruthy(); // read-only role badge
+    expect(screen.getByText("Who belongs to Acme Corporation: their roles, teams and status.")).toBeTruthy();
+    expect(within(bob).getByText("Admin")).toBeTruthy(); // read-only role badge
     expect(within(bob).queryByRole("button")).toBeNull();
     expect(within(bob).queryByLabelText(/Role for/)).toBeNull();
     expect(screen.queryByText("Add a member")).toBeNull();
@@ -386,13 +446,37 @@ describe("OrgUsersPage", () => {
     expect(calledPaths().some((p) => p.startsWith("/v1/auth/users"))).toBe(false);
   });
 
-  it("removes a member and changes a role through the org member routes", async () => {
+  it("removes a member and changes a role through the org member routes, previewing the impact", async () => {
     signIn({ orgRole: "admin" });
-    routeApiFetch({ perms: MANAGER });
+    routeApiFetch({
+      perms: MANAGER,
+      roles: [
+        { id: 1, scope: "organization", name: "member", is_system: true, permissions: ["org.members.view"] },
+        {
+          id: 2,
+          scope: "organization",
+          name: "admin",
+          is_system: true,
+          permissions: ["org.members.view", "org.members.manage"],
+        },
+      ],
+      teams: [{ id: 7, name: "Sales", members: [{ user_id: 2, team_role: "member" }] }],
+    });
     render(<OrgUsersPage />);
 
     const bob = await row("bob");
+    await within(bob).findByText("Teams: Sales");
+    // Wait for the roles, so the impact preview can be built.
+    await vi.waitFor(() => expect(calledPaths()).toContain("/v1/organizations/1/roles"));
+    await act(async () => {});
     fireEvent.change(await within(bob).findByLabelText("Role for bob"), { target: { value: "admin" } });
+    expect(confirmMock).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Make bob Admin?", confirmLabel: "Change role" }),
+    );
+    const preview = render(<>{confirmMock.mock.calls[0][0].details}</>);
+    expect(within(preview.container).getByText("They can then also:")).toBeTruthy();
+    expect(within(preview.container).getByText("Manage members and their roles")).toBeTruthy();
+    preview.unmount();
     await vi.waitFor(() =>
       expect(apiFetch).toHaveBeenCalledWith("/v1/organizations/1/members", {
         method: "POST",
@@ -403,9 +487,14 @@ describe("OrgUsersPage", () => {
     await screen.findByText("Role updated.");
 
     fireEvent.click(within(bob).getByRole("button", { name: /Remove/ }));
-    expect(confirmMock).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Remove member?", danger: true }),
+    expect(confirmMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ title: "Remove bob?", danger: true }),
     );
+    // What they lose: their role here and their teams.
+    const loses = render(<>{confirmMock.mock.lastCall![0].details}</>);
+    expect(within(loses.container).getByText("Member")).toBeTruthy();
+    expect(within(loses.container).getByText("Sales")).toBeTruthy();
+    loses.unmount();
     await vi.waitFor(() =>
       expect(apiFetch).toHaveBeenCalledWith("/v1/organizations/1/members/2", {
         method: "DELETE",

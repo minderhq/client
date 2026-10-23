@@ -1,9 +1,18 @@
 import { NavLink, useLocation } from "react-router-dom";
 
 import { useI18n } from "../i18n";
-import { tabGroupForPath, useNav, visibleEntry } from "../lib/nav";
+import { type NavLeaf, tabGroupForPath, useNav, visibleEntry } from "../lib/nav";
 import { useAccess } from "../lib/useCan";
+import { useEntitlement } from "../lib/useEntitlement";
 import { Icon } from "./Icon";
+import { PlanBadge } from "./PlanBadge";
+
+/** A plan tab's badge (Q6.3), shown once the org's plan is known and lacks
+ * the feature. Its own component so only plan tabs read the entitlement. */
+function TabPlanBadge({ plan }: { plan: NonNullable<NavLeaf["plan"]> }) {
+  const { tier, isAvailable } = useEntitlement();
+  return tier && !isAvailable(plan.feature) ? <PlanBadge tier={plan.tier} /> : null;
+}
 
 /** In-page sub-navigation for the grouped pages (Marketplace › Discover /
  * Installed / Publish, Knowledge Graph). The old nav
@@ -49,6 +58,7 @@ export function PageTabs() {
         >
           <Icon name={tab.icon} size={15} />
           {tab.label}
+          {tab.plan && <TabPlanBadge plan={tab.plan} />}
         </NavLink>
       ))}
     </nav>

@@ -26,6 +26,7 @@ const DETAIL_ROUTES: Record<string, string> = {
   "/rag/public-chat/:endpointId/conversations": "/rag/public-chat",
   "/rag/public-chat/:endpointId/conversations/:sessionId": "/rag/public-chat",
   [`${ROUTES.sources}/:repositoryId`]: ROUTES.sources,
+  [`${ROUTES.people}/:userId`]: ROUTES.people,
 };
 
 /** Sign-in, account-recovery and invite pages: deliberately not in the nav. */

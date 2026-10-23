@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { orgRoleTone, slugify } from "./orgs";
+import { ApiError } from "./api";
+import { orgMemberErrorMessage, orgRoleTone, slugify } from "./orgs";
 
 describe("slugify", () => {
   it("lowercases and hyphenates spaces and specials", () => {
@@ -40,5 +41,16 @@ describe("orgRoleTone", () => {
     expect(orgRoleTone("admin")).toContain("amber");
     expect(orgRoleTone("member")).toContain("gray");
     expect(orgRoleTone("something-else")).toContain("gray");
+  });
+});
+
+describe("orgMemberErrorMessage", () => {
+  it("explains the owner-only and last-owner refusals of a role change or removal", () => {
+    expect(orgMemberErrorMessage(new ApiError("requires_owner", 403))).toBe(
+      "Only an owner can change or remove another owner or admin.",
+    );
+    expect(orgMemberErrorMessage(new ApiError("last_owner", 409))).toBe(
+      "This is the organization's last owner. Make someone else an owner first.",
+    );
   });
 });

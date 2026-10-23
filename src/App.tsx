@@ -17,7 +17,6 @@ import { useI18n } from "./i18n";
 import { AuthProvider } from "./lib/auth";
 import { isModalOpen } from "./lib/modalLayer";
 import { MEMBER, PLATFORM_ADMIN } from "./lib/permissions";
-import { ORG_USERS_PATH } from "./lib/orgs";
 import { LEGACY_REDIRECTS, ROUTES, SECTION_REDIRECTS } from "./lib/routes";
 import { iconButtonClass, kbdClass, pageEnterClass } from "./lib/ui";
 import { useRouteFocus } from "./lib/useRouteFocus";
@@ -47,6 +46,9 @@ import { MyLicensesPage } from "./pages/MyLicensesPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { OrganizationPage } from "./pages/OrganizationPage";
 import { OrgUsersPage } from "./pages/OrgUsersPage";
+import { PeopleDomainsPage } from "./pages/PeopleDomainsPage";
+import { PeopleInvitesPage } from "./pages/PeopleInvitesPage";
+import { PersonPage } from "./pages/PersonPage";
 import { PluginSourceRepositoriesPage } from "./pages/PluginSourceRepositoriesPage";
 import { PublicChatConversationsPage } from "./pages/PublicChatConversationsPage";
 import { PublicChatEndpointsPage } from "./pages/PublicChatEndpointsPage";
@@ -296,7 +298,39 @@ export function App() {
                     />
                     <Route path="/platform/teams" element={<TeamsPage />} />
                     <Route path="/organization" element={<OrganizationPage />} />
-                    <Route path={ORG_USERS_PATH} element={<OrgUsersPage />} />
+                    {/* Organization › People (UX step 7); /organization/users redirects here. */}
+                    <Route
+                      path={ROUTES.people}
+                      element={
+                        <RequirePermission requires="org.members.manage">
+                          <OrgUsersPage />
+                        </RequirePermission>
+                      }
+                    />
+                    <Route
+                      path={ROUTES.peopleInvites}
+                      element={
+                        <RequirePermission requires="org.members.manage">
+                          <PeopleInvitesPage />
+                        </RequirePermission>
+                      }
+                    />
+                    <Route
+                      path={ROUTES.peopleDomains}
+                      element={
+                        <RequirePermission requires="org.settings.manage">
+                          <PeopleDomainsPage />
+                        </RequirePermission>
+                      }
+                    />
+                    <Route
+                      path={`${ROUTES.people}/:userId`}
+                      element={
+                        <RequirePermission requires="org.members.manage">
+                          <PersonPage />
+                        </RequirePermission>
+                      }
+                    />
                     <Route
                       path="/organizations"
                       element={
