@@ -362,5 +362,64 @@ export const en = {
       docs: "How to connect your models",
       askAdmin: "No model is connected yet. Ask an administrator to connect a model.",
     },
+    checklist: {
+      title: "Getting started",
+      progress: "{done} of {total} done",
+      hide: "Hide Getting started",
+      done: "Done",
+      notDone: "Not done yet",
+      markDone: "Mark as done",
+      skip: "Skip",
+      skipStep: "Skip: {step}",
+      markStepDone: "Mark as done: {step}",
+      saveFailed: "Couldn't save that change. Try again.",
+      serviceUnavailable: "This can't be checked right now: the service isn't answering.",
+      notAuthorized: "You can't see this yet. Ask an administrator.",
+      steps: {
+        knowledgeBase: {
+          title: "Create your first knowledge base",
+          hint: "A knowledge base holds the documents Minder answers from. Share it with your organization so everyone can ask it.",
+        },
+        upload: {
+          title: "Upload a document",
+          hint: "Add a PDF, TXT or Markdown file so there is something to search.",
+        },
+        assistant: {
+          title: "Set up an assistant",
+          hint: "An assistant answers questions from one or more knowledge bases. You'll find it under Pipelines.",
+        },
+        ask: {
+          title: "Ask your first question",
+          hint: "Answers show the passages they come from.",
+        },
+        invite: {
+          title: "Invite your teammates",
+          hint: "Send invites from your organization's page.",
+        },
+        email: {
+          title: "Set up email",
+          hint: "This installation doesn't deliver email yet, so invites and password resets have to be shared as links. Configure an email backend in the installation settings.",
+        },
+        useKb: {
+          title: "Use a knowledge base",
+          hint: "Open a knowledge base shared with you, or create your own and upload a document.",
+        },
+        profile: {
+          title: "Complete your profile",
+          hint: "Choose your language and preferences. They follow you across devices.",
+        },
+      },
+    },
+  },
+
+  home: {
+    greetingFirst: "Welcome to Minder, {name}",
+    greetingReturning: "Welcome back, {name}",
+    greeting: "Hello, {name}",
+    introFirst: "A few short steps below get you to your first answer.",
+    introReturning: "Pick up where you left off.",
+    introAnonymous: "Browsing is open for everyone. Log in on any page to make changes.",
+    ask: "Ask a question",
+    shortcuts: "Shortcuts",
   },
 } satisfies MessageTree;

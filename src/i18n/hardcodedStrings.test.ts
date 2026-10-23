@@ -42,6 +42,6 @@ describe("hard-coded user-facing strings", () => {
   }, 30_000);
 
   it("are not flagged (yet) in a file that hasn't been migrated", async () => {
-    expect(await hardcodedTextErrors(SAMPLE, "src/pages/HomePage.tsx")).toEqual([]);
+    expect(await hardcodedTextErrors(SAMPLE, "src/pages/VoicePage.tsx")).toEqual([]);
   }, 30_000);
 });
