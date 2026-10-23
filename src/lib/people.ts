@@ -6,10 +6,12 @@
  */
 import { apiFetch } from "./api";
 import type { components } from "./api-types.gen";
-import { useAsyncResource } from "./useAsyncResource";
-import type { TeamDetail } from "../pages/TeamsPage";
+import type { OrgInvite } from "./orgs";
 
-export type BulkInviteResult = components["schemas"]["BulkOrgInviteResultItem"];
+/** One address's outcome; a created row's `invite` carries `email_delivery`. */
+export type BulkInviteResult = Omit<components["schemas"]["BulkOrgInviteResultItem"], "invite"> & {
+  invite?: OrgInvite | null;
+};
 export type OrgRole = components["schemas"]["RoleOut"];
 export type RoleAssignment = components["schemas"]["MemberRoleAssignmentOut"];
 export type PermissionEntry = components["schemas"]["EffectivePermissionEntry"];
@@ -30,7 +32,7 @@ export async function bulkInvite(
 ): Promise<BulkInviteResult[]> {
   const results: BulkInviteResult[] = [];
   for (let i = 0; i < emails.length; i += BULK_INVITE_MAX) {
-    const res = await apiFetch<components["schemas"]["BulkOrgInviteResponse"]>(
+    const res = await apiFetch<{ results: BulkInviteResult[] }>(
       `/v1/organizations/${orgId}/invites/bulk`,
       { method: "POST", body: { emails: emails.slice(i, i + BULK_INVITE_MAX), org_role: orgRole }, token },
     );
@@ -138,39 +140,4 @@ export function roleImpact(
     gains: [...will].filter((k) => !had.has(k)).sort(),
     loses: [...had].filter((k) => !will.has(k)).sort(),
   };
-}
-
-/** A team a member belongs to, and their role in it. */
-export interface MemberTeam {
-  id: number;
-  name: string;
-  team_role: string;
-}
-
-/** Each member's teams in the caller's active org, by user id.
- *
- * shortcut: the gateway has no "a member's teams" route, so this lists the
- * org's teams and reads each roster (one request per team). Fine for the
- * handful of teams an org has today; switch to a per-member route once the
- * gateway offers one. A Platform Admin's team list spans every org and its
- * items don't say which org they belong to, so it is not loaded for them
- * (`enabled` false). */
-export function useTeamsByMember(token: string, sessionKey: string, enabled: boolean) {
-  return useAsyncResource<Map<number, MemberTeam[]>>(
-    async (signal) => {
-      const list = await apiFetch<{ teams: { id: number }[] }>("/v1/teams?limit=500", { token, signal });
-      const details = await Promise.all(
-        list.teams.map((t) => apiFetch<TeamDetail>(`/v1/teams/${t.id}`, { token, signal })),
-      );
-      const byMember = new Map<number, MemberTeam[]>();
-      for (const team of details) {
-        for (const m of team.members ?? []) {
-          const entry = { id: team.id, name: team.name, team_role: m.team_role };
-          byMember.set(m.user_id, [...(byMember.get(m.user_id) ?? []), entry]);
-        }
-      }
-      return byMember;
-    },
-    { deps: [sessionKey], enabled },
-  );
 }

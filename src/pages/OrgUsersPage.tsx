@@ -20,7 +20,6 @@ import {
   orgMemberResetPasswordPath,
   orgRoleTone,
 } from "../lib/orgs";
-import type { MemberTeam } from "../lib/people";
 import { personRoute, ROUTES } from "../lib/routes";
 import {
   badgeClass,
@@ -55,13 +54,13 @@ export function OrgUsersPage() {
   const [addTarget, setAddTarget] = useState("");
   const [addRole, setAddRole] = useState("member");
 
-  const { orgsRes, active, membersRes, rolesRes, teamsRes, canManage, canSuspend } = usePeopleData();
+  const { orgsRes, active, membersRes, rolesRes, canManage, canSuspend } = usePeopleData();
   const actions = useMemberActions(
     active,
     rolesRes.data ?? [],
     (m) => ({
       roles: [roleLabel(m.org_role)],
-      teams: (teamsRes.data?.get(m.user_id) ?? []).map((team) => team.name),
+      teams: (m.teams ?? []).map((team) => team.name),
     }),
     membersRes.reload,
   );
@@ -221,7 +220,6 @@ export function OrgUsersPage() {
                   <MemberRow
                     key={m.user_id}
                     member={m}
-                    teams={teamsRes.data ? (teamsRes.data.get(m.user_id) ?? []) : undefined}
                     orgId={active.id}
                     token={token}
                     isSelf={String(m.user_id) === userId}
@@ -266,7 +264,6 @@ export function MemberBadges({ member: m }: { member: OrgMember }) {
 
 function MemberRow({
   member: m,
-  teams,
   orgId,
   token,
   isSelf,
@@ -279,8 +276,6 @@ function MemberRow({
   onAccountActive,
 }: {
   member: OrgMember;
-  /** Undefined while unknown (loading, or not loaded for this caller). */
-  teams: MemberTeam[] | undefined;
   orgId: number;
   token: string;
   isSelf: boolean;
@@ -316,10 +311,10 @@ function MemberRow({
           <MemberBadges member={m} />
         </span>
         <span className="block truncate text-xs text-gray-500 dark:text-gray-400">{m.email}</span>
-        {teams && (
+        {m.teams && (
           <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
-            {teams.length > 0
-              ? t("people.members.teams", { teams: teams.map((team) => team.name).join(", ") })
+            {m.teams.length > 0
+              ? t("people.members.teams", { teams: m.teams.map((team) => team.name).join(", ") })
               : t("people.members.noTeams")}
           </span>
         )}
