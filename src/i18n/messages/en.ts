@@ -337,6 +337,19 @@ export const en = {
     },
   },
 
+  providers: {
+    apiKeyOptional: "optional",
+    loopbackHint:
+      "Minder runs in Docker: use your machine's LAN IP or host.docker.internal, not localhost.",
+    localNoModels:
+      "No models listed: this server's models won't appear in model pickers until you fetch them. After adding it, use Fetch models on its card and save the list.",
+    adapterNote: "Served by the {adapter} adapter (port {port})",
+    adapterNoteNoPort: "Served by the {adapter} adapter",
+    piiMasking: "Mask personal data before it is sent to this provider",
+    piiMaskingHelp:
+      "Emails, phone numbers, IBAN and card numbers, national IDs and IP addresses are replaced with placeholders and restored in the reply.",
+  },
+
   onboarding: {
     model: {
       step: "Model",

@@ -335,6 +335,19 @@ export const tr: Messages = {
     },
   },
 
+  providers: {
+    apiKeyOptional: "isteğe bağlı",
+    loopbackHint:
+      "Minder Docker içinde çalışır: localhost yerine makinenizin yerel ağ (LAN) IP adresini veya host.docker.internal adresini kullanın.",
+    localNoModels:
+      "Listede model yok: bu sunucunun modelleri siz onları getirene kadar model seçicilerde görünmez. Ekledikten sonra kartındaki Fetch models düğmesini kullanıp listeyi kaydedin.",
+    adapterNote: "{adapter} bağdaştırıcısı tarafından sunuluyor (port {port})",
+    adapterNoteNoPort: "{adapter} bağdaştırıcısı tarafından sunuluyor",
+    piiMasking: "Kişisel verileri bu sağlayıcıya gönderilmeden önce maskele",
+    piiMaskingHelp:
+      "E-posta adresleri, telefon numaraları, IBAN ve kart numaraları, kimlik numaraları ve IP adresleri yer tutucularla değiştirilir ve yanıtta geri yerleştirilir.",
+  },
+
   onboarding: {
     model: {
       step: "Model",

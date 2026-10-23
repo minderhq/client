@@ -11,12 +11,14 @@ import {
   FetchedModelsPicker,
   ModelsEditor,
 } from "../components/ProviderModelsEditor";
+import { useI18n } from "../i18n";
 import { useAuth } from "../lib/auth";
 import {
   createProvider,
   deleteProvider,
   fetchModelsErrorMessage,
   fetchProviderModels,
+  isLoopbackUrl,
   listProviderPresets,
   listProviders,
   providerSaveErrorMessage,
@@ -63,7 +65,16 @@ export type { Provider, ProviderPreset };
 const ADAPTER_LABEL: Record<Provider["adapter"], string> = {
   openai_compatible: "OpenAI-compatible",
   anthropic: "Anthropic",
+  ollama: "Ollama",
 };
+
+function urlPort(url: string | null): string {
+  try {
+    return url ? new URL(url).port : "";
+  } catch {
+    return "";
+  }
+}
 
 // #1511: a non-local (cloud/BYOK) provider trades away this platform's
 // local-first privacy guarantee -- data sent through it leaves the
@@ -99,6 +110,7 @@ function ProviderRow({
   onChanged: () => void;
   confirm: ReturnType<typeof useConfirm>["confirm"];
 }) {
+  const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [isError, setIsError] = useState(false);
@@ -122,6 +134,12 @@ function ProviderRow({
   const effective = provider.effective_models;
   const needsModels =
     !provider.is_local && Array.isArray(effective) && effective.length === 0;
+  // e.g. an openai_compatible row on port 11434 is served by the Ollama adapter.
+  const servedBy =
+    provider.effective_adapter && provider.effective_adapter !== provider.adapter
+      ? (ADAPTER_LABEL[provider.effective_adapter] ?? provider.effective_adapter)
+      : null;
+  const servedPort = servedBy ? urlPort(provider.base_url) : "";
 
   function openEdit(mode: Exclude<RowEditMode, null>) {
     setStatus("");
@@ -206,6 +224,21 @@ function ProviderRow({
           ? { enabled: true, privacy_acknowledged: true }
           : { enabled: enabling },
       );
+      onChanged();
+    } catch (e) {
+      setStatus(providerSaveErrorMessage(e));
+      setIsError(true);
+    }
+    setBusy(false);
+  }
+
+  async function handlePiiMasking(enabled: boolean) {
+    if (busy) return;
+    setBusy(true);
+    setIsError(false);
+    setStatus("");
+    try {
+      await updateProvider(token, provider.id, { pii_masking_enabled: enabled });
       onChanged();
     } catch (e) {
       setStatus(providerSaveErrorMessage(e));
@@ -363,6 +396,24 @@ function ProviderRow({
           </button>
         </div>
       </div>
+      {servedBy && (
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          {servedPort
+            ? t("providers.adapterNote", { adapter: servedBy, port: servedPort })
+            : t("providers.adapterNoteNoPort", { adapter: servedBy })}
+        </p>
+      )}
+      {!provider.is_local && (
+        <label className="mt-2 flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+          <input
+            type="checkbox"
+            checked={provider.pii_masking_enabled}
+            onChange={(e) => handlePiiMasking(e.target.checked)}
+            disabled={busy}
+          />
+          <span title={t("providers.piiMaskingHelp")}>{t("providers.piiMasking")}</span>
+        </label>
+      )}
       {provider.policy_error && (
         <div className="mt-2">
           <InfoCallout icon="warning" tone="danger">
@@ -570,6 +621,7 @@ function AddProviderForm({
   presetsLoading: boolean;
   presetsError: string | null;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   // The chosen preset's `id`, or null to fall back to the first preset (so the
   // dropdown shows a sensible default the moment the backend list loads, with
@@ -583,6 +635,8 @@ function AddProviderForm({
   // preset change so the admin re-affirms it per provider rather than a stale
   // check carrying over from a previous selection.
   const [acknowledged, setAcknowledged] = useState(false);
+  // Cloud rows only (the backend ignores it for is_local); on by default.
+  const [piiMasking, setPiiMasking] = useState(true);
   // #2522: the new row's model list. null = untouched, so it follows the chosen
   // preset's `suggested_models`; reset to null on a preset change so switching
   // presets re-fills it from the new one.
@@ -604,6 +658,7 @@ function AddProviderForm({
     setBaseUrl("");
     setApiKey("");
     setAcknowledged(false);
+    setPiiMasking(true);
     setModelsDraft(null);
   }
 
@@ -618,9 +673,11 @@ function AddProviderForm({
         adapter: selected.adapter,
         name,
         base_url: baseUrl || undefined,
-        api_key: apiKey,
+        // Omitted when blank: a keyless self-hosted server needs none.
+        api_key: apiKey || undefined,
         is_local: selected.is_local,
         privacy_acknowledged: selected.is_local ? false : acknowledged,
+        pii_masking_enabled: piiMasking,
         models,
       });
       reset();
@@ -649,13 +706,9 @@ function AddProviderForm({
     : selected?.base_url_placeholder
       ? "optional — a custom OpenAI-compatible endpoint"
       : "optional — defaults to the provider's own API";
-  // The create endpoint still requires a non-empty api_key even when the preset
-  // doesn't need a real one (a self-hosted vLLM run without --api-key accepts any
-  // bearer token), so the field stays required -- `requires_api_key` only drives
-  // the hint that any placeholder value will do.
-  const apiKeyHelp = selected && !selected.requires_api_key
-    ? "not required by default — any non-empty value works unless the server was started with an API key"
-    : "";
+  // The create endpoint requires a key for a cloud row and makes it optional
+  // for an is_local (self-hosted) one, so the field follows the preset.
+  const keyOptional = !!selected?.is_local;
 
   return (
     <form
@@ -712,12 +765,19 @@ function AddProviderForm({
               placeholder={selected.base_url_placeholder ?? ""}
               required={selected.is_local}
             />
+            {isLoopbackUrl(baseUrl) && (
+              <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                {t("providers.loopbackHint")}
+              </p>
+            )}
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
               API key
-              {apiKeyHelp && (
-                <span className="ml-1 font-normal text-gray-400">({apiKeyHelp})</span>
+              {keyOptional && (
+                <span className="ml-1 font-normal text-gray-400">
+                  ({t("providers.apiKeyOptional")})
+                </span>
               )}
             </label>
             <input
@@ -725,8 +785,7 @@ function AddProviderForm({
               className={inputClass}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder={selected.requires_api_key ? "" : "not-required"}
-              required
+              required={!keyOptional}
             />
           </div>
           <ModelsEditor
@@ -734,6 +793,25 @@ function AddProviderForm({
             onChange={setModelsDraft}
             disabled={busy}
           />
+          {selected.is_local && models.length === 0 && (
+            <InfoCallout icon="warning">{t("providers.localNoModels")}</InfoCallout>
+          )}
+          {!selected.is_local && (
+            <label className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={piiMasking}
+                onChange={(e) => setPiiMasking(e.target.checked)}
+              />
+              <span>
+                {t("providers.piiMasking")}
+                <span className="block text-xs text-gray-400 dark:text-gray-500">
+                  {t("providers.piiMaskingHelp")}
+                </span>
+              </span>
+            </label>
+          )}
           {requiresAck && (
             <div>
               <InfoCallout icon="warning">{CLOUD_PRIVACY_DISCLOSURE}</InfoCallout>

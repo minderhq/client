@@ -4,6 +4,7 @@ import { ApiError } from "./api";
 import {
   fetchModelsErrorMessage,
   fetchProviderModels,
+  isLoopbackUrl,
   MAX_MODELS,
   mergeModelIds,
   modelIdError,
@@ -90,4 +91,20 @@ describe("modelProviders", () => {
       "the provider doesn't list its models -- enter the model ids manually";
     expect(fetchModelsErrorMessage(new ApiError(detail, 502))).toBe(detail);
   });
+});
+
+describe("isLoopbackUrl", () => {
+  it.each([
+    "http://localhost:1234/v1",
+    "localhost:8080",
+    "http://127.0.0.1:8000/v1",
+    "http://127.1.2.3",
+    "http://[::1]:8080/v1",
+    "http://0.0.0.0:11434",
+  ])("flags %s", (url) => expect(isLoopbackUrl(url)).toBe(true));
+
+  it.each(["", "http://192.168.1.50:1234/v1", "http://host.docker.internal:1234", "https://api.example.com/v1", "not a url"])(
+    "does not flag %s",
+    (url) => expect(isLoopbackUrl(url)).toBe(false),
+  );
 });

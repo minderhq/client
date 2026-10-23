@@ -13,7 +13,7 @@
 
 import { ApiError, apiFetch, friendlyErrorMessage } from "./api";
 
-export type ProviderAdapter = "openai_compatible" | "anthropic";
+export type ProviderAdapter = "openai_compatible" | "anthropic" | "ollama";
 
 /** One org-owned provider row (model-management's `ProviderOut`). */
 export interface Provider {
@@ -33,6 +33,12 @@ export interface Provider {
    * static catalog for the vendor it describes (OpenAI / Anthropic), else
    * nothing. Empty on a non-local row means no model can be used yet. */
   effective_models: string[];
+  /** The adapter that actually serves this row: differs from `adapter` for an
+   * `openai_compatible` row on Ollama's port (11434), served as `ollama`.
+   * Absent on an older backend. */
+  effective_adapter?: ProviderAdapter;
+  /** Mask PII before text is sent to this provider. Ignored for `is_local`. */
+  pii_masking_enabled: boolean;
   /** #2530: why this stored row breaks the CURRENT network (egress) policy,
    * e.g. its base URL points somewhere now refused; null when it's fine.
    * The row is kept, but every call through it is refused with this reason.
@@ -64,9 +70,11 @@ export interface ProviderCreate {
   adapter: ProviderAdapter;
   name: string;
   base_url?: string;
-  api_key: string;
+  /** Required for a cloud row; optional for an `is_local` (keyless) one. */
+  api_key?: string;
   is_local: boolean;
   privacy_acknowledged: boolean;
+  pii_masking_enabled?: boolean;
   models?: string[];
 }
 
@@ -77,6 +85,7 @@ export interface ProviderUpdate {
   api_key?: string;
   enabled?: boolean;
   privacy_acknowledged?: boolean;
+  pii_masking_enabled?: boolean;
   models?: string[];
 }
 
@@ -156,6 +165,28 @@ export function fetchProviderModels(
   return apiFetch<FetchModelsResult>(
     `/v1/model-providers/${encodeURIComponent(id)}/fetch-models`,
     { method: "POST", token },
+  );
+}
+
+/** Whether `url`'s host is a loopback address (localhost, 127.x, ::1,
+ * 0.0.0.0). The backend refuses those: inside Docker they point at the
+ * container itself, not the machine running the model server. */
+export function isLoopbackUrl(url: string): boolean {
+  const raw = url.trim();
+  if (!raw) return false;
+  let host: string;
+  try {
+    host = new URL(raw.includes("://") ? raw : `http://${raw}`).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  host = host.replace(/^\[|\]$/g, "");
+  return (
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host === "0.0.0.0" ||
+    host === "::1" ||
+    /^127\.\d+\.\d+\.\d+$/.test(host)
   );
 }
 
