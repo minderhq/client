@@ -40,6 +40,7 @@ each also has a matching `ARG` default in the `Dockerfile`.
 | `VITE_API_BASE_URL` | `http://localhost:8000` | api-gateway base for all `fetch()` calls. Works over the direct-port bypass. |
 | `VITE_OIDC_LOGIN_URL` | *(empty)* | SSO login entry (full-page nav into Authelia's OIDC flow). **No default** — only a real Traefik + DNS + TLS deployment has it. When unset, the SSO button is **hidden** and local login is the only option (over localhost the `*.minder.local` host can't resolve, so a baked URL would dead-end). |
 | `VITE_AUTHELIA_PORTAL_URL` | *(empty)* | Authelia self-service portal link on the Settings page. Same opt-in rule; plain text shown when unset. |
+| `VITE_DEPLOYMENT_MODE` | `self-hosted` | `saas`, `self-hosted` or `air-gapped`. Decides the plan notices' actions: SaaS billing owners get Upgrade / trial; self-hosted shows "requires a licence" with no buy buttons; air-gapped never links outside. |
 
 > Both `*.minder.local` URLs are empty-by-default on purpose (a recurring
 > localhost dead-link class): render the link only when the deployment configures

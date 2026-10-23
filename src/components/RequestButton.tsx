@@ -11,6 +11,7 @@ import {
   type AccessRequestKind,
 } from "../lib/accessRequests";
 import { useAuth } from "../lib/auth";
+import { deploymentMode } from "../lib/billing";
 import { ROUTES } from "../lib/routes";
 import { fieldHintClass, inputClass, primaryButtonClass, secondaryButtonClass } from "../lib/ui";
 import { useModal } from "../lib/useModal";
@@ -57,6 +58,10 @@ export function RequestButton({
     team_join: { button: t("requests.send.teamJoin"), title: t("requests.send.teamJoinTitle", { name: name ?? "" }) },
     plugin_install: { button: t("requests.send.pluginInstall"), title: t("requests.send.pluginInstallTitle", { name: name ?? "" }) },
     model_request: { button: t("requests.send.model"), title: t("requests.send.modelTitle") },
+    plan_request:
+      deploymentMode === "saas"
+        ? { button: t("requests.send.planBillingOwner"), title: t("requests.send.planTitle", { name: name ?? "" }) }
+        : { button: t("requests.send.planLicence"), title: t("requests.send.planLicenceTitle", { name: name ?? "" }) },
   }[kind];
   const askSubject = kind === "model_request" && subject === undefined;
 
@@ -131,7 +136,9 @@ export function RequestButton({
                 ? t("requests.send.sent")
                 : kind === "team_join"
                   ? t("requests.send.teamJoinRoute")
-                  : t("requests.send.adminRoute")}
+                  : kind === "plan_request"
+                    ? t(deploymentMode === "saas" ? "requests.send.planRoute" : "requests.send.planLicenceRoute")
+                    : t("requests.send.adminRoute")}
             </p>
           }
         >

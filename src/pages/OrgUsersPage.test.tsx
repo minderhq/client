@@ -88,6 +88,8 @@ function routeApiFetch(opts: {
   users?: DirectoryUser[];
   membersError?: Error;
   fail?: Record<string, Error>;
+  /** GET /v1/organizations/1/limits (the seat banner); 403 when omitted. */
+  limits?: unknown;
 } = {}) {
   const { members = [member()], perms = ["org.members.view"], users = [], fail = {} } = opts;
   apiFetch.mockImplementation((path: string, init?: { method?: string; body?: unknown }) => {
@@ -109,6 +111,8 @@ function routeApiFetch(opts: {
       return Promise.resolve({ members });
     }
     if (path === "/v1/auth/users" && method === "GET") return Promise.resolve({ users });
+    if (path === "/v1/organizations/1/limits")
+      return opts.limits ? Promise.resolve(opts.limits) : Promise.reject(new ApiError("forbidden", 403));
     if (path.startsWith("/v1/organizations/1/members")) {
       if (path.endsWith("/reset-password"))
         return Promise.resolve({
@@ -166,6 +170,35 @@ describe("OrgUsersPage", () => {
       expect.objectContaining({ token: "tok" }),
     );
     expect(calledPaths()).not.toContain("/v1/auth/users");
+  });
+
+  it("shows the honest seat banner to a member manager: over the limit, no buy buttons on self-hosted", async () => {
+    signIn();
+    routeApiFetch({
+      perms: MANAGER,
+      limits: {
+        organization_id: 1,
+        view: "full",
+        tier: "community",
+        enforced: true,
+        limits: [],
+        seats: { organization_id: 1, used: 14, reserved: 0, max: 10, behaviour: "soft", state: "over_limit" },
+      },
+    });
+    render(<OrgUsersPage />);
+    expect(await screen.findByText("14/10 Community seats in use")).toBeTruthy();
+    expect(screen.getByText("Requires a Pro licence.")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Upgrade" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Try Pro/ })).toBeNull();
+  });
+
+  it("shows no seat banner when the caller may not see seats", async () => {
+    signIn();
+    routeApiFetch();
+    render(<OrgUsersPage />);
+    await row("bob");
+    expect(calledPaths()).toContain("/v1/organizations/1/limits");
+    expect(screen.queryByText(/seats in use/)).toBeNull();
   });
 
   it("offers Suspend, but not role change or Remove, with only org.members.suspend", async () => {

@@ -67,3 +67,46 @@ export const UPGRADE_TIERS = ["pro", "enterprise"] as const;
 /** Default `base_tier` proposed for a new plugin submission (the free baseline
  * plan; same vocabulary as UPGRADE_TIERS). */
 export const DEFAULT_SUBMISSION_TIER = "community";
+
+/** A paid plan a feature or limit can require (`<PlanBadge>`, `<LimitNotice>`). */
+export type PlanTier = (typeof UPGRADE_TIERS)[number];
+
+const TIER_LABELS: Record<string, string> = {
+  free: "Free",
+  community: "Community",
+  pro: "Pro",
+  professional: "Pro",
+  enterprise: "Enterprise",
+};
+
+/** A tier's display name (a product name: the same in every language). An
+ * unknown tier is shown as sent. */
+export function tierLabel(tier: string): string {
+  return TIER_LABELS[tier.toLowerCase()] ?? tier;
+}
+
+/** The plan that lifts a limit of `tier`: Pro below Pro, Enterprise for Pro,
+ * null for Enterprise (its overage is billed at renewal, nothing to sell). */
+export function upgradeTierFor(tier: string | null | undefined): PlanTier | null {
+  const t = (tier ?? "").toLowerCase();
+  if (t === "enterprise") return null;
+  return t === "pro" || t === "professional" ? "enterprise" : "pro";
+}
+
+/** Where this console runs (client#126 Q6.5), baked at build time like the
+ * other VITE_* config: `saas` shows trial/upgrade actions to billing owners;
+ * `self-hosted` (the default) shows "requires a licence" without buy buttons;
+ * `air-gapped` also never links outside, only to a licence file. The API has
+ * no way to tell yet. shortcut: the operator's "show upsell notes" installation
+ * setting isn't readable from the API yet, so self-hosted is always upsell-off;
+ * read it here once the gateway exposes it. */
+export type DeploymentMode = "saas" | "self-hosted" | "air-gapped";
+
+export function parseDeploymentMode(value: string | undefined): DeploymentMode {
+  const v = (value ?? "").trim().toLowerCase();
+  return v === "saas" || v === "air-gapped" ? v : "self-hosted";
+}
+
+export const deploymentMode: DeploymentMode = parseDeploymentMode(
+  import.meta.env.VITE_DEPLOYMENT_MODE,
+);
