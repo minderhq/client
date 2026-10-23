@@ -54,6 +54,7 @@ function provider(overrides: Partial<Provider> = {}): Provider {
     enabled: true,
     is_local: false,
     privacy_acknowledged: true,
+    pii_masking_enabled: true,
     models: [],
     effective_models: ["gpt-4o", "gpt-4o-mini"],
     created_at: "2026-01-01T00:00:00Z",
@@ -179,6 +180,153 @@ function installApi(
     },
   );
 }
+
+// The cloud privacy acknowledgment (the add form also has a PII-masking box).
+const ackCheckbox = () => screen.getByRole("checkbox", { name: /I understand/ });
+
+async function openAddForm(presetId: string) {
+  render(<CloudProvidersPage />);
+  await screen.findByText("No cloud providers configured yet.");
+  fireEvent.click(screen.getByText("Add Provider"));
+  fireEvent.change(await screen.findByRole("combobox"), { target: { value: presetId } });
+}
+
+const LOCAL_PRESET: ProviderPreset = {
+  id: "lmstudio",
+  label: "LM Studio (self-hosted)",
+  adapter: "openai_compatible",
+  is_local: true,
+  base_url_placeholder: "http://192.168.1.50:1234/v1",
+  requires_api_key: false,
+  description: "LM Studio's local server.",
+  suggested_models: [],
+};
+
+describe("CloudProvidersPage self-hosted servers", () => {
+  afterEach(() => {
+    cleanup();
+    apiFetch.mockReset();
+  });
+
+  const keyInput = () => document.querySelector('input[type="password"]') as HTMLInputElement;
+
+  it("makes the API key optional for a local preset and sends none when blank", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({ presets: [...PRESETS, LOCAL_PRESET] });
+    await openAddForm("lmstudio");
+    expect(screen.getByText("(optional)")).toBeTruthy();
+    expect(keyInput().required).toBe(false);
+    expect(screen.queryByText(/any non-empty value works/)).toBeNull();
+
+    fireEvent.change(screen.getByPlaceholderText("e.g. LM Studio (self-hosted)"), {
+      target: { value: "LM Studio" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("http://192.168.1.50:1234/v1"), {
+      target: { value: "http://192.168.1.50:1234/v1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        "/v1/model-providers",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    const post = apiFetch.mock.calls.find(([, o]) => o?.method === "POST");
+    expect(post?.[1].body).toMatchObject({ adapter: "openai_compatible", is_local: true });
+    expect(post?.[1].body.api_key).toBeUndefined();
+  });
+
+  it("keeps the API key required for a cloud preset", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi();
+    await openAddForm("openai_compatible");
+    expect(screen.queryByText("(optional)")).toBeNull();
+    expect(keyInput().required).toBe(true);
+  });
+
+  it("explains loopback for localhost but not for a LAN IP", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi();
+    await openAddForm("vllm");
+    const url = screen.getByPlaceholderText("http://localhost:8000/v1");
+    const hint = /use your machine's LAN IP or host.docker.internal, not localhost/;
+    fireEvent.change(url, { target: { value: "http://localhost:8000/v1" } });
+    expect(screen.getByText(hint)).toBeTruthy();
+    fireEvent.change(url, { target: { value: "http://192.168.1.50:8000/v1" } });
+    expect(screen.queryByText(hint)).toBeNull();
+  });
+
+  it("warns that a local row with no models won't show in pickers", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi();
+    await openAddForm("vllm");
+    expect(screen.getByText(/won't appear in model pickers until you fetch them/)).toBeTruthy();
+  });
+
+  it("notes when a row is served by a different adapter", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({
+      providers: [
+        provider({
+          is_local: true,
+          base_url: "http://192.168.1.50:11434/v1",
+          effective_adapter: "ollama",
+        }),
+        provider({ id: "p2", name: "Plain", effective_adapter: "openai_compatible" }),
+      ],
+    });
+    render(<CloudProvidersPage />);
+    expect(await screen.findByText("Served by the Ollama adapter (port 11434)")).toBeTruthy();
+    expect(screen.getAllByText(/Served by the/)).toHaveLength(1);
+  });
+
+  it("sends PII masking on create for a cloud preset and hides it for a local one", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi();
+    await openAddForm("openai_compatible");
+    const pii = screen.getByRole("checkbox", { name: /Mask personal data/ });
+    expect((pii as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(pii);
+    fireEvent.change(screen.getByPlaceholderText("e.g. OpenAI-compatible (custom)"), {
+      target: { value: "Custom" },
+    });
+    fireEvent.change(keyInput(), { target: { value: "k" } });
+    fireEvent.click(ackCheckbox());
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        "/v1/model-providers",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.objectContaining({ pii_masking_enabled: false }),
+        }),
+      ),
+    );
+
+    fireEvent.click(screen.getByText("Add Provider"));
+    fireEvent.change(await screen.findByRole("combobox"), { target: { value: "vllm" } });
+    expect(screen.queryByRole("checkbox", { name: /Mask personal data/ })).toBeNull();
+  });
+
+  it("toggles PII masking on a cloud row via PATCH, and hides it on a local row", async () => {
+    mockAuth = { token: "tok", role: "admin" };
+    installApi({
+      providers: [provider(), provider({ id: "v", name: "vLLM box", is_local: true })],
+    });
+    render(<CloudProvidersPage />);
+    await screen.findByText("vLLM box");
+    const boxes = screen.getAllByRole("checkbox", { name: /Mask personal data/ });
+    expect(boxes).toHaveLength(1);
+    fireEvent.click(boxes[0]);
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith("/v1/model-providers/p1", {
+        method: "PATCH",
+        token: "tok",
+        body: { pii_masking_enabled: false },
+      }),
+    );
+  });
+});
 
 describe("CloudProvidersPage", () => {
   afterEach(() => {
@@ -371,7 +519,7 @@ describe("CloudProvidersPage", () => {
     fireEvent.change(apiKeyInput, { target: { value: "secret-key" } });
 
     // #1511: a cloud provider requires acknowledging the privacy tradeoff first.
-    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(ackCheckbox());
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     await waitFor(() =>
@@ -385,6 +533,7 @@ describe("CloudProvidersPage", () => {
           api_key: "secret-key",
           is_local: false,
           privacy_acknowledged: true,
+          pii_masking_enabled: true,
           models: [],
         },
       }),
@@ -429,6 +578,7 @@ describe("CloudProvidersPage", () => {
           // #1511: a self-hosted (is_local) provider never leaves the box, so no
           // acknowledgment is required or sent as acknowledged.
           privacy_acknowledged: false,
+          pii_masking_enabled: true,
           models: [],
         },
       }),
@@ -456,7 +606,7 @@ describe("CloudProvidersPage", () => {
       true,
     );
 
-    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(ackCheckbox());
     expect(screen.getByRole("button", { name: "Add" })).toHaveProperty(
       "disabled",
       false,
@@ -802,7 +952,7 @@ describe("CloudProvidersPage", () => {
       document.querySelector('input[type="password"]') as HTMLInputElement,
       { target: { value: "zai-key" } },
     );
-    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(ackCheckbox());
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     await waitFor(() =>
