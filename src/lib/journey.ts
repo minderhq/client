@@ -1,4 +1,5 @@
 import type { IconName } from "../components/Icon";
+import { ROUTES } from "./routes";
 
 /** The single source of truth for the RAG "golden path" — the KB → Upload →
  * Pipeline → Ask sequence a first-time user has to walk to get an answer.
@@ -75,7 +76,7 @@ export function completedStepCount(counts: JourneyCounts | null, modelReady?: bo
  * (an org owner/admin or an instance admin). `label` comes from the caller's
  * i18n catalog. */
 export function withModelStep(label: string): JourneyStep[] {
-  return [{ key: "model", label, to: "/platform/providers", icon: "models" }, ...JOURNEY_STEPS];
+  return [{ key: "model", label, to: ROUTES.orgAi, icon: "models" }, ...JOURNEY_STEPS];
 }
 
 /** Per-step status relative to the current position, for the stepper's styling.

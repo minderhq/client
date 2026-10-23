@@ -369,7 +369,7 @@ describe("model not connected", () => {
     const card = await checklist();
     expect((await stepIds())[0]).toBe("model");
     expect(within(card).getByRole("link", { name: "Connect a model" }).getAttribute("href")).toBe(
-      "/platform/providers",
+      "/organization/ai",
     );
     expect(within(card).getByText(/No language model is available yet/)).toBeTruthy();
     expect(within(card).getByRole("link", { name: /How to connect your models/ })).toBeTruthy();
@@ -403,8 +403,8 @@ describe("model not connected", () => {
     renderHome();
 
     expect(await screen.findByText(/No language model is available yet/)).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Open Providers & defaults" }).getAttribute("href")).toBe(
-      "/platform/providers",
+    expect(screen.getByRole("link", { name: "Open AI providers" }).getAttribute("href")).toBe(
+      "/organization/ai",
     );
     expect(screen.queryByRole("region", { name: "Getting started" })).toBeNull();
     // An admin connects the model; there's nobody to ask.

@@ -230,7 +230,22 @@ const NAV_MODEL: NavSectionDef[] = [
         ],
       },
       { to: "/rag/public-chat", id: "publicChat", icon: "ask", requires: "org.chatbots.manage" },
-      { to: "/platform/providers", id: "providers", icon: "globe", requires: "org.ai.manage" },
+      {
+        // Organization › AI (UX step 9): the org's providers and its default
+        // model per task. Members keep the read-only Models page.
+        to: ROUTES.orgAi,
+        id: "orgAi",
+        icon: "models",
+        requires: "org.ai.manage",
+        match: ROUTES.orgAi,
+        tabs: [
+          { to: ROUTES.orgAi, id: "orgAiProviders", icon: "globe", end: true, requires: "org.ai.manage" },
+          { to: ROUTES.orgAiDefaults, id: "orgAiDefaults", icon: "models", requires: "org.ai.manage" },
+        ],
+      },
+      // Organization › Plugins: what is installed for the whole org. The
+      // marketplace's install gate is org.settings.manage, so this is too.
+      { to: ROUTES.orgPlugins, id: "orgPlugins", icon: "plugins", requires: "org.settings.manage" },
       { to: ROUTES.billing, id: "billing", icon: "billing", end: true, requires: "org.billing.view" },
       { to: "/audit", id: "audit", icon: "audit", requires: "org.audit.view" },
     ],

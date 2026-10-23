@@ -145,7 +145,10 @@ export const tr: Messages = {
       submissions: { label: "Gönderimler", title: "Eklenti gönderimleri", description: "Bir eklenti gönderin ve incelemesini takip edin", keywords: "gönder taslak yükle submit draft" },
       submissionReview: { label: "Gönderim incelemesi", title: "Gönderim incelemesi", description: "Gönderilen eklentileri onaylayın ya da reddedin (yönetici)", keywords: "inceleme kuyruk onayla reddet denetim review approve reject" },
       models: { label: "Modeller", description: "Yerel dil modelleri (Ollama): indirin, deneyin, kaldırın", keywords: "model indir dil modeli ollama llm pull" },
-      providers: { label: "Sağlayıcılar ve varsayılanlar", description: "Görev başına varsayılan modeller; OpenAI uyumlu ya da Anthropic sağlayıcıları bağlayın (yönetici)", keywords: "sağlayıcı bulut api anahtarı kimlik bilgisi varsayılan model openai anthropic provider" },
+      orgAi: { label: "Yapay zekâ", description: "Kuruluşun yapay zekâ sağlayıcıları ve varsayılan modelleri", keywords: "yapay zekâ sağlayıcı varsayılan model bulut api anahtarı ai providers default models openai anthropic ollama vllm" },
+      orgAiProviders: { label: "Sağlayıcılar", title: "Yapay zekâ sağlayıcıları", description: "OpenAI uyumlu, Anthropic ya da kendi model sunucunuzu bağlayın", keywords: "sağlayıcı bulut api anahtarı kimlik bilgisi provider openai anthropic vllm ollama" },
+      orgAiDefaults: { label: "Varsayılan modeller", title: "Varsayılan modeller", description: "Her görev için varsayılan model", keywords: "varsayılan model cevap sohbet çıkarım default models" },
+      orgPlugins: { label: "Eklentiler", title: "Kuruluş eklentileri", description: "Bütün kuruluş için kurulu eklentiler: aç, kapat, ayarlar", keywords: "eklenti kurulu kuruluş aç kapat kaldır ayar gizli anahtar istek plugins installed organization" },
       voice: { label: "Ses", description: "Metinden sese ve sesten metne", keywords: "ses konuşma yazıya dökme tts stt piper speech" },
       backups: { label: "Yedekler", description: "Platformun anlık görüntüsünü alın ve geri yükleyin", keywords: "yedek geri yükle arşiv anlık görüntü backup restore snapshot" },
       status: { label: "Durum", description: "Hizmetlerin sağlık durumu ve son günlükler", keywords: "sağlık hizmetler çalışma süresi günlük kayıt health logs status" },
@@ -262,6 +265,27 @@ export const tr: Messages = {
     },
   },
 
+  orgAi: {
+    providersSubtitle:
+      "OpenAI uyumlu ya da Anthropic bir sağlayıcıyı veya vLLM gibi kendi sunucunuzu bağlayın; modelleri yerel modellerin yanında görünür. Sağlayıcılar kuruluşun kendi API kimlik bilgilerini tutar; onları yalnızca sahipleri ve yöneticileri görür.",
+    defaultsSubtitle:
+      "Bir bilgi tabanı ya da soru kendi modelini seçmedikçe her görevin kullandığı model.",
+  },
+
+  orgPlugins: {
+    subtitle:
+      "Bütün kuruluş için kurulu eklentiler: her üye bunlara sahiptir. Açın, kapatın, kaldırın ve ayarlarını düzenleyin.",
+    loadError: "Kuruluşun eklentileri yüklenemedi.",
+    empty: "Kuruluş için henüz kurulu eklenti yok.",
+    discover: "Keşfet'te bir tane bulun",
+    pending: { one: "{count} eklenti kurulum isteği karar bekliyor.", other: "{count} eklenti kurulum isteği karar bekliyor." },
+    openRequests: "İstekleri aç",
+    installedForOrg: "Kuruluşunuz için kurulu",
+    installFor: "{org} için kur",
+    installForAria: "{plugin} eklentisini {org} için kur",
+    adminOnly: "Eklentileri yalnızca kuruluş yöneticileri kurar. Kurulum iste ile onlardan isteyin.",
+  },
+
   auditLog: {
     scopeOrg: "{org} ve alt kuruluşlarının denetim kaydı gösteriliyor.",
     scopeInstance: "Tüm kurulumun denetim kaydı gösteriliyor (Platform Yöneticisi).",
@@ -360,7 +384,7 @@ export const tr: Messages = {
         "Henüz kullanılabilir bir dil modeli yok; bu yüzden yüklenen belgeler vektöre dönüştürülemez ve Sor yanıt veremez. Önce Ollama'ya bir model indirin ya da bir vLLM veya bulut sağlayıcısı bağlayın.",
       unavailable:
         "Model servisi yanıt vermiyor; bu yüzden yüklenen belgeler vektöre dönüştürülemez ve Sor yanıt veremez. Model altyapısını kontrol edin ya da bir vLLM veya bulut sağlayıcısı bağlayın.",
-      providers: "Sağlayıcılar ve varsayılanlar sayfasını aç",
+      providers: "Yapay zekâ sağlayıcılarını aç",
       docs: "Modellerinizi nasıl bağlarsınız",
       askAdmin: "Henüz bağlı bir model yok. Bir model bağlaması için bir yöneticiye başvurun.",
     },

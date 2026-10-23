@@ -101,7 +101,7 @@ describe("GoldenPathStepper", () => {
 
     expect(screen.getAllByRole("listitem")).toHaveLength(5);
     const current = screen.getByRole("link", { current: "step" });
-    expect(current.getAttribute("href")).toBe("/platform/providers");
+    expect(current.getAttribute("href")).toBe("/organization/ai");
     expect(current.textContent).toBe("Model");
     expect(screen.getByText("Connect a model")).toBeTruthy();
   });

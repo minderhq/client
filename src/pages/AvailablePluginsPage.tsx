@@ -11,10 +11,12 @@ import { PluginRatings } from "../components/PluginRatings";
 import { ListedVersion } from "../components/PluginVersion";
 import { RequestButton } from "../components/RequestButton";
 import { SourceBadge, SourceLegend } from "../components/SourceBadge";
-import { InstallStateBadge, StatusBadge } from "../components/StatusBadge";
+import { InstallStateBadge, OrgInstallBadge, StatusBadge } from "../components/StatusBadge";
 import { StatusLine } from "../components/StatusLine";
+import { useI18n } from "../i18n";
 import { friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { fetchMyOrgs, pickActiveOrg } from "../lib/orgs";
 import { useAutoClearTimeout } from "../lib/browser";
 import { useCan } from "../lib/useCan";
 import {
@@ -43,6 +45,7 @@ import {
   type SourceKind,
 } from "../lib/pluginSource";
 import type { Installation } from "../lib/types";
+import { useAsyncResource } from "../lib/useAsyncResource";
 import { useDebouncedValue } from "../lib/useDebouncedValue";
 import { usePaginatedList } from "../lib/usePaginatedList";
 import { usePluginLifecycle } from "../lib/usePluginLifecycle";
@@ -344,6 +347,7 @@ export function PluginCard({
   isAuthenticated,
   isAdmin = false,
   canInstall = true,
+  orgName,
   onInstalled,
   onUninstalled,
   onToggleEnabled,
@@ -359,6 +363,9 @@ export function PluginCard({
   /** Whether the caller installs plugins (an org admin). A signed-in caller
    * who doesn't gets "Request install" instead of Install. */
   canInstall?: boolean;
+  /** The active organization's name: an admin's install is for the whole
+   * org, so the button says "Install for {org}". */
+  orgName?: string;
   onInstalled: () => void;
   onUninstalled: (pluginId: string) => void;
   onToggleEnabled: (pluginId: string, enabled: boolean) => void;
@@ -367,7 +374,8 @@ export function PluginCard({
   const [justInstalled, setJustInstalled] = useState(false);
   const loginHintId = useId();
   const scheduleTimeout = useAutoClearTimeout();
-  const { status, isError, busy, install, uninstall, toggleEnabled } = usePluginLifecycle({
+  const { t } = useI18n();
+  const { status, isError, busy, installRefused, install, uninstall, toggleEnabled } = usePluginLifecycle({
     pluginId: plugin.id,
     displayName: plugin.display_name,
     token,
@@ -442,7 +450,7 @@ export function PluginCard({
           />
         </div>
         <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
-          {!installation && isAuthenticated && !canInstall ? (
+          {!installation && isAuthenticated && (!canInstall || installRefused) ? (
             <RequestButton
               kind="plugin_install"
               subject={plugin.display_name}
@@ -453,12 +461,18 @@ export function PluginCard({
             <button
               onClick={handleInstall}
               disabled={!isAuthenticated || busy}
-              aria-label={`Install ${plugin.display_name}`}
+              aria-label={
+                orgName
+                  ? t("orgPlugins.installForAria", { plugin: plugin.display_name, org: orgName })
+                  : `Install ${plugin.display_name}`
+              }
               aria-describedby={!isAuthenticated ? loginHintId : undefined}
               className={primaryButtonClass}
             >
-              Install
+              {orgName ? t("orgPlugins.installFor", { org: orgName }) : "Install"}
             </button>
+          ) : installation.tenant_id && !canInstall ? (
+            <OrgInstallBadge />
           ) : (
             <>
               <button
@@ -477,7 +491,7 @@ export function PluginCard({
               >
                 <Icon name="delete" size={15} /> Uninstall
               </button>
-              <InstallStateBadge enabled={installation.enabled} />
+              <InstallStateBadge enabled={installation.enabled} org={!!installation.tenant_id} />
             </>
           )}
           {!isAuthenticated && (
@@ -617,13 +631,20 @@ function Recommendations({ recommendations }: { recommendations: Recommendation[
 }
 
 export function AvailablePluginsPage() {
-  const { token, sessionKey, isAuthenticated, isPlatformAdmin } = useAuth();
+  const { token, sessionKey, isAuthenticated, isPlatformAdmin, activeTenantId } = useAuth();
   const tokenRef = useTokenRef();
   // The install-from-git endpoint is Platform Admin only; gate the affordance on
   // the claim, not role === "admin" (the backend 403s an admin without it).
   const isAdmin = isPlatformAdmin;
   // Org admins install plugins; everyone else asks them (client#126 Q3).
   const canInstall = useCan("org.settings.manage");
+  // An admin's install is for the whole org (client#126 Q3): name it on the
+  // button. Without the name (not loaded, or failed) the button says Install.
+  const orgsRes = useAsyncResource(
+    (signal) => fetchMyOrgs(token, signal).then((r) => r.organizations),
+    { enabled: canInstall && !!token, deps: [sessionKey] },
+  );
+  const orgName = orgsRes.data ? pickActiveOrg(orgsRes.data, activeTenantId)?.name : undefined;
   const { confirm, dialog } = useConfirm();
   const featuredHeadingId = useId();
   const allPluginsHeadingId = useId();
@@ -909,6 +930,7 @@ export function AvailablePluginsPage() {
               isAuthenticated={isAuthenticated}
               isAdmin={isAdmin}
               canInstall={canInstall}
+              orgName={orgName}
               onInstalled={loadMyInstallations}
               onUninstalled={handleUninstalled}
               onToggleEnabled={handleToggleEnabled}
@@ -1007,6 +1029,7 @@ export function AvailablePluginsPage() {
               isAuthenticated={isAuthenticated}
               isAdmin={isAdmin}
               canInstall={canInstall}
+              orgName={orgName}
               onInstalled={loadMyInstallations}
               onUninstalled={handleUninstalled}
               onToggleEnabled={handleToggleEnabled}

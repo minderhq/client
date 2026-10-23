@@ -147,7 +147,10 @@ export const en = {
       submissions: { label: "Submissions", title: "Plugin submissions", description: "Submit a plugin and follow its review", keywords: "submit draft upload" },
       submissionReview: { label: "Submission review", title: "Submission review", description: "Approve or reject submitted plugins (admin)", keywords: "review queue approve reject moderation" },
       models: { label: "Models", description: "Local LLMs (Ollama): pull, test, remove", keywords: "ollama llm pull download" },
-      providers: { label: "Providers & defaults", description: "Default models per task; connect OpenAI-compatible or Anthropic providers (admin)", keywords: "openai anthropic cloud remote provider api key credential default models answer chat extraction utility" },
+      orgAi: { label: "AI", description: "The organization's AI providers and default models", keywords: "ai providers default models openai anthropic ollama vllm cloud remote api key credential answer chat extraction utility" },
+      orgAiProviders: { label: "Providers", title: "AI providers", description: "Connect OpenAI-compatible, Anthropic or self-hosted model servers", keywords: "openai anthropic vllm ollama cloud remote provider api key credential" },
+      orgAiDefaults: { label: "Model defaults", title: "Model defaults", description: "The default model for each task", keywords: "default models answer chat extraction utility" },
+      orgPlugins: { label: "Plugins", title: "Organization plugins", description: "Plugins installed for the whole organization: enable, disable, settings", keywords: "plugins installed organization org enable disable uninstall settings secrets requests" },
       voice: { label: "Voice", description: "Text-to-speech & speech-to-text", keywords: "tts stt speech piper transcribe" },
       backups: { label: "Backups", description: "Snapshot & restore the platform", keywords: "restore archive snapshot" },
       status: { label: "Status", description: "Service health & recent logs", keywords: "health services uptime logs" },
@@ -264,6 +267,27 @@ export const en = {
     },
   },
 
+  orgAi: {
+    providersSubtitle:
+      "Connect an OpenAI-compatible or Anthropic provider, or a self-hosted server such as vLLM, so its models appear next to the local ones. Providers hold the organization's own API credentials; only its owners and admins see them.",
+    defaultsSubtitle:
+      "The model each task uses unless a knowledge base or a question picks its own.",
+  },
+
+  orgPlugins: {
+    subtitle:
+      "Plugins installed for the whole organization: every member has them. Enable, disable or uninstall them, and edit their settings.",
+    loadError: "Couldn't load the organization's plugins.",
+    empty: "No plugins are installed for the organization yet.",
+    discover: "Find one in Discover",
+    pending: { one: "{count} plugin install request is waiting for a decision.", other: "{count} plugin install requests are waiting for a decision." },
+    openRequests: "Open Requests",
+    installedForOrg: "Installed for your organization",
+    installFor: "Install for {org}",
+    installForAria: "Install {plugin} for {org}",
+    adminOnly: "Only organization admins install plugins. Ask them with Request install.",
+  },
+
   auditLog: {
     scopeOrg: "Showing the audit log of {org} and its sub-organizations.",
     scopeInstance: "Showing the whole installation's audit log (Platform Admin).",
@@ -362,7 +386,7 @@ export const en = {
         "No language model is available yet, so uploads can't be embedded and Ask can't answer. Pull a model into Ollama or connect a vLLM or cloud provider first.",
       unavailable:
         "The model service isn't answering, so uploads can't be embedded and Ask can't answer. Check the model backend, or connect a vLLM or cloud provider.",
-      providers: "Open Providers & defaults",
+      providers: "Open AI providers",
       docs: "How to connect your models",
       askAdmin: "No model is connected yet. Ask an administrator to connect a model.",
     },
