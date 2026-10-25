@@ -47,6 +47,9 @@ export interface PublicChatEndpoint {
   rag_config: Record<string, unknown>;
   enabled: boolean;
   rate_limit_per_minute: number;
+  /** Comma-separated origins allowed to embed the chatbot; null = none. */
+  allowed_origins?: string | null;
+  shareable_link?: boolean;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -85,13 +88,29 @@ function ragConfigForMethod(method: string): Record<string, unknown> {
   return method ? { method } : {};
 }
 
-/** The API base for a slug's anonymous chat routes. Built from the configured
- * gateway base URL (VITE_API_BASE_URL) rather than any hardcoded host — the
- * routes live on the gateway at /public/chat/{slug}. It is NOT a page: opening
- * it in a browser 404s, so it is shown as a copyable developer address, never
- * as a link (#142). The hosted visitor page and embed code are follow-ups. */
+/** The hosted visitor page for a slug. Built from the configured gateway base
+ * URL (VITE_API_BASE_URL), never a hardcoded host, so a gateway served under
+ * /api yields /api/public/chat/... (the embed snippet below likewise). */
 function publicUrlForSlug(slug: string): string {
   return `${apiBaseUrl}/public/chat/${slug}`;
+}
+
+/** The one-line embed loader snippet for a slug. */
+function embedCodeForSlug(slug: string): string {
+  return `<script src="${apiBaseUrl}/public/chat/widget.js" data-bot="${slug}" async></script>`;
+}
+
+/** POST .../preview-token response (untyped in the spec); `url` is relative
+ * to the gateway base and stays valid for 10 minutes. */
+interface PreviewToken {
+  token: string;
+  expires_in: number;
+  url: string;
+}
+
+/** The endpoint's allowed origins as a list (the API stores them comma-separated). */
+function originsOf(raw: string | null | undefined): string[] {
+  return (raw ?? "").split(",").map((o) => o.trim()).filter(Boolean);
 }
 
 const SLUG_PATTERN = "[a-zA-Z0-9._-]+";
@@ -313,7 +332,7 @@ function EndpointRow({
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [isError, setIsError] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"" | "embed" | "link">("");
   const scheduleTimeout = useAutoClearTimeout();
   const { t } = useI18n();
 
@@ -332,10 +351,58 @@ function EndpointRow({
     setEditing(true);
   }
 
-  async function handleCopy() {
-    if (!(await copyText(publicUrl))) return;
-    setCopied(true);
-    scheduleTimeout(() => setCopied(false), 1500);
+  async function handleCopy(what: "embed" | "link") {
+    const text = what === "embed" ? embedCodeForSlug(endpoint.slug) : publicUrl;
+    if (!(await copyText(text))) return;
+    setCopied(what);
+    scheduleTimeout(() => setCopied(""), 1500);
+  }
+
+  async function handlePreview() {
+    if (busy) return;
+    // Open the tab synchronously, inside the click, so popup blockers allow it;
+    // it is pointed at the preview URL once the token arrives.
+    const tab = window.open("", "_blank");
+    setBusy(true);
+    setIsError(false);
+    setStatus("");
+    try {
+      const { url } = await apiFetch<PreviewToken>(
+        `/v1/public-chat/endpoints/${endpoint.id}/preview-token`,
+        { method: "POST", token },
+      );
+      const absolute = `${apiBaseUrl}${url}`;
+      if (tab) {
+        tab.opener = null;
+        tab.location.href = absolute;
+      } else {
+        window.open(absolute, "_blank", "noopener");
+      }
+    } catch (e) {
+      tab?.close();
+      setStatus(friendlyErrorMessage(e));
+      setIsError(true);
+    }
+    setBusy(false);
+  }
+
+  async function handleShareableToggle() {
+    if (busy) return;
+    setBusy(true);
+    setIsError(false);
+    setStatus("");
+    try {
+      await apiFetch(`/v1/public-chat/endpoints/${endpoint.id}`, {
+        method: "PATCH",
+        token,
+        body: { shareable_link: !endpoint.shareable_link },
+      });
+      onChanged();
+    } catch (e) {
+      setStatus(friendlyErrorMessage(e));
+      setIsError(true);
+    }
+    setBusy(false);
   }
 
   async function handleSave() {
@@ -562,25 +629,61 @@ function EndpointRow({
                 {pipelineName}
               </span>
             </span>
-            <span aria-hidden="true">·</span>
-            <span className="flex items-center gap-1">
-              {t("publicChat.apiAddressLabel")}:{" "}
-              <span className="font-mono" data-testid="public-chat-api-address">
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleCopy("embed")}
+              className={secondaryButtonClass}
+            >
+              <Icon name="copy" size={14} />{" "}
+              {copied === "embed" ? t("publicChat.embedCopied") : t("publicChat.copyEmbed")}
+            </button>
+            <button
+              type="button"
+              onClick={handlePreview}
+              disabled={busy}
+              title={t("publicChat.previewHint")}
+              className={secondaryButtonClass}
+            >
+              {t("publicChat.preview")}
+            </button>
+            <label className="flex items-center gap-1 text-xs text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                checked={!!endpoint.shareable_link}
+                onChange={handleShareableToggle}
+                disabled={busy}
+              />
+              {t("publicChat.shareableLink")}
+            </label>
+          </div>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {t("publicChat.shareableLinkHint")}
+          </p>
+          {endpoint.shareable_link && (
+            <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+              {t("publicChat.publicLinkLabel")}:{" "}
+              <span className="font-mono" data-testid="public-chat-link">
                 {publicUrl}
               </span>
               <button
                 type="button"
-                onClick={handleCopy}
-                title={t("publicChat.copyApiAddress")}
-                aria-label={t("publicChat.copyApiAddress")}
+                onClick={() => handleCopy("link")}
+                aria-label={t("publicChat.copyPublicLink")}
+                title={t("publicChat.copyPublicLink")}
                 className="underline hover:text-gray-700 dark:hover:text-gray-200"
               >
-                {copied ? "copied" : "copy"}
+                {copied === "link" ? "copied" : "copy"}
               </button>
-            </span>
-          </div>
+            </div>
+          )}
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {t("publicChat.apiAddressHint")}
+            {originsOf(endpoint.allowed_origins).length > 0
+              ? t("publicChat.allowedSites", {
+                  origins: originsOf(endpoint.allowed_origins).join(", "),
+                })
+              : t("publicChat.noAllowedSites")}
           </p>
         </>
       )}

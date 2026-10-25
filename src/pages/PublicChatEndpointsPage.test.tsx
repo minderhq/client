@@ -181,7 +181,7 @@ describe("PublicChatEndpointsPage", () => {
     mockAuth = ADMIN;
     installApi({
       endpoints: [
-        endpoint({ name: "Support Bot", slug: "support" }),
+        endpoint({ name: "Support Bot", slug: "support", shareable_link: true }),
         endpoint({ id: 2, name: "Sales Bot", slug: "sales", enabled: false }),
       ],
     });
@@ -198,49 +198,138 @@ describe("PublicChatEndpointsPage", () => {
     ).toBeTruthy();
   });
 
-  // #142: /public/chat/{slug} is an API base (404s in a browser), so it's
-  // labelled as a developer address and must never be a clickable link.
-  it("labels the endpoint address as an API address, not a link", async () => {
-    mockAuth = ADMIN;
-    installApi({ endpoints: [endpoint({ slug: "support" })] });
-    renderPage();
-
-    const value = await screen.findByTestId("public-chat-api-address");
-    expect(value.textContent).toBe("http://gateway.test/public/chat/support");
-    expect(value.tagName).not.toBe("A");
-    expect(value.closest("a")).toBeNull();
-    expect(screen.queryByRole("link", { name: /public\/chat/ })).toBeNull();
-    expect(screen.getByText(/API address \(for developers\)/)).toBeTruthy();
-    expect(
-      screen.getByText("The visitor chat page and embed code are coming soon."),
-    ).toBeTruthy();
-  });
-
-  it("copies the API address with the copy button", async () => {
+  it("copies the embed code built from the gateway base", async () => {
     mockAuth = ADMIN;
     installApi({ endpoints: [endpoint({ slug: "support" })] });
     vi.mocked(copyText).mockClear();
     renderPage();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Copy API address" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Copy embed code/ }));
+    await waitFor(() =>
+      expect(copyText).toHaveBeenCalledWith(
+        '<script src="http://gateway.test/public/chat/widget.js" data-bot="support" async></script>',
+      ),
+    );
+    expect(await screen.findByText("Embed code copied")).toBeTruthy();
+  });
+
+  it("previews via a preview token, opened absolute against the gateway base", async () => {
+    mockAuth = ADMIN;
+    installApi({ endpoints: [endpoint({ id: 7, slug: "support" })] });
+    const tab = { opener: {}, location: { href: "" }, close: vi.fn() };
+    const open = vi.spyOn(window, "open").mockReturnValue(tab as unknown as Window);
+    const base = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation((path: string, options: { method?: string } = {}) =>
+      path === "/v1/public-chat/endpoints/7/preview-token"
+        ? Promise.resolve({ token: "pt", expires_in: 600, url: "/public/chat/support?preview=pt" })
+        : base(path, options),
+    );
+    try {
+      renderPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Preview" }));
+      await waitFor(() =>
+        expect(tab.location.href).toBe("http://gateway.test/public/chat/support?preview=pt"),
+      );
+      expect(apiFetch).toHaveBeenCalledWith("/v1/public-chat/endpoints/7/preview-token", {
+        method: "POST",
+        token: "tok",
+      });
+      expect(open).toHaveBeenCalledWith("", "_blank");
+      expect(tab.opener).toBeNull();
+    } finally {
+      open.mockRestore();
+    }
+  });
+
+  it("closes the preview tab and shows the error when the token call fails", async () => {
+    mockAuth = ADMIN;
+    installApi({ endpoints: [endpoint()] });
+    const tab = { opener: {}, location: { href: "" }, close: vi.fn() };
+    const open = vi.spyOn(window, "open").mockReturnValue(tab as unknown as Window);
+    const base = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation((path: string, options: { method?: string } = {}) =>
+      path.endsWith("/preview-token")
+        ? Promise.reject(new Error("preview failed"))
+        : base(path, options),
+    );
+    try {
+      renderPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Preview" }));
+      expect(await screen.findByText("preview failed")).toBeTruthy();
+      expect(tab.close).toHaveBeenCalled();
+    } finally {
+      open.mockRestore();
+    }
+  });
+
+  it("hides the public link while the shareable link is off and turns it on via PATCH", async () => {
+    mockAuth = ADMIN;
+    installApi({ endpoints: [endpoint({ shareable_link: false })] });
+    renderPage();
+
+    const toggle = await screen.findByRole("checkbox", { name: "Shareable link" });
+    expect((toggle as HTMLInputElement).checked).toBe(false);
+    expect(screen.queryByTestId("public-chat-link")).toBeNull();
+
+    fireEvent.click(toggle);
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith("/v1/public-chat/endpoints/1", {
+        method: "PATCH",
+        token: "tok",
+        body: { shareable_link: true },
+      }),
+    );
+  });
+
+  it("shows and copies the public link when the shareable link is on", async () => {
+    mockAuth = ADMIN;
+    installApi({ endpoints: [endpoint({ slug: "support", shareable_link: true })] });
+    vi.mocked(copyText).mockClear();
+    renderPage();
+
+    const link = await screen.findByTestId("public-chat-link");
+    expect(link.textContent).toBe("http://gateway.test/public/chat/support");
+    expect(
+      (screen.getByRole("checkbox", { name: "Shareable link" }) as HTMLInputElement).checked,
+    ).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Copy public link" }));
     await waitFor(() =>
       expect(copyText).toHaveBeenCalledWith("http://gateway.test/public/chat/support"),
     );
-    expect(await screen.findByText("copied")).toBeTruthy();
   });
 
-  it("shows the API address label and hint in Turkish", async () => {
+  it("explains the embed only works on the allowed sites", async () => {
+    mockAuth = ADMIN;
+    installApi({
+      endpoints: [
+        endpoint({ allowed_origins: "https://a.example, https://b.example" }),
+        endpoint({ id: 2, name: "Sales Bot", slug: "sales", allowed_origins: null }),
+      ],
+    });
+    renderPage();
+
+    expect(
+      await screen.findByText(
+        "The embed code only works on this chatbot's allowed sites: https://a.example, https://b.example.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "This chatbot has no allowed sites yet, so the embed code won't work on any website.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("shows the embed controls in Turkish", async () => {
     setLocale("tr");
     try {
       mockAuth = ADMIN;
       installApi({ endpoints: [endpoint({ slug: "support" })] });
       renderPage();
 
-      expect(await screen.findByText(/API adresi \(geliştiriciler için\)/)).toBeTruthy();
-      expect(
-        screen.getByText("Ziyaretçi sohbet sayfası ve yerleştirme kodu yakında geliyor."),
-      ).toBeTruthy();
-      expect(screen.getByRole("button", { name: "API adresini kopyala" })).toBeTruthy();
+      expect(await screen.findByRole("button", { name: /Yerleştirme kodunu kopyala/ })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Önizle" })).toBeTruthy();
+      expect(screen.getByRole("checkbox", { name: "Paylaşılabilir bağlantı" })).toBeTruthy();
     } finally {
       setLocale("en");
     }
