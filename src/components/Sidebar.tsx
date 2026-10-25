@@ -38,8 +38,9 @@ export function Sidebar({
   const { t, plural } = useI18n();
   const { sections } = useNav();
   const pending = usePendingRequestCount();
-  // The pending badge sits on the entry that holds the caller's inbox.
-  const inboxEntry = access.can(REQUEST_INBOX_REQUIRES) ? ROUTES.people : ROUTES.account;
+  // The pending badge sits on the entry that holds the caller's inbox: People
+  // when its Requests tab is theirs, else My account (My requests).
+  const inboxPath = access.can(REQUEST_INBOX_REQUIRES) ? ROUTES.requests : ROUTES.myRequests;
 
   return (
     <aside
@@ -124,7 +125,7 @@ export function Sidebar({
                         }
                       />
                       {item.label}
-                      {item.to === inboxEntry && pending > 0 && (
+                      {(item.to === inboxPath || item.tabs?.some((tab) => tab.to === inboxPath)) && pending > 0 && (
                         <span className="ml-auto rounded-full bg-indigo-600 px-1.5 text-xs font-semibold text-white">
                           <span aria-hidden="true">{pending}</span>
                           <span className="sr-only">{plural("requests.pendingBadge", pending)}</span>

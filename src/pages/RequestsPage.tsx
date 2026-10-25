@@ -23,7 +23,7 @@ import {
 } from "../lib/accessRequests";
 import { useAuth } from "../lib/auth";
 import { ROUTES } from "../lib/routes";
-import { useAllows } from "../lib/useCan";
+import { useAllows, usePermissionsSettled } from "../lib/useCan";
 import {
   badgeBaseClass,
   badgeNeutralToneClass,
@@ -78,6 +78,9 @@ function useDescribe() {
  * requests (My account › My requests) for everyone else. */
 export function RequestsRedirect() {
   const inbox = useAllows(REQUEST_INBOX_REQUIRES);
+  const settled = usePermissionsSettled();
+  // Decide once, on the server's permissions, not on the interim fallback.
+  if (!settled) return null;
   return <RedirectWithQuery to={inbox ? ROUTES.requests : ROUTES.myRequests} />;
 }
 
@@ -93,6 +96,8 @@ export function RequestsPage({ view }: { view: "inbox" | "mine" }) {
   const { token, sessionKey } = useAuth();
   const { t } = useI18n();
   const canDecide = useCanDecideRequests();
+  // Exactly when the People › Requests tab (and so the People entry, which is
+  // gated by its tabs) is in the caller's menu.
   const hasOrgInbox = useAllows(REQUEST_INBOX_REQUIRES);
   const inboxHeadingId = useId();
   const mineHeadingId = useId();

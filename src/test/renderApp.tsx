@@ -81,7 +81,9 @@ export function personaResponse(persona: Persona, url: string): Response {
   if (path === "/v1/me/permissions" && claims) {
     const held = (keys: readonly string[]) =>
       keys.map((key) => ({ key, sources: [{ kind: "role", role_id: 1 }] }));
-    const orgKeys: string[] = [...(ORG_ROLE_PERMISSIONS[claims.org_role ?? "member"] ?? [])];
+    const orgKeys: string[] = [
+      ...(persona.orgKeys ?? ORG_ROLE_PERMISSIONS[claims.org_role ?? "member"] ?? []),
+    ];
     if (persona.billing.view) orgKeys.push("org.billing.view");
     return json({
       user_id: Number(claims.sub),
@@ -102,6 +104,9 @@ export function personaResponse(persona: Persona, url: string): Response {
       })),
       permission_version: `${claims.sub}.1`,
     });
+  }
+  if (path === "/v1/access-requests/inbox" && claims) {
+    return json({ requests: [], total: persona.pendingRequests ?? 0, limit: 50, offset: 0 });
   }
   if (path === "/v1/profile/me" && claims) {
     return json({

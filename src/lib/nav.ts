@@ -312,10 +312,12 @@ export function leafVisible(leaf: NavLeaf, access: Access): boolean {
 
 /** The entry as this caller should see it: its tabs filtered to the visible
  * ones and its link pointed at the first of those, or null when nothing in
- * it is visible. The one place Sidebar and PageTabs take gating from. */
+ * it is visible. An entry with tabs is gated by its tabs alone, so a caller
+ * who may open any one of them (People › Requests without
+ * org.members.manage) still gets the entry. The one place Sidebar and
+ * PageTabs take gating from. */
 export function visibleEntry(entry: NavEntry, access: Access): NavEntry | null {
-  if (!leafVisible(entry, access)) return null;
-  if (!entry.tabs) return entry;
+  if (!entry.tabs) return leafVisible(entry, access) ? entry : null;
   const tabs = entry.tabs.filter((t) => leafVisible(t, access));
   if (tabs.length === 0) return null;
   return { ...entry, to: tabs[0].to, tabs };

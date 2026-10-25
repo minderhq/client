@@ -480,6 +480,57 @@ describe("known gaps (client#126)", APP_TEST, () => {
   );
 });
 
+// A custom role holding org.settings.manage without org.members.manage: the
+// requests inbox is theirs (People › Requests) although Members and Invites
+// are not, so People must show (gated by its tabs), carry the pending badge,
+// and be where the old /requests lands. Its keys come only from the server,
+// so this also covers acting before GET /v1/me/permissions has answered.
+describe("a custom role with the inbox but not the member list", APP_TEST, () => {
+  afterEach(resetApp);
+
+  const settingsOnly = withPersona("teamlessMember", {
+    label: "custom role: org.settings.manage only",
+    claims: { org_role: "settings_admin" },
+    orgKeys: ["org.settings.manage"],
+    pendingRequests: 2,
+  });
+
+  it("gets People (Requests, Domains) in the menu, with the pending badge", async () => {
+    renderApp(settingsOnly);
+    await settleApp();
+    await waitFor(
+      () =>
+        expect(renderedNav()).toEqual({
+          ...MEMBER_NAV,
+          // The badge: "2" on screen, "2 requests …" for screen readers.
+          Organization: ["Overview", "People22 requests waiting for your decision", "Plugins", "Knowledge quality"],
+        }),
+      SETTLE,
+    );
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(within(nav).getByRole("link", { name: /^People/ }).getAttribute("href")).toBe(ROUTES.requests);
+  });
+
+  it("opens the inbox, with Requests and Domains as the People tabs", async () => {
+    renderApp(settingsOnly, ROUTES.requests);
+    expect(await screen.findByRole("heading", { level: 1, name: "Requests" }, SETTLE)).toBeTruthy();
+    await settleApp();
+    const tabs = screen.getByRole("navigation", { name: "People sections" });
+    expect(within(tabs).getAllByRole("link").map((a) => a.textContent)).toEqual([
+      "Requests",
+      "DomainsProAvailable on the Pro plan",
+    ]);
+  });
+
+  it("is sent from the old /requests to the inbox once its permissions arrive", async () => {
+    renderApp(settingsOnly, "/requests?kind=plugin_install#pending");
+    await settleApp();
+    expect(appLocation()?.pathname).toBe(ROUTES.requests);
+    expect(appLocation()?.search).toBe("?kind=plugin_install");
+    expect(appLocation()?.hash).toBe("#pending");
+  });
+});
+
 describe("persona fixtures", () => {
   it("refuses claim overrides for the logged-out visitor", () => {
     expect(() => withPersona("loggedOut", { claims: { role: "admin" } })).toThrow(/no token/);
