@@ -145,8 +145,10 @@ export function personaResponse(persona: Persona, url: string): Response {
   // Organization › AI: the org's providers and presets are bare arrays.
   if (path === "/v1/model-providers" || path === "/v1/model-providers/presets") return json([]);
   if (path === "/v1/teams") {
+    // The org lists every team to its members, the caller's and the others.
+    const teams = claims ? [...persona.teams, OTHER_TEAM] : persona.teams;
     return json({
-      teams: persona.teams.map((t) => ({
+      teams: teams.map((t) => ({
         id: t.id,
         name: t.name,
         description: null,
@@ -154,13 +156,16 @@ export function personaResponse(persona: Persona, url: string): Response {
         created_at: null,
         member_count: 1,
       })),
-      total: persona.teams.length,
+      total: teams.length,
       limit: 20,
       offset: 0,
     });
   }
   const teamDetail = /^\/v1\/teams\/(\d+)$/.exec(path);
   if (teamDetail && claims) {
+    if (Number(teamDetail[1]) === OTHER_TEAM.id) {
+      return json({ ...OTHER_TEAM, description: null, created_by: null, created_at: null, members: [] });
+    }
     const team = persona.teams.find((t) => t.id === Number(teamDetail[1]));
     if (!team) return json({ detail: "Not found" }, 404);
     return json({
@@ -182,6 +187,9 @@ export function personaResponse(persona: Persona, url: string): Response {
   }
   return json(SAFE_EMPTY_RESPONSE);
 }
+
+/** A team of the org no persona belongs to (its roster is not theirs to see). */
+export const OTHER_TEAM = { id: 20, name: "Design" };
 
 /** The router's current location, captured next to <App/>. */
 let currentLocation: Location | null = null;

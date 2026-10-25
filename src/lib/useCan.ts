@@ -64,7 +64,10 @@ function loadServerPermissions(sessionKey: string, token: string) {
 function useServerPermissions(): EffectivePermissions | null {
   const { sessionKey, isAuthenticated } = useAuth();
   const tokenRef = useTokenRef();
-  const [loaded, setLoaded] = useState<{ key: string; value: EffectivePermissions } | null>(null);
+  // A null value: the request failed (re-render so useMyTeamIds can tell).
+  const [loaded, setLoaded] = useState<{ key: string; value: EffectivePermissions | null } | null>(
+    null,
+  );
 
   useEffect(() => {
     const token = tokenRef.current;
@@ -77,7 +80,7 @@ function useServerPermissions(): EffectivePermissions | null {
     if (serverCache.has(sessionKey) || failed.has(sessionKey)) return;
     let current = true;
     loadServerPermissions(sessionKey, token).then((value) => {
-      if (current && value) setLoaded({ key: sessionKey, value });
+      if (current) setLoaded({ key: sessionKey, value });
     });
     return () => {
       current = false;
@@ -120,6 +123,16 @@ export function resetServerPermissionsCache(): void {
   serverCache.clear();
   failed.clear();
   inflight.clear();
+}
+
+/** The ids of the teams the caller belongs to, from `GET /v1/me/permissions`:
+ * undefined while it loads, null when the server can't say (signed out, or a
+ * gateway without the route; the role claims carry no teams). */
+export function useMyTeamIds(): Set<string> | null | undefined {
+  const { sessionKey } = useAuth();
+  const server = useServerPermissions();
+  if (server) return new Set(server.teams.map((team) => team.id));
+  return !sessionKey || failed.has(sessionKey) ? null : undefined;
 }
 
 /** Every gate at once, for filtering lists (sidebar, tabs, palette). */

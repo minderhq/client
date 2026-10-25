@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { setLocale } from "../i18n";
 import { myPermissions, SERVER_SESSION, serveMyPermissions } from "../test/myPermissions";
 
 import { TeamsPage, type Team, type TeamDetail } from "./TeamsPage";
@@ -232,6 +233,31 @@ describe("TeamsPage", () => {
     expect(screen.getByRole("button", { name: "Leave" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
     expect(screen.queryByRole("combobox")).toBeNull();
+  });
+
+  it("renders the team card in Turkish", async () => {
+    setLocale("tr");
+    try {
+      mockAuth = { token: "tok", username: "alice", role: "user", loginWithToken };
+      apiFetch.mockImplementation((path: string) => {
+        if (path === "/v1/teams/1") return Promise.resolve(detail());
+        if (path.startsWith("/v1/invites"))
+          return Promise.resolve({ invites: [], total: 0, limit: 50, offset: 0 });
+        return Promise.resolve({ teams: [team()], total: 1, limit: 50, offset: 0 });
+      });
+      render(<TeamsPage />);
+      expect(await screen.findByRole("heading", { level: 1, name: "Takımlar" })).toBeTruthy();
+      expect(screen.getByText("2 üye")).toBeTruthy();
+      fireEvent.click(screen.getByText("Engineering"));
+      await screen.findByText("bob");
+      expect(screen.getByRole("button", { name: "Çıkar" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Ayrıl" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Üye ekle" })).toBeTruthy();
+      expect(screen.getAllByText("Takım yöneticisi").length).toBeGreaterThan(0);
+      expect(await screen.findByRole("heading", { level: 3, name: "Davetler" })).toBeTruthy();
+    } finally {
+      setLocale("en");
+    }
   });
 
   it("a team_admin member sees management controls for other members", async () => {

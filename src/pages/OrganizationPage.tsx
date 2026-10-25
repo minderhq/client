@@ -39,6 +39,7 @@ export function OrganizationPage() {
   // The org PATCH's gate (_require_org_manage) is org.members.manage: owner/
   // admin, any custom role granted it, or the Platform Admin.
   const canManage = useCan("org.members.manage");
+  const canManageTeams = useCan("org.teams.manage");
   const { t } = useI18n();
 
   // #1503: edit the active org's own name/description.
@@ -238,7 +239,7 @@ export function OrganizationPage() {
                   </>
                 )}
                 <Link
-                  to="/platform/teams"
+                  to={canManageTeams ? ROUTES.orgTeams : ROUTES.myTeam}
                   className="flex items-center gap-1 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400"
                 >
                   {t("people.overview.teams")}

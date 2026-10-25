@@ -27,7 +27,7 @@ import {
   tierVariants,
   withPersona,
 } from "./test/personas";
-import { appLocation, renderApp, resetApp, settleApp } from "./test/renderApp";
+import { OTHER_TEAM, appLocation, renderApp, resetApp, settleApp } from "./test/renderApp";
 
 /** Each case renders the whole app; the slowest takes about 2 s. */
 const APP_TEST = { timeout: 10_000 };
@@ -76,8 +76,8 @@ const MEMBER_NAV: NavModel = {
   Knowledge: ["Knowledge Bases", "Pipelines", "Conversations", "Knowledge Graph"],
   Marketplace: ["Discover", "Installed", "Publish"],
   "AI & system": ["Models", "Status"],
-  Team: ["Teams"],
-  "My account": ["Profile & settings", "Voice", "Licenses", "Requests"],
+  // My team is every member's: their team, or where they ask to join one.
+  "My account": ["My team", "Profile & settings", "Voice", "Licenses", "Requests"],
 };
 
 /** An org owner or admin: the member nav plus the Organization section.
@@ -85,7 +85,7 @@ const MEMBER_NAV: NavModel = {
  * hidden although its page lets them manage endpoints. */
 const ORG_ADMIN_NAV: NavModel = {
   ...MEMBER_NAV,
-  Organization: ["Overview", "People", "Public Chat", "AI", "Plugins", "Billing", "Audit Log"],
+  Organization: ["Overview", "People", "Teams", "Public Chat", "AI", "Plugins", "Billing", "Audit Log"],
 };
 
 const PLATFORM_ADMIN_NAV: NavModel = {
@@ -200,23 +200,26 @@ describe("navigation matrix: in-page tab strips", APP_TEST, () => {
   });
 });
 
-describe("team role: Teams page controls per persona", APP_TEST, () => {
+describe("team role: My team and Organization › Teams per persona", APP_TEST, () => {
   afterEach(resetApp);
 
-  /** Expand a team card and wait for its member list (the caller's row). */
-  async function openTeam(name: string, persona: Persona) {
+  /** Expand a team card and wait for its member list to load. */
+  async function openTeam(name: string) {
     const details = (await screen.findByText(name, {}, SETTLE)).closest("details")!;
     details.open = true;
     fireEvent(details, new Event("toggle"));
-    await within(details).findAllByText(new RegExp(persona.claims!.username), {}, SETTLE);
+    await waitFor(() => expect(within(details).queryByText("Loading…")).toBeNull(), SETTLE);
+    return details;
   }
 
   it.each([
     ["teamAdmin", true],
     ["teamMember", false],
-  ] as const)("%s may manage its team: %s", async (id, canManage) => {
-    renderApp(PERSONAS[id], "/platform/teams");
-    await openTeam("Engineering", PERSONAS[id]);
+  ] as const)("%s sees only its own team on My team; may manage it: %s", async (id, canManage) => {
+    renderApp(PERSONAS[id], ROUTES.myTeam);
+    expect(await screen.findByRole("heading", { level: 1, name: "My team" }, SETTLE)).toBeTruthy();
+    const details = await openTeam("Engineering");
+    await within(details).findAllByText(new RegExp(PERSONAS[id].claims!.username), {}, SETTLE);
     if (canManage) {
       // The controls appear once GET /v1/teams/{id} has answered.
       expect(await screen.findByRole("button", { name: "Add Member" }, SETTLE)).toBeTruthy();
@@ -226,11 +229,52 @@ describe("team role: Teams page controls per persona", APP_TEST, () => {
     await settleApp();
     expect(screen.getByText("Engineering")).toBeTruthy();
     expect(!!screen.queryByRole("button", { name: "Add Member" })).toBe(canManage);
+    // The org's other team is not "my team", and there is no join view.
+    expect(screen.queryByText(OTHER_TEAM.name)).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Ask to join/ })).toBeNull();
+    // A member is not pointed at the org's team administration.
+    expect(screen.queryByRole("link", { name: "Open Teams" })).toBeNull();
   });
 
-  it("shows a team-less member no teams", async () => {
-    renderApp(PERSONAS.teamlessMember, "/platform/teams");
-    expect(await screen.findByText(/No teams yet/, {}, SETTLE)).toBeTruthy();
+  it("offers a team-less member the org's teams to ask to join", async () => {
+    renderApp(PERSONAS.teamlessMember, ROUTES.myTeam);
+    expect(await screen.findByText(/You're not in a team yet. Ask to join/, {}, SETTLE)).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Teams" })).toBeTruthy();
+    expect(screen.getByText(OTHER_TEAM.name)).toBeTruthy();
+    expect(screen.getByRole("button", { name: `Ask to join: ${OTHER_TEAM.name}` })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Open Teams" })).toBeNull();
+  });
+
+  it.each(["orgOwner", "orgAdmin", "platformAdmin"] as const)(
+    "points %s (in no team) at Organization › Teams from My team",
+    async (id) => {
+      renderApp(PERSONAS[id], ROUTES.myTeam);
+      expect(await screen.findByText(/Add yourself to one under Organization › Teams/, {}, SETTLE)).toBeTruthy();
+      expect(screen.getByRole("link", { name: "Open Teams" }).getAttribute("href")).toBe(ROUTES.orgTeams);
+      expect(screen.queryByRole("button", { name: /^Ask to join/ })).toBeNull();
+    },
+  );
+
+  // CLOSED: org owners/admins used to get a read-only team unless they were
+  // its team_admin. Organization › Teams lists every team, managed under
+  // org.teams.manage (as the API's team gate allows).
+  it.each(["orgOwner", "orgAdmin"] as const)(
+    "lets %s manage any team of the org under Organization › Teams",
+    async (id) => {
+      renderApp(PERSONAS[id], ROUTES.orgTeams);
+      expect(await screen.findByRole("heading", { level: 1, name: "Teams" }, SETTLE)).toBeTruthy();
+      await openTeam(OTHER_TEAM.name);
+      expect(await screen.findByRole("button", { name: "Add Member" }, SETTLE)).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /^Ask to join/ })).toBeNull();
+    },
+  );
+
+  it("redirects the old /platform/teams to My team, keeping query and hash", async () => {
+    renderApp(PERSONAS.teamMember, "/platform/teams?team=10#members");
+    await settleApp();
+    expect(appLocation()?.pathname).toBe(ROUTES.myTeam);
+    expect(appLocation()?.search).toBe("?team=10");
+    expect(appLocation()?.hash).toBe("#members");
   });
 });
 
@@ -267,6 +311,14 @@ const GATED_ROUTES: GatedRoute[] = [
   { path: ROUTES.orgAi, heading: "AI providers", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
   { path: ROUTES.orgAiDefaults, heading: "Model defaults", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
   { path: ROUTES.orgPlugins, heading: "Organization plugins", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
+  // Organization › Teams: org.teams.manage (team admins manage their own team
+  // from My team). My team itself is every member's.
+  { path: ROUTES.orgTeams, heading: "Teams", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
+  {
+    path: ROUTES.myTeam,
+    heading: "My team",
+    open: ["platformAdmin", "orgOwner", "orgAdmin", "teamAdmin", "teamMember", "teamlessMember"],
+  },
 ];
 
 const ROUTE_CASES = GATED_ROUTES.flatMap((route) =>
@@ -386,14 +438,6 @@ describe("known gaps (client#126)", APP_TEST, () => {
       await settleApp();
       expect(screen.getByRole("heading", { level: 1, name: "You don't have access to this page" })).toBeTruthy();
     },
-  );
-
-  it.todo(
-    // KNOWN GAP (client#126): TeamsPage lets only an instance admin or the
-    // team's own team_admin manage a team. An org owner/admin who is not
-    // that team's team_admin gets a read-only team, and the nav has no
-    // org-level team administration. Decide in the new IA who manages teams.
-    "org owners/admins can manage their org's teams",
   );
 
   it.todo(

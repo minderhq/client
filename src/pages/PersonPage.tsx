@@ -31,6 +31,7 @@ import {
   secondaryButtonClass,
 } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
+import { useCan } from "../lib/useCan";
 import { useMemberActions, usePeopleData, usePermissionName, useRoleLabel } from "../lib/usePeople";
 import { MemberBadges } from "./OrgUsersPage";
 
@@ -47,6 +48,9 @@ export function PersonPage() {
   const uid = Number(param);
   const { token, sessionKey, userId } = useAuth();
   const { t } = useI18n();
+  // Organization › Teams is gated on org.teams.manage, this page on
+  // org.members.manage: link the teams only for callers who may open it.
+  const canManageTeams = useCan("org.teams.manage");
   const roleLabel = useRoleLabel();
   const { orgsRes, active, membersRes, rolesRes, canManage, canSuspend } = usePeopleData();
   const member = membersRes.data?.find((m) => m.user_id === uid);
@@ -184,9 +188,13 @@ export function PersonPage() {
             <ul className="flex flex-col gap-1">
               {teams.map((team) => (
                 <li key={team.id} className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100">
-                  <Link to="/platform/teams" className="hover:underline">
-                    {team.name}
-                  </Link>
+                  {canManageTeams ? (
+                    <Link to={ROUTES.orgTeams} className="hover:underline">
+                      {team.name}
+                    </Link>
+                  ) : (
+                    team.name
+                  )}
                 </li>
               ))}
             </ul>

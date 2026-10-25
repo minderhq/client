@@ -128,7 +128,6 @@ describe("nav — marketplace IA (#2197)", () => {
       "Knowledge",
       "Marketplace",
       "AI & system",
-      "Team",
       "My account",
       "Organization",
       "Platform",
@@ -209,6 +208,7 @@ describe("nav — marketplace IA (#2197)", () => {
       [ROUTES.orgAi]: "org.ai.manage",
       [ROUTES.orgAiDefaults]: "org.ai.manage",
       [ROUTES.orgPlugins]: "org.settings.manage",
+      [ROUTES.orgTeams]: "org.teams.manage",
       [ROUTES.billing]: "org.billing.view",
       "/audit": "org.audit.view",
       "/organizations": "platform-admin",
@@ -216,6 +216,13 @@ describe("nav — marketplace IA (#2197)", () => {
       "/platform/backups": "platform-admin",
       [ROUTES.sources]: "platform-admin",
     });
+  });
+
+  it("puts My team under My account for every member and Teams under Organization", () => {
+    expect(visibleRows("My account", MEMBER)["My team"]).toBe(ROUTES.myTeam);
+    expect(visibleRows("Organization", MEMBER).Teams).toBeUndefined();
+    expect(visibleRows("Organization", ORG_OWNER).Teams).toBe(ROUTES.orgTeams);
+    expect(NAV_SECTIONS.some((s) => s.label === "Team")).toBe(false);
   });
 
   it("shows the Organization section to org owners/admins and All Users to Platform Admins only", () => {
@@ -322,7 +329,6 @@ describe("nav — localized copy (i18n)", () => {
       "Bilgi",
       "Pazar yeri",
       "Yapay zekâ ve sistem",
-      "Ekip",
       "Hesabım",
       "Kuruluş",
       "Platform",
@@ -357,6 +363,8 @@ describe("nav — breadcrumb trail (#131)", () => {
     expect(trail("/rag/pipelines")).toEqual(["Knowledge", "Pipelines", null]);
     expect(trail(`${ROUTES.sources}/r1`)).toEqual(["Platform", "MindHub & sources", null]);
     expect(trail(ROUTES.licenses)).toEqual(["My account", "Licenses", null]);
+    expect(trail(ROUTES.myTeam)).toEqual(["My account", "My team", null]);
+    expect(trail(ROUTES.orgTeams)).toEqual(["Organization", "Teams", null]);
   });
 
   it("puts the heading-less top group directly under Home", () => {
