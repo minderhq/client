@@ -240,6 +240,7 @@ const EXPECTED_REDIRECTS: Record<string, string> = {
   "/bundles/available": "/marketplace/discover/service-bundles",
   "/bundles/installed": "/marketplace/installed/service-bundles",
   "/organization/users": "/organization/people",
+  "/platform/providers": "/organization/ai",
 };
 
 describe("App — redirects (#2197)", () => {

@@ -40,11 +40,13 @@ import { InstalledPluginsPage } from "./pages/InstalledPluginsPage";
 import { InstalledToolsPage } from "./pages/InstalledToolsPage";
 import { InviteRedeemPage } from "./pages/InviteRedeemPage";
 import { KnowledgeBasesPage } from "./pages/KnowledgeBasesPage";
+import { ModelDefaultsPage } from "./pages/ModelDefaultsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ModelManagementPage } from "./pages/ModelManagementPage";
 import { MyLicensesPage } from "./pages/MyLicensesPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { OrganizationPage } from "./pages/OrganizationPage";
+import { OrgPluginsPage } from "./pages/OrgPluginsPage";
 import { OrgUsersPage } from "./pages/OrgUsersPage";
 import { PeopleDomainsPage } from "./pages/PeopleDomainsPage";
 import { PeopleInvitesPage } from "./pages/PeopleInvitesPage";
@@ -277,7 +279,6 @@ export function App() {
                     />
 
                     <Route path="/platform" element={<ModelManagementPage />} />
-                    <Route path="/platform/providers" element={<CloudProvidersPage />} />
                     <Route path="/platform/status" element={<StatusPage />} />
                     <Route path="/platform/voice" element={<VoicePage />} />
                     <Route
@@ -328,6 +329,31 @@ export function App() {
                       element={
                         <RequirePermission requires="org.members.manage">
                           <PersonPage />
+                        </RequirePermission>
+                      }
+                    />
+                    {/* Organization › AI and › Plugins (UX step 9); /platform/providers redirects. */}
+                    <Route
+                      path={ROUTES.orgAi}
+                      element={
+                        <RequirePermission requires="org.ai.manage">
+                          <CloudProvidersPage />
+                        </RequirePermission>
+                      }
+                    />
+                    <Route
+                      path={ROUTES.orgAiDefaults}
+                      element={
+                        <RequirePermission requires="org.ai.manage">
+                          <ModelDefaultsPage />
+                        </RequirePermission>
+                      }
+                    />
+                    <Route
+                      path={ROUTES.orgPlugins}
+                      element={
+                        <RequirePermission requires="org.settings.manage">
+                          <OrgPluginsPage />
                         </RequirePermission>
                       }
                     />

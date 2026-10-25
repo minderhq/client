@@ -10,7 +10,7 @@ import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
 import { PluginVersion } from "../components/PluginVersion";
 import { SourceBadge, SourceLegend } from "../components/SourceBadge";
-import { InstallStateBadge } from "../components/StatusBadge";
+import { InstallStateBadge, OrgInstallBadge } from "../components/StatusBadge";
 import { StatusLine } from "../components/StatusLine";
 import { friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -39,6 +39,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from "../lib/ui";
+import { useCan } from "../lib/useCan";
 import { useTokenRef } from "../lib/useTokenRef";
 import { ROUTES } from "../lib/routes";
 
@@ -549,6 +550,7 @@ export function InstalledPluginCard({
   entry,
   token,
   runtimeKnown = false,
+  canManageOrgInstall = true,
   onUninstalled,
   onToggleEnabled,
   confirm,
@@ -558,11 +560,16 @@ export function InstalledPluginCard({
   /** Whether plugin-registry's runtime list loaded, i.e. whether a missing
    * `entry.runtime` means "not running" rather than "unknown". */
   runtimeKnown?: boolean;
+  /** Whether the caller manages the org's installs (an org admin). A member
+   * sees an org install marked, without actions: the API would only reach
+   * their own personal install. */
+  canManageOrgInstall?: boolean;
   onUninstalled: (pluginId: string) => void;
   onToggleEnabled: (pluginId: string, enabled: boolean) => void;
   confirm: ReturnType<typeof useConfirm>["confirm"];
 }) {
   const { installation, runtime } = entry;
+  const orgInstall = !!installation?.tenant_id;
   const hasVersion = entry.installedVersion !== null;
   const hasNeeds = entry.requiresServices.length > 0;
 
@@ -576,8 +583,9 @@ export function InstalledPluginCard({
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <SourceBadge source={entry.source} />
             <RuntimeState runtime={runtime} runtimeKnown={runtimeKnown} />
+            {orgInstall && <OrgInstallBadge />}
             {installation && (
-              <InstallStateBadge enabled={installation.enabled} />
+              <InstallStateBadge enabled={installation.enabled} org={orgInstall} />
             )}
           </div>
           {(hasVersion || hasNeeds || runtime) && (
@@ -596,7 +604,7 @@ export function InstalledPluginCard({
             </p>
           )}
         </div>
-        {installation && (
+        {installation && (!orgInstall || canManageOrgInstall) && (
           <InstallationActions
             installation={installation}
             displayName={entry.displayName}
@@ -621,6 +629,7 @@ export function InstalledPluginsPage() {
   const { token, sessionKey, isAuthenticated } = useAuth();
   const tokenRef = useTokenRef();
   const { confirm, dialog } = useConfirm();
+  const canManageOrgInstall = useCan("org.settings.manage");
   const {
     entries,
     loading,
@@ -711,6 +720,7 @@ export function InstalledPluginsPage() {
               entry={entry}
               token={token}
               runtimeKnown={runtime !== null && !runtimeTruncated}
+              canManageOrgInstall={canManageOrgInstall}
               onUninstalled={removeInstallation}
               onToggleEnabled={setInstallationEnabled}
               confirm={confirm}

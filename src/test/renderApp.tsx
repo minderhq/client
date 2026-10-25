@@ -142,6 +142,8 @@ export function personaResponse(persona: Persona, url: string): Response {
       seats: null,
     });
   }
+  // Organization › AI: the org's providers and presets are bare arrays.
+  if (path === "/v1/model-providers" || path === "/v1/model-providers/presets") return json([]);
   if (path === "/v1/teams") {
     return json({
       teams: persona.teams.map((t) => ({

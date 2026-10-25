@@ -35,6 +35,9 @@ export const ROUTES = {
   people: "/organization/people",
   peopleInvites: "/organization/people/invites",
   peopleDomains: "/organization/people/domains",
+  orgAi: "/organization/ai",
+  orgAiDefaults: "/organization/ai/defaults",
+  orgPlugins: "/organization/plugins",
 } as const;
 
 /** One member's person page (Organization › People). */
@@ -97,4 +100,6 @@ export const LEGACY_REDIRECTS: Redirect[] = [
   { from: "/bundles/installed", to: ROUTES.installedServiceBundles },
   // The org's member list before Organization › People (UX step 7).
   { from: "/organization/users", to: ROUTES.people },
+  // Providers & defaults before Organization › AI (UX step 9).
+  { from: "/platform/providers", to: ROUTES.orgAi },
 ];

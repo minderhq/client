@@ -1,9 +1,8 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { EmptyState } from "../components/EmptyState";
 import { Icon } from "../components/Icon";
 import { InfoCallout } from "../components/InfoCallout";
-import { ModelDefaultsPanel } from "../components/ModelDefaultsPanel";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
 import { useConfirm } from "../components/ConfirmDialog";
@@ -870,11 +869,13 @@ function AddProviderForm({
 }
 
 export function CloudProvidersPage() {
-  const { token, sessionKey } = useAuth();
-  // Defaults and providers both sit behind model-management's
-  // require_admin_or_org_admin: an instance admin, or an owner/admin of the org
-  // being acted in (org.ai.manage, the route's gate). Every other member sees
-  // the defaults read-only and no providers.
+  const { token } = useAuth();
+  const { t } = useI18n();
+  // Providers sit behind model-management's require_admin_or_org_admin: an
+  // instance admin, or an owner/admin of the org being acted in (org.ai.manage,
+  // the route's gate). The route (Organization › AI) is gated too; this keeps
+  // the page honest if reached another way. The defaults are the next tab
+  // (ModelDefaultsPage).
   const canManage = useCanManageModelProviders();
   const { confirm, dialog } = useConfirm();
 
@@ -895,39 +896,14 @@ export function CloudProvidersPage() {
     { enabled: canManage },
   );
 
-  // Self-hosted provider rows (`is_local`) serve Local models; every other
-  // `remote:` model is Cloud.
-  const localProviders = useMemo(
-    () =>
-      new Set(
-        (providersRes.data ?? []).filter((p) => p.is_local).map((p) => p.id),
-      ),
-    [providersRes.data],
-  );
-
   return (
     <>
       {dialog}
       <PageHeader
         icon="globe"
-        title="Providers & defaults"
-        subtitle="Pick the default model for each task, and connect an external OpenAI-compatible/Anthropic provider or a self-hosted instance (e.g. vLLM) so models from it appear alongside your local Ollama models. Opt-in and per-organization — nothing here is on by default. Providers hold the organization's own API credentials, so only its owners and admins can see or change them."
+        title={t("nav.items.orgAiProviders.title")}
+        subtitle={t("orgAi.providersSubtitle")}
       />
-
-      {token && (
-        <div className="mb-6">
-          <ModelDefaultsPanel
-            token={token}
-            canEdit={canManage}
-            sessionKey={sessionKey}
-            localProviders={localProviders}
-          />
-        </div>
-      )}
-
-      <h2 className="mb-2 text-base font-semibold text-gray-900 dark:text-gray-100">
-        Providers
-      </h2>
 
       {!canManage && (
         <InfoCallout icon="lock">

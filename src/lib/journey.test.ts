@@ -75,7 +75,7 @@ describe("the Model step", () => {
   it("prepends a Model step pointing at the providers page", () => {
     const steps = withModelStep("Model");
     expect(steps.map((s) => s.key)).toEqual(["model", "kb", "upload", "pipeline", "ask"]);
-    expect(steps[0]).toMatchObject({ label: "Model", to: "/platform/providers" });
+    expect(steps[0]).toMatchObject({ label: "Model", to: "/organization/ai" });
     expect(steps.slice(1)).toEqual(JOURNEY_STEPS);
   });
 

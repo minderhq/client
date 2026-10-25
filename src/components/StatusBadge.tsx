@@ -1,3 +1,4 @@
+import { useI18n } from "../i18n";
 import { badgeBaseClass, badgeNeutralToneClass, badgeTone } from "../lib/ui";
 import { Icon, type IconName } from "./Icon";
 
@@ -43,12 +44,20 @@ export function StatusBadge({
  * and Installed plugins word it identically (#2195). "Your install:" stays
  * visible: on Installed it sits beside the runtime "Enabled on this
  * installation" badge, and the two mean different things. */
-export function InstallStateBadge({ enabled }: { enabled: boolean }) {
+export function InstallStateBadge({ enabled, org = false }: { enabled: boolean; org?: boolean }) {
+  const who = org ? "Organization install" : "Your install";
   return (
     <StatusBadge
       icon={enabled ? "check" : "close"}
-      label={enabled ? "Your install: Enabled" : "Your install: Disabled"}
+      label={`${who}: ${enabled ? "Enabled" : "Disabled"}`}
       tone={enabled ? "success" : "neutral"}
     />
   );
+}
+
+/** Marks a plugin installed for the whole organization (`tenant_id` on the
+ * installation): every member has it, and only org admins change it. */
+export function OrgInstallBadge() {
+  const { t } = useI18n();
+  return <StatusBadge icon="org" label={t("orgPlugins.installedForOrg")} />;
 }

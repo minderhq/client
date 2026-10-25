@@ -23,7 +23,10 @@ vi.mock("react-router-dom", () => ({
 
 // Mutable per test (like GraphExplorerPage.test.tsx's behavior vars) so both
 // the logged-out and logged-in/authenticated paths can be exercised.
-let mockAuth = { token: "", isAuthenticated: false };
+let mockAuth: { token: string; isAuthenticated: boolean; tenantId?: string } = {
+  token: "",
+  isAuthenticated: false,
+};
 vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
 }));
@@ -88,6 +91,8 @@ function renderCard(overrides: {
   installation?: Installation;
   isAuthenticated?: boolean;
   isAdmin?: boolean;
+  canInstall?: boolean;
+  orgName?: string;
   confirm?: ReturnType<typeof vi.fn>;
   onInstalled?: ReturnType<typeof vi.fn>;
   onUninstalled?: ReturnType<typeof vi.fn>;
@@ -104,6 +109,8 @@ function renderCard(overrides: {
       token="tok"
       isAuthenticated={overrides.isAuthenticated ?? true}
       isAdmin={overrides.isAdmin ?? false}
+      canInstall={overrides.canInstall ?? true}
+      orgName={overrides.orgName}
       onInstalled={onInstalled}
       onUninstalled={onUninstalled}
       onToggleEnabled={onToggleEnabled}
@@ -143,6 +150,53 @@ describe("PluginCard", () => {
     expect(
       screen.queryByText(/Installed\. If this plugin exposes an AI tool/),
     ).toBeNull();
+  });
+
+  it("names the organization on an admin's Install: the install is for the whole org", async () => {
+    apiFetch.mockResolvedValue({});
+    renderCard({ installation: undefined, orgName: "Acme" });
+    const button = screen.getByRole("button", { name: "Install Weather for Acme" });
+    expect(button.textContent).toBe("Install for Acme");
+    fireEvent.click(button);
+    await screen.findByText(/Installed\. If this plugin exposes an AI tool/);
+  });
+
+  it("falls back to Request install when the marketplace refuses a non-admin (403)", async () => {
+    mockAuth = { token: "tok", isAuthenticated: true, tenantId: "7" };
+    apiFetch.mockRejectedValue(
+      Object.assign(new Error("plugin_install_requires_admin"), { status: 403 }),
+    );
+    renderCard({ installation: undefined });
+
+    fireEvent.click(screen.getByRole("button", { name: "Install Weather" }));
+
+    expect(
+      await screen.findByText("Only organization admins install plugins. Ask them with Request install."),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Request install/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Install Weather" })).toBeNull();
+    mockAuth = { token: "", isAuthenticated: false };
+  });
+
+  it("keeps Install after any other install failure", async () => {
+    apiFetch.mockRejectedValue(Object.assign(new Error("Forbidden"), { status: 403 }));
+    renderCard({ installation: undefined });
+    fireEvent.click(screen.getByRole("button", { name: "Install Weather" }));
+    await screen.findByText("Forbidden");
+    expect(screen.getByRole("button", { name: "Install Weather" })).toBeTruthy();
+  });
+
+  it("marks an org install and gives a member no actions on it", () => {
+    renderCard({ installation: installation({ tenant_id: "7" }), canInstall: false });
+    expect(screen.getByText("Installed for your organization")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Uninstall Weather" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Disable Weather" })).toBeNull();
+  });
+
+  it("gives an org admin the actions on the org install", () => {
+    renderCard({ installation: installation({ tenant_id: "7" }), canInstall: true });
+    expect(screen.getByRole("button", { name: "Uninstall Weather" })).toBeTruthy();
+    expect(screen.getByText("Organization install: Enabled")).toBeTruthy();
   });
 
   it("does not uninstall when the confirmation is declined", async () => {

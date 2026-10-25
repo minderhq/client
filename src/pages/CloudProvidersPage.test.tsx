@@ -28,21 +28,6 @@ vi.mock("../lib/auth", () => ({
 
 // The Defaults section has its own tests (ModelDefaultsPanel.test.tsx); here a
 // stub just records how the page mounts it.
-vi.mock("../components/ModelDefaultsPanel", () => ({
-  ModelDefaultsPanel: ({
-    canEdit,
-    localProviders,
-  }: {
-    canEdit: boolean;
-    localProviders?: ReadonlySet<string>;
-  }) => (
-    <div data-testid="defaults-panel">
-      {canEdit ? "defaults: editable" : "defaults: read-only"}
-      <span data-testid="local-providers">{[...(localProviders ?? [])].join(",")}</span>
-    </div>
-  ),
-}));
-
 const mockConfirm = vi.fn();
 vi.mock("../components/ConfirmDialog", () => ({
   useConfirm: () => ({ confirm: mockConfirm, dialog: null }),
@@ -346,11 +331,9 @@ describe("CloudProvidersPage", () => {
       screen.getByText("Only the organization's owners and admins can view or manage providers."),
     ).toBeTruthy();
     expect(apiFetch).not.toHaveBeenCalled();
-    // #2523: members still see the org's default models, read-only.
-    expect(screen.getByTestId("defaults-panel").textContent).toBe("defaults: read-only");
   });
 
-  it("lets an org owner manage providers and defaults without being an instance admin", async () => {
+  it("lets an org owner manage providers without being an instance admin", async () => {
     mockAuth = { token: "tok", role: "member", orgRole: "owner", isAuthenticated: true };
     installApi({
       providers: [
@@ -359,8 +342,8 @@ describe("CloudProvidersPage", () => {
       ],
     });
     render(<CloudProvidersPage />);
-    expect(screen.getByTestId("defaults-panel").textContent).toMatch(/^defaults: editable/);
-    await waitFor(() => expect(screen.getByTestId("local-providers").textContent).toBe("box"));
+    // The default models moved to their own tab (Organization › AI › Model defaults).
+    expect(screen.queryByRole("region", { name: "Default models" })).toBeNull();
     // model-management's require_admin_or_org_admin lets an org owner/admin
     // manage the org's providers, so the client offers it too.
     await waitFor(() =>
@@ -400,7 +383,9 @@ describe("CloudProvidersPage", () => {
     await waitFor(() =>
       expect(apiFetch).toHaveBeenCalledWith("/v1/model-providers/presets", expect.anything()),
     );
-    expect(screen.getByTestId("defaults-panel").textContent).toMatch(/^defaults: editable/);
+    expect(
+      screen.queryByText("Only the organization's owners and admins can view or manage providers."),
+    ).toBeNull();
   });
 
   it("keeps providers from an org admin role the server grants no org.ai.manage", async () => {
@@ -413,12 +398,6 @@ describe("CloudProvidersPage", () => {
         screen.getByText("Only the organization's owners and admins can view or manage providers."),
       ).toBeTruthy(),
     );
-  });
-
-  it("hides the defaults section when signed out", () => {
-    mockAuth = { token: "", role: "" };
-    render(<CloudProvidersPage />);
-    expect(screen.queryByTestId("defaults-panel")).toBeNull();
   });
 
   it("warns on a provider whose base URL breaks the network policy", async () => {
