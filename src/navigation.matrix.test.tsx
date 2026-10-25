@@ -319,7 +319,7 @@ const ORG_ADMINS: PersonaId[] = ["platformAdmin", "orgOwner", "orgAdmin"];
 const SIGNED_IN: PersonaId[] = [...ORG_ADMINS, "teamAdmin", "teamMember", "teamlessMember"];
 
 const GATED_ROUTES: GatedRoute[] = [
-  { path: ROUTES.chatbots, heading: "Public Chat", open: ORG_ADMINS },
+  { path: ROUTES.chatbots, heading: "Website chatbots", open: ORG_ADMINS },
   { path: ROUTES.backups, heading: "Backups", open: ["platformAdmin"] },
   { path: ROUTES.allOrganizations, heading: "All Organizations", open: ["platformAdmin"] },
   // Organization › Security › Audit log keeps the old /audit gate; the
@@ -425,7 +425,7 @@ describe("known gaps (client#126)", APP_TEST, () => {
       expect(navShows(PERSONAS[id], ROUTES.chatbots)).toBe(true);
       const { fetchMock } = renderApp(PERSONAS[id], ROUTES.chatbots);
       await settleApp();
-      expect(screen.queryByText(/to manage public chat endpoints/)).toBeNull();
+      expect(screen.queryByText(/to manage website chatbots/)).toBeNull();
       await waitFor(() =>
         expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/v1/public-chat/endpoints"))).toBe(
           true,

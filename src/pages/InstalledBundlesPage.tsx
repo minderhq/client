@@ -26,6 +26,7 @@ import {
 import { ROUTES } from "../lib/routes";
 import { fieldHintClass, secondaryButtonClass } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
+import { useI18n } from "../i18n";
 
 /** Downloads `data` as a JSON file -- a real browser download (this is the
  * actual product, not a sandboxed preview), not an in-page viewer. */
@@ -241,6 +242,7 @@ export function ExportImportPanel({
  * per claimed service live here rather than on Discover service bundles, since both
  * are specifically about the bundles you're actually running. */
 export function InstalledBundlesPage() {
+  const { t, rich } = useI18n();
   const { token, isPlatformAdmin } = useAuth();
   const isAdmin = isPlatformAdmin;
   const reconcileReasonId = useId();
@@ -283,8 +285,8 @@ export function InstalledBundlesPage() {
     <>
       <PageHeader
         icon="bundles"
-        title="Installed modules"
-        subtitle="Service bundles currently turned on, the Docker image each claimed service actually runs, and export/import for the whole set. Disabling, reconciling or importing requires a Platform Admin."
+        title={t("nav.items.modulesInstalled.title")}
+        subtitle={t("modules.installedSubtitle")}
       />
 
       {bundlesRes.data && (
@@ -297,13 +299,13 @@ export function InstalledBundlesPage() {
       )}
 
       <StatusLine isError={isError}>
-        {status || (bundlesRes.loading ? "Loading service bundles…" : "")}
+        {status || (bundlesRes.loading ? t("modules.loading") : "")}
       </StatusLine>
       {bundlesRes.error && (
         <LoadError
-          title="Couldn't load the service bundles."
+          title={t("modules.loadError")}
           message={bundlesRes.error}
-          what="service bundles"
+          what={t("modules.what")}
           onRetry={bundlesRes.reload}
         />
       )}
@@ -311,9 +313,7 @@ export function InstalledBundlesPage() {
       {orphaned.length > 0 && (
         <div className="mb-4">
           <InfoCallout icon="warning">
-            Orphaned services (claimed by no enabled bundle, should be
-            stopped): {orphaned.join(", ")}. Run Reconcile below to clean these
-            up.
+            {t("modules.orphaned", { list: orphaned.join(", ") })}
           </InfoCallout>
         </div>
       )}
@@ -336,16 +336,18 @@ export function InstalledBundlesPage() {
       </div>
 
       <h2 className="mb-2 text-base font-semibold text-gray-900 dark:text-gray-100">
-        Enabled bundles
+        {t("modules.enabled")}
       </h2>
       {bundlesRes.loading && !bundlesRes.data && <CardListSkeleton />}
       {bundlesRes.data && !bundlesRes.error && installed.length === 0 && (
         <EmptyState>
-          No service bundles are enabled yet — see{" "}
-          <Link to={ROUTES.modules} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
-            Discover modules
-          </Link>
-          .
+          {rich("modules.noneEnabled", {
+            link: (
+              <Link to={ROUTES.modules} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+                {t("nav.items.modulesDiscover.title")}
+              </Link>
+            ),
+          })}
         </EmptyState>
       )}
       {adminReason && installed.length > 0 && (

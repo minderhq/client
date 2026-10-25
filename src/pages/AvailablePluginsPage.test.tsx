@@ -132,7 +132,7 @@ describe("PluginCard", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Install Weather" }));
 
-    await screen.findByText(/Installed\. If this plugin exposes an AI tool/);
+    await screen.findByText(/Installed\. If this plugin brings a tool/);
     expect(apiFetch).toHaveBeenCalledWith("/v1/marketplace/plugins/p1/install", {
       method: "POST",
       token: "tok",
@@ -148,7 +148,7 @@ describe("PluginCard", () => {
 
     await screen.findByText("Plugin already installed");
     expect(
-      screen.queryByText(/Installed\. If this plugin exposes an AI tool/),
+      screen.queryByText(/Installed\. If this plugin brings a tool/),
     ).toBeNull();
   });
 
@@ -158,7 +158,7 @@ describe("PluginCard", () => {
     const button = screen.getByRole("button", { name: "Install Weather for Acme" });
     expect(button.textContent).toBe("Install for Acme");
     fireEvent.click(button);
-    await screen.findByText(/Installed\. If this plugin exposes an AI tool/);
+    await screen.findByText(/Installed\. If this plugin brings a tool/);
   });
 
   it("falls back to Request install when the marketplace refuses a non-admin (403)", async () => {

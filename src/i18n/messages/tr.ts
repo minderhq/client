@@ -57,14 +57,14 @@ export const tr: Messages = {
     forbiddenTitle: "Bu sayfaya erişiminiz yok",
     forbiddenBody: "Bu sayfa {audience} açık.",
     audience: {
-      members: "bu kuruluşun üyelerine",
-      orgAdmins: "kuruluş sahiplerine ve yöneticilerine",
-      teamAdmins: "ekibin yöneticilerine",
-      billing: "bu kuruluşun faturalandırmasını görebilen kişilere",
+      members: "bu kurumun üyelerine",
+      orgAdmins: "kurum sahiplerine ve yöneticilerine",
+      teamAdmins: "takımın yöneticilerine",
+      billing: "bu kurumun planını ve faturasını görebilen kişilere",
       platformAdmins: "platform yöneticilerine",
     },
     requestAccess: "Erişim iste",
-    requestAccessSoon: "Erişim istekleri yakında geliyor. O zamana kadar bir kuruluş yöneticisine başvurun.",
+    requestAccessSoon: "Erişim istekleri yakında geliyor. O zamana kadar bir kurum yöneticisine başvurun.",
     signInTitle: "Devam etmek için giriş yapın",
     signInBody: "Bu sayfayı görmek için giriş yapmanız gerekiyor.",
     backHome: "Ana sayfaya dön",
@@ -96,15 +96,15 @@ export const tr: Messages = {
     escape: "Esc",
     groupActions: "Eylemler",
     groupKnowledgeBase: "Bilgi tabanı",
-    groupPipeline: "İşlem hattı",
+    groupPipeline: "Asistan",
     groupPlugin: "Eklenti",
     openInKnowledgeBases: "Bilgi tabanlarında aç",
-    openInPipelines: "İşlem hatlarında aç",
+    openInPipelines: "Asistanlarda aç",
     openInDiscoverPlugins: "Eklenti keşfinde aç",
     actions: {
       ask: { label: "Soru sor", sublabel: "Bilgi tabanlarınızı sorgulayın", keywords: "sohbet soru sorgu chat rag query" },
       kb: { label: "Yeni bilgi tabanı", sublabel: "Belge yükleyin", keywords: "oluştur ekle yükle create add upload" },
-      pipeline: { label: "Yeni işlem hattı", sublabel: "Bilgi tabanlarını birleştirin", keywords: "oluştur ekle pipeline create add" },
+      pipeline: { label: "Yeni asistan", sublabel: "Bilgi tabanlarını birleştirin", keywords: "oluştur ekle işlem hattı pipeline create add" },
       model: { label: "Model indir", sublabel: "Ollama model yaşam döngüsü", keywords: "indir kur model download install ollama" },
       theme: { label: "Temayı değiştir", sublabel: "Sistem / açık / koyu", keywords: "karanlık aydınlık mod görünüm dark light theme" },
     },
@@ -156,7 +156,7 @@ export const tr: Messages = {
       billing: { label: "Plan ve fatura", title: "Plan ve fatura", description: "Planınız, aboneliğiniz, yükseltmeler ve lisanslar", keywords: "abonelik plan yükselt ödeme fiyat fatura lisans hak billing upgrade invoice licenses" },
       status: { label: "Durum ve kayıtlar", description: "Hizmetlerin sağlık durumu ve son günlükler", keywords: "sağlık hizmetler çalışma süresi günlük kayıt durum health logs status" },
       models: { label: "Yerel modeller", description: "Yerel dil modelleri (Ollama): indirin, deneyin, kaldırın", keywords: "model indir dil modeli ollama llm pull" },
-      modules: { label: "Modüller", description: "Bu kurulumun çalıştırabildiği hizmet paketleri", keywords: "modül hizmet paketi hizmetler yetenekler izleme çıkarım ses modules bundle services" },
+      modules: { label: "Modüller", description: "Birlikte açılıp kapatılan platform servis grupları", keywords: "modül hizmet paketi hizmetler yetenekler izleme çıkarım ses modules bundle services" },
       modulesDiscover: { label: "Keşfet", title: "Modülleri keşfet", description: "Açabileceğiniz modüller", keywords: "hizmet paketi açılabilir bundle available" },
       modulesInstalled: { label: "Kurulu", title: "Kurulu modüller", description: "Açık modüller, imajları, dışa ve içe aktarma", keywords: "hizmet paketi dışa aktar içe aktar bundle export import docker" },
       allOrganizations: { label: "Tüm kurumlar", description: "Bu kurulumdaki tüm kurumlar ve oluşturma", keywords: "kurumlar kuruluşlar oluştur yönetici organizations tenants provision" },
@@ -178,7 +178,7 @@ export const tr: Messages = {
       forgotAskAdmin: "Parolanızı mı unuttunuz? Sıfırlaması için yöneticinize başvurun.",
       submitRegister: "Hesap oluştur ve giriş yap",
       inviteOnly:
-        "Henüz hesabınız yok mu? Bu kurulumda hesaplar davetle oluşturulur. Davet aldıysanız davetinizdeki bağlantıyı açın. Almadıysanız kuruluşunuzun bir yöneticisinden sizi davet etmesini isteyin.",
+        "Henüz hesabınız yok mu? Bu kurulumda hesaplar davetle oluşturulur. Davet aldıysanız davetinizdeki bağlantıyı açın. Almadıysanız kurumunuzun bir yöneticisinden sizi davet etmesini isteyin.",
       ssoOnly: "Henüz hesabınız yok mu? Bu kurulumda kayıt kapalı.",
       ssoOnlyUseSso: "Aşağıdan SSO ile giriş yapın; hesabınız ilk girişinizde oluşturulur.",
       ssoOnlyAskAdmin: "Sizin için bir hesap oluşturması için bir yöneticiye başvurun.",
@@ -265,7 +265,7 @@ export const tr: Messages = {
 
   orgAi: {
     providersSubtitle:
-      "OpenAI uyumlu ya da Anthropic bir sağlayıcıyı veya vLLM gibi kendi sunucunuzu bağlayın; modelleri yerel modellerin yanında görünür. Sağlayıcılar kuruluşun kendi API kimlik bilgilerini tutar; onları yalnızca sahipleri ve yöneticileri görür.",
+      "OpenAI uyumlu ya da Anthropic bir sağlayıcıyı veya vLLM gibi kendi sunucunuzu bağlayın; modelleri yerel modellerin yanında görünür. Sağlayıcılar kurumun kendi API kimlik bilgilerini tutar; onları yalnızca sahipleri ve yöneticileri görür.",
     defaultsSubtitle:
       "Bir bilgi tabanı ya da soru kendi modelini seçmedikçe her görevin kullandığı model.",
   },
@@ -285,9 +285,9 @@ export const tr: Messages = {
     leave: "Ayrıl",
     remove: "Çıkar",
     leaveTitle: "Bu takımdan ayrılınsın mı?",
-    leaveMessage: "Bu takımın paylaştığı bilgi tabanlarına ve işlem hatlarına erişiminizi kaybedersiniz. Daha sonra yeniden davet edilebilirsiniz.",
+    leaveMessage: "Bu takımın paylaştığı bilgi tabanlarına ve asistanlarına erişiminizi kaybedersiniz. Daha sonra yeniden davet edilebilirsiniz.",
     removeTitle: "{name} çıkarılsın mı?",
-    removeMessage: "{name}, bu takımın paylaştığı bilgi tabanlarına ve işlem hatlarına erişimini hemen kaybeder.",
+    removeMessage: "{name}, bu takımın paylaştığı bilgi tabanlarına ve asistanlarına erişimini hemen kaybeder.",
     memberEmailPlaceholder: "Mevcut üyenin e-postası",
     addMember: "Üye ekle",
     added: "{email} eklendi. Takımla paylaşılanları görmesi için çıkış yapıp yeniden giriş yapması gerekir.",
@@ -302,38 +302,178 @@ export const tr: Messages = {
   myTeam: {
     subtitle: "Üyesi olduğunuz takımlar ve üyeleri. Takım yöneticileri takımlarını burada yönetir.",
     loadError: "Takımlar yüklenemedi.",
-    manageAll: "Kurumun bütün takımlarını Kuruluş › Takımlar altında oluşturup yönetebilirsiniz.",
+    manageAll: "Kurumun bütün takımlarını Kurum › Takımlar altında oluşturup yönetebilirsiniz.",
     openOrgTeams: "Takımlar'ı aç",
     noTeamHeading: "Takımlar",
     noTeam: "Henüz bir takımda değilsiniz. Aşağıdan birine katılmak isteyin; kararı takımın yöneticileri verir.",
-    noTeamAdmin: "Henüz bir takımda değilsiniz. Kendinizi Kuruluş › Takımlar altından bir takıma ekleyebilirsiniz.",
+    noTeamAdmin: "Henüz bir takımda değilsiniz. Kendinizi Kurum › Takımlar altından bir takıma ekleyebilirsiniz.",
     noTeams: "Kurumunuzda henüz takım yok. Bir kurum yöneticisinden takım oluşturmasını ya da sizi eklemesini isteyin.",
   },
 
   orgPlugins: {
     subtitle:
-      "Bütün kuruluş için kurulu eklentiler: her üye bunlara sahiptir. Açın, kapatın, kaldırın ve ayarlarını düzenleyin.",
-    loadError: "Kuruluşun eklentileri yüklenemedi.",
-    empty: "Kuruluş için henüz kurulu eklenti yok.",
+      "Bütün kurum için kurulu eklentiler: her üye bunlara sahiptir. Açın, kapatın, kaldırın ve ayarlarını düzenleyin.",
+    loadError: "Kurumun eklentileri yüklenemedi.",
+    empty: "Kurum için henüz kurulu eklenti yok.",
     discover: "Keşfet'te bir tane bulun",
     pending: { one: "{count} eklenti kurulum isteği karar bekliyor.", other: "{count} eklenti kurulum isteği karar bekliyor." },
     openRequests: "İstekleri aç",
-    installedForOrg: "Kuruluşunuz için kurulu",
+    installedForOrg: "Kurumunuz için kurulu",
     installFor: "{org} için kur",
     installForAria: "{plugin} eklentisini {org} için kur",
-    adminOnly: "Eklentileri yalnızca kuruluş yöneticileri kurar. Kurulum iste ile onlardan isteyin.",
+    adminOnly: "Eklentileri yalnızca kurum yöneticileri kurar. Kurulum iste ile onlardan isteyin.",
   },
 
   auditLog: {
-    scopeOrg: "{org} ve alt kuruluşlarının denetim kaydı gösteriliyor.",
+    scopeOrg: "{org} ve alt kurumlarının denetim kaydı gösteriliyor.",
     scopeInstance: "Tüm kurulumun denetim kaydı gösteriliyor (Platform Yöneticisi).",
-    noOrg: "Bir kuruluşta değilsiniz, bu yüzden gösterilecek denetim kaydı yok.",
+    noOrg: "Bir kurumda değilsiniz, bu yüzden gösterilecek denetim kaydı yok.",
   },
 
   publicChat: {
     apiAddressLabel: "API adresi (geliştiriciler için)",
     apiAddressHint: "Ziyaretçi sohbet sayfası ve yerleştirme kodu yakında geliyor.",
     copyApiAddress: "API adresini kopyala",
+    subtitle:
+      "Asistanlarınızdan birine dayanan bir sohbet botunu web sitenizde yayınlayın. Her sohbet botu yalnızca asistanının bilgi tabanlarından yanıt verir, kendi herkese açık adresinden erişilir ve dakikalık kendi istek sınırıyla kısıtlanır. Yalnızca yöneticiler içindir ve bu kurumla sınırlıdır.",
+    needsAssistant: "Önce bir asistan oluşturun; web sitesi sohbet botu yanıt vermek için bir asistana ihtiyaç duyar.",
+    newChatbot: "Yeni sohbet botu",
+    pickAssistant: "Bu sohbet botu için bir asistan seçin.",
+    assistant: "Asistan",
+    chooseAssistant: "Bir asistan seçin…",
+    assistantHint: "Sohbet botu, bu asistanın aradığı bilgi tabanlarından yanıt verir.",
+    boundAssistant: "Sohbet botunun asistanı",
+    nameLabel: "Sohbet botu adı",
+    deleteTitle: "Sohbet botunu sil",
+    adminRequired: "Web sitesi sohbet botlarını yönetmek için yönetici rolü gerekir.",
+    logInAsAdmin: "Web sitesi sohbet botlarını yönetmek için yönetici olarak giriş yapın.",
+    empty: "Henüz web sitesi sohbet botu yok.",
+    conversationsSubtitleNamed: "“{name}” web sitesi sohbet botunuz üzerinden yapılan anonim konuşmalar; salt okunur.",
+    conversationsSubtitle: "Web sitesi sohbet botunuz üzerinden yapılan anonim konuşmalar; salt okunur.",
+    allChatbots: "Tüm sohbet botları",
+    conversationsAdminRequired: "Web sitesi sohbet botu konuşmalarını görmek için yönetici rolü gerekir.",
+    conversationsLogIn: "Web sitesi sohbet botu konuşmalarını görmek için yönetici olarak giriş yapın.",
+  },
+
+  assistants: {
+    subtitle:
+      "Asistan, soru sorduğunuz şeydir: bir ya da daha fazla bilgi tabanında (yüklediğiniz belgelerde) arar ve kaynaklarını göstererek oradan yanıt verir. Aşağıda bir tane oluşturun, sonra Sohbet'te onunla konuşun.",
+    openChat: "Sohbeti aç",
+    create: "Asistan oluştur",
+    needsKb: "Önce bir bilgi tabanı oluşturun; bir asistanın arayacağı en az bir bilgi tabanı olmalı.",
+    noReadyKb:
+      "Seçilen bilgi tabanlarının hiçbirinde henüz belge yok; siz belge yükleyene kadar bunlar üzerindeki bir asistan boş yanıt verir.",
+    logInToCreate: "Asistan oluşturmak için giriş yapın.",
+    chooseTeam: "Bu asistanı paylaşacağınız takımı seçin.",
+    deleteTitle: "Asistan silinsin mi?",
+    deleteMessage: "“{name}” kalıcı olarak silinir. Aradığı bilgi tabanları etkilenmez.",
+    gone: "Bu asistan artık sunucuda yok; listenizden kaldırıldı.",
+    nameLabel: "Asistan adı",
+    copyId: "Asistan kimliğinin tamamını kopyala",
+    logInToEdit: "Bu asistanı düzenlemek ya da silmek için giriş yapın.",
+    chatWith: "Bu asistanla sohbet et",
+    empty: "Henüz asistan yok; yukarıdan en az bir bilgi tabanı seçin.",
+    filter: "Asistanları süz",
+    noMatch: "“{filter}” ile eşleşen asistan yok.",
+    localOnly: "Yalnızca yerel: bu asistanın bilgi tabanı içeriği hiçbir zaman bulut modeline gönderilmez.",
+    default: "(asistan varsayılanı)",
+  },
+
+  chat: {
+    subtitle: "Bilgi tabanlarınızla sohbet edin: bir asistan seçin ve sorun.",
+    noAssistants: "Henüz asistanınız yok. Soru sormaya başlamak için bir bilgi tabanı ve bir {link} oluşturun.",
+    assistantLink: "asistan",
+    picker: "Sorulacak asistan",
+    grounded: "Yanıtlar {name} üzerinden gelir ve kaynaklarını gösterir.",
+    yourAssistant: "asistanınız",
+    logInToAsk: "{login}, sonra soru sorun. Asistanlarınıza göz atmak herkese açık.",
+    logInLink: "Giriş yapın",
+    gone: "Bu asistan artık sunucuda yok. Asistanlarınız yeniden yükleniyor…",
+    modelHint:
+      "Bu soruyu asistanın ayarlı modeli yerine belirli bir modelle yanıtlayın; örneğin zor bir soru için daha güçlü bir model. Arama değişmez.",
+    localOnlyHint:
+      "Bu asistan Yalnızca yerel bir bilgi tabanında arar; bu yüzden içeriği hiçbir zaman bulut modeline gönderilmez ve burada bulut modelleri seçilemez.",
+  },
+
+  conversations: {
+    subtitle: "Başlattığınız sohbetler, hangi asistanla olursa olsun; en son etkin olan en üstte.",
+    empty: "Henüz sohbet yok. {chat} ekranında bir tane başlatın (ardından sorduğunuz sorular buraya dönebileceğiniz bir konu oluşturur).",
+  },
+
+  knowledgeBases: {
+    subtitle:
+      "Bilgi tabanları oluşturun ve belge yükleyin: asistanlarınız bu veriler üzerinde arama yapar. Bilgi tabanları kurumunuza aittir; görmek, oluşturmak, yüklemek ya da silmek için giriş yapın.",
+    createAssistant: "üzerinde bir asistan oluşturun →",
+    answerModelHint:
+      "Bir asistanın bu bilgi tabanında bulduklarından yanıtı yazar. “Org default”, kurumun yanıt modelini izler; o değişse bile.",
+  },
+
+  graph: {
+    subtitle:
+      "Metninizden bir bilgi grafiği kurun ve keşfedin: içindeki kişiler, kurumlar, yerler ve konular ile aralarındaki bağlantılar. Asistan benzer metin parçalarını bulur; bu ise {connected} bulur.",
+    connected: "kimin kiminle bağlantılı olduğunu",
+    exploreHint:
+      "Grafikte anlama göre arayın, varlıkları adıyla bulun ya da bir varlığın komşularına ve kaynak belgelerine bakın; aynı bilgiye bir asistanın aramasından farklı bir yol.",
+    separate: "Bu grafik, Keşfet altında gösterilen eklenti bağımlılık grafiğinden ayrıdır; verileri ilgisizdir.",
+  },
+
+  knowledgeQuality: {
+    entityMerges: "Varlık birleştirmeleri",
+  },
+
+  modules: {
+    availableSubtitle:
+      "Henüz açmadığınız isteğe bağlı modüller. Her biri bir grup servisi üstlenir; gerektiğinde bunları başka modüllerle paylaşır. Göz atmak herkese açık; açmak için Platform yöneticisi gerekir.",
+    installedSubtitle:
+      "Şu an açık olan modüller, üstlendikleri her servisin gerçekte çalıştırdığı Docker imajı ve bütün kümenin dışa/içe aktarımı. Kapatmak, uzlaştırmak ya da içe aktarmak için Platform yöneticisi gerekir.",
+    neverStarted:
+      "Açmak yalnızca zaten var olan kapsayıcıları başlatır. Hiç ayağa kaldırılmamış bir servis (örneğin bu modül kurulumdan beri kapalıysa) ana makinede yeniden kurulum gerektiriyor olarak görünür; onu gerçekten oluşturmak için ana makinede {start} ya da {restart} çalıştırın.",
+    loading: "Modüller yükleniyor…",
+    loadError: "Modüller yüklenemedi.",
+    what: "modüller",
+    canEnable: "Açabileceğiniz modüller",
+    allEnabled: "Bütün modüller zaten açık; bkz. {link}.",
+    enabled: "Açık modüller",
+    noneEnabled: "Henüz açık modül yok; bkz. {link}.",
+    orphaned: "Sahipsiz servisler (hiçbir açık modül üstlenmiyor, durdurulmalı): {list}. Temizlemek için aşağıdaki Reconcile düğmesini kullanın.",
+  },
+
+  tools: {
+    discoverTitle: "Araçları keşfet",
+    installedTitle: "Kurulu araçlar",
+    discoverSubtitle:
+      "Eklentilerin sunduğu araçların kataloğu, plan bilgisiyle. Şu an çalışmayan eklentilerin araçlarını da içerir ve bir eklenti yeniden yüklendiğinde güncellendiği için {installed} sayfasının gerisinde kalabilir. Bu sayfa için giriş gerekmez; her durumda salt okunurdur.",
+    discoverCallout:
+      "Bu katalogdur, şu an çağrılabilenler değil. Burada listelenen bir araç, onu sağlayan eklenti kurulup çalıştığında çağrılabilir; şu an canlı olanlar için {installed} sayfasına bakın.",
+    loading: "Araçlar yükleniyor…",
+    catalog: "Araç kataloğu",
+    catalogError: "Araç kataloğu yüklenemedi.",
+    catalogWhat: "araç kataloğu",
+    catalogEmpty: "Katalogda henüz araç yok.",
+    moreError: "Daha fazla araç yüklenemedi.",
+    moreWhat: "daha fazla araç",
+    installedSubtitle:
+      "Bu kurulumda şu an çalışan eklentilerden, gerçekten çağrılabilen bütün araçlar: bir asistanın sohbette kullanabileceklerinin tam listesi. Göz atmak için giriş gerekmez; veriyi değiştiren bir aracı çalıştırmak için, Minder'ın her yerinde olduğu gibi, gerekir.",
+    installedCallout:
+      "Bu, şu anda canlı olanlardır; her istekte yeniden hesaplanır. Bir eklenti çalışmıyorsa, araçları {discover} sayfasında olsa bile burada görünmez; onları canlı yapan, eklentiyi kurup açmaktır.",
+    callable: "Çağrılabilen araçlar",
+    liveError: "Şu an canlı olan araçlar yüklenemedi.",
+    liveWhat: "kurulu araçlar",
+    liveEmpty: "Şu an hiçbir eklenti araç sunmuyor.",
+    justInstalled: "Kuruldu. Bu eklenti bir araç getiriyorsa, canlı olduğunu doğrulamak için {check}.",
+    checkInstalled: "Kurulu araçlara bakın",
+    someExpose: "Bunların bazıları bir asistanın sohbette kullanabileceği araçlar getirir; hangilerinin şu an canlı olduğunu görmek için {check}.",
+  },
+
+  installedPlugins: {
+    subtitle:
+      "Bu kurulumda çalışan her şey ve Keşfet'ten kurduğunuz eklentiler: sürümlerine ve sağlıklarına bakın; açın, kapatın, kaldırın ya da ayarlarını düzenleyin. Giriş gerekir.",
+    notYours: "Bu kurulum tarafından herkes için yüklendi; açıp kapatabileceğiniz ya da kaldırabileceğiniz size ait bir kurulum yok.",
+    installsError: "Kurulumlarınız yüklenemedi: {error}",
+  },
+
+  voice: {
+    noRewriteModel: "Metni yeniden yazmak için hazır bir model yok; önce Yerel modeller altından bir model indirin.",
   },
 
   settings: {
@@ -409,6 +549,7 @@ export const tr: Messages = {
       "Listede model yok: bu sunucunun modelleri siz onları getirene kadar model seçicilerde görünmez. Ekledikten sonra kartındaki Fetch models düğmesini kullanıp listeyi kaydedin.",
     adapterNote: "{adapter} bağdaştırıcısı tarafından sunuluyor (port {port})",
     adapterNoteNoPort: "{adapter} bağdaştırıcısı tarafından sunuluyor",
+    modelIdsHint: "Bu sağlayıcının sunduğu model kimlikleri. Sohbette ve asistanlarda yalnızca bunlar kullanılabilir.",
     piiMasking: "Kişisel verileri bu sağlayıcıya gönderilmeden önce maskele",
     piiMaskingHelp:
       "E-posta adresleri, telefon numaraları, IBAN ve kart numaraları, kimlik numaraları ve IP adresleri yer tutucularla değiştirilir ve yanıtta geri yerleştirilir.",
@@ -419,9 +560,9 @@ export const tr: Messages = {
       step: "Model",
       title: "Bir model bağlayın",
       noModel:
-        "Henüz kullanılabilir bir dil modeli yok; bu yüzden yüklenen belgeler vektöre dönüştürülemez ve Sor yanıt veremez. Önce Ollama'ya bir model indirin ya da bir vLLM veya bulut sağlayıcısı bağlayın.",
+        "Henüz kullanılabilir bir dil modeli yok; bu yüzden yüklenen belgeler vektöre dönüştürülemez ve Sohbet yanıt veremez. Önce Ollama'ya bir model indirin ya da bir vLLM veya bulut sağlayıcısı bağlayın.",
       unavailable:
-        "Model servisi yanıt vermiyor; bu yüzden yüklenen belgeler vektöre dönüştürülemez ve Sor yanıt veremez. Model altyapısını kontrol edin ya da bir vLLM veya bulut sağlayıcısı bağlayın.",
+        "Model servisi yanıt vermiyor; bu yüzden yüklenen belgeler vektöre dönüştürülemez ve Sohbet yanıt veremez. Model altyapısını kontrol edin ya da bir vLLM veya bulut sağlayıcısı bağlayın.",
       providers: "Yapay zekâ sağlayıcılarını aç",
       docs: "Modellerinizi nasıl bağlarsınız",
       askAdmin: "Henüz bağlı bir model yok. Bir model bağlaması için bir yöneticiye başvurun.",
@@ -442,7 +583,7 @@ export const tr: Messages = {
       steps: {
         knowledgeBase: {
           title: "İlk bilgi tabanınızı oluşturun",
-          hint: "Bilgi tabanı, Minder'ın yanıt verirken kullandığı belgeleri tutar. Herkes soru sorabilsin diye kuruluşunuzla paylaşın.",
+          hint: "Bilgi tabanı, Minder'ın yanıt verirken kullandığı belgeleri tutar. Herkes soru sorabilsin diye kurumunuzla paylaşın.",
         },
         upload: {
           title: "Bir belge yükleyin",
@@ -450,15 +591,15 @@ export const tr: Messages = {
         },
         assistant: {
           title: "Bir asistan kurun",
-          hint: "Asistan, bir ya da daha fazla bilgi tabanından gelen soruları yanıtlar. İşlem hatları sayfasında bulunur.",
+          hint: "Asistan, bir ya da daha fazla bilgi tabanından gelen soruları yanıtlar. Asistanlar sayfasında bulunur.",
         },
         ask: {
           title: "İlk sorunuzu sorun",
           hint: "Yanıtlar, dayandıkları metin parçalarını gösterir.",
         },
         invite: {
-          title: "Ekip arkadaşlarınızı davet edin",
-          hint: "Davetleri kuruluşunuzun sayfasından gönderin.",
+          title: "Takım arkadaşlarınızı davet edin",
+          hint: "Davetleri kurumunuzun sayfasından gönderin.",
         },
         email: {
           title: "E-postayı ayarlayın",
@@ -490,7 +631,7 @@ export const tr: Messages = {
     kinds: {
       join: "Kuruma katılma",
       invite: "Davet",
-      team_join: "Ekibe katılma",
+      team_join: "Takıma katılma",
       plugin_install: "Eklenti kurulumu",
       model_request: "Model",
       plan_request: "Plan değişikliği",
@@ -502,13 +643,13 @@ export const tr: Messages = {
       expired: "Süresi doldu",
       withdrawn: "Geri çekildi",
     },
-    teamNumber: "{id} numaralı ekip",
+    teamNumber: "{id} numaralı takım",
     reason: "Neden: {reason}",
     pendingBadge: { one: "Kararınızı bekleyen {count} istek", other: "Kararınızı bekleyen {count} istek" },
     followUp: {
       install_plugin: "Onaylandı. Şimdi eklentiyi Eklenti keşfet sayfasından kurun.",
       enable_model: "Onaylandı. Şimdi modeli indirin ya da sağlayıcısını bağlayın.",
-      change_plan: "Onaylandı. Şimdi planı Faturalandırma sayfasından değiştirin.",
+      change_plan: "Onaylandı. Şimdi planı Plan ve fatura sayfasından değiştirin.",
     },
     send: {
       pluginInstall: "Kurulum iste",
@@ -516,9 +657,9 @@ export const tr: Messages = {
       model: "Model iste",
       modelTitle: "Model isteyin",
       teamJoin: "Katılmak iste",
-      teamJoinTitle: "{name} ekibine katılmak isteyin",
+      teamJoinTitle: "{name} takımına katılmak isteyin",
       adminRoute: "İstek kurumunuzun yöneticilerine gider. Yanıtı İstekler sayfasında görürsünüz.",
-      teamJoinRoute: "İstek ekibin yöneticilerine, ekibin yöneticisi yoksa kurumun yöneticilerine gider. Yanıtı İstekler sayfasında görürsünüz.",
+      teamJoinRoute: "İstek takımın yöneticilerine, takımın yöneticisi yoksa kurumun yöneticilerine gider. Yanıtı İstekler sayfasında görürsünüz.",
       subjectLabel: "Hangi modele ihtiyacınız var?",
       subjectPlaceholder: "örn. llama3.1:8b ya da bir bulut modeli",
       subjectRequired: "İhtiyacınız olan modeli yazın.",
@@ -567,9 +708,9 @@ export const tr: Messages = {
     },
   },
   people: {
-    subtitle: "{org} kuruluşunda kimler var: rolleri, ekipleri ve durumları.",
-    noOrg: "Henüz hiçbir kuruluşa üye değilsiniz. Kuruluşları bir yönetici oluşturur.",
-    orgLoadError: "Kuruluşunuz yüklenemedi.",
+    subtitle: "{org} kurumunda kimler var: rolleri, takımları ve durumları.",
+    noOrg: "Henüz hiçbir kuruma üye değilsiniz. Kurumları bir yönetici oluşturur.",
+    orgLoadError: "Kurumunuz yüklenemedi.",
     requests: "İstekler",
     role: "Rol",
     roles: {
@@ -578,7 +719,7 @@ export const tr: Messages = {
       member: "Üye",
     },
     badges: {
-      home: "ana kuruluş",
+      home: "ana kurum",
       suspended: "askıda",
       deactivated: "devre dışı",
       mustChange: "parolasını değiştirmeli",
@@ -594,31 +735,31 @@ export const tr: Messages = {
       addChoose: "Bir kullanıcı seçin…",
       addSubmit: "Ekle",
       loadError: "Üyeler yüklenemedi.",
-      forbidden: "Bu kuruluşun üyelerini görme yetkiniz yok.",
+      forbidden: "Bu kurumun üyelerini görme yetkiniz yok.",
       empty: "Henüz üye yok. Başlamak için kişi davet edin.",
       noMatch: "“{query}” ile eşleşen kimse yok.",
       count: { one: "{count} kişi gösteriliyor", other: "{count} kişi gösteriliyor" },
-      teams: "Ekipler: {teams}",
-      noTeams: "Ekibi yok",
+      teams: "Takımlar: {teams}",
+      noTeams: "Takımı yok",
       roleFor: "{name} için rol",
       resetSso: "Parolası tek oturum açma (SSO) ile yönetiliyor.",
       resetHint: "Parola burada sıfırlanamaz. {link}.",
       resetLink: "{name} parolasını e-postayla sıfırlayabilir",
       footerManage:
-        "Bir üyeyi askıya almak ya da çıkarmak yalnızca bu kuruluşu etkiler. Parola sıfırlama ve hesabı devre dışı bırakma yalnızca bu kuruluşun yönettiği hesaplarda sunulur; diğer herkes parolasını giriş sayfasından e-postayla sıfırlayabilir.",
-      footerView: "Üyeleri yönetmek sahip ve yöneticilerin işidir. Günlük paylaşım Ekipler üzerinden yapılır.",
+        "Bir üyeyi askıya almak ya da çıkarmak yalnızca bu kurumu etkiler. Parola sıfırlama ve hesabı devre dışı bırakma yalnızca bu kurumun yönettiği hesaplarda sunulur; diğer herkes parolasını giriş sayfasından e-postayla sıfırlayabilir.",
+      footerView: "Üyeleri yönetmek sahip ve yöneticilerin işidir. Günlük paylaşım Takımlar üzerinden yapılır.",
     },
     actions: {
       suspend: "Askıya al",
       unsuspend: "Askıdan çıkar",
-      suspendHint: "Bu kuruluşa erişimini askıya al",
-      unsuspendHint: "Bu kuruluşa erişimini geri ver",
+      suspendHint: "Bu kuruma erişimini askıya al",
+      unsuspendHint: "Bu kuruma erişimini geri ver",
       deactivate: "Devre dışı bırak",
       reactivate: "Yeniden etkinleştir",
       deactivateHint: "Bu hesabı her yerde devre dışı bırak",
       reactivateHint: "Bu hesabı yeniden etkinleştir",
       remove: "Çıkar",
-      removeHint: "Kuruluştan çıkar",
+      removeHint: "Kurumdan çıkar",
       removeName: "{name} kişisini çıkar",
     },
     status: {
@@ -633,18 +774,18 @@ export const tr: Messages = {
     },
     confirm: {
       roleTitle: "{name} için rol {role} olsun mu?",
-      roleMessage: "{name} kişisinin {org} kuruluşundaki rolü {from} rolünden {to} rolüne geçer.",
+      roleMessage: "{name} kişisinin {org} kurumundaki rolü {from} rolünden {to} rolüne geçer.",
       roleConfirm: "Rolü değiştir",
       gains: "Artık şunları da yapabilir:",
       loses: "Artık şunları yapamaz:",
       removeTitle: "{name} çıkarılsın mı?",
       removeMessage:
-        "{name}, {org} kuruluşuna erişimini kaybeder. Hesabı ve üye olduğu diğer kuruluşlar etkilenmez.",
+        "{name}, {org} kurumuna erişimini kaybeder. Hesabı ve üye olduğu diğer kurumlar etkilenmez.",
       suspendTitle: "{name} askıya alınsın mı?",
       suspendMessage:
-        "{name}, siz geri verene kadar {org} kuruluşuna erişemez. Hesabı ve üye olduğu diğer kuruluşlar etkilenmez.",
+        "{name}, siz geri verene kadar {org} kurumuna erişemez. Hesabı ve üye olduğu diğer kurumlar etkilenmez.",
       roles: "Burada kaybettiği roller:",
-      teams: "Erişimini kaybettiği ekipler:",
+      teams: "Erişimini kaybettiği takımlar:",
       deactivateTitle: "{name} hesabı devre dışı bırakılsın mı?",
       deactivateMessage:
         "{name} artık hiçbir yerde giriş yapamaz. Verileri korunur; hesabı istediğiniz zaman yeniden etkinleştirebilirsiniz.",
@@ -653,9 +794,9 @@ export const tr: Messages = {
       passwordChange:
         "Önce kendi parolanızı değiştirin: hesabınızda bekleyen bir parola değişikliği var, o yapılana kadar diğer işlemler engellenir.",
       notFound:
-        "Bu hesap artık bu kuruluşta değil ya da buradan yönetilemiyor. Listeyi yenileyip tekrar deneyin.",
+        "Bu hesap artık bu kurumda değil ya da buradan yönetilemiyor. Listeyi yenileyip tekrar deneyin.",
       requiresOwner: "Başka bir sahibi ya da yöneticiyi yalnızca bir sahip değiştirebilir veya çıkarabilir.",
-      lastOwner: "Bu, kuruluşun son sahibi. Önce başka birini sahip yapın.",
+      lastOwner: "Bu, kurumun son sahibi. Önce başka birini sahip yapın.",
     },
     permissionNames: {
       "org.members.view": "Üyeleri görme",
@@ -663,15 +804,15 @@ export const tr: Messages = {
       "org.members.manage": "Üyeleri ve rollerini yönetme",
       "org.members.suspend": "Üyeleri askıya alma",
       "org.roles.manage": "Rolleri, sahipleri ve yöneticileri yönetme",
-      "org.teams.manage": "Bütün ekipleri yönetme",
-      "org.settings.manage": "Kuruluş ayarlarını değiştirme",
+      "org.teams.manage": "Bütün takımları yönetme",
+      "org.settings.manage": "Kurum ayarlarını değiştirme",
       "org.billing.view": "Planı ve faturayı görme",
       "org.billing.manage": "Planı ve faturayı değiştirme",
       "org.audit.view": "Denetim kaydını okuma",
-      "org.suborgs.create": "Alt kuruluş oluşturma",
-      "org.suborgs.manage": "Alt kuruluşları yönetme",
+      "org.suborgs.create": "Alt kurum oluşturma",
+      "org.suborgs.manage": "Alt kurumları yönetme",
       "org.ai.manage": "Yapay zekâ sağlayıcılarını ve varsayılan modelleri yönetme",
-      "org.chatbots.manage": "Herkese açık sohbet botlarını yönetme",
+      "org.chatbots.manage": "Web sitesi sohbet botlarını yönetme",
     },
     invites: {
       subtitle: "Bir kişiyi ya da bütün bir listeyi davet edin, gönderdiğiniz davetleri izleyin.",
@@ -710,7 +851,7 @@ export const tr: Messages = {
       failed: "Davet edilemedi",
       reasons: {
         seat_limit: "Planda boş koltuk kalmadı.",
-        org_policy: "Kuruluşun politikası izin vermiyor (örneğin izinli e-posta alan adları).",
+        org_policy: "Kurumun politikası izin vermiyor (örneğin izinli e-posta alan adları).",
         rate_limit: "Bugün çok fazla davet gönderildi. Yarın tekrar deneyin.",
       },
       listHeading: "Davetler",
@@ -746,7 +887,7 @@ export const tr: Messages = {
       resendWait: "Bu davet kısa süre önce e-postayla gönderildi. {time} itibarıyla yeniden gönderebilirsiniz.",
       resendWaitLater: "Bu davet kısa süre önce e-postayla gönderildi. Daha sonra tekrar deneyin.",
       howTo:
-        "Bu sunucuda e-posta ayarlıysa her davet e-postayla gönderilir; bağlantıyı kopyalayıp kendiniz de gönderebilirsiniz. Kişi bu e-posta adresiyle giriş yapar (ya da kaydolur), ardından {org} kuruluşuna katılmak için bağlantıyı açar.",
+        "Bu sunucuda e-posta ayarlıysa her davet e-postayla gönderilir; bağlantıyı kopyalayıp kendiniz de gönderebilirsiniz. Kişi bu e-posta adresiyle giriş yapar (ya da kaydolur), ardından {org} kurumuna katılmak için bağlantıyı açar.",
     },
     domains: {
       what:
@@ -754,26 +895,26 @@ export const tr: Messages = {
       label: "İzinli e-posta alan adları",
       placeholder: "ornek.com",
       hint: "Her satıra bir alan adı, ör. ornek.com. Her alan adına izin vermek için boş bırakın.",
-      parent: "Üst kuruluş da bunlarla sınırlıyor: {list}",
+      parent: "Üst kurum da bunlarla sınırlıyor: {list}",
       save: "Kaydet",
       clear: "Her alan adına izin ver",
       saved: "İzinli alan adları kaydedildi.",
       grandfathered:
         "Planınız artık bu ayarı içermiyor. Mevcut liste geçerli olmaya devam eder; yalnızca temizleyebilirsiniz.",
-      loadError: "Kuruluşun politikası yüklenemedi.",
+      loadError: "Kurumun politikası yüklenemedi.",
       unsupported: "Bu sunucu bu ayarı henüz sunmuyor.",
       locked: {
-        org_kind: "Kişisel bir kuruluş e-posta alan adlarını sınırlayamaz.",
+        org_kind: "Kişisel bir kurum e-posta alan adlarını sınırlayamaz.",
         operator: "Bu kurulumun işletmecisi bu ayarı kapattı.",
         license: "Bu kurulumun lisansı bu ayarı içermiyor.",
       },
     },
     person: {
-      back: "Kişilere dön",
+      back: "İnsanlar sayfasına dön",
       notFoundTitle: "Kişi bulunamadı",
-      notFound: "Bu kişi bu kuruluşun üyesi değil ya da burada gösterilemiyor.",
+      notFound: "Bu kişi bu kurumun üyesi değil ya da burada gösterilemiyor.",
       rolesHeading: "Roller",
-      orgRole: "Kuruluş rolü",
+      orgRole: "Kurum rolü",
       direct: "doğrudan verildi",
       until: "{date} tarihine kadar",
       expired: "süresi doldu",
@@ -785,25 +926,25 @@ export const tr: Messages = {
       grantUntil: "Bitiş tarihi (isteğe bağlı)",
       grant: "Rolü ver",
       granted: "Rol verildi.",
-      noCustomRoles: "Bu kuruluşta yalnızca hazır roller var.",
+      noCustomRoles: "Bu kurumda yalnızca hazır roller var.",
       teamRolesNote:
-        "Roller henüz bir ekibe verilemiyor; bu yüzden buradaki her rol kişiye doğrudan verilmiştir.",
+        "Roller henüz bir takıma verilemiyor; bu yüzden buradaki her rol kişiye doğrudan verilmiştir.",
       permsHeading: "Neler yapabilir",
       permsLoadError: "Neler yapabileceği yüklenemedi.",
-      permsEmpty: "Bu kuruluşta henüz bir yetkisi yok.",
+      permsEmpty: "Bu kurumda henüz bir yetkisi yok.",
       fromRole: "{role} rolünden",
       fromGroup: "{role} › {group} üzerinden",
-      fromParent: "üst kuruluştan ({role})",
-      teamsHeading: "Ekipler",
-      teamsEmpty: "Hiçbir ekipte değil.",
+      fromParent: "üst kurumdan ({role})",
+      teamsHeading: "Takımlar",
+      teamsEmpty: "Hiçbir takımda değil.",
       accessHeading: "Erişim",
-      accessHint: "Askıya almak ya da çıkarmak yalnızca {org} kuruluşunu etkiler. Her ikisi de onay ister ve kişinin neyi kaybedeceğini gösterir.",
+      accessHint: "Askıya almak ya da çıkarmak yalnızca {org} kurumunu etkiler. Her ikisi de onay ister ve kişinin neyi kaybedeceğini gösterir.",
     },
     overview: {
       manage: "Kişileri yönet",
       invite: "Kişi davet et",
-      teams: "Ekipleri yönet",
-      body: "{org} kuruluşunda kimlerin olduğu, rolleri ve davetleri Kişiler altında. Günlük paylaşım Ekipler üzerinden yapılır.",
+      teams: "Takımları yönet",
+      body: "{org} kurumunda kimlerin olduğu, rolleri ve davetleri İnsanlar altında. Günlük paylaşım Takımlar üzerinden yapılır.",
     },
   },
   plans: {

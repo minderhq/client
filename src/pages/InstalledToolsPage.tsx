@@ -15,6 +15,7 @@ import { exampleForSchema } from "../lib/jsonSchemaExample";
 import { badgeClass, inputClass, secondaryButtonClass } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
 import { ROUTES } from "../lib/routes";
+import { useI18n } from "../i18n";
 
 /** The live Tool shape lives in lib/marketplace.ts (#119); re-exported for
  * existing importers. */
@@ -162,6 +163,7 @@ function LiveToolCard({ tool, token }: { tool: LiveTool; token: string }) {
  * parameter list (unlike the durable Discover AI tools catalog), which is
  * what makes a runnable example possible only here. */
 export function InstalledToolsPage() {
+  const { t, rich } = useI18n();
   const { token } = useAuth();
   const liveTools = useAsyncResource(
     (signal) =>
@@ -177,39 +179,32 @@ export function InstalledToolsPage() {
     <>
       <PageHeader
         icon="ai-tools"
-        title="Installed AI tools"
-        subtitle={
-          <>
-            Every AI tool actually callable right now, from plugins currently
-            running on Plugin Registry — exactly what the assistant's
-            function-calling can reach. Browsing needs no login; running a tool
-            that changes data does, same as anywhere else in Minder.
-          </>
-        }
+        title={t("tools.installedTitle")}
+        subtitle={t("tools.installedSubtitle")}
       />
       <InfoCallout icon="info">
-        This is what's live this moment, computed fresh on every request. If a
-        plugin isn't running, its tools won't appear here even when they're in
-        the{" "}
-        <Link to={ROUTES.discoverAiTools} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
-          Discover AI tools
-        </Link>{" "}
-        — installing and enabling that plugin is what makes them live.
+        {rich("tools.installedCallout", {
+          discover: (
+            <Link to={ROUTES.discoverAiTools} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+              {t("tools.discoverTitle")}
+            </Link>
+          ),
+        })}
       </InfoCallout>
-      <StatusLine>{liveTools.loading ? "Loading AI tools…" : ""}</StatusLine>
-      <h2 className="sr-only">Callable AI tools</h2>
+      <StatusLine>{liveTools.loading ? t("tools.loading") : ""}</StatusLine>
+      <h2 className="sr-only">{t("tools.callable")}</h2>
       {liveTools.loading && liveTools.data === null && <CardListSkeleton />}
       {liveTools.error && (
         <LoadError
-          title="Couldn't load the AI tools that are live right now."
+          title={t("tools.liveError")}
           message={liveTools.error}
-          what="installed AI tools"
+          what={t("tools.liveWhat")}
           onRetry={liveTools.reload}
         />
       )}
       {!liveTools.loading && !liveTools.error && liveTools.data?.length === 0 && (
         <EmptyState className="mb-6">
-          No plugin is currently exposing an AI tool.
+          {t("tools.liveEmpty")}
         </EmptyState>
       )}
       {!liveTools.error && liveTools.data?.map((t) => (

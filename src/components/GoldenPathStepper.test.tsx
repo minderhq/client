@@ -71,8 +71,8 @@ describe("GoldenPathStepper", () => {
 
     expect(screen.getByText("Knowledge base")).toBeTruthy();
     expect(screen.getByText("Upload docs")).toBeTruthy();
-    expect(screen.getByText("Pipeline")).toBeTruthy();
-    expect(screen.getByText("Ask")).toBeTruthy();
+    expect(screen.getByText("Assistant")).toBeTruthy();
+    expect(screen.getByText("Chat")).toBeTruthy();
 
     // The current step carries aria-current + the "Next:" hint mirrors it.
     const current = screen.getByRole("link", { current: "step" });

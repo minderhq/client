@@ -82,7 +82,7 @@ describe("InstalledBundlesPage", () => {
     });
     render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
 
-    expect(await screen.findByText(/No service bundles are enabled yet/)).toBeTruthy();
+    expect(await screen.findByText(/No modules are enabled yet/)).toBeTruthy();
     expect(
       screen.getByRole("link", { name: "Discover modules" }).getAttribute("href"),
     ).toBe("/platform/modules");
@@ -211,27 +211,27 @@ describe("InstalledBundlesPage", () => {
     render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
 
     expect(screen.getByTestId("card-list-skeleton")).toBeTruthy();
-    expect(screen.queryByText(/No service bundles are enabled yet/)).toBeNull();
+    expect(screen.queryByText(/No modules are enabled yet/)).toBeNull();
 
     reject(new Error("bundle reconciler down"));
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toContain("Couldn't load the service bundles.");
-    expect(screen.queryByText(/No service bundles are enabled yet/)).toBeNull();
+    expect(alert.textContent).toContain("Couldn't load the modules.");
+    expect(screen.queryByText(/No modules are enabled yet/)).toBeNull();
 
     apiFetch.mockResolvedValueOnce({ bundles: [bundle({ name: "voice", enabled: true })], count: 1 });
-    fireEvent.click(screen.getByRole("button", { name: "Retry loading service bundles" }));
+    fireEvent.click(screen.getByRole("button", { name: "Retry loading modules" }));
     expect(await screen.findByRole("heading", { level: 3, name: "voice" })).toBeTruthy();
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("nests bundle cards (h3) under an 'Enabled bundles' h2", async () => {
+  it("nests bundle cards (h3) under an 'Enabled modules' h2", async () => {
     apiFetch.mockResolvedValue({ bundles: [bundle({ name: "voice", enabled: true })], count: 1 });
     render(<InstalledBundlesPage />, { wrapper: MemoryRouter });
 
     await screen.findByRole("heading", { level: 3, name: "voice" });
     expect(
       screen.getAllByRole("heading").map((h) => `${h.tagName}:${h.textContent?.trim()}`),
-    ).toEqual(["H1:Installed modules", "H2:Export / Import", "H2:Enabled bundles", "H3:voice"]);
+    ).toEqual(["H1:Installed modules", "H2:Export / Import", "H2:Enabled modules", "H3:voice"]);
   });
 });
 

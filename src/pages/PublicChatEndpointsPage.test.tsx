@@ -139,7 +139,7 @@ describe("PublicChatEndpointsPage", () => {
     mockAuth = { isAuthenticated: true, token: "tok", role: "member", orgRole: "member", isPlatformAdmin: false };
     renderPage();
     expect(
-      screen.getByText("Admin role required to manage public chat endpoints."),
+      screen.getByText("Admin role required to manage website chatbots."),
     ).toBeTruthy();
     expect(apiFetch).not.toHaveBeenCalled();
   });
@@ -147,7 +147,7 @@ describe("PublicChatEndpointsPage", () => {
   it("gives the legacy instance admin role no access by itself", () => {
     mockAuth = { isAuthenticated: true, token: "tok", role: "admin", orgRole: "member", isPlatformAdmin: false };
     renderPage();
-    expect(screen.getByText("Admin role required to manage public chat endpoints.")).toBeTruthy();
+    expect(screen.getByText("Admin role required to manage website chatbots.")).toBeTruthy();
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
@@ -156,7 +156,7 @@ describe("PublicChatEndpointsPage", () => {
     installApi({});
     serveMyPermissions(apiFetch, myPermissions({ orgKeys: ["org.chatbots.manage"] }));
     renderPage();
-    expect(screen.getByText("Admin role required to manage public chat endpoints.")).toBeTruthy();
+    expect(screen.getByText("Admin role required to manage website chatbots.")).toBeTruthy();
     // The page never asks: the gate is the session's org role.
     expect(apiFetch).not.toHaveBeenCalled();
   });
@@ -166,14 +166,14 @@ describe("PublicChatEndpointsPage", () => {
     installApi({});
     renderPage();
     await waitFor(() => expect(apiFetch).toHaveBeenCalled());
-    expect(screen.queryByText("Admin role required to manage public chat endpoints.")).toBeNull();
+    expect(screen.queryByText("Admin role required to manage website chatbots.")).toBeNull();
   });
 
   it("prompts to log in when unauthenticated", () => {
     mockAuth = { token: "", role: "", orgRole: "", isPlatformAdmin: false };
     renderPage();
     expect(
-      screen.getByText("Log in as an admin to manage public chat endpoints."),
+      screen.getByText("Log in as an admin to manage website chatbots."),
     ).toBeTruthy();
   });
 
@@ -251,17 +251,17 @@ describe("PublicChatEndpointsPage", () => {
     installApi({ endpoints: [] });
     renderPage();
     expect(
-      await screen.findByText("No public chat endpoints yet."),
+      await screen.findByText("No website chatbots yet."),
     ).toBeTruthy();
   });
 
-  it("prompts to create a pipeline first when none exist", async () => {
+  it("prompts to create an assistant first when none exist", async () => {
     mockAuth = ADMIN;
     installApi({ endpoints: [], pipelines: [] });
     renderPage();
     expect(
       await screen.findByText(
-        "Create a RAG pipeline first — a public chat endpoint needs one to answer from.",
+        "Create an assistant first — a website chatbot needs one to answer from.",
       ),
     ).toBeTruthy();
   });
@@ -270,9 +270,9 @@ describe("PublicChatEndpointsPage", () => {
     mockAuth = ADMIN;
     installApi({ endpoints: [] });
     renderPage();
-    await screen.findByText("No public chat endpoints yet.");
+    await screen.findByText("No website chatbots yet.");
 
-    fireEvent.click(screen.getByText("New Endpoint"));
+    fireEvent.click(screen.getByText("New chatbot"));
 
     fireEvent.change(await screen.findByPlaceholderText("e.g. Support Bot"), {
       target: { value: "Support Bot" },
@@ -306,9 +306,9 @@ describe("PublicChatEndpointsPage", () => {
     mockAuth = ADMIN;
     installApi({ endpoints: [] });
     renderPage();
-    await screen.findByText("No public chat endpoints yet.");
+    await screen.findByText("No website chatbots yet.");
 
-    fireEvent.click(screen.getByText("New Endpoint"));
+    fireEvent.click(screen.getByText("New chatbot"));
     fireEvent.change(await screen.findByPlaceholderText("e.g. Support Bot"), {
       target: { value: "Support Bot" },
     });
@@ -344,7 +344,7 @@ describe("PublicChatEndpointsPage", () => {
     await screen.findByText("Support Bot");
 
     fireEvent.click(screen.getByText("Edit"));
-    const nameInput = await screen.findByLabelText("Endpoint name");
+    const nameInput = await screen.findByLabelText("Chatbot name");
     fireEvent.change(nameInput, { target: { value: "Renamed Bot" } });
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));

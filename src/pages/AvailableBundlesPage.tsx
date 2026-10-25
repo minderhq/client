@@ -13,11 +13,13 @@ import { useAuth } from "../lib/auth";
 import { BUNDLE_TOGGLE_ACTION, type BundlesResponse, bundleAdminReason } from "../lib/bundles";
 import { ROUTES } from "../lib/routes";
 import { useAsyncResource } from "../lib/useAsyncResource";
+import { useI18n } from "../i18n";
 
 /** Bundles NOT currently enabled -- the ones you could turn on. A bundle that
  * gets enabled here disappears from this list and reappears on Installed
  * service bundles, mirroring how Discover and Installed plugins behave. */
 export function AvailableBundlesPage() {
+  const { t, rich } = useI18n();
   const { token, isPlatformAdmin } = useAuth();
   const isAdmin = isPlatformAdmin;
   const adminNoteId = useId();
@@ -33,34 +35,36 @@ export function AvailableBundlesPage() {
     <>
       <PageHeader
         icon="bundles"
-        title="Discover modules"
-        subtitle="Optional service bundles you haven't turned on yet — each claims a set of services shared with other bundles where needed. Browsing is open for everyone; enabling requires a Platform Admin."
+        title={t("nav.items.modulesDiscover.title")}
+        subtitle={t("modules.availableSubtitle")}
       />
       <InfoCallout icon="info">
-        Enabling only starts containers that already exist. A service that
-        was never brought up (e.g. this bundle has been off since install)
-        shows as needing a host converge — run <code>./setup.sh start</code>{" "}
-        or <code>./setup.sh restart</code> on the host to actually create it.
+        {rich("modules.neverStarted", {
+          start: <code>./setup.sh start</code>,
+          restart: <code>./setup.sh restart</code>,
+        })}
       </InfoCallout>
-      <StatusLine>{bundlesRes.loading ? "Loading service bundles…" : ""}</StatusLine>
+      <StatusLine>{bundlesRes.loading ? t("modules.loading") : ""}</StatusLine>
       {bundlesRes.error && (
         <LoadError
-          title="Couldn't load the service bundles."
+          title={t("modules.loadError")}
           message={bundlesRes.error}
-          what="service bundles"
+          what={t("modules.what")}
           onRetry={bundlesRes.reload}
         />
       )}
 
-      <h2 className="sr-only">Bundles you can enable</h2>
+      <h2 className="sr-only">{t("modules.canEnable")}</h2>
       {bundlesRes.loading && !bundlesRes.data && <CardListSkeleton />}
       {bundlesRes.data && !bundlesRes.error && available.length === 0 && (
         <EmptyState>
-          Every service bundle is already enabled — see{" "}
-          <Link to={ROUTES.installedModules} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
-            Installed modules
-          </Link>
-          .
+          {rich("modules.allEnabled", {
+            link: (
+              <Link to={ROUTES.installedModules} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+                {t("nav.items.modulesInstalled.title")}
+              </Link>
+            ),
+          })}
         </EmptyState>
       )}
       {adminReason && available.length > 0 && (

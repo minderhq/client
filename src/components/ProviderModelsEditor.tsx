@@ -15,6 +15,7 @@ import {
   secondaryButtonClass,
 } from "../lib/ui";
 import { Icon } from "./Icon";
+import { useI18n } from "../i18n";
 
 // #2522: the per-provider model list editor -- a chip/tag input. Enter (or a
 // comma) adds the typed id(s), each chip has its own remove button, and
@@ -33,6 +34,7 @@ export function ModelsEditor({
   /** Extra guidance under the field, e.g. what an empty list means. */
   hint?: string;
 }) {
+  const { t } = useI18n();
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const inputId = useId();
@@ -134,8 +136,7 @@ export function ModelsEditor({
         </p>
       ) : (
         <p className={fieldHintClass}>
-          The model ids this provider offers. Only these can be used in chat
-          and pipelines.{hint ? ` ${hint}` : ""}
+          {t("providers.modelIdsHint")}{hint ? ` ${hint}` : ""}
         </p>
       )}
     </div>

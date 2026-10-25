@@ -155,13 +155,13 @@ describe("InstalledToolsPage", () => {
     apiFetch.mockReset();
   });
 
-  it("renders the Installed AI tools heading and points to Discover AI tools", async () => {
+  it("renders the Installed tools heading and points to Discover tools", async () => {
     apiFetch.mockResolvedValue({ tools: [] });
     renderPage();
 
-    expect(screen.getByRole("heading", { name: "Installed AI tools" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Installed tools" })).toBeTruthy();
     expect(
-      screen.getAllByText("Discover AI tools")[0].closest("a")?.getAttribute("href"),
+      screen.getAllByText("Discover tools")[0].closest("a")?.getAttribute("href"),
     ).toBe("/marketplace/discover/ai-tools");
   });
 
@@ -169,7 +169,7 @@ describe("InstalledToolsPage", () => {
     apiFetch.mockResolvedValue({ tools: [] });
     renderPage();
 
-    await screen.findByText("No plugin is currently exposing an AI tool.");
+    await screen.findByText("No plugin is currently exposing a tool.");
     expect(apiFetch).toHaveBeenCalledWith(
       "/v1/plugins/ai/tools",
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
@@ -214,15 +214,15 @@ describe("InstalledToolsPage", () => {
     renderPage();
 
     expect(screen.getByTestId("card-list-skeleton")).toBeTruthy();
-    expect(screen.queryByText("No plugin is currently exposing an AI tool.")).toBeNull();
+    expect(screen.queryByText("No plugin is currently exposing a tool.")).toBeNull();
 
     reject(new Error("plugin-registry unreachable"));
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toContain("Couldn't load the AI tools that are live right now.");
-    expect(screen.queryByText("No plugin is currently exposing an AI tool.")).toBeNull();
+    expect(alert.textContent).toContain("Couldn't load the tools that are live right now.");
+    expect(screen.queryByText("No plugin is currently exposing a tool.")).toBeNull();
 
     apiFetch.mockResolvedValueOnce({ tools: [tool()] });
-    fireEvent.click(screen.getByRole("button", { name: "Retry loading installed AI tools" }));
+    fireEvent.click(screen.getByRole("button", { name: "Retry loading installed tools" }));
     expect(await screen.findByRole("heading", { level: 3, name: "get_weather" })).toBeTruthy();
     expect(screen.queryByRole("alert")).toBeNull();
   });
@@ -237,13 +237,13 @@ describe("InstalledToolsPage", () => {
     );
     expect(screen.getByRole("button", { name: "Run get_weather" })).toBeTruthy();
     // Card titles are h3 under the page's (visually hidden) h2.
-    expect(screen.getByRole("heading", { level: 2, name: "Callable AI tools" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Callable tools" })).toBeTruthy();
   });
 
   it("renders (does not crash) when the response omits `tools` entirely", async () => {
     apiFetch.mockResolvedValue({});
     renderPage();
 
-    await screen.findByText("No plugin is currently exposing an AI tool.");
+    await screen.findByText("No plugin is currently exposing a tool.");
   });
 });

@@ -9,6 +9,7 @@ import { isValidElement, type ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { setLocale } from "../i18n";
 import { ApiError } from "../lib/api";
 import {
   AutoRouterStatsCard,
@@ -22,7 +23,7 @@ import {
   type RagPipeline,
 } from "./RagPipelinesPage";
 
-// PipelineCard now renders a react-router <Link> ("Ask this pipeline", #1229),
+// PipelineCard now renders a react-router <Link> ("Chat with this assistant", #1229),
 // so every bare render needs a Router in context. Wrap bare renders here — but
 // NOT ones that already supply their own <MemoryRouter> (react-router throws on
 // a Router nested inside a Router).
@@ -284,7 +285,7 @@ describe("CreatePipelineForm", () => {
 
   it("shows a login hint and disables submit when logged out", () => {
     render(<CreatePipelineForm token="" kbs={[kb]} onCreated={vi.fn()} />);
-    expect(screen.getByText("Log in to create a pipeline.")).toBeTruthy();
+    expect(screen.getByText("Log in to create an assistant.")).toBeTruthy();
     expect(
       (screen.getByRole("button", { name: "Create" }) as HTMLButtonElement).disabled,
     ).toBe(true);
@@ -337,7 +338,7 @@ describe("PipelineCard", () => {
         confirm={vi.fn()}
       />,
     );
-    expect(screen.getByText("Log in to edit or delete this pipeline.")).toBeTruthy();
+    expect(screen.getByText("Log in to edit or delete this assistant.")).toBeTruthy();
     expect(
       (screen.getByRole("button", { name: "Edit" }) as HTMLButtonElement).disabled,
     ).toBe(true);
@@ -356,7 +357,7 @@ describe("PipelineCard", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-    fireEvent.change(screen.getByLabelText("Pipeline name"), { target: { value: "   " } });
+    fireEvent.change(screen.getByLabelText("Assistant name"), { target: { value: "   " } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await screen.findByText("Name can't be empty.");
@@ -375,7 +376,7 @@ describe("PipelineCard", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-    fireEvent.change(screen.getByLabelText("Pipeline name"), { target: { value: "Renamed" } });
+    fireEvent.change(screen.getByLabelText("Assistant name"), { target: { value: "Renamed" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(onUpdated).toHaveBeenCalledWith(pipeline({ name: "Renamed" })));
@@ -384,7 +385,7 @@ describe("PipelineCard", () => {
       body: { name: "Renamed", visibility: "private", team_id: null },
       token: "tok",
     });
-    expect(screen.queryByLabelText("Pipeline name")).toBeNull();
+    expect(screen.queryByLabelText("Assistant name")).toBeNull();
   });
 
   it("cancels a rename without saving", () => {
@@ -397,7 +398,7 @@ describe("PipelineCard", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-    fireEvent.change(screen.getByLabelText("Pipeline name"), { target: { value: "Discard me" } });
+    fireEvent.change(screen.getByLabelText("Assistant name"), { target: { value: "Discard me" } });
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(screen.getByText("Support pipeline")).toBeTruthy();
@@ -559,7 +560,7 @@ describe("PipelineCard", () => {
     fireEvent.change(screen.getByLabelText("Visibility"), { target: { value: "team" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    await screen.findByText("Choose a team to share this pipeline with.");
+    await screen.findByText("Choose a team to share this assistant with.");
   });
 
   it("saves visibility and team_id together", async () => {
@@ -639,6 +640,31 @@ describe("RagPipelinesPage", () => {
     expect(await screen.findByText("Support pipeline")).toBeTruthy();
   });
 
+  it("is titled Asistanlar in Turkish, with Turkish copy for the empty list", async () => {
+    apiFetch.mockImplementation((path: string) => {
+      if (path.startsWith("/v1/rag/knowledge-bases")) return Promise.resolve({ items: [kb] });
+      if (path === "/v1/rag/capabilities") return Promise.resolve(caps);
+      if (path.startsWith("/v1/rag/pipeline?")) return Promise.resolve({ items: [] });
+      if (path === "/v1/rag/decision-stats") return Promise.resolve(null);
+      if (path === "/v1/teams?limit=500") return Promise.resolve({ teams: [] });
+      if (path.startsWith("/v1/models")) return Promise.resolve({ items: [] });
+      throw new Error(`unexpected path ${path}`);
+    });
+    setLocale("tr");
+    try {
+      render(
+        <MemoryRouter>
+          <RagPipelinesPage />
+        </MemoryRouter>,
+      );
+      expect(screen.getByRole("heading", { level: 1, name: "Asistanlar" })).toBeTruthy();
+      expect(await screen.findByText(/Henüz asistan yok/)).toBeTruthy();
+      expect(screen.getByRole("link", { name: /Sohbeti aç/ })).toBeTruthy();
+    } finally {
+      setLocale("en");
+    }
+  });
+
   it("degrades gracefully when decision-stats 404s (older backend)", async () => {
     apiFetch.mockImplementation((path: string) => {
       if (path.startsWith("/v1/rag/knowledge-bases")) return Promise.resolve({ items: [] });
@@ -655,7 +681,7 @@ describe("RagPipelinesPage", () => {
       </MemoryRouter>,
     );
 
-    await screen.findByText(/No pipelines created yet/);
+    await screen.findByText(/No assistants yet/);
     // The whole page loaded fine despite decision-stats failing.
     expect(screen.queryByText(/Auto-router analytics/)).toBeNull();
   });
@@ -692,7 +718,7 @@ describe("RagPipelinesPage", () => {
     );
     await screen.findByText("Support");
 
-    fireEvent.change(screen.getByLabelText("Filter pipelines"), { target: { value: "sal" } });
+    fireEvent.change(screen.getByLabelText("Filter assistants"), { target: { value: "sal" } });
 
     expect(screen.getByText("Sales")).toBeTruthy();
     expect(screen.queryByText("Support")).toBeNull();
@@ -720,9 +746,9 @@ describe("RagPipelinesPage", () => {
     );
     await screen.findByText("Support");
 
-    fireEvent.change(screen.getByLabelText("Filter pipelines"), { target: { value: "nope" } });
+    fireEvent.change(screen.getByLabelText("Filter assistants"), { target: { value: "nope" } });
 
-    await screen.findByText('No pipelines match "nope".');
+    await screen.findByText("No assistants match “nope”.");
   });
 
   it("links each pipeline card to Ask with the pipeline preselected (#1229)", async () => {
@@ -740,7 +766,7 @@ describe("RagPipelinesPage", () => {
     );
 
     await screen.findByText("Support pipeline");
-    const ask = screen.getByRole("link", { name: /Ask this pipeline/ });
+    const ask = screen.getByRole("link", { name: /Chat with this assistant/ });
     expect(ask.getAttribute("href")).toBe("/ask?pipeline=p-1");
   });
 

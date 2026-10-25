@@ -121,7 +121,7 @@ describe("primaryAction", () => {
   it("suggests building a pipeline once a KB is READY but no pipeline does", () => {
     const action = primaryAction(counts({ kbCount: 1, readyKbCount: 1, pipelineCount: 0 }));
     expect(action.to).toBe("/rag/pipelines");
-    expect(action.title).toBe("Build a pipeline");
+    expect(action.title).toBe("Set up an assistant");
     expect(action.body).toContain("1 knowledge base ready"); // singular
   });
 
@@ -134,11 +134,11 @@ describe("primaryAction", () => {
     const action = primaryAction(counts({ kbCount: 2, readyKbCount: 2, pipelineCount: 1 }));
     expect(action.to).toBe("/ask");
     expect(action.title).toBe("Ask a question");
-    expect(action.body).toContain("1 pipeline "); // singular
+    expect(action.body).toContain("1 assistant "); // singular
   });
 
   it("pluralizes the pipeline count in the ask-a-question suggestion", () => {
     const action = primaryAction(counts({ kbCount: 2, readyKbCount: 2, pipelineCount: 4 }));
-    expect(action.body).toContain("4 pipelines ");
+    expect(action.body).toContain("4 assistants ");
   });
 });

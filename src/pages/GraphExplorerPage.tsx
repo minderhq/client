@@ -19,6 +19,7 @@ import {
 } from "../lib/ui";
 import { type AsyncResource, useAsyncResource } from "../lib/useAsyncResource";
 import { useTokenRef } from "../lib/useTokenRef";
+import { useI18n } from "../i18n";
 
 interface Entity {
   text: string;
@@ -424,6 +425,7 @@ function ExtractAndBuildCard({
 }
 
 function ExploreCard({ token }: { token: string }) {
+  const { t } = useI18n();
   const [mode, setMode] = useState<"search" | "find" | "entity">("search");
   const [query, setQuery] = useState("");
   const [findQuery, setFindQuery] = useState("");
@@ -533,9 +535,7 @@ function ExploreCard({ token }: { token: string }) {
         Explore
       </h2>
       <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-        Search the graph by meaning, find entities by name, or look up a specific
-        entity's neighbors and source documents — a different retrieval path from
-        RAG Pipelines' vector search, over the same underlying knowledge.
+        {t("graph.exploreHint")}
       </p>
       <div className="mb-3 flex gap-2 border-b border-gray-100 dark:border-gray-800">
         <button
@@ -1426,6 +1426,7 @@ function CorrelationsCard({ token }: { token: string }) {
 }
 
 export function GraphExplorerPage() {
+  const { t, rich } = useI18n();
   const { token, sessionKey } = useAuth();
   const tokenRef = useTokenRef();
   const { confirm, dialog } = useConfirm();
@@ -1474,18 +1475,10 @@ export function GraphExplorerPage() {
       <PageHeader
         icon="graph"
         title="Knowledge Graph"
-        subtitle={
-          <>
-            Build and explore a knowledge graph from your text — spaCy extracts
-            entities and relationships, Neo4j stores them. A different retrieval
-            paradigm from vector-search RAG Pipelines: this finds{" "}
-            <em>who's connected to whom</em>, not just similar-sounding chunks.
-          </>
-        }
+        subtitle={rich("graph.subtitle", { connected: <em>{t("graph.connected")}</em> })}
       />
       <InfoCallout icon="info">
-        This graph is separate from the plugin dependency graph shown on the
-        Marketplace page — same underlying Neo4j instance, unrelated data.
+        {t("graph.separate")}
       </InfoCallout>
       {dialog}
       <GraphOverviewCard stats={stats} />

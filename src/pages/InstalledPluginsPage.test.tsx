@@ -240,12 +240,12 @@ describe("InstalledPluginsPage", () => {
     expect(screen.queryByText("Loading installed plugins…")).toBeNull();
   });
 
-  it("renders installed plugin cards and the Installed AI tools cross-link when non-empty", async () => {
+  it("renders installed plugin cards and the Installed tools cross-link when non-empty", async () => {
     mockApi({ installations: [installation()] });
     render(<InstalledPluginsPage />);
 
     expect(await screen.findByText("My Plugin")).toBeTruthy();
-    expect(screen.getByText("check Installed AI tools")).toBeTruthy();
+    expect(screen.getByText("check Installed tools")).toBeTruthy();
   });
 
   it("marks an install for the organization and gives a member no actions on it", async () => {
@@ -277,7 +277,7 @@ describe("InstalledPluginsPage", () => {
     expect(checked.querySelector("time")?.getAttribute("dateTime")).toBe("2026-01-01T00:05:00Z");
     expect(card.querySelector("[title^='Last health check']")).toBeNull();
     expect(within(card).getByText("v2.1.0")).toBeTruthy();
-    expect(within(card).getByText(/no marketplace install/)).toBeTruthy();
+    expect(within(card).getByText(/no install of yours/)).toBeTruthy();
     // Nothing for the marketplace lifecycle endpoints to act on.
     expect(within(card).queryByRole("button", { name: /Uninstall/ })).toBeNull();
     expect(within(card).queryByRole("button", { name: /Enable|Disable/ })).toBeNull();
@@ -344,7 +344,7 @@ describe("InstalledPluginsPage", () => {
     render(<InstalledPluginsPage />);
 
     expect(
-      await screen.findByText("Couldn't load your marketplace installs: marketplace unreachable"),
+      await screen.findByText("Couldn't load your installs: marketplace unreachable"),
     ).toBeTruthy();
     expect(screen.getByRole("heading", { name: "weather" })).toBeTruthy();
     expect(screen.queryByText("find one in Discover plugins")).toBeNull();
@@ -461,7 +461,7 @@ describe("InstalledPluginsPage", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: /Uninstall/ })).toBeNull());
     const card = cardFor("Weather");
     expect(within(card).getByText("Enabled on this installation")).toBeTruthy();
-    expect(within(card).getByText(/no marketplace install/)).toBeTruthy();
+    expect(within(card).getByText(/no install of yours/)).toBeTruthy();
   });
 });
 

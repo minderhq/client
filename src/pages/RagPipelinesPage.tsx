@@ -35,6 +35,7 @@ import {
 } from "../lib/ui";
 import { useTokenRef } from "../lib/useTokenRef";
 import { EmptyState } from "../components/EmptyState";
+import { useI18n } from "../i18n";
 
 // document_count/vector_count come along so the picker below can flag empty
 // KBs (#1227) — building a pipeline over one is the classic "silent nothing".
@@ -241,6 +242,7 @@ export function QueryResultCard({
   kbIds?: readonly string[];
   token?: string | null;
 }) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const scheduleTimeout = useAutoClearTimeout();
   const details = response.method_details;
@@ -315,7 +317,7 @@ export function QueryResultCard({
         {response.data_policy === "local_only" && (
           <span
             className={badgeClass}
-            title="Local only: this pipeline's knowledge base content is never sent to a cloud model."
+            title={t("assistants.localOnly")}
           >
             <Icon name="lock" size={12} />
             Local only
@@ -380,6 +382,7 @@ export function CreatePipelineForm({
   kbs: KnowledgeBase[];
   onCreated: (p: RagPipeline) => void;
 }) {
+  const { t } = useI18n();
   const nameId = useId();
   const [name, setName] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -446,13 +449,10 @@ export function CreatePipelineForm({
     <section className={`mb-6 ${cardClass}`}>
       <h2 className="mb-1 flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
         <Icon name="plus" size={16} className="text-indigo-500 dark:text-indigo-400" />
-        Create a pipeline
+        {t("assistants.create")}
       </h2>
       {kbs.length === 0 ? (
-        <EmptyState>
-          Create a knowledge base first — a pipeline needs at least one to
-          search over.
-        </EmptyState>
+        <EmptyState>{t("assistants.needsKb")}</EmptyState>
       ) : (
         <form onSubmit={handleSubmit}>
           <fieldset disabled={!token || creating} className="mt-2 flex flex-col gap-3">
@@ -496,9 +496,7 @@ export function CreatePipelineForm({
             </fieldset>
             {noReadySelected && (
               <p className="text-xs text-amber-600 dark:text-amber-400">
-                None of the selected knowledge bases have documents yet — a
-                pipeline over them will return empty answers until you upload
-                some.
+                {t("assistants.noReadyKb")}
               </p>
             )}
             <div className="flex items-center gap-3">
@@ -507,7 +505,7 @@ export function CreatePipelineForm({
               </button>
               {!token && (
                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                  Log in to create a pipeline.
+                  {t("assistants.logInToCreate")}
                 </span>
               )}
               <span className="text-sm text-gray-500 dark:text-gray-400">{status}</span>
@@ -545,6 +543,7 @@ export function PipelineCard({
   onUpdated: (pipeline: RagPipeline) => void;
   confirm: ReturnType<typeof useConfirm>["confirm"];
 }) {
+  const { t } = useI18n();
   const [status, setStatus] = useState("");
   const [isError, setIsError] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -573,7 +572,7 @@ export function PipelineCard({
       return;
     }
     if (editVisibility === "team" && editTeamId === "") {
-      setStatus("Choose a team to share this pipeline with.");
+      setStatus(t("assistants.chooseTeam"));
       setIsError(true);
       return;
     }
@@ -605,8 +604,8 @@ export function PipelineCard({
 
   async function handleDelete() {
     const ok = await confirm({
-      title: "Delete pipeline?",
-      message: `This permanently deletes "${pipeline.name}". The knowledge bases it searches over are not affected.`,
+      title: t("assistants.deleteTitle"),
+      message: t("assistants.deleteMessage", { name: pipeline.name }),
       danger: true,
     });
     if (!ok) return;
@@ -617,7 +616,7 @@ export function PipelineCard({
       onDeleted(pipeline.id);
     } catch (e) {
       if (e instanceof ApiError && e.status === 404) {
-        setStatus("This pipeline no longer exists on the server — removed from your list.");
+        setStatus(t("assistants.gone"));
         onDeleted(pipeline.id);
         return;
       }
@@ -643,7 +642,7 @@ export function PipelineCard({
                   className={inputClass}
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  aria-label="Pipeline name"
+                  aria-label={t("assistants.nameLabel")}
                   disabled={saving}
                 />
               </div>
@@ -729,7 +728,7 @@ export function PipelineCard({
             <button
               type="button"
               onClick={handleCopy}
-              title="Copy full pipeline id"
+              title={t("assistants.copyId")}
               className="ml-1.5 underline hover:text-gray-600 dark:hover:text-gray-300"
             >
               {copied ? "copied" : "copy"}
@@ -772,7 +771,7 @@ export function PipelineCard({
       </div>
       {!token && (
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Log in to edit or delete this pipeline.
+          {t("assistants.logInToEdit")}
         </p>
       )}
       <StatusLine isError={isError}>{status}</StatusLine>
@@ -785,7 +784,7 @@ export function PipelineCard({
           className={primaryButtonClass}
         >
           <Icon name="ask" size={16} />
-          Ask this pipeline
+          {t("assistants.chatWith")}
         </Link>
       </div>
     </section>
@@ -862,6 +861,7 @@ export function AutoRouterStatsCard({ stats }: { stats: DecisionStats | null }) 
 }
 
 export function RagPipelinesPage() {
+  const { t } = useI18n();
   const { token, sessionKey } = useAuth();
   const tokenRef = useTokenRef();
   const { confirm, dialog } = useConfirm();
@@ -949,21 +949,12 @@ export function RagPipelinesPage() {
       {dialog}
       <PageHeader
         icon="pipelines"
-        title="Pipelines"
-        subtitle={
-          <>
-            A <strong>pipeline</strong> is the thing you ask questions against:
-            it points at one or more <em>knowledge bases</em> (your uploaded
-            documents) and answers using Minder's own retrieval — RAG
-            (retrieval-augmented generation). Create one below, then ask it in{" "}
-            <em>Ask</em>. This is separate from OpenWebUI's own disconnected
-            Knowledge feature.
-          </>
-        }
+        title={t("nav.items.pipelines.label")}
+        subtitle={t("assistants.subtitle")}
         actions={
           <Link to="/ask" className={secondaryButtonClass}>
             <Icon name="ask" size={16} />
-            Open Ask
+            {t("assistants.openChat")}
           </Link>
         }
       />
@@ -980,9 +971,7 @@ export function RagPipelinesPage() {
       <RetrievalMethodsReference />
       <AutoRouterStatsCard stats={decisionStats} />
       {pipelines.length === 0 && (
-        <EmptyState>
-          No pipelines created yet — pick at least one knowledge base above.
-        </EmptyState>
+        <EmptyState>{t("assistants.empty")}</EmptyState>
       )}
       {pipelines.length > 1 && (
         <div className="mb-3 flex items-center gap-3">
@@ -992,7 +981,7 @@ export function RagPipelinesPage() {
             placeholder="Filter by name or knowledge base id…"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            aria-label="Filter pipelines"
+            aria-label={t("assistants.filter")}
           />
           {filter.trim() && (
             <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -1002,7 +991,7 @@ export function RagPipelinesPage() {
         </div>
       )}
       {pipelines.length > 0 && visiblePipelines.length === 0 && (
-        <EmptyState>No pipelines match "{filter}".</EmptyState>
+        <EmptyState>{t("assistants.noMatch", { filter })}</EmptyState>
       )}
       {visiblePipelines.map((p) => (
         <PipelineCard
