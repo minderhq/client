@@ -14,6 +14,7 @@ import { Sidebar } from "./components/Sidebar";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { UserMenu } from "./components/UserMenu";
 import { useI18n } from "./i18n";
+import { REQUEST_INBOX_REQUIRES } from "./lib/accessRequests";
 import { AuthProvider } from "./lib/auth";
 import { isModalOpen } from "./lib/modalLayer";
 import { MEMBER, PLATFORM_ADMIN } from "./lib/permissions";
@@ -44,7 +45,6 @@ import { MyTeamPage } from "./pages/MyTeamPage";
 import { ModelDefaultsPage } from "./pages/ModelDefaultsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ModelManagementPage } from "./pages/ModelManagementPage";
-import { MyLicensesPage } from "./pages/MyLicensesPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { OrganizationPage } from "./pages/OrganizationPage";
 import { OrgPluginsPage } from "./pages/OrgPluginsPage";
@@ -57,10 +57,8 @@ import { PublicChatConversationsPage } from "./pages/PublicChatConversationsPage
 import { PublicChatEndpointsPage } from "./pages/PublicChatEndpointsPage";
 import { RagPipelinesPage } from "./pages/RagPipelinesPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
-import { RequestsPage } from "./pages/RequestsPage";
-import { ReviewQueuePage } from "./pages/ReviewQueuePage";
+import { RequestsPage, RequestsRedirect } from "./pages/RequestsPage";
 import { SettingsPage } from "./pages/SettingsPage";
-import { SubmissionsPage } from "./pages/SubmissionsPage";
 import { StatusPage } from "./pages/StatusPage";
 import { EntityMergeReviewPage } from "./pages/EntityMergeReviewPage";
 import { TaxonomyReviewPage } from "./pages/TaxonomyReviewPage";
@@ -183,16 +181,20 @@ export function App() {
                     <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                     <Route path="/reset-password" element={<ResetPasswordPage />} />
                     <Route path="/verify-email" element={<VerifyEmailPage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
+                    {/* Me › My account: profile, voice, the caller's own requests. */}
+                    <Route path={ROUTES.account} element={<SettingsPage />} />
+                    <Route path={ROUTES.voice} element={<VoicePage />} />
                     <Route
-                      path={ROUTES.requests}
+                      path={ROUTES.myRequests}
                       element={
                         <RequirePermission requires={MEMBER}>
-                          <RequestsPage />
+                          <RequestsPage view="mine" />
                         </RequirePermission>
                       }
                     />
-                    <Route path="/billing" element={<BillingPage />} />
+                    {/* The old /requests: the inbox for whoever can open it, the
+                      caller's own list for everyone else. */}
+                    <Route path="/requests" element={<RequestsRedirect />} />
                     <Route path="/invite/:token" element={<InviteRedeemPage />} />
 
                     <Route path="/rag" element={<KnowledgeBasesPage />} />
@@ -202,17 +204,14 @@ export function App() {
                       path="/rag/taxonomy-review"
                       element={<TaxonomyReviewPage />}
                     />
-                    <Route
-                      path="/rag/entity-merges"
-                      element={<EntityMergeReviewPage />}
-                    />
                     <Route path="/rag/conversations" element={<ConversationsPage />} />
                     {/* Route guards (#131): a caller who doesn't meet the requirement
                       gets the forbidden page at the same URL. Each guard asks
                       what the page itself already checks; operator screens
-                      check the Platform Admin, never a permission key. */}
+                      check the Platform Admin, never a permission key.
+                      Organization › Website chatbots: */}
                     <Route
-                      path="/rag/public-chat"
+                      path={ROUTES.chatbots}
                       element={
                         <RequirePermission requires="org.chatbots.manage">
                           <PublicChatEndpointsPage />
@@ -220,7 +219,7 @@ export function App() {
                       }
                     />
                     <Route
-                      path="/rag/public-chat/:endpointId/conversations"
+                      path={`${ROUTES.chatbots}/:endpointId/conversations`}
                       element={
                         <RequirePermission requires="org.chatbots.manage">
                           <PublicChatConversationsPage />
@@ -228,7 +227,7 @@ export function App() {
                       }
                     />
                     <Route
-                      path="/rag/public-chat/:endpointId/conversations/:sessionId"
+                      path={`${ROUTES.chatbots}/:endpointId/conversations/:sessionId`}
                       element={
                         <RequirePermission requires="org.chatbots.manage">
                           <PublicChatConversationsPage />
@@ -236,32 +235,21 @@ export function App() {
                       }
                     />
 
-                    {/* Marketplace (#2197): Discover / Installed / Publish, each
-                      with one tab per item type. Paths come from lib/routes.ts. */}
+                    {/* Build › Discover: the plugin catalog and what is installed.
+                      The AI tools pages have no menu row (a tool is a facet of
+                      a plugin); the plugin pages link to them. */}
                     <Route path={ROUTES.discoverPlugins} element={<AvailablePluginsPage />} />
                     <Route path={ROUTES.discoverAiTools} element={<AvailableToolsPage />} />
-                    <Route
-                      path={ROUTES.discoverServiceBundles}
-                      element={<AvailableBundlesPage />}
-                    />
                     <Route path={ROUTES.installedPlugins} element={<InstalledPluginsPage />} />
                     <Route path={ROUTES.installedAiTools} element={<InstalledToolsPage />} />
-                    <Route
-                      path={ROUTES.installedServiceBundles}
-                      element={<InstalledBundlesPage />}
-                    />
-                    <Route path={ROUTES.publishSubmissions} element={<SubmissionsPage />} />
-                    <Route
-                      path={ROUTES.publishSubmissionReview}
-                      element={
-                        <RequirePermission requires={PLATFORM_ADMIN}>
-                          <ReviewQueuePage />
-                        </RequirePermission>
-                      }
-                    />
 
-                    {/* My account › Licenses, Platform › MindHub & sources. */}
-                    <Route path={ROUTES.licenses} element={<MyLicensesPage />} />
+                    {/* Platform. Status (public), Local models and Modules stay
+                      readable by every member; their admin actions are gated
+                      on the pages and by the API. */}
+                    <Route path={ROUTES.status} element={<StatusPage />} />
+                    <Route path={ROUTES.models} element={<ModelManagementPage />} />
+                    <Route path={ROUTES.modules} element={<AvailableBundlesPage />} />
+                    <Route path={ROUTES.installedModules} element={<InstalledBundlesPage />} />
                     <Route
                       path={ROUTES.sources}
                       element={
@@ -278,12 +266,8 @@ export function App() {
                         </RequirePermission>
                       }
                     />
-
-                    <Route path="/platform" element={<ModelManagementPage />} />
-                    <Route path="/platform/status" element={<StatusPage />} />
-                    <Route path="/platform/voice" element={<VoicePage />} />
                     <Route
-                      path="/platform/backups"
+                      path={ROUTES.backups}
                       element={
                         <RequirePermission requires={PLATFORM_ADMIN}>
                           <BackupsPage />
@@ -291,7 +275,7 @@ export function App() {
                       }
                     />
                     <Route
-                      path="/platform/users"
+                      path={ROUTES.allUsers}
                       element={
                         <RequirePermission requires={PLATFORM_ADMIN}>
                           <UsersPage />
@@ -330,6 +314,14 @@ export function App() {
                       element={
                         <RequirePermission requires="org.members.manage">
                           <PeopleInvitesPage />
+                        </RequirePermission>
+                      }
+                    />
+                    <Route
+                      path={ROUTES.requests}
+                      element={
+                        <RequirePermission requires={REQUEST_INBOX_REQUIRES}>
+                          <RequestsPage view="inbox" />
                         </RequirePermission>
                       }
                     />
@@ -374,19 +366,33 @@ export function App() {
                         </RequirePermission>
                       }
                     />
+                    {/* Organization › Knowledge quality: the entity-merge review.
+                      Its API serves any member for the candidates they own. */}
+                    <Route path={ROUTES.knowledgeQuality} element={<EntityMergeReviewPage />} />
+                    <Route path={ROUTES.billing} element={<BillingPage />} />
                     <Route
-                      path="/organizations"
+                      path={ROUTES.allOrganizations}
                       element={
                         <RequirePermission requires={PLATFORM_ADMIN}>
                           <AllOrganizationsPage />
                         </RequirePermission>
                       }
                     />
+                    {/* Organization › Security › Audit log (the active org) and
+                      Platform › Platform audit log (the whole installation). */}
                     <Route
-                      path="/audit"
+                      path={ROUTES.orgAudit}
                       element={
                         <RequirePermission requires="org.audit.view">
-                          <AuditLogPage />
+                          <AuditLogPage scope="org" />
+                        </RequirePermission>
+                      }
+                    />
+                    <Route
+                      path={ROUTES.platformAudit}
+                      element={
+                        <RequirePermission requires={PLATFORM_ADMIN}>
+                          <AuditLogPage scope="platform" />
                         </RequirePermission>
                       }
                     />

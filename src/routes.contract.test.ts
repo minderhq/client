@@ -23,8 +23,8 @@ import { LEGACY_REDIRECTS, ROUTES, SECTION_REDIRECTS } from "./lib/routes";
 /** Pages reached through a nav destination rather than from the nav itself,
  * keyed by path → the nav destination that owns them. */
 const DETAIL_ROUTES: Record<string, string> = {
-  "/rag/public-chat/:endpointId/conversations": "/rag/public-chat",
-  "/rag/public-chat/:endpointId/conversations/:sessionId": "/rag/public-chat",
+  [`${ROUTES.chatbots}/:endpointId/conversations`]: ROUTES.chatbots,
+  [`${ROUTES.chatbots}/:endpointId/conversations/:sessionId`]: ROUTES.chatbots,
   [`${ROUTES.sources}/:repositoryId`]: ROUTES.sources,
   [`${ROUTES.people}/:userId`]: ROUTES.people,
 };
@@ -42,6 +42,9 @@ const AUTH_ROUTES = [
 /** Routes outside the main nav for another stated reason. */
 const UTILITY_ROUTES: Record<string, string> = {
   "*": "unmatched paths get the 404 page",
+  [ROUTES.discoverAiTools]: "a tool is a facet of a plugin: linked from the plugin pages, no menu row",
+  [ROUTES.installedAiTools]: "a tool is a facet of a plugin: linked from the plugin pages, no menu row",
+  "/requests": "the old Requests URL: redirects to the inbox or to My requests, by permission",
 };
 
 /** The JSX expression in `path={…}` that maps the redirect tables to routes;

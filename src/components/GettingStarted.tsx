@@ -116,7 +116,7 @@ export function GettingStarted({
     : [
         ask,
         step("use_kb", "/rag", "knowledge-bases", "useKb", checks?.knowledge_base),
-        step("profile", "/settings", "user", "profile"),
+        step("profile", ROUTES.account, "user", "profile"),
       ];
 
   const visible = orderSteps(

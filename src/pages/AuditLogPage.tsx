@@ -71,10 +71,13 @@ function StatePeek({ label, value }: { label: string; value: unknown }) {
  * from where, with before/after state. Backend already records every
  * privileged mutation (role changes, org create/switch, member add/remove,
  * plugin review, …) and streams to SIEM — this makes it readable in the app
- * instead of only via the API. A Platform Admin reads the instance-wide log
- * (GET /v1/audit-logs); anyone else reads their active org's log (GET
- * /v1/organizations/{id}/audit-logs, org.audit.view — the route's gate). */
-export function AuditLogPage() {
+ * instead of only via the API. Two pages (client#126 menu decision):
+ * - "org" (Organization › Security › Audit log): always the active org's log
+ *   (GET /v1/organizations/{id}/audit-logs, org.audit.view — the route's
+ *   gate; the API lets a Platform Admin read any org's log too).
+ * - "platform" (Platform › Platform audit log): the installation-wide log
+ *   (GET /v1/audit-logs, Platform Admin only). */
+export function AuditLogPage({ scope }: { scope: "org" | "platform" }) {
   const { isAuthenticated, token, sessionKey, isPlatformAdmin, activeTenantId } = useAuth();
   const { t } = useI18n();
   const [action, setAction] = useState("");
@@ -86,10 +89,12 @@ export function AuditLogPage() {
 
   const orgsRes = useAsyncResource<MyOrg[]>(
     (signal) => fetchMyOrgs(token, signal).then((r) => r.organizations),
-    { deps: [sessionKey], enabled: isAuthenticated && !isPlatformAdmin },
+    { deps: [sessionKey], enabled: isAuthenticated && scope === "org" },
   );
-  const org = isPlatformAdmin ? undefined : pickActiveOrg(orgsRes.data ?? [], activeTenantId);
-  const basePath = isPlatformAdmin
+  const platform = scope === "platform" && isPlatformAdmin;
+  const org = scope === "org" ? pickActiveOrg(orgsRes.data ?? [], activeTenantId) : undefined;
+  const title = scope === "platform" ? t("nav.items.platformAudit.title") : t("nav.items.audit.title");
+  const basePath = platform
     ? "/v1/audit-logs"
     : org && `/v1/organizations/${org.id}/audit-logs`;
 
@@ -111,7 +116,7 @@ export function AuditLogPage() {
       <>
         <PageHeader
           icon="audit"
-          title="Audit Log"
+          title={title}
           subtitle="Who did what, when — the append-only record of privileged actions."
         />
         <InfoCallout icon="lock">
@@ -131,12 +136,12 @@ export function AuditLogPage() {
     <>
       <PageHeader
         icon="audit"
-        title="Audit Log"
+        title={title}
         subtitle="The append-only record of privileged actions — role changes, org & member management, plugin review, and more — with actor, time, source, and before/after state."
       />
 
       <p className={`mb-3 ${mutedTextClass}`}>
-        {isPlatformAdmin
+        {platform
           ? t("auditLog.scopeInstance")
           : org
             ? t("auditLog.scopeOrg", { org: org.name })

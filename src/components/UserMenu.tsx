@@ -4,6 +4,7 @@ import { useI18n } from "../i18n";
 import { useAuth } from "../lib/auth";
 import { primaryButtonClass, secondaryButtonClass } from "../lib/ui";
 import { Icon } from "./Icon";
+import { ROUTES } from "../lib/routes";
 
 /** The platform's one login control. Routes to the /login page, which offers
  * local username/password auth (works over a direct localhost / LAN-IP address)
@@ -26,7 +27,7 @@ export function UserMenu() {
   return (
     <div className="flex items-center gap-2">
       <Link
-        to="/settings"
+        to={ROUTES.account}
         className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-100 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-indigo-400"
       >
         <Icon name="user" size={18} />

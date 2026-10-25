@@ -99,12 +99,8 @@ src/
 - **`ExternalLink.tsx`** — new-tab link for an API-supplied URL
   (`rel="noopener noreferrer"`). Only http(s) URLs become links (`lib/safeUrl.ts`);
   anything else (`javascript:`, `data:`, …) shows as text with a note.
-- **`SubmissionReviewCard.tsx`** / **`SubmissionDetails.tsx`** — one submission in
-  Publish › Submission review: what will run, who submitted it and when, previous
-  feedback, the raw record, and the reviewer actions (approve/archive confirm,
-  reject needs feedback).
-- **`MindHubConnectionPlaceholder.tsx`** — informational panel on Installation
-  settings › MindHub & sources until the real connection (#2201) lands. No
+- **`MindHubConnectionPlaceholder.tsx`** — informational panel on Platform ›
+  MindHub & sources until the real connection (#2201) lands. No
   controls.
 - **`PageHeader.tsx`**, **`InfoCallout.tsx`**, **`ConfirmDialog.tsx`** (via
   `useConfirm()`), **`Sidebar.tsx`**, **`UserMenu.tsx`**.
@@ -167,23 +163,31 @@ src/
 ## Navigation and routes
 
 `src/lib/nav.ts` is the single source for the sidebar, the in-page tabs
-(`PageTabs`) and the ⌘K palette, including role gating (`visibleEntry` /
-`leafVisible`: `adminOnly`, `requiresBilling`). `src/lib/routes.ts` holds the
-marketplace routes and every redirect. One vocabulary is used for the route,
+(`PageTabs`) and the ⌘K palette, including permission gating (`visibleEntry` /
+`leafVisible`, through `useCan`). `src/lib/routes.ts` holds the routes and
+every redirect. The menu has three layers for everyone (Use / Build / Me) and,
+below a divider, Organization (the tenant) and Platform (the installation),
+each row shown only to callers who hold its permission. One vocabulary is used for the route,
 the tab, the page title (`PageHeader`) and the palette entry; tests hold the
 pages' titles to `nav.ts` (its copy: `src/i18n/messages`). `useRouteFocus` moves focus to the new page's `<h1>`
 after a client-side navigation.
 
-| Section › entry | Tabs → route | Who sees it |
+| Section › entry | Tabs → route | Menu row for |
 |---|---|---|
-| Marketplace › Discover | Plugins `/marketplace/discover/plugins` (`?source=`, `?q=`) · AI tools `/marketplace/discover/ai-tools` · Service bundles `/marketplace/discover/service-bundles` | everyone |
-| Marketplace › Installed | Plugins `/marketplace/installed/plugins` · AI tools `/marketplace/installed/ai-tools` · Service bundles `/marketplace/installed/service-bundles` | everyone (actions need login / admin, as before) |
-| Marketplace › Publish | Submissions `/marketplace/publish/submissions` · Submission review `/marketplace/publish/submission-review` | everyone · admin |
-| Organization › Billing & licenses | Billing `/billing` · Licenses `/billing/licenses` | billing access (#64) · everyone |
-| Installation settings › MindHub & sources | `/settings/sources`, `/settings/sources/:repositoryId` | admin |
+| Use › Home, Chat | `/` · New chat `/ask` · History `/rag/conversations` | every member |
+| Build › Knowledge | Knowledge bases `/rag` · Knowledge graph `/rag/graph` · Taxonomy review `/rag/taxonomy-review` | every member |
+| Build › Assistants | `/rag/pipelines` | every member |
+| Build › Discover | Plugins `/marketplace/discover/plugins` (`?source=`, `?q=`) · Installed `/marketplace/installed/plugins` (AI tools pages `/marketplace/{discover,installed}/ai-tools` are linked from the plugin pages, no row) | every member |
+| Me › My team, My account | `/team` · Profile `/account` · Voice `/account/voice` · My requests `/account/requests` | every member |
+| Organization › Overview, People | `/organization` · Members, Invites, Requests (the inbox), Domains `/organization/people/*` | `org.settings.manage` · `org.members.manage` |
+| Organization › Teams, AI, Plugins | `/organization/teams` · `/organization/ai(/defaults)` · `/organization/plugins` | the page's key |
+| Organization › Website chatbots | `/organization/chatbots(/:endpointId/conversations(/:sessionId))` | `org.chatbots.manage` |
+| Organization › Knowledge quality | `/organization/knowledge-quality` (entity merges) | `org.settings.manage` (the page serves any member) |
+| Organization › Security, Plan & billing | Audit log `/organization/security/audit` (the active org) · `/organization/billing` | `org.audit.view` · `org.billing.view` |
+| Platform | Status & logs `/status` (public) · Local models `/platform/models` · Modules `/platform/modules(/installed)` · All organizations `/platform/organizations` · All users `/platform/users` · MindHub & sources `/platform/sources(/:repositoryId)` · Backups `/platform/backups` · Platform audit log `/platform/audit` | Platform Admin |
 
-Old URLs (`/plugins/*`, `/ai-tools/*`, `/bundles/*`, `/platform/bundles`,
-`/marketplace/plugins/*`, …) redirect to these, query string included. Add to
+Old URLs (`/plugins/*`, `/ai-tools/*`, `/bundles/*`, `/billing`, `/audit`,
+`/settings`, `/rag/public-chat/*`, `/marketplace/publish/*`, …) redirect to these, query string included. Add to
 `LEGACY_REDIRECTS` when you move a page; never remove an entry.
 
 ## Translations (i18n)

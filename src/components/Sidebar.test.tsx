@@ -2,6 +2,8 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resetServerPermissionsCache } from "../lib/useCan";
+import { myPermissions, SERVER_SESSION } from "../test/myPermissions";
 import { Sidebar } from "./Sidebar";
 
 // Mutable per test (like AvailablePluginsPage.test.tsx's mockAuth) so both
@@ -29,14 +31,16 @@ describe("Sidebar", () => {
     mockBilling = true;
   });
 
-  it("shows Billing only to callers who may view billing (#64), Licenses to everyone", () => {
+  it("shows Plan & billing only to callers who may view billing (#64), and no personal Licenses", () => {
     const { unmount } = render(
       <MemoryRouter>
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
-    expect(screen.getByText("Billing").closest("a")?.getAttribute("href")).toBe("/billing");
-    expect(screen.getByText("Licenses").closest("a")?.getAttribute("href")).toBe("/billing/licenses");
+    expect(screen.getByText("Plan & billing").closest("a")?.getAttribute("href")).toBe(
+      "/organization/billing",
+    );
+    expect(screen.queryByText("Licenses")).toBeNull();
     unmount();
     mockBilling = false;
     render(
@@ -44,8 +48,7 @@ describe("Sidebar", () => {
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
-    expect(screen.queryByText("Billing")).toBeNull();
-    expect(screen.getByText("Licenses").closest("a")?.getAttribute("href")).toBe("/billing/licenses");
+    expect(screen.queryByText("Plan & billing")).toBeNull();
   });
 
   it("shows a signed-out visitor no menu", () => {
@@ -82,24 +85,13 @@ describe("Sidebar", () => {
     );
 
     expect(screen.getByText("Minder").closest("a")?.getAttribute("href")).toBe("/");
-    expect(
-      screen.getByText("Knowledge Bases").closest("a")?.getAttribute("href"),
-    ).toBe("/rag");
-    expect(
-      screen.getByText("Pipelines").closest("a")?.getAttribute("href"),
-    ).toBe("/rag/pipelines");
-    expect(
-      screen.getByText("Discover").closest("a")?.getAttribute("href"),
-    ).toBe("/marketplace/discover/plugins");
-    expect(
-      screen.getByText("Installed").closest("a")?.getAttribute("href"),
-    ).toBe("/marketplace/installed/plugins");
-    expect(
-      screen.getByText("Publish").closest("a")?.getAttribute("href"),
-    ).toBe("/marketplace/publish/submissions");
-    expect(screen.getByText("Models").closest("a")?.getAttribute("href")).toBe(
-      "/platform",
-    );
+    const href = (label: string) => screen.getByText(label).closest("a")?.getAttribute("href");
+    expect(href("Chat")).toBe("/ask");
+    expect(href("Knowledge")).toBe("/rag");
+    expect(href("Assistants")).toBe("/rag/pipelines");
+    expect(href("Discover")).toBe("/marketplace/discover/plugins");
+    expect(href("My team")).toBe("/team");
+    expect(href("My account")).toBe("/account");
   });
 
   it("renders every section label", () => {
@@ -110,8 +102,8 @@ describe("Sidebar", () => {
     );
 
     // Billing is visible (mockBilling), so the Organization section shows.
-    for (const label of ["Knowledge", "Marketplace", "AI & system", "My account", "Organization"]) {
-      expect(screen.getByText(label)).toBeTruthy();
+    for (const label of ["Use", "Build", "Me", "Organization"]) {
+      expect(screen.getByRole("group", { name: label })).toBeTruthy();
     }
   });
 
@@ -123,7 +115,7 @@ describe("Sidebar", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByText("Pipelines"));
+    fireEvent.click(screen.getByText("Assistants"));
     expect(onNavigate).toHaveBeenCalledTimes(1);
   });
 
@@ -166,30 +158,28 @@ describe("Sidebar", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("Pipelines").className).toContain("bg-indigo-50");
-    expect(screen.getByText("Knowledge Bases").className).not.toContain(
+    expect(screen.getByText("Assistants").className).toContain("bg-indigo-50");
+    expect(screen.getByText("Knowledge").className).not.toContain(
       "bg-indigo-50",
     );
   });
 
-  it("shows one Marketplace section of Discover / Installed / Publish (#2197)", () => {
+  it("shows Build as Knowledge / Assistants / Discover, with no AI tools, modules or Publish", () => {
     render(
       <MemoryRouter>
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
 
-    const marketplace = screen.getByRole("group", { name: "Marketplace" });
-    expect(
-      within(marketplace).getAllByRole("link").map((a) => a.textContent),
-    ).toEqual(["Discover", "Installed", "Publish"]);
-    // The old per-type stores and their tabs are gone from the sidebar.
-    for (const old of ["Plugins", "AI Tools", "Bundles", "Submit a Plugin", "Review Queue"]) {
+    const build = screen.getByRole("group", { name: "Build" });
+    expect(within(build).getAllByRole("link").map((a) => a.textContent)).toEqual([
+      "Knowledge",
+      "Assistants",
+      "Discover",
+    ]);
+    for (const old of ["Installed", "AI tools", "Service bundles", "Modules", "Publish", "Models", "Status"]) {
       expect(screen.queryByText(old)).toBeNull();
     }
-    expect(
-      within(screen.getByRole("group", { name: "AI & system" })).queryByText(/bundles/i),
-    ).toBeNull();
   });
 
   it("shows Platform › MindHub & sources to an operator only", () => {
@@ -212,7 +202,7 @@ describe("Sidebar", () => {
     const settings = screen.getByRole("group", { name: "Platform" });
     expect(
       within(settings).getByText("MindHub & sources").closest("a")?.getAttribute("href"),
-    ).toBe("/settings/sources");
+    ).toBe("/platform/sources");
   });
 
   /** Every sidebar link that carries aria-current, as label → value. */
@@ -232,43 +222,44 @@ describe("Sidebar", () => {
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
-    expect(currentRows()).toEqual({ Pipelines: "page" });
+    expect(currentRows()).toEqual({ Assistants: "page" });
   });
 
   it("marks a tabbed entry as the current section, not the page (the tab is the page)", () => {
-    for (const path of ["/marketplace/installed/ai-tools", "/marketplace/installed/plugins"]) {
+    for (const path of ["/marketplace/installed/ai-tools", "/marketplace/installed/plugins", "/rag/conversations"]) {
       const { unmount } = render(
         <MemoryRouter initialEntries={[path]}>
           <Sidebar open={false} onNavigate={() => {}} />
         </MemoryRouter>,
       );
-      expect(currentRows()).toEqual({ Installed: "true" });
+      expect(currentRows()).toEqual(path === "/rag/conversations" ? { Chat: "true" } : { Discover: "true" });
       unmount();
     }
   });
 
   it("marks an entry 'page' when the caller sees no tab strip for it", () => {
-    // A non-admin sees only Submissions in Publish, so no tab strip renders
-    // and the sidebar row is the only current-page marker.
+    // Security has one tab (Audit log), so no tab strip renders and the
+    // sidebar row is the only current-page marker.
+    mockAuth = { isAuthenticated: true, role: "user", orgRole: "admin" };
     render(
-      <MemoryRouter initialEntries={["/marketplace/publish/submissions"]}>
+      <MemoryRouter initialEntries={["/organization/security/audit"]}>
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
-    expect(currentRows()).toEqual({ Publish: "page" });
+    expect(currentRows()).toEqual({ Security: "page" });
   });
 
   it("marks MindHub & sources 'page' on the list and 'true' on a repository's detail", () => {
     mockAuth = { isAuthenticated: true, role: "admin", isPlatformAdmin: true };
     const { unmount } = render(
-      <MemoryRouter initialEntries={["/settings/sources"]}>
+      <MemoryRouter initialEntries={["/platform/sources"]}>
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
     expect(currentRows()).toEqual({ "MindHub & sources": "page" });
     unmount();
     render(
-      <MemoryRouter initialEntries={["/settings/sources/r1"]}>
+      <MemoryRouter initialEntries={["/platform/sources/r1"]}>
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
@@ -282,7 +273,7 @@ describe("Sidebar", () => {
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
-    expect(screen.queryByText("All Users")).toBeNull();
+    expect(screen.queryByText("All users")).toBeNull();
     expect(screen.queryByText("People", { selector: "a *, a" })).toBeNull();
     first.unmount();
 
@@ -292,7 +283,7 @@ describe("Sidebar", () => {
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
-    expect(screen.queryByText("All Users")).toBeNull();
+    expect(screen.queryByText("All users")).toBeNull();
     expect(
       screen.getByText("People", { selector: "a *, a" }).closest("a")?.getAttribute("href"),
     ).toBe("/organization/people");
@@ -306,7 +297,7 @@ describe("Sidebar", () => {
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
-    expect(screen.queryByText("All Users")).toBeNull();
+    expect(screen.queryByText("All users")).toBeNull();
     expect(screen.queryByRole("group", { name: "Platform" })).toBeNull();
     third.unmount();
 
@@ -317,7 +308,7 @@ describe("Sidebar", () => {
       </MemoryRouter>,
     );
     expect(
-      screen.getByText("All Users").closest("a")?.getAttribute("href"),
+      screen.getByText("All users").closest("a")?.getAttribute("href"),
     ).toBe("/platform/users");
   });
 });
@@ -342,7 +333,7 @@ describe("Sidebar: pending requests badge", () => {
     return fetchMock;
   }
 
-  it("counts the requests waiting for an org admin on the Requests entry", async () => {
+  it("counts the requests waiting for an org admin on the People entry (its inbox)", async () => {
     stubApi(3);
     mockAuth = { isAuthenticated: true, role: "user", orgRole: "admin", token: "tok", sessionKey: "s1" };
     render(
@@ -351,9 +342,36 @@ describe("Sidebar: pending requests badge", () => {
       </MemoryRouter>,
     );
     const link = await screen.findByRole("link", {
-      name: "Requests 3 requests waiting for your decision",
+      name: "People 3 requests waiting for your decision",
     });
-    expect(link.getAttribute("href")).toBe("/requests");
+    expect(link.getAttribute("href")).toBe("/organization/people");
+  });
+
+  it("counts a team admin's join requests on My account (My requests holds them)", async () => {
+    resetServerPermissionsCache();
+    mockAuth = { ...SERVER_SESSION, role: "user", orgRole: "member", token: "tok" };
+    const teamAdmin = myPermissions({ orgRole: "member", teams: [{ id: 4, keys: ["team.members.manage"] }] });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        const body = url.includes("/v1/me/permissions")
+          ? teamAdmin
+          : url.includes("/v1/access-requests/inbox")
+            ? { requests: [], total: 2, limit: 50, offset: 0 }
+            : { organizations: [], active_organization_id: null };
+        return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+      }),
+    );
+    render(
+      <MemoryRouter>
+        <Sidebar open={false} onNavigate={() => {}} />
+      </MemoryRouter>,
+    );
+    const link = await screen.findByRole("link", {
+      name: "My account 2 requests waiting for your decision",
+    });
+    expect(link.getAttribute("href")).toBe("/account");
   });
 
   it("never asks for a member who decides nothing", async () => {
@@ -364,7 +382,7 @@ describe("Sidebar: pending requests badge", () => {
         <Sidebar open={false} onNavigate={() => {}} />
       </MemoryRouter>,
     );
-    expect(screen.getByRole("link", { name: "Requests" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "My account" })).toBeTruthy();
     await new Promise((r) => setTimeout(r, 0));
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("access-requests"))).toBe(false);
   });

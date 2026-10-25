@@ -64,7 +64,7 @@ describe("CommandPalette — marketplace entries (#2197)", () => {
       open();
       for (const q of ["işlem hat", "İŞLEM HAT", "IŞLEM HAT"]) {
         search(q);
-        expect(resultLabels()).toContain("İşlem hatları");
+        expect(resultLabels()).toContain("Asistanlar");
       }
     } finally {
       act(() => setLocale("en"));
@@ -75,19 +75,18 @@ describe("CommandPalette — marketplace entries (#2197)", () => {
     open();
     search("plugins");
     expect(resultLabels()).toEqual(
-      expect.arrayContaining(["Discover plugins", "Installed plugins", "Plugin submissions"]),
+      expect.arrayContaining(["Discover plugins", "Installed plugins"]),
     );
     expect(resultLabels()).not.toContain("Plugins: Browse");
   });
 
-  it("finds AI tools and service bundles under both Discover and Installed", () => {
+  it("finds AI tools on the plugin pages, and service bundles as Platform modules", () => {
+    mockAuth = { isAuthenticated: true, role: "admin", isPlatformAdmin: true, sessionKey: "" };
     open();
     search("ai tools");
-    expect(resultLabels()).toEqual(expect.arrayContaining(["Discover AI tools", "Installed AI tools"]));
+    expect(resultLabels()).toEqual(expect.arrayContaining(["Discover plugins", "Installed plugins"]));
     search("bundles");
-    expect(resultLabels()).toEqual(
-      expect.arrayContaining(["Discover service bundles", "Installed service bundles"]),
-    );
+    expect(resultLabels()).toEqual(expect.arrayContaining(["Discover modules", "Installed modules"]));
   });
 
   it("navigates to the new route", () => {
@@ -97,12 +96,12 @@ describe("CommandPalette — marketplace entries (#2197)", () => {
     expect(pathname).toBe("/marketplace/discover/plugins");
   });
 
-  it("offers MindHub & sources and Submission review to Platform Admins only", () => {
+  it("offers MindHub & sources and Modules to Platform Admins only", () => {
     open();
     search("mindhub");
     expect(screen.queryByText("MindHub & sources")).toBeNull();
-    search("review queue");
-    expect(screen.queryByText("Submission review")).toBeNull();
+    search("modules");
+    expect(screen.queryByText("Discover modules")).toBeNull();
     cleanup();
 
     // The instance "admin" role without the Platform Admin claim is not enough.
@@ -110,28 +109,28 @@ describe("CommandPalette — marketplace entries (#2197)", () => {
     open();
     search("mindhub");
     expect(screen.queryByText("MindHub & sources")).toBeNull();
-    search("review queue");
-    expect(screen.queryByText("Submission review")).toBeNull();
+    search("modules");
+    expect(screen.queryByText("Discover modules")).toBeNull();
     cleanup();
 
     mockAuth = { isAuthenticated: true, role: "admin", isPlatformAdmin: true, sessionKey: "" };
     open();
     search("mindhub");
     expect(screen.getByText("MindHub & sources")).toBeTruthy();
-    search("review queue");
-    expect(screen.getByText("Submission review")).toBeTruthy();
+    search("modules");
+    expect(screen.getByText("Discover modules")).toBeTruthy();
   });
 
-  it("hides Billing without billing access but keeps Plugin licenses", () => {
+  it("hides Plan & billing without billing access, and has no personal licenses page", () => {
     mockBilling = false;
     open();
     search("billing");
     expect(screen.queryAllByRole("option").map((o) => o.textContent)).not.toContain(
-      expect.stringContaining("Billing"),
+      expect.stringContaining("Plan & billing"),
     );
-    // Licenses is a My account page of its own now (#131), not a Billing tab.
+    // Personal licenses were removed: entitlements show on Plan & billing.
     search("licenses");
-    expect(resultLabels()).toContain("Plugin licenses");
+    expect(screen.queryByText("Plugin licenses")).toBeNull();
   });
 });
 

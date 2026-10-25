@@ -59,8 +59,8 @@ describe("AvailableBundlesPage", () => {
 
     expect(await screen.findByText(/Every service bundle is already enabled/)).toBeTruthy();
     expect(
-      screen.getByRole("link", { name: "Installed service bundles" }).getAttribute("href"),
-    ).toBe("/marketplace/installed/service-bundles");
+      screen.getByRole("link", { name: "Installed modules" }).getAttribute("href"),
+    ).toBe("/platform/modules/installed");
   });
   it("shows a skeleton, not the empty state, while loading; an error offers Retry (#2195)", async () => {
     let reject!: (e: unknown) => void;

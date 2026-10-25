@@ -23,6 +23,7 @@ import {
   secondaryButtonClass,
 } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
+import { chatbotConversationsRoute } from "../lib/routes";
 
 // #1581 (client half of #1522): admin-only management of PUBLIC chat endpoints.
 // Each endpoint binds one RAG pipeline (its knowledge bases + retrieval config)
@@ -527,7 +528,7 @@ function EndpointRow({
               {/* Read-only creator dashboard: the anonymous conversations that
                   flowed through this endpoint (#1582). */}
               <Link
-                to={`/rag/public-chat/${endpoint.id}/conversations`}
+                to={chatbotConversationsRoute(endpoint.id)}
                 className={secondaryButtonClass}
               >
                 <Icon name="conversations" size={14} /> Conversations

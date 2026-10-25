@@ -117,7 +117,7 @@ describe("App", () => {
       expect(screen.getByRole("button", { name: "Sign out and continue" })).toBeTruthy();
       cleanup();
       // Every other route is still gated.
-      renderAt("/settings");
+      renderAt(ROUTES.account);
       expect(screen.getByText(/An administrator reset your password/)).toBeTruthy();
     } finally {
       window.history.replaceState(null, "", "/");
@@ -141,12 +141,12 @@ describe("App", () => {
     const crumbs = screen.getByRole("navigation", { name: "Breadcrumb" });
     expect(within(crumbs).getAllByRole("listitem").map((li) => li.textContent).filter(Boolean)).toEqual([
       "Home",
+      "Build",
       "Knowledge",
-      "Knowledge Graph",
       "Taxonomy Review",
     ]);
     expect(within(crumbs).getByRole("link", { name: "Home" }).getAttribute("href")).toBe("/");
-    expect(within(crumbs).getByRole("link", { name: "Knowledge Graph" }).getAttribute("href")).toBe("/rag/graph");
+    expect(within(crumbs).getByRole("link", { name: "Knowledge" }).getAttribute("href")).toBe("/rag");
     expect(within(crumbs).getByText("Taxonomy Review").getAttribute("aria-current")).toBe("page");
     cleanup();
     renderAt("/");
@@ -158,9 +158,9 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "Discover plugins" })).toBeTruthy();
   });
 
-  it("redirects the old /platform/bundles path to Discover service bundles", () => {
+  it("redirects the old /platform/bundles path to Platform › Modules", () => {
     renderAt("/platform/bundles");
-    expect(screen.getByRole("heading", { name: "Discover service bundles" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Discover modules" })).toBeTruthy();
   });
 
   it("redirects the old section-index /ai-tools path to Discover AI tools", () => {
@@ -202,13 +202,14 @@ describe("App", () => {
     expect(container.querySelector(".fixed.inset-0.z-30")).not.toBeNull();
 
     const sidebar = container.querySelector("aside")!;
-    fireEvent.click(within(sidebar).getByText("Pipelines"));
+    fireEvent.click(within(sidebar).getByText("Assistants"));
     expect(container.querySelector(".fixed.inset-0.z-30")).toBeNull();
   });
 });
 
-// The full old → new map (#2197). Spelled out here rather than derived from
-// LEGACY_REDIRECTS, so an accidental edit to the table fails a test.
+// The full old → new map (#2197, then the client#126 menu regroup). Spelled
+// out here rather than derived from LEGACY_REDIRECTS, so an accidental edit to
+// the table fails a test.
 const EXPECTED_REDIRECTS: Record<string, string> = {
   "/knowledge-bases": "/rag",
   "/rag-pipelines": "/rag/pipelines",
@@ -216,32 +217,52 @@ const EXPECTED_REDIRECTS: Record<string, string> = {
   "/marketplace": "/marketplace/discover/plugins",
   "/marketplace/discover": "/marketplace/discover/plugins",
   "/marketplace/installed": "/marketplace/installed/plugins",
-  "/marketplace/publish": "/marketplace/publish/submissions",
+  "/organization/security": "/organization/security/audit",
   "/marketplace/plugins": "/marketplace/discover/plugins",
   "/marketplace/plugins/available": "/marketplace/discover/plugins",
   "/marketplace/plugins/installed": "/marketplace/installed/plugins",
   "/marketplace/plugins/ai-tools": "/marketplace/discover/ai-tools",
-  "/marketplace/bundles": "/marketplace/discover/service-bundles",
-  "/platform/bundles": "/marketplace/discover/service-bundles",
+  "/marketplace/bundles": "/platform/modules",
+  "/platform/bundles": "/platform/modules",
   "/plugins": "/marketplace/discover/plugins",
   "/plugins/available": "/marketplace/discover/plugins",
   "/plugins/installed": "/marketplace/installed/plugins",
   "/plugins/config": "/marketplace/installed/plugins",
   "/plugins/ai-tools": "/marketplace/discover/ai-tools",
-  "/plugins/submissions": "/marketplace/publish/submissions",
-  "/plugins/review": "/marketplace/publish/submission-review",
-  "/plugins/licenses": "/billing/licenses",
-  "/plugins/sources": "/settings/sources",
-  "/plugins/sources/r1": "/settings/sources/r1",
+  "/plugins/submissions": "/marketplace/discover/plugins",
+  "/plugins/review": "/marketplace/discover/plugins",
+  "/plugins/licenses": "/organization/billing",
+  "/plugins/sources": "/platform/sources",
+  "/plugins/sources/r1": "/platform/sources/r1",
   "/ai-tools": "/marketplace/discover/ai-tools",
   "/ai-tools/available": "/marketplace/discover/ai-tools",
   "/ai-tools/installed": "/marketplace/installed/ai-tools",
-  "/bundles": "/marketplace/discover/service-bundles",
-  "/bundles/available": "/marketplace/discover/service-bundles",
-  "/bundles/installed": "/marketplace/installed/service-bundles",
+  "/bundles": "/platform/modules",
+  "/bundles/available": "/platform/modules",
+  "/bundles/installed": "/platform/modules/installed",
   "/organization/users": "/organization/people",
   "/platform/providers": "/organization/ai",
   "/platform/teams": "/team",
+  // The menu regroup: every moved page's old URL.
+  "/rag/public-chat": "/organization/chatbots",
+  "/rag/public-chat/7/conversations": "/organization/chatbots/7/conversations",
+  "/rag/public-chat/7/conversations/s1": "/organization/chatbots/7/conversations/s1",
+  "/rag/entity-merges": "/organization/knowledge-quality",
+  "/billing": "/organization/billing",
+  "/billing/licenses": "/organization/billing",
+  "/audit": "/organization/security/audit",
+  "/organizations": "/platform/organizations",
+  "/settings": "/account",
+  "/settings/sources": "/platform/sources",
+  "/settings/sources/r1": "/platform/sources/r1",
+  "/marketplace/discover/service-bundles": "/platform/modules",
+  "/marketplace/installed/service-bundles": "/platform/modules/installed",
+  "/marketplace/publish": "/marketplace/discover/plugins",
+  "/marketplace/publish/submissions": "/marketplace/discover/plugins",
+  "/marketplace/publish/submission-review": "/marketplace/discover/plugins",
+  "/platform": "/platform/models",
+  "/platform/status": "/status",
+  "/platform/voice": "/account/voice",
 };
 
 describe("App — redirects (#2197)", () => {
@@ -253,7 +274,7 @@ describe("App — redirects (#2197)", () => {
 
   it("covers every entry of the redirect tables", () => {
     const tables = [...SECTION_REDIRECTS, ...LEGACY_REDIRECTS].map((r) =>
-      r.from.replace(":repositoryId", "r1"),
+      r.from.replace(":repositoryId", "r1").replace(":endpointId", "7").replace(":sessionId", "s1"),
     );
     expect(tables.sort()).toEqual(Object.keys(EXPECTED_REDIRECTS).sort());
   });
@@ -281,7 +302,7 @@ describe("App — redirects (#2197)", () => {
       renderAt(`/plugins/sources/${encoded}?q=x`);
       // Same single encoding as sourceRepositoryRoute(): no "/" splitting the
       // segment, no double encoding.
-      expect(currentLocation?.pathname).toBe(`/settings/sources/${encodeURIComponent(decoded)}`);
+      expect(currentLocation?.pathname).toBe(`/platform/sources/${encodeURIComponent(decoded)}`);
       expect(currentLocation?.search).toBe("?q=x");
     },
   );
@@ -305,8 +326,29 @@ describe("App — page titles match the nav (#2197)", () => {
     .filter((l) => l.title)
     .map((l) => [l.to, l.title!] as const);
 
+  /** Routes whose nav entry has no title of its own (the label is the page's
+   * name) or that have no nav entry at all. */
+  const UNTITLED: string[] = [
+    ROUTES.discoverAiTools,
+    ROUTES.installedAiTools,
+    ROUTES.chatHistory,
+    ROUTES.account,
+    ROUTES.voice,
+    ROUTES.chatbots,
+    ROUTES.knowledgeQuality,
+    ROUTES.status,
+    ROUTES.models,
+    ROUTES.allOrganizations,
+    ROUTES.allUsers,
+    ROUTES.backups,
+  ];
+
   it("checks every titled destination", () => {
-    expect(titled.map(([to]) => to).sort()).toEqual(Object.values(ROUTES).sort());
+    expect(titled.map(([to]) => to).sort()).toEqual(
+      Object.values(ROUTES)
+        .filter((to) => !UNTITLED.includes(to))
+        .sort(),
+    );
   });
 
   it.each(titled)("renders %s with the heading %s", (to, title) => {
@@ -317,14 +359,14 @@ describe("App — page titles match the nav (#2197)", () => {
 
   it("labels each grouped page's tab strip with its tab labels, current tab marked", () => {
     signIn("admin", true);
-    renderAt(ROUTES.installedAiTools);
-    const tabs = screen.getByRole("navigation", { name: "Installed sections" });
+    renderAt(ROUTES.installedModules);
+    const tabs = screen.getByRole("navigation", { name: "Modules sections" });
     const links = within(tabs).getAllByRole("link");
-    expect(links.map((a) => a.textContent)).toEqual(["Plugins", "AI tools", "Service bundles"]);
-    expect(links.map((a) => a.getAttribute("aria-current"))).toEqual([null, "page", null]);
+    expect(links.map((a) => a.textContent)).toEqual(["Discover", "Installed"]);
+    expect(links.map((a) => a.getAttribute("aria-current"))).toEqual([null, "page"]);
   });
 
-  it.each([ROUTES.discoverPlugins, ROUTES.installedAiTools, ROUTES.publishSubmissionReview])(
+  it.each([ROUTES.discoverPlugins, ROUTES.installedPlugins, ROUTES.installedModules, ROUTES.myRequests])(
     "marks exactly one link as the current page on %s (the tab; its sidebar entry is 'true')",
     (path) => {
       signIn("admin", true);
@@ -366,7 +408,7 @@ describe("App — Installation settings › MindHub & sources gating", () => {
 
   // The operator APIs want the Platform Admin claim; role "admin" alone (an org
   // owner, an SSO admin) gets the forbidden page, not a page that 403s.
-  it.each([ROUTES.sources, ROUTES.publishSubmissionReview, "/platform/backups"])(
+  it.each([ROUTES.sources, ROUTES.platformAudit, ROUTES.backups])(
     "shows an admin without the Platform Admin claim the forbidden page on %s",
     (path) => {
       signIn("admin");
@@ -387,10 +429,10 @@ describe("App — focus after navigation", () => {
   it("moves focus to the new page's heading when a tab is followed", async () => {
     renderAt(ROUTES.discoverPlugins);
     const tabs = screen.getByRole("navigation", { name: "Discover sections" });
-    fireEvent.click(within(tabs).getByRole("link", { name: "AI tools" }));
+    fireEvent.click(within(tabs).getByRole("link", { name: "Installed" }));
     await waitFor(() =>
       expect(document.activeElement).toBe(
-        screen.getByRole("heading", { level: 1, name: "Discover AI tools" }),
+        screen.getByRole("heading", { level: 1, name: "Installed plugins" }),
       ),
     );
   });
@@ -500,19 +542,19 @@ describe("App — ⌘K and the modal layer (#97)", () => {
     trigger.addEventListener("focus", focusedTrigger);
 
     const input = screen.getByRole("combobox", { name: "Search pages and actions" });
-    fireEvent.change(input, { target: { value: "discover ai tools" } });
+    fireEvent.change(input, { target: { value: "installed plugins" } });
     fireEvent.keyDown(input, { key: "Enter" });
 
     expect(palette()).toBeNull();
-    expect(currentLocation?.pathname).toBe(ROUTES.discoverAiTools);
+    expect(currentLocation?.pathname).toBe(ROUTES.installedPlugins);
     await waitFor(() =>
       expect(document.activeElement).toBe(
-        screen.getByRole("heading", { level: 1, name: "Discover AI tools" }),
+        screen.getByRole("heading", { level: 1, name: "Installed plugins" }),
       ),
     );
     await nextFrames();
     expect(document.activeElement).toBe(
-      screen.getByRole("heading", { level: 1, name: "Discover AI tools" }),
+      screen.getByRole("heading", { level: 1, name: "Installed plugins" }),
     );
     expect(focusedTrigger).not.toHaveBeenCalled();
   });

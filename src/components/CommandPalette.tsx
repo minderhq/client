@@ -94,7 +94,7 @@ export function CommandPalette({
             action("ask", "ask", { to: "/ask" }),
             action("kb", "knowledge-bases", { to: "/rag" }),
             action("pipeline", "pipelines", { to: "/rag/pipelines" }),
-            action("model", "models", { to: "/platform" }),
+            action("model", "models", { to: ROUTES.models }),
           ]
         : []),
       action("theme", "theme-dark", { run: cycleTheme }),

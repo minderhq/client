@@ -61,10 +61,10 @@ function signInAs(orgRole: "member" | "admin") {
   mockAuth = { ...mockAuth, orgRole };
 }
 
-function renderPage() {
+function renderPage(view: "inbox" | "mine" = "mine") {
   return render(
     <MemoryRouter>
-      <RequestsPage />
+      <RequestsPage view={view} />
     </MemoryRouter>,
   );
 }
@@ -116,6 +116,15 @@ describe("RequestsPage: my requests", () => {
     expect(screen.queryByRole("region", { name: "Waiting for your decision" })).toBeNull();
   });
 
+  it("leaves an org admin's inbox to Organization › People › Requests", async () => {
+    signInAs("admin");
+    routes[INBOX] = list([inboxItem()]);
+    renderPage();
+    expect(await screen.findByRole("heading", { level: 1, name: "My requests" })).toBeTruthy();
+    expect(await screen.findByText(/You haven't asked for anything yet/)).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Waiting for your decision" })).toBeNull();
+  });
+
   it("offers Retry when the list can't load", async () => {
     routes[MINE] = () => ({ status: 500, body: { detail: "boom" } });
     renderPage();
@@ -125,10 +134,13 @@ describe("RequestsPage: my requests", () => {
 });
 
 describe("RequestsPage: inbox", () => {
-  it("shows an admin an empty inbox", async () => {
+  it("shows an admin an empty inbox, and not their own requests", async () => {
     signInAs("admin");
-    renderPage();
+    renderPage("inbox");
     expect(await screen.findByText("No requests are waiting for you.")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "Requests" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "My requests" })).toBeNull();
+    expect(fetchMock.mock.calls.some(([u]) => String(u).endsWith("/v1/access-requests"))).toBe(false);
   });
 
   it("shows a team admin the join requests routed to them, without an org permission", async () => {
@@ -147,7 +159,7 @@ describe("RequestsPage: inbox", () => {
       decided = true;
       return { body: { access_request: inboxItem({ status: "approved" }), follow_up: "install_plugin" } };
     };
-    renderPage();
+    renderPage("inbox");
 
     const inbox = await screen.findByRole("region", { name: "Waiting for your decision" });
     expect(await within(inbox).findByText("Asked by carol · Oct 20, 2026")).toBeTruthy();
@@ -170,7 +182,7 @@ describe("RequestsPage: inbox", () => {
       ]);
       return { body: inboxItem({ status: "denied" }) };
     };
-    renderPage();
+    renderPage("inbox");
 
     const inbox = await screen.findByRole("region", { name: "Waiting for your decision" });
     fireEvent.click(await within(inbox).findByRole("button", { name: /^Reject/ }));
@@ -192,7 +204,7 @@ describe("RequestsPage: inbox", () => {
       routes[INBOX] = list([inboxItem({ status: "approved", decided_by_username: "erin" })]);
       return { status: 409, body: { detail: "access_request_not_pending" } };
     };
-    renderPage();
+    renderPage("inbox");
 
     const inbox = await screen.findByRole("region", { name: "Waiting for your decision" });
     fireEvent.click(await within(inbox).findByRole("button", { name: /^Approve/ }));

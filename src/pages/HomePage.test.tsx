@@ -162,7 +162,7 @@ describe("HomePage per persona", () => {
     expect(screen.queryByText("Invite your teammates")).toBeNull();
     expect(screen.queryByTestId("health-strip")).toBeNull();
     expect(screen.getByRole("link", { name: "Complete your profile" }).getAttribute("href")).toBe(
-      "/settings",
+      "/account",
     );
   });
 

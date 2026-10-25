@@ -4,6 +4,7 @@ import { apiFetch } from "../lib/api";
 import { useAsyncResource } from "../lib/useAsyncResource";
 import { Icon } from "./Icon";
 import { Skeleton } from "./Skeleton";
+import { ROUTES } from "../lib/routes";
 
 interface ServiceStatus {
   name: string;
@@ -55,7 +56,7 @@ export function HealthStrip() {
 
   return (
     <Link
-      to="/platform/status"
+      to={ROUTES.status}
       data-health={health}
       className="group mb-6 flex items-center gap-3.5 rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm shadow-sm ring-1 ring-black/[0.02] transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:ring-white/[0.02] dark:hover:border-indigo-800"
     >

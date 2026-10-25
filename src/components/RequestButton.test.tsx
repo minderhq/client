@@ -59,7 +59,7 @@ describe("RequestButton", () => {
       subject: "llama3.1:8b",
       note: "For contracts",
     });
-    expect(screen.getByRole("link", { name: "View my requests" }).getAttribute("href")).toBe("/requests");
+    expect(screen.getByRole("link", { name: "View my requests" }).getAttribute("href")).toBe("/account/requests");
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     const done = screen.getByRole("button", { name: "Requested" }) as HTMLButtonElement;
     expect(done.disabled).toBe(true);

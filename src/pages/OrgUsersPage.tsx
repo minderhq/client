@@ -120,7 +120,7 @@ export function OrgUsersPage() {
             <div className="flex items-center gap-3">
               {isPlatformAdmin && (
                 <Link
-                  to="/platform/users"
+                  to={ROUTES.allUsers}
                   className="flex items-center gap-1 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400"
                 >
                   {t("people.members.allUsers")}

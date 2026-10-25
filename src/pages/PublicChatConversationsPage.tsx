@@ -20,6 +20,7 @@ import { useAsyncResource } from "../lib/useAsyncResource";
 import { usePaginatedList } from "../lib/usePaginatedList";
 import { useTokenRef } from "../lib/useTokenRef";
 import type { PublicChatEndpoint } from "./PublicChatEndpointsPage";
+import { chatbotConversationsRoute, ROUTES } from "../lib/routes";
 
 // #1582 (client half): the creator conversation dashboard. An endpoint owner
 // reads the anonymous conversations that flowed through THEIR public chat
@@ -177,7 +178,7 @@ function ConversationList({ endpointId }: { endpointId: string }) {
       {conversations.map((c) => (
         <Link
           key={c.session_id}
-          to={`/rag/public-chat/${endpointId}/conversations/${encodeURIComponent(c.session_id)}`}
+          to={chatbotConversationsRoute(endpointId, c.session_id)}
           className="mb-2 flex items-center gap-3 rounded-lg border border-gray-200 p-3 text-sm transition hover:border-indigo-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-indigo-800 dark:hover:bg-gray-800/50"
         >
           <div className="min-w-0 flex-1">
@@ -390,7 +391,7 @@ function ConversationDetail({
 
   const backLink = (
     <Link
-      to={`/rag/public-chat/${endpointId}/conversations`}
+      to={chatbotConversationsRoute(endpointId)}
       className={secondaryButtonClass}
     >
       <Icon name="arrow" size={14} /> Back to conversations
@@ -476,7 +477,7 @@ export function PublicChatConversationsPage() {
             : "Anonymous conversations through your public chat endpoint, read-only."
         }
         actions={
-          <Link to="/rag/public-chat" className={secondaryButtonClass}>
+          <Link to={ROUTES.chatbots} className={secondaryButtonClass}>
             <Icon name="arrow" size={14} /> All endpoints
           </Link>
         }

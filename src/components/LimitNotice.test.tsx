@@ -49,7 +49,7 @@ describe("LimitNotice", () => {
     setup("saas", true);
     renderNotice();
     expect(screen.getByText("Included in the Pro plan.")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Upgrade" }).getAttribute("href")).toBe("/billing");
+    expect(screen.getByRole("link", { name: "Upgrade" }).getAttribute("href")).toBe("/organization/billing");
     expect(screen.getByRole("button", { name: "Try Pro free for 14 days" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Ask the billing owner" })).toBeNull();
   });
