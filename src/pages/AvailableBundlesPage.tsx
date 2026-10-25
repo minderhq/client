@@ -33,7 +33,7 @@ export function AvailableBundlesPage() {
     <>
       <PageHeader
         icon="bundles"
-        title="Discover service bundles"
+        title="Discover modules"
         subtitle="Optional service bundles you haven't turned on yet — each claims a set of services shared with other bundles where needed. Browsing is open for everyone; enabling requires a Platform Admin."
       />
       <InfoCallout icon="info">
@@ -57,8 +57,8 @@ export function AvailableBundlesPage() {
       {bundlesRes.data && !bundlesRes.error && available.length === 0 && (
         <EmptyState>
           Every service bundle is already enabled — see{" "}
-          <Link to={ROUTES.installedServiceBundles} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
-            Installed service bundles
+          <Link to={ROUTES.installedModules} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+            Installed modules
           </Link>
           .
         </EmptyState>

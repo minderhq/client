@@ -34,7 +34,7 @@ const APP_TEST = { timeout: 10_000 };
 /** How long to wait for async state (the billing probe, a page's fetch). */
 const SETTLE = { timeout: 5_000 };
 
-/** The heading-less top group (Home, Ask). */
+/** A section without a heading (none today: every section is labelled). */
 const TOP = "(top)";
 
 type NavModel = Record<string, string[]>;
@@ -52,12 +52,6 @@ function renderedNav(): NavModel {
   return model;
 }
 
-/** The href of a rendered sidebar entry. */
-function navHref(label: string): string | null {
-  const nav = screen.getByRole("navigation", { name: "Main" });
-  return within(nav).getByRole("link", { name: label }).getAttribute("href");
-}
-
 /** The nav model nav.ts itself produces for this persona's permissions. */
 function modelFromNavTs(persona: Persona): NavModel {
   const model: NavModel = {};
@@ -69,29 +63,47 @@ function modelFromNavTs(persona: Persona): NavModel {
 
 // --- Expected sidebar per persona --------------------------------------------
 
-/** What every signed-in member sees: the sections everyone works in. There is
- * still no team-role dimension: team_role is not in the token. */
+/** What every signed-in member sees: Use / Build / Me (client#126 menu
+ * decision). There is still no team-role dimension: team_role is not in the
+ * token. */
 const MEMBER_NAV: NavModel = {
-  [TOP]: ["Home", "Ask"],
-  Knowledge: ["Knowledge Bases", "Pipelines", "Conversations", "Knowledge Graph"],
-  Marketplace: ["Discover", "Installed", "Publish"],
-  "AI & system": ["Models", "Status"],
+  Use: ["Home", "Chat"],
+  Build: ["Knowledge", "Assistants", "Discover"],
   // My team is every member's: their team, or where they ask to join one.
-  "My account": ["My team", "Profile & settings", "Voice", "Licenses", "Requests"],
+  Me: ["My team", "My account"],
 };
 
-/** An org owner or admin: the member nav plus the Organization section.
+/** An org owner or admin: the member nav plus the Organization area.
  * CLOSED (#131): they used to get exactly the member nav, with Public Chat
  * hidden although its page lets them manage endpoints. */
 const ORG_ADMIN_NAV: NavModel = {
   ...MEMBER_NAV,
-  Organization: ["Overview", "People", "Teams", "Public Chat", "AI", "Plugins", "Billing", "Audit Log"],
+  Organization: [
+    "Overview",
+    "People",
+    "Teams",
+    "AI",
+    "Plugins",
+    "Website chatbots",
+    "Knowledge quality",
+    "Security",
+    "Plan & billing",
+  ],
 };
 
 const PLATFORM_ADMIN_NAV: NavModel = {
   ...MEMBER_NAV,
   Organization: ORG_ADMIN_NAV.Organization,
-  Platform: ["All Organizations", "All Users", "Backups", "MindHub & sources"],
+  Platform: [
+    "Status & logs",
+    "Local models",
+    "Modules",
+    "All organizations",
+    "All users",
+    "MindHub & sources",
+    "Backups",
+    "Platform audit log",
+  ],
 };
 
 const EXPECTED_NAV: Record<PersonaId, NavModel> = {
@@ -142,24 +154,15 @@ describe("navigation matrix: sidebar per persona", APP_TEST, () => {
 describe("navigation matrix: in-page tab strips", APP_TEST, () => {
   afterEach(resetApp);
 
-  it("shows the Publish tabs (with Submission review) to a platform admin", () => {
-    renderApp(PERSONAS.platformAdmin, ROUTES.publishSubmissions);
-    const tabs = screen.getByRole("navigation", { name: "Publish sections" });
+  it.each(["teamMember", "orgOwner"] as const)("shows %s the My account tabs", (id) => {
+    renderApp(PERSONAS[id], ROUTES.voice);
+    const tabs = screen.getByRole("navigation", { name: "My account sections" });
     expect(within(tabs).getAllByRole("link").map((a) => a.textContent)).toEqual([
-      "Submissions",
-      "Submission review",
+      "Profile",
+      "Voice",
+      "My requests",
     ]);
   });
-
-  it.each(["orgOwner", "orgAdmin", "teamlessMember"] as const)(
-    "shows %s no Publish tab strip (Submission review is instance-admin only)",
-    async (id) => {
-      renderApp(PERSONAS[id], ROUTES.publishSubmissions);
-      expect(screen.getByRole("heading", { level: 1, name: "Plugin submissions" })).toBeTruthy();
-      await settleApp();
-      expect(screen.queryByRole("navigation", { name: "Publish sections" })).toBeNull();
-    },
-  );
 
   // Organization › People (UX step 7): Members, Invites and the plan tab
   // Domains, which keeps its place on every plan and wears a Pro badge on a
@@ -174,6 +177,7 @@ describe("navigation matrix: in-page tab strips", APP_TEST, () => {
       expect(within(tabs).getAllByRole("link").map((a) => a.textContent)).toEqual([
         "Members",
         "Invites",
+        "Requests",
         "DomainsProAvailable on the Pro plan",
       ]);
     },
@@ -190,13 +194,31 @@ describe("navigation matrix: in-page tab strips", APP_TEST, () => {
     },
   );
 
-  // Billing (Organization) and Licenses (My account) are separate entries
-  // since #131, so neither page carries a tab strip.
-  it.each(["orgOwner", "teamMember"] as const)("Licenses has no tab strip for %s", async (id) => {
-    renderApp(PERSONAS[id], ROUTES.licenses);
+  // Personal licenses were removed (menu decision): the old URL lands on
+  // Organization › Plan & billing, where entitlements are shown.
+  it("sends the old Licenses URL to Plan & billing, keeping query and hash", async () => {
+    renderApp(PERSONAS.orgOwner, "/billing/licenses?tier=pro#keys");
     await settleApp();
-    expect(navHref("Licenses")).toBe(ROUTES.licenses);
-    expect(screen.queryByRole("navigation", { name: /sections$/ })).toBeNull();
+    expect(appLocation()?.pathname).toBe(ROUTES.billing);
+    expect(appLocation()?.search).toBe("?tier=pro");
+    expect(appLocation()?.hash).toBe("#keys");
+  });
+});
+
+describe("the old /requests URL per persona", APP_TEST, () => {
+  afterEach(resetApp);
+
+  it.each([
+    ["orgAdmin", ROUTES.requests],
+    ["platformAdmin", ROUTES.requests],
+    ["teamAdmin", ROUTES.myRequests],
+    ["teamMember", ROUTES.myRequests],
+  ] as const)("sends %s to %s, keeping query and hash", async (id, target) => {
+    renderApp(PERSONAS[id], "/requests?kind=plugin_install#pending");
+    await settleApp();
+    expect(appLocation()?.pathname).toBe(target);
+    expect(appLocation()?.search).toBe("?kind=plugin_install");
+    expect(appLocation()?.hash).toBe("#pending");
   });
 });
 
@@ -293,32 +315,36 @@ interface GatedRoute {
   open: PersonaId[];
 }
 
+const ORG_ADMINS: PersonaId[] = ["platformAdmin", "orgOwner", "orgAdmin"];
+const SIGNED_IN: PersonaId[] = [...ORG_ADMINS, "teamAdmin", "teamMember", "teamlessMember"];
+
 const GATED_ROUTES: GatedRoute[] = [
-  { path: "/rag/public-chat", heading: "Public Chat", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
-  { path: "/platform/backups", heading: "Backups", open: ["platformAdmin"] },
-  { path: "/organizations", heading: "All Organizations", open: ["platformAdmin"] },
-  { path: "/audit", heading: "Audit Log", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
-  { path: ROUTES.publishSubmissionReview, heading: "Submission review", open: ["platformAdmin"] },
-  { path: "/platform/users", heading: "All users", open: ["platformAdmin"] },
+  { path: ROUTES.chatbots, heading: "Public Chat", open: ORG_ADMINS },
+  { path: ROUTES.backups, heading: "Backups", open: ["platformAdmin"] },
+  { path: ROUTES.allOrganizations, heading: "All Organizations", open: ["platformAdmin"] },
+  // Organization › Security › Audit log keeps the old /audit gate; the
+  // installation-wide log is the Platform Admin's.
+  { path: ROUTES.orgAudit, heading: "Audit log", open: ORG_ADMINS },
+  { path: ROUTES.platformAudit, heading: "Platform audit log", open: ["platformAdmin"] },
+  { path: ROUTES.allUsers, heading: "All users", open: ["platformAdmin"] },
   // Organization › People is for org admins (ux-design §5); members get no
   // people directory (the design's member menu has none).
-  { path: ROUTES.people, heading: "Members", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
-  { path: ROUTES.peopleInvites, heading: "Invites", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
-  { path: ROUTES.peopleDomains, heading: "Email domains", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
+  { path: ROUTES.people, heading: "Members", open: ORG_ADMINS },
+  { path: ROUTES.peopleInvites, heading: "Invites", open: ORG_ADMINS },
+  { path: ROUTES.peopleDomains, heading: "Email domains", open: ORG_ADMINS },
+  // The requests inbox (People › Requests) and each member's own requests.
+  { path: ROUTES.requests, heading: "Requests", open: ORG_ADMINS },
+  { path: ROUTES.myRequests, heading: "My requests", open: SIGNED_IN },
   { path: ROUTES.sources, heading: "MindHub & sources", open: ["platformAdmin"] },
   // Organization › AI and › Plugins (UX step 9, Q2/Q3): org admins only;
   // members keep the read-only Models and Installed pages.
-  { path: ROUTES.orgAi, heading: "AI providers", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
-  { path: ROUTES.orgAiDefaults, heading: "Model defaults", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
-  { path: ROUTES.orgPlugins, heading: "Organization plugins", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
+  { path: ROUTES.orgAi, heading: "AI providers", open: ORG_ADMINS },
+  { path: ROUTES.orgAiDefaults, heading: "Model defaults", open: ORG_ADMINS },
+  { path: ROUTES.orgPlugins, heading: "Organization plugins", open: ORG_ADMINS },
   // Organization › Teams: org.teams.manage (team admins manage their own team
   // from My team). My team itself is every member's.
-  { path: ROUTES.orgTeams, heading: "Teams", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
-  {
-    path: ROUTES.myTeam,
-    heading: "My team",
-    open: ["platformAdmin", "orgOwner", "orgAdmin", "teamAdmin", "teamMember", "teamlessMember"],
-  },
+  { path: ROUTES.orgTeams, heading: "Teams", open: ORG_ADMINS },
+  { path: ROUTES.myTeam, heading: "My team", open: SIGNED_IN },
 ];
 
 const ROUTE_CASES = GATED_ROUTES.flatMap((route) =>
@@ -347,7 +373,7 @@ describe("route access matrix: route guards per persona", APP_TEST, () => {
   });
 
   it("offers a disabled Request access action until access requests exist", async () => {
-    renderApp(PERSONAS.teamMember, "/platform/backups");
+    renderApp(PERSONAS.teamMember, ROUTES.backups);
     await settleApp();
     const request = screen.getByRole("button", { name: "Request access" }) as HTMLButtonElement;
     expect(request.disabled).toBe(true);
@@ -355,11 +381,11 @@ describe("route access matrix: route guards per persona", APP_TEST, () => {
   });
 
   it("sends a signed-out visitor to sign in, remembering the page", async () => {
-    renderApp(PERSONAS.loggedOut, "/audit");
+    renderApp(PERSONAS.loggedOut, ROUTES.orgAudit);
     await settleApp();
     fireEvent.click(within(screen.getByRole("main")).getByRole("link", { name: "Log in" }));
     expect(appLocation()?.pathname).toBe("/login");
-    expect(appLocation()?.state).toEqual({ from: "/audit" });
+    expect(appLocation()?.state).toEqual({ from: ROUTES.orgAudit });
   });
 });
 
@@ -396,8 +422,8 @@ describe("known gaps (client#126)", APP_TEST, () => {
   it.each(["orgOwner", "orgAdmin"] as const)(
     "Public Chat is in the nav for %s and the page lets them manage it",
     async (id) => {
-      expect(navShows(PERSONAS[id], "/rag/public-chat")).toBe(true);
-      const { fetchMock } = renderApp(PERSONAS[id], "/rag/public-chat");
+      expect(navShows(PERSONAS[id], ROUTES.chatbots)).toBe(true);
+      const { fetchMock } = renderApp(PERSONAS[id], ROUTES.chatbots);
       await settleApp();
       expect(screen.queryByText(/to manage public chat endpoints/)).toBeNull();
       await waitFor(() =>
@@ -429,7 +455,7 @@ describe("known gaps (client#126)", APP_TEST, () => {
   // CLOSED: the instance role "admin" without the claim (an org owner, an SSO
   // admin) used to count as the operator here, though the operator APIs
   // refuse it. Now it gets neither the entries nor the pages.
-  it.each(["/platform/users", "/platform/backups", ROUTES.sources, ROUTES.publishSubmissionReview])(
+  it.each([ROUTES.allUsers, ROUTES.backups, ROUTES.sources, ROUTES.platformAudit])(
     "an instance admin without the Platform Admin claim gets no nav entry and no page for %s",
     async (path) => {
       const persona = withPersona("orgOwner", { label: "instance admin, no claim", claims: { role: "admin" } });
@@ -452,6 +478,57 @@ describe("known gaps (client#126)", APP_TEST, () => {
     // including a logged-out visitor, lands on the same Home dashboard.
     "each persona lands on its own default page",
   );
+});
+
+// A custom role holding org.settings.manage without org.members.manage: the
+// requests inbox is theirs (People › Requests) although Members and Invites
+// are not, so People must show (gated by its tabs), carry the pending badge,
+// and be where the old /requests lands. Its keys come only from the server,
+// so this also covers acting before GET /v1/me/permissions has answered.
+describe("a custom role with the inbox but not the member list", APP_TEST, () => {
+  afterEach(resetApp);
+
+  const settingsOnly = withPersona("teamlessMember", {
+    label: "custom role: org.settings.manage only",
+    claims: { org_role: "settings_admin" },
+    orgKeys: ["org.settings.manage"],
+    pendingRequests: 2,
+  });
+
+  it("gets People (Requests, Domains) in the menu, with the pending badge", async () => {
+    renderApp(settingsOnly);
+    await settleApp();
+    await waitFor(
+      () =>
+        expect(renderedNav()).toEqual({
+          ...MEMBER_NAV,
+          // The badge: "2" on screen, "2 requests …" for screen readers.
+          Organization: ["Overview", "People22 requests waiting for your decision", "Plugins", "Knowledge quality"],
+        }),
+      SETTLE,
+    );
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(within(nav).getByRole("link", { name: /^People/ }).getAttribute("href")).toBe(ROUTES.requests);
+  });
+
+  it("opens the inbox, with Requests and Domains as the People tabs", async () => {
+    renderApp(settingsOnly, ROUTES.requests);
+    expect(await screen.findByRole("heading", { level: 1, name: "Requests" }, SETTLE)).toBeTruthy();
+    await settleApp();
+    const tabs = screen.getByRole("navigation", { name: "People sections" });
+    expect(within(tabs).getAllByRole("link").map((a) => a.textContent)).toEqual([
+      "Requests",
+      "DomainsProAvailable on the Pro plan",
+    ]);
+  });
+
+  it("is sent from the old /requests to the inbox once its permissions arrive", async () => {
+    renderApp(settingsOnly, "/requests?kind=plugin_install#pending");
+    await settleApp();
+    expect(appLocation()?.pathname).toBe(ROUTES.requests);
+    expect(appLocation()?.search).toBe("?kind=plugin_install");
+    expect(appLocation()?.hash).toBe("#pending");
+  });
 });
 
 describe("persona fixtures", () => {

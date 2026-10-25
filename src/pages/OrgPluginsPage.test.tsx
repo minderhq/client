@@ -125,7 +125,7 @@ describe("OrgPluginsPage", () => {
     expect(
       await screen.findByText("2 plugin install requests are waiting for a decision."),
     ).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Open Requests" }).getAttribute("href")).toBe("/requests");
+    expect(screen.getByRole("link", { name: "Open Requests" }).getAttribute("href")).toBe("/organization/people/requests");
   });
 
   it("shows no request line when none wait", async () => {

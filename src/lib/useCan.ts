@@ -135,6 +135,16 @@ export function useMyTeamIds(): Set<string> | null | undefined {
   return !sessionKey || failed.has(sessionKey) ? null : undefined;
 }
 
+/** Has the server's answer for this session arrived (or failed, leaving the
+ * role-claim fallback for good)? True while signed out. For one-shot
+ * decisions, like a redirect, that must not act on the interim fallback. */
+export function usePermissionsSettled(): boolean {
+  const { isAuthenticated, sessionKey } = useAuth();
+  const server = useServerPermissions();
+  if (!isAuthenticated || !sessionKey) return true;
+  return !!server || failed.has(sessionKey);
+}
+
 /** Every gate at once, for filtering lists (sidebar, tabs, palette). */
 export function useAccess(): Access {
   const effective = useEffectivePermissions();

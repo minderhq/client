@@ -283,7 +283,7 @@ export function InstalledBundlesPage() {
     <>
       <PageHeader
         icon="bundles"
-        title="Installed service bundles"
+        title="Installed modules"
         subtitle="Service bundles currently turned on, the Docker image each claimed service actually runs, and export/import for the whole set. Disabling, reconciling or importing requires a Platform Admin."
       />
 
@@ -342,8 +342,8 @@ export function InstalledBundlesPage() {
       {bundlesRes.data && !bundlesRes.error && installed.length === 0 && (
         <EmptyState>
           No service bundles are enabled yet — see{" "}
-          <Link to={ROUTES.discoverServiceBundles} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
-            Discover service bundles
+          <Link to={ROUTES.modules} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+            Discover modules
           </Link>
           .
         </EmptyState>

@@ -143,6 +143,12 @@ export const REVIEW_KEYS: readonly PermissionKey[] = [
   "org.billing.manage",
 ];
 
+/** The permission that opens the org's request inbox (Organization › People
+ * › Requests): org.settings.manage decides plugin and model requests, the
+ * bulk of it. Anyone else who decides requests (a team admin) finds them on
+ * My account › My requests. */
+export const REQUEST_INBOX_REQUIRES: PermissionKey = "org.settings.manage";
+
 /** May the caller decide any kind of request (inbox and menu badge)? */
 export function useCanDecideRequests(): boolean {
   const access = useAccess();

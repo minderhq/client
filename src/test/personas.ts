@@ -74,6 +74,11 @@ export interface Persona {
   tier: PlanTier;
   /** Teams the caller belongs to, with their team role. */
   teams: PersonaTeam[];
+  /** A custom org role's keys, as GET /v1/me/permissions answers them
+   * (default: the org role's keys from the role table). */
+  orgKeys?: string[];
+  /** Requests waiting for the caller's decision (the inbox's `total`). */
+  pendingRequests?: number;
 }
 
 const ORG_ID = "1";

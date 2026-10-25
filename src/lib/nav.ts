@@ -2,6 +2,7 @@ import { useMemo } from "react";
 
 import type { IconName } from "../components/Icon";
 import { en, useI18n, type Messages } from "../i18n";
+import { REQUEST_INBOX_REQUIRES } from "./accessRequests";
 import { type PlanTier, UPGRADE_TIERS } from "./billing";
 import { allows, MEMBER, PLATFORM_ADMIN, type Access, type Requirement } from "./permissions";
 import { ROUTES } from "./routes";
@@ -38,10 +39,10 @@ export interface NavLeaf {
  * sidebar item, exposing the rest as in-page tabs (see PageTabs). */
 export interface NavEntry extends NavLeaf {
   /** Pathname prefix(es) that keep this entry highlighted for any of its
-   * routes. Usually one shared prefix (e.g. "/plugins"); an array lets an entry
-   * own sibling pages that DON'T share a prefix — the graph surfaces
-   * (/rag/graph, /rag/taxonomy-review, /rag/entity-merges) nest under one
-   * "Knowledge Graph" entry that way (#1230). */
+   * routes, detail pages included (e.g. "/organization/people" for a
+   * person's page). Without it, an entry with tabs is active on any of its
+   * tabs' pages, so tabs that DON'T share a prefix (Chat: /ask and
+   * /rag/conversations) still form one entry. */
   match?: string | string[];
   /** Sub-pages surfaced as tabs on each of the group's pages, not as their own
    * sidebar rows — this is what collapses the repetitive Available/Installed
@@ -88,16 +89,20 @@ interface NavSectionDef {
 }
 
 /**
- * The app's information architecture (#126, #131): one panel for everyone,
- * grouped by what the user is trying to DO rather than by which backend
- * service powers it. Everyone gets the sections they work in (Knowledge,
- * Marketplace, AI & system, My account); the administration sections
- * (Organization, Platform) sit below a divider and appear only to callers
- * who hold their permissions. Each row names the permission it needs; the
- * sidebar, tabs and palette filter through useCan, never through role names.
+ * The app's information architecture (client#126 menu decision): one panel
+ * for everyone, in three layers named for what the user is doing: Use (Home,
+ * Chat), Build (Knowledge, Assistants, Discover) and Me (My team, My account).
+ * The administration areas sit below a divider and appear only to callers
+ * who hold their permissions: Organization (the tenant) and Platform (the
+ * installation, always apart from Organization). Each row names the
+ * permission it needs; the sidebar, tabs and palette filter through useCan,
+ * never through role names. The main menu never changes by plan.
  *
- * Read-only system views (Models, Status, Installed) stay open to every
- * member; changing them is gated on the pages and by the API.
+ * A page that moved keeps its route guard: the menu entry decides who is
+ * shown the page, the guard (App.tsx) who may open it. The Platform pages
+ * Status & logs, Local models and Modules stay readable by every member at
+ * their URL (the status page is public); only their menu rows are the
+ * Platform Admin's.
  *
  * Labels, page titles, descriptions and palette keywords are not here: each
  * entry's `id` names its copy in the message catalogs (`nav.items.<id>`), so
@@ -105,111 +110,85 @@ interface NavSectionDef {
  */
 const NAV_MODEL: NavSectionDef[] = [
   {
+    id: "use",
     items: [
       { to: "/", id: "home", icon: "home", end: true, requires: MEMBER },
-      { to: "/ask", id: "ask", icon: "ask", requires: MEMBER },
-    ],
-  },
-  {
-    id: "knowledge",
-    items: [
-      { to: "/rag", id: "knowledgeBases", icon: "knowledge-bases", end: true, requires: MEMBER },
-      { to: "/rag/pipelines", id: "pipelines", icon: "pipelines", requires: MEMBER },
-      { to: "/rag/conversations", id: "conversations", icon: "conversations", requires: MEMBER },
-      // Graph / Taxonomy Review / Entity Merge Review are advanced surfaces a
-      // first-timer has no data for — nested under one "Knowledge Graph" entry
-      // as in-page tabs (#1230) so top-level Knowledge is just the golden path
-      // (KB · Pipelines · Conversations). They don't share a path prefix, hence
-      // the match[] array. Taxonomy review is per owner: every member reviews
-      // the suggestions on their own entities.
       {
-        to: "/rag/graph",
-        id: "knowledgeGraph",
-        icon: "graph",
+        to: "/ask",
+        id: "chat",
+        icon: "ask",
         requires: MEMBER,
-        match: ["/rag/graph", "/rag/taxonomy-review", "/rag/entity-merges"],
         tabs: [
-          { to: "/rag/graph", id: "graph", icon: "graph", end: true, requires: MEMBER },
-          { to: "/rag/taxonomy-review", id: "taxonomyReview", icon: "taxonomy", requires: MEMBER },
-          { to: "/rag/entity-merges", id: "entityMerges", icon: "merge", requires: MEMBER },
+          { to: "/ask", id: "ask", icon: "ask", requires: MEMBER },
+          { to: ROUTES.chatHistory, id: "conversations", icon: "conversations", requires: MEMBER },
         ],
       },
     ],
   },
   {
-    // Marketplace (#2197): ONE Discover catalog, ONE Installed view, ONE
-    // Publish area. The item type is the tab; a plugin's source (first-party,
-    // private git, submitted, later MindHub) is a filter and badge on Discover.
-    id: "marketplace",
+    id: "build",
     items: [
       {
+        // Knowledge bases and the knowledge graph; the member's own taxonomy
+        // review queue is a tab of it (every member reviews the suggestions
+        // on their own entities). Entity merges are Organization › Knowledge
+        // quality.
+        to: "/rag",
+        id: "knowledge",
+        icon: "knowledge-bases",
+        requires: MEMBER,
+        tabs: [
+          { to: "/rag", id: "knowledgeBases", icon: "knowledge-bases", end: true, requires: MEMBER },
+          { to: "/rag/graph", id: "knowledgeGraph", icon: "graph", requires: MEMBER },
+          { to: "/rag/taxonomy-review", id: "taxonomyReview", icon: "taxonomy", requires: MEMBER },
+        ],
+      },
+      { to: "/rag/pipelines", id: "pipelines", icon: "pipelines", requires: MEMBER },
+      {
+        // Discover: ONE catalog screen for plugins, with what is installed as
+        // a view of it. A plugin's source is a filter and badge. AI tools are
+        // a facet of a plugin (their pages stay reachable from the plugin
+        // pages, without a row of their own); modules are Platform-only.
         to: ROUTES.discoverPlugins,
         id: "discover",
         icon: "available-plugins",
         requires: MEMBER,
-        match: "/marketplace/discover",
+        match: "/marketplace",
         tabs: [
           { to: ROUTES.discoverPlugins, id: "discoverPlugins", icon: "plugins", requires: MEMBER },
-          { to: ROUTES.discoverAiTools, id: "discoverAiTools", icon: "ai-tools", requires: MEMBER },
-          { to: ROUTES.discoverServiceBundles, id: "discoverServiceBundles", icon: "bundles", requires: MEMBER },
-        ],
-      },
-      {
-        to: ROUTES.installedPlugins,
-        id: "installed",
-        icon: "installed",
-        requires: MEMBER,
-        match: "/marketplace/installed",
-        tabs: [
-          { to: ROUTES.installedPlugins, id: "installedPlugins", icon: "plugins", requires: MEMBER },
-          { to: ROUTES.installedAiTools, id: "installedAiTools", icon: "ai-tools", requires: MEMBER },
-          { to: ROUTES.installedServiceBundles, id: "installedServiceBundles", icon: "bundles", requires: MEMBER },
-        ],
-      },
-      {
-        to: ROUTES.publishSubmissions,
-        id: "publish",
-        icon: "submit",
-        requires: MEMBER,
-        match: "/marketplace/publish",
-        tabs: [
-          { to: ROUTES.publishSubmissions, id: "submissions", icon: "submit", requires: MEMBER },
-          { to: ROUTES.publishSubmissionReview, id: "submissionReview", icon: "review", requires: PLATFORM_ADMIN },
+          { to: ROUTES.installedPlugins, id: "installedPlugins", icon: "installed", requires: MEMBER },
         ],
       },
     ],
   },
   {
-    // What every member may look at (read-only for most): the models they can
-    // use and the platform's health.
-    id: "ai",
+    id: "me",
     items: [
-      { to: "/platform", id: "models", icon: "models", end: true, requires: MEMBER },
-      { to: "/platform/status", id: "status", icon: "status", requires: MEMBER },
-    ],
-  },
-  {
-    // Personal settings live together: your team, profile, voice, your own
-    // licenses. My team is every member's: with no team it is where they ask
-    // to join one (client#126 menu decision).
-    id: "account",
-    items: [
+      // Every member's: their team, or where they ask to join one.
       { to: ROUTES.myTeam, id: "myTeam", icon: "teams", requires: MEMBER },
-      { to: "/settings", id: "account", icon: "settings", end: true, requires: MEMBER },
-      { to: "/platform/voice", id: "voice", icon: "voice", requires: MEMBER },
-      { to: ROUTES.licenses, id: "licenses", icon: "licenses", requires: MEMBER },
-      // Everyone follows their own requests; deciders also find their inbox here.
-      { to: ROUTES.requests, id: "requests", icon: "send", requires: MEMBER },
+      {
+        to: ROUTES.account,
+        id: "account",
+        icon: "settings",
+        requires: MEMBER,
+        tabs: [
+          { to: ROUTES.account, id: "profile", icon: "user", end: true, requires: MEMBER },
+          { to: ROUTES.voice, id: "voice", icon: "voice", requires: MEMBER },
+          // What the caller asked for; the decision inbox is Organization ›
+          // People › Requests.
+          { to: ROUTES.myRequests, id: "myRequests", icon: "send", requires: MEMBER },
+        ],
+      },
     ],
   },
   {
-    // Running the organization: people, AI providers, public chatbots, plan.
+    // Running the organization (the tenant).
     id: "organization",
     admin: true,
     items: [
       { to: "/organization", id: "orgOverview", icon: "org", end: true, requires: "org.settings.manage" },
       {
-        // Organization › People (UX step 7): members, invites and the
+        // Organization › People: members, invites, the requests inbox and the
         // allowed email domains; each person's page sits under it too.
         to: ROUTES.people,
         id: "orgUsers",
@@ -219,6 +198,8 @@ const NAV_MODEL: NavSectionDef[] = [
         tabs: [
           { to: ROUTES.people, id: "people", icon: "users", end: true, requires: "org.members.manage" },
           { to: ROUTES.peopleInvites, id: "peopleInvites", icon: "mail", requires: "org.members.manage" },
+          // One inbox for every request kind.
+          { to: ROUTES.requests, id: "requests", icon: "send", requires: REQUEST_INBOX_REQUIRES },
           {
             to: ROUTES.peopleDomains,
             id: "peopleDomains",
@@ -230,10 +211,8 @@ const NAV_MODEL: NavSectionDef[] = [
       },
       // Organization › Teams: every team of the org, created and managed here.
       { to: ROUTES.orgTeams, id: "teams", icon: "teams", requires: "org.teams.manage" },
-      { to: "/rag/public-chat", id: "publicChat", icon: "ask", requires: "org.chatbots.manage" },
       {
-        // Organization › AI (UX step 9): the org's providers and its default
-        // model per task. Members keep the read-only Models page.
+        // Organization › AI: the org's providers and its default model per task.
         to: ROUTES.orgAi,
         id: "orgAi",
         icon: "models",
@@ -247,8 +226,27 @@ const NAV_MODEL: NavSectionDef[] = [
       // Organization › Plugins: what is installed for the whole org. The
       // marketplace's install gate is org.settings.manage, so this is too.
       { to: ROUTES.orgPlugins, id: "orgPlugins", icon: "plugins", requires: "org.settings.manage" },
-      { to: ROUTES.billing, id: "billing", icon: "billing", end: true, requires: "org.billing.view" },
-      { to: "/audit", id: "audit", icon: "audit", requires: "org.audit.view" },
+      {
+        to: ROUTES.chatbots,
+        id: "publicChat",
+        icon: "ask",
+        match: ROUTES.chatbots,
+        requires: "org.chatbots.manage",
+      },
+      // The entity-merge review. Its page and API serve any member for the
+      // candidates they own; the row is the org admin's (org.settings.manage)
+      // so Organization stays an admin area.
+      { to: ROUTES.knowledgeQuality, id: "knowledgeQuality", icon: "merge", requires: "org.settings.manage" },
+      {
+        // Organization › Security › Audit log: always the active org's log.
+        to: ROUTES.orgAudit,
+        id: "security",
+        icon: "lock",
+        requires: "org.audit.view",
+        match: "/organization/security",
+        tabs: [{ to: ROUTES.orgAudit, id: "audit", icon: "audit", requires: "org.audit.view" }],
+      },
+      { to: ROUTES.billing, id: "billing", icon: "billing", requires: "org.billing.view" },
     ],
   },
   {
@@ -256,10 +254,25 @@ const NAV_MODEL: NavSectionDef[] = [
     id: "platform",
     admin: true,
     items: [
-      { to: "/organizations", id: "allOrganizations", icon: "org", requires: PLATFORM_ADMIN },
-      { to: "/platform/users", id: "allUsers", icon: "users", requires: PLATFORM_ADMIN },
-      { to: "/platform/backups", id: "backups", icon: "backups", requires: PLATFORM_ADMIN },
+      { to: ROUTES.status, id: "status", icon: "status", requires: PLATFORM_ADMIN },
+      { to: ROUTES.models, id: "models", icon: "models", requires: PLATFORM_ADMIN },
+      {
+        // Modules (service bundles): local runtime switches, never in Discover.
+        to: ROUTES.modules,
+        id: "modules",
+        icon: "bundles",
+        requires: PLATFORM_ADMIN,
+        match: ROUTES.modules,
+        tabs: [
+          { to: ROUTES.modules, id: "modulesDiscover", icon: "available-plugins", end: true, requires: PLATFORM_ADMIN },
+          { to: ROUTES.installedModules, id: "modulesInstalled", icon: "installed", requires: PLATFORM_ADMIN },
+        ],
+      },
+      { to: ROUTES.allOrganizations, id: "allOrganizations", icon: "org", requires: PLATFORM_ADMIN },
+      { to: ROUTES.allUsers, id: "allUsers", icon: "users", requires: PLATFORM_ADMIN },
       { to: ROUTES.sources, id: "sources", icon: "sources", match: ROUTES.sources, requires: PLATFORM_ADMIN },
+      { to: ROUTES.backups, id: "backups", icon: "backups", requires: PLATFORM_ADMIN },
+      { to: ROUTES.platformAudit, id: "platformAudit", icon: "audit", requires: PLATFORM_ADMIN },
     ],
   },
 ];
@@ -299,10 +312,12 @@ export function leafVisible(leaf: NavLeaf, access: Access): boolean {
 
 /** The entry as this caller should see it: its tabs filtered to the visible
  * ones and its link pointed at the first of those, or null when nothing in
- * it is visible. The one place Sidebar and PageTabs take gating from. */
+ * it is visible. An entry with tabs is gated by its tabs alone, so a caller
+ * who may open any one of them (People › Requests without
+ * org.members.manage) still gets the entry. The one place Sidebar and
+ * PageTabs take gating from. */
 export function visibleEntry(entry: NavEntry, access: Access): NavEntry | null {
-  if (!leafVisible(entry, access)) return null;
-  if (!entry.tabs) return entry;
+  if (!entry.tabs) return leafVisible(entry, access) ? entry : null;
   const tabs = entry.tabs.filter((t) => leafVisible(t, access));
   if (tabs.length === 0) return null;
   return { ...entry, to: tabs[0].to, tabs };
@@ -332,25 +347,26 @@ export function entryIsActive(entry: NavEntry, pathname: string): boolean {
     const prefixes = Array.isArray(entry.match) ? entry.match : [entry.match];
     return prefixes.some((p) => underPrefix(p, pathname));
   }
+  if (entry.tabs) return entry.tabs.some((t) => leafIsActive(t, pathname));
   if (entry.end) return pathname === entry.to;
   return underPrefix(entry.to, pathname);
 }
 
+/** Is `pathname` this leaf's page (or, without `end`, under it)? */
+function leafIsActive(leaf: NavLeaf, pathname: string): boolean {
+  return leaf.end ? pathname === leaf.to : underPrefix(leaf.to, pathname);
+}
+
 /** The tab group (if any) a path belongs to — used by PageTabs to render the
- * in-page sub-navigation (Discover / Installed / Publish, Billing & licenses,
- * Knowledge Graph). Tabs are unfiltered; PageTabs applies visibleEntry. */
+ * in-page sub-navigation (Chat, Knowledge, Discover, My account, People,
+ * Modules…). Tabs are unfiltered; PageTabs applies visibleEntry. */
 export function tabGroupForPath(
   pathname: string,
   sections: NavSection[] = NAV_SECTIONS,
 ): NavEntry | null {
   for (const section of sections) {
     for (const item of section.items) {
-      if (item.tabs && item.match) {
-        const prefixes = Array.isArray(item.match) ? item.match : [item.match];
-        if (prefixes.some((p) => underPrefix(p, pathname))) {
-          return item;
-        }
-      }
+      if (item.tabs && entryIsActive(item, pathname)) return item;
     }
   }
   return null;
@@ -371,9 +387,7 @@ export function navTrailForPath(pathname: string, sections: NavSection[]): NavTr
   for (const section of sections) {
     for (const entry of section.items) {
       if (!entryIsActive(entry, pathname)) continue;
-      const tab = entry.tabs?.find((t) =>
-        t.end ? pathname === t.to : underPrefix(t.to, pathname),
-      );
+      const tab = entry.tabs?.find((t) => leafIsActive(t, pathname));
       return { ...(section.label ? { section: section.label } : {}), entry, ...(tab ? { tab } : {}) };
     }
   }

@@ -72,7 +72,7 @@ describe("HealthStrip", () => {
     expect(await screen.findByText("All systems healthy")).toBeTruthy();
     const link = screen.getByRole("link", { name: /All systems healthy/ });
     expect(link.getAttribute("data-health")).toBe("ok");
-    expect(link.getAttribute("href")).toBe("/platform/status");
+    expect(link.getAttribute("href")).toBe("/status");
   });
 
   it("shows an X/Y count with a yellow indicator when some (not all) services are down", async () => {

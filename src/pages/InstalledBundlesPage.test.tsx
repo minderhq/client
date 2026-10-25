@@ -84,8 +84,8 @@ describe("InstalledBundlesPage", () => {
 
     expect(await screen.findByText(/No service bundles are enabled yet/)).toBeTruthy();
     expect(
-      screen.getByRole("link", { name: "Discover service bundles" }).getAttribute("href"),
-    ).toBe("/marketplace/discover/service-bundles");
+      screen.getByRole("link", { name: "Discover modules" }).getAttribute("href"),
+    ).toBe("/platform/modules");
   });
 
   it("shows an orphaned-services warning banner listing every orphan", async () => {
@@ -231,7 +231,7 @@ describe("InstalledBundlesPage", () => {
     await screen.findByRole("heading", { level: 3, name: "voice" });
     expect(
       screen.getAllByRole("heading").map((h) => `${h.tagName}:${h.textContent?.trim()}`),
-    ).toEqual(["H1:Installed service bundles", "H2:Export / Import", "H2:Enabled bundles", "H3:voice"]);
+    ).toEqual(["H1:Installed modules", "H2:Export / Import", "H2:Enabled bundles", "H3:voice"]);
   });
 });
 
@@ -321,7 +321,7 @@ describe("ExportImportPanel import: preview, confirm, cancel (#2195)", () => {
   it("puts focus on the page heading after Cancel, since the busy file input is disabled", async () => {
     render(
       <main>
-        <h1>Installed service bundles</h1>
+        <h1>Installed modules</h1>
         <ExportImportPanel
           bundles={[bundle({ name: "monitoring", enabled: false })]}
           token="tok"
@@ -340,7 +340,7 @@ describe("ExportImportPanel import: preview, confirm, cancel (#2195)", () => {
 
     await screen.findByText("Import cancelled — nothing was changed.");
     expect(document.activeElement).toBe(
-      screen.getByRole("heading", { name: "Installed service bundles" }),
+      screen.getByRole("heading", { name: "Installed modules" }),
     );
   });
 

@@ -2,7 +2,7 @@ import { useId } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import { useI18n } from "../i18n";
-import { usePendingRequestCount } from "../lib/accessRequests";
+import { REQUEST_INBOX_REQUIRES, usePendingRequestCount } from "../lib/accessRequests";
 import { entryIsActive, useNav, visibleSections } from "../lib/nav";
 import { ROUTES } from "../lib/routes";
 import { sectionLabelClass } from "../lib/ui";
@@ -17,9 +17,8 @@ const inactiveItemClass =
   "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100";
 
 /** The platform's persistent nav — a single always-visible tree, grouped by
- * what the user is trying to DO (Knowledge / Marketplace / AI & system / Team /
- * My account, then the Organization and Platform administration sections below
- * a divider) rather than by backend service. Every row is filtered through
+ * what the user is trying to DO (Use / Build / Me, then the Organization and
+ * Platform administration sections below a divider) rather than by backend service. Every row is filtered through
  * useCan: a caller sees only what they hold the permission for, and a signed-out
  * visitor sees no menu at all. Renders from the
  * shared nav model (lib/nav.ts) the ⌘K palette also uses. The repetitive
@@ -39,6 +38,9 @@ export function Sidebar({
   const { t, plural } = useI18n();
   const { sections } = useNav();
   const pending = usePendingRequestCount();
+  // The pending badge sits on the entry that holds the caller's inbox: People
+  // when its Requests tab is theirs, else My account (My requests).
+  const inboxPath = access.can(REQUEST_INBOX_REQUIRES) ? ROUTES.requests : ROUTES.myRequests;
 
   return (
     <aside
@@ -123,7 +125,7 @@ export function Sidebar({
                         }
                       />
                       {item.label}
-                      {item.to === ROUTES.requests && pending > 0 && (
+                      {(item.to === inboxPath || item.tabs?.some((tab) => tab.to === inboxPath)) && pending > 0 && (
                         <span className="ml-auto rounded-full bg-indigo-600 px-1.5 text-xs font-semibold text-white">
                           <span aria-hidden="true">{pending}</span>
                           <span className="sr-only">{plural("requests.pendingBadge", pending)}</span>

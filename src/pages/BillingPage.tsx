@@ -119,7 +119,7 @@ export function BillingPage() {
     <>
       <PageHeader
         icon="billing"
-        title="Billing"
+        title="Plan & billing"
         subtitle="Your organization's plan and subscription. Upgrades and payment management happen on the provider's secure hosted pages."
       />
 

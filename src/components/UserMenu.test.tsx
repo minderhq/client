@@ -39,7 +39,7 @@ describe("UserMenu", () => {
     expect(screen.queryByText("Log out")).toBeNull();
   });
 
-  it("shows the username linking to /settings and a Log out button when logged in", () => {
+  it("shows the username linking to /account and a Log out button when logged in", () => {
     useAuth.mockReturnValue({
       isAuthenticated: true,
       username: "alice",
@@ -49,7 +49,7 @@ describe("UserMenu", () => {
 
     expect(screen.queryByText("Log in")).toBeNull();
     const link = screen.getByText("alice").closest("a");
-    expect(link?.getAttribute("href")).toBe("/settings");
+    expect(link?.getAttribute("href")).toBe("/account");
     expect(screen.getByText("Log out")).toBeTruthy();
   });
 

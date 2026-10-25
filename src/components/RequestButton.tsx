@@ -144,7 +144,7 @@ export function RequestButton({
         >
           {sent ? (
             <div className="mt-5 flex justify-end gap-2">
-              <Link to={ROUTES.requests} className={secondaryButtonClass} onClick={close}>
+              <Link to={ROUTES.myRequests} className={secondaryButtonClass} onClick={close}>
                 {t("requests.send.viewRequests")}
               </Link>
               <button type="button" autoFocus className={primaryButtonClass} onClick={close}>

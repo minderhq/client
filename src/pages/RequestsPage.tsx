@@ -4,6 +4,7 @@ import { Dialog } from "../components/Dialog";
 import { EmptyState } from "../components/EmptyState";
 import { LoadError } from "../components/LoadError";
 import { PageHeader } from "../components/PageHeader";
+import { RedirectWithQuery } from "../components/RedirectWithQuery";
 import { Skeleton } from "../components/Skeleton";
 import { StatusLine } from "../components/StatusLine";
 import { useI18n, type Messages } from "../i18n";
@@ -15,11 +16,14 @@ import {
   fetchRequestInbox,
   isAlreadyDecided,
   notifyRequestsChanged,
+  REQUEST_INBOX_REQUIRES,
   useCanDecideRequests,
   type InboxRequest,
   type MyAccessRequest,
 } from "../lib/accessRequests";
 import { useAuth } from "../lib/auth";
+import { ROUTES } from "../lib/routes";
+import { useAllows, usePermissionsSettled } from "../lib/useCan";
 import {
   badgeBaseClass,
   badgeNeutralToneClass,
@@ -70,19 +74,36 @@ function useDescribe() {
   };
 }
 
-/** Requests (client#126 Q4): what the caller asked for and how it went, and,
- * for whoever decides requests, the ones routed to them with approve and
- * reject. The first decision closes a request for every recipient, so a
- * decided one shows who decided it. */
-export function RequestsPage() {
+/** The old /requests URL: the inbox for whoever can open it, the caller's own
+ * requests (My account › My requests) for everyone else. */
+export function RequestsRedirect() {
+  const inbox = useAllows(REQUEST_INBOX_REQUIRES);
+  const settled = usePermissionsSettled();
+  // Decide once, on the server's permissions, not on the interim fallback.
+  if (!settled) return null;
+  return <RedirectWithQuery to={inbox ? ROUTES.requests : ROUTES.myRequests} />;
+}
+
+/** Requests (client#126 Q4), in two places (menu decision):
+ * - "inbox" (Organization › People › Requests): the requests routed to the
+ *   caller, every kind in one list, with approve and reject. The first
+ *   decision closes a request for every recipient, so a decided one shows who
+ *   decided it.
+ * - "mine" (My account › My requests): what the caller asked for and how it
+ *   went. A caller who decides requests without the org inbox (a team admin's
+ *   join requests) finds the requests routed to them here too. */
+export function RequestsPage({ view }: { view: "inbox" | "mine" }) {
   const { token, sessionKey } = useAuth();
   const { t } = useI18n();
   const canDecide = useCanDecideRequests();
+  // Exactly when the People › Requests tab (and so the People entry, which is
+  // gated by its tabs) is in the caller's menu.
+  const hasOrgInbox = useAllows(REQUEST_INBOX_REQUIRES);
   const inboxHeadingId = useId();
   const mineHeadingId = useId();
 
   const mine = useAsyncResource((signal) => fetchMyAccessRequests(token, signal), {
-    enabled: !!token,
+    enabled: !!token && view === "mine",
     deps: [sessionKey],
   });
   // Asked of everyone: a team admin's join requests are routed to them even
@@ -92,11 +113,16 @@ export function RequestsPage() {
     deps: [sessionKey],
   });
   const inboxItems = inbox.data?.requests ?? [];
-  const showInbox = canDecide || inboxItems.length > 0;
+  const showInbox =
+    view === "inbox" || (!hasOrgInbox && (canDecide || inboxItems.length > 0));
 
   return (
     <>
-      <PageHeader icon="send" title={t("nav.items.requests.title")} subtitle={t("requests.page.subtitle")} />
+      <PageHeader
+        icon="send"
+        title={view === "inbox" ? t("nav.items.requests.title") : t("nav.items.myRequests.title")}
+        subtitle={view === "inbox" ? t("requests.page.inboxSubtitle") : t("requests.page.subtitle")}
+      />
 
       {showInbox && (
         <section aria-labelledby={inboxHeadingId} className="mb-8">
@@ -124,6 +150,7 @@ export function RequestsPage() {
         </section>
       )}
 
+      {view === "mine" && (
       <section aria-labelledby={mineHeadingId}>
         <h2 id={mineHeadingId} className="mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">
           {t("requests.page.mineHeading")}
@@ -147,6 +174,7 @@ export function RequestsPage() {
           </ul>
         )}
       </section>
+      )}
     </>
   );
 }
