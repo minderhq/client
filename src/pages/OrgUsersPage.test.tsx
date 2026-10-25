@@ -92,8 +92,6 @@ function routeApiFetch(opts: {
   limits?: unknown;
   /** GET /v1/organizations/1/roles; 403 when omitted. */
   roles?: unknown[];
-  /** The org's teams and their rosters (GET /v1/teams, /v1/teams/{id}). */
-  teams?: { id: number; name: string; members: { user_id: number; team_role: string }[] }[];
   /** Hold GET /members unanswered (the loading state). */
   membersPending?: boolean;
 } = {}) {
@@ -120,12 +118,6 @@ function routeApiFetch(opts: {
     if (path === "/v1/auth/users" && method === "GET") return Promise.resolve({ users });
     if (path === "/v1/organizations/1/roles")
       return opts.roles ? Promise.resolve({ roles: opts.roles }) : Promise.reject(new ApiError("forbidden", 403));
-    if (path === "/v1/teams?limit=500")
-      return opts.teams
-        ? Promise.resolve({ teams: opts.teams.map((t) => ({ id: t.id, name: t.name })) })
-        : Promise.reject(new ApiError("forbidden", 403));
-    const teamDetail = /^\/v1\/teams\/(\d+)$/.exec(path);
-    if (teamDetail && opts.teams) return Promise.resolve(opts.teams.find((t) => t.id === Number(teamDetail[1])));
     if (path.startsWith("/v1/access-requests")) return Promise.resolve({ requests: [], total: 0 });
     if (path === "/v1/organizations/1/limits")
       return opts.limits ? Promise.resolve(opts.limits) : Promise.reject(new ApiError("forbidden", 403));
@@ -197,13 +189,20 @@ describe("OrgUsersPage", () => {
     signIn({ orgRole: "admin" });
     routeApiFetch({
       perms: MANAGER,
-      members: [member(), member({ user_id: 3, username: "carol", email: "carol@example.com" })],
-      teams: [{ id: 7, name: "Sales", members: [{ user_id: 2, team_role: "member" }] }],
+      members: [
+        member({ teams: [{ id: 7, name: "Sales" }, { id: 9, name: "Support" }] }),
+        member({ user_id: 3, username: "carol", email: "carol@example.com", teams: [] }),
+        // An older gateway without `teams`: no team line rather than a wrong "No teams".
+        member({ user_id: 4, username: "dan", email: "dan@example.com" }),
+      ],
     });
     render(<OrgUsersPage />);
     const bob = await row("bob");
-    expect(await within(bob).findByText("Teams: Sales")).toBeTruthy();
+    expect(await within(bob).findByText("Teams: Sales, Support")).toBeTruthy();
     expect(within(await row("carol")).getByText("No teams")).toBeTruthy();
+    expect(within(await row("dan")).queryByText(/team/i)).toBeNull();
+    // The teams come with the member list: no team list or roster fetches.
+    expect(calledPaths().filter((p) => p.startsWith("/v1/teams"))).toEqual([]);
     expect(within(bob).getByRole("link", { name: "bob" }).getAttribute("href")).toBe("/organization/people/2");
 
     fireEvent.change(screen.getByLabelText("Search people"), { target: { value: "carol" } });
@@ -211,6 +210,16 @@ describe("OrgUsersPage", () => {
     expect(screen.getByText("carol")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Search people"), { target: { value: "nobody" } });
     expect(screen.getByText("No one matches “nobody”.")).toBeTruthy();
+  });
+
+  it("shows a Platform Admin each member's teams in this org, from the member list", async () => {
+    signIn({ isPlatformAdmin: true });
+    // The member list is scoped to org 1, teams included: a team the person
+    // has in another org never reaches this page.
+    routeApiFetch({ members: [member({ teams: [{ id: 7, name: "Sales" }] })] });
+    render(<OrgUsersPage />);
+    expect(await within(await row("bob")).findByText("Teams: Sales")).toBeTruthy();
+    expect(calledPaths().filter((p) => p.startsWith("/v1/teams"))).toEqual([]);
   });
 
   it("lists the active org's members read-only for a caller who may only view", async () => {
@@ -460,7 +469,7 @@ describe("OrgUsersPage", () => {
           permissions: ["org.members.view", "org.members.manage"],
         },
       ],
-      teams: [{ id: 7, name: "Sales", members: [{ user_id: 2, team_role: "member" }] }],
+      members: [member({ teams: [{ id: 7, name: "Sales" }] })],
     });
     render(<OrgUsersPage />);
 

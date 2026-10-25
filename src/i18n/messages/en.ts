@@ -618,7 +618,21 @@ export const en = {
       email: "Email address",
       emailPlaceholder: "person@example.com",
       send: "Send invite",
-      sent: "Invite created for {email}. Copy its link below and send it to them.",
+      sent: "Invite created for {email}.",
+      delivery: {
+        queued: "Email sent",
+        none: "No email was sent. Copy the link and send it to them yourself.",
+        reasons: {
+          email_not_configured:
+            "Email isn't set up on this server, so no email was sent. Copy the link and send it to them yourself.",
+          recipient_capped:
+            "This address has had too many emails from us today, so none was sent. Copy the link and send it to them yourself.",
+          suppressed:
+            "This address doesn't receive our emails (it bounced or unsubscribed before). Copy the link and send it to them yourself.",
+          invalid_address: "The email couldn't be delivered to this address. Check it, or copy the link and send it yourself.",
+          error: "The email couldn't be sent. Copy the link and send it to them yourself.",
+        },
+      },
       bulkHeading: "Invite a list",
       bulkLabel: "Email addresses",
       bulkPlaceholder: "one@example.com, two@example.com",
@@ -658,8 +672,20 @@ export const en = {
       revokeTitle: "Revoke invite?",
       revokeMessage: "The invite link for {email} stops working.",
       revoked: "Invite revoked.",
+      resend: "Resend",
+      resendFor: "Resend the invite email to {email}",
+      resent: "Invite email sent again to {email}.",
+      resendNotSent: "Not resent to {email}. {reason}",
+      resendErrors: {
+        invite_revoked: "This invite was revoked, so it can't be resent.",
+        invite_accepted: "This invite has already been accepted.",
+        invite_expired: "This invite has expired. Create a new one instead.",
+        not_found: "This invite can't be found. It may be gone, or you can only resend invites you sent yourself.",
+      },
+      resendWait: "This invite was emailed recently. You can resend it at {time}.",
+      resendWaitLater: "This invite was emailed recently. Try again later.",
       howTo:
-        "Minder doesn't email invites yet: copy the link and send it yourself. The person signs in (or registers) with that email address, then opens the link to join {org}.",
+        "Each invite is emailed when email is set up on this server; you can also copy its link and send it yourself. The person signs in (or registers) with that email address, then opens the link to join {org}.",
     },
     domains: {
       what:
@@ -708,11 +734,7 @@ export const en = {
       fromGroup: "from {role} › {group}",
       fromParent: "from the parent organization ({role})",
       teamsHeading: "Teams",
-      teamsLoadError: "Couldn't load their teams.",
       teamsEmpty: "Not in any team.",
-      teamsUnavailable: "Team memberships aren't shown to Platform Admins yet.",
-      teamAdmin: "team admin",
-      teamMember: "member",
       accessHeading: "Access",
       accessHint: "Suspending or removing only affects {org}. Each asks you to confirm and shows what they lose.",
     },

@@ -19,7 +19,7 @@ import {
   setOrgMemberAccountActive,
   setOrgMemberSuspended,
 } from "./orgs";
-import { fetchOrgRoles, type OrgRole, roleImpact, useTeamsByMember } from "./people";
+import { fetchOrgRoles, type OrgRole, roleImpact } from "./people";
 import { useAsyncResource } from "./useAsyncResource";
 
 /** A role's display name: the built-in ones translated, a custom role as
@@ -41,7 +41,8 @@ export function usePermissionName(): (key: string) => string {
 }
 
 /** The active org, its members, the caller's permissions there, the org's
- * roles and each member's teams: what the People pages read. */
+ * roles: what the People pages read. Each member's teams come with the
+ * member list. */
 export function usePeopleData() {
   const { isAuthenticated, token, sessionKey, userId, orgRole, activeTenantId, isPlatformAdmin } =
     useAuth();
@@ -84,13 +85,11 @@ export function usePeopleData() {
     (signal) => fetchOrgRoles(active!.id, token, signal).then((r) => r.roles),
     { deps: [sessionKey, active?.id], enabled: isAuthenticated && !!active && canManage },
   );
-  const teamsRes = useTeamsByMember(token, sessionKey, isAuthenticated && !!active && !isPlatformAdmin);
   return {
     orgsRes,
     active,
     membersRes,
     rolesRes,
-    teamsRes,
     canManage,
     canSuspend: has(ORG_PERMISSIONS.suspend),
   };

@@ -51,6 +51,7 @@ const BOB: OrgMember = {
   managed_by_caller: false,
   resettable_by_caller: false,
   outside_allowed_domains: false,
+  teams: [{ id: 7, name: "Sales" }],
 };
 
 const ROLES = [
@@ -87,10 +88,6 @@ function routeApiFetch(opts: { perms?: string[] } = {}) {
           { permission_key: "org.teams.manage", role_id: 9, role_name: "admin", via_ancestor_organization_id: 4 },
         ],
       });
-    if (path === "/v1/teams?limit=500") return Promise.resolve({ teams: [{ id: 7 }, { id: 8 }] });
-    if (path === "/v1/teams/7")
-      return Promise.resolve({ id: 7, name: "Sales", members: [{ user_id: 2, team_role: "team_admin" }] });
-    if (path === "/v1/teams/8") return Promise.resolve({ id: 8, name: "Ops", members: [{ user_id: 3, team_role: "member" }] });
     if (path === "/v1/organizations/1/limits") return Promise.reject(new ApiError("forbidden", 403));
     if (path.startsWith("/v1/access-requests") || path.startsWith("/v1/billing"))
       return Promise.resolve({ requests: [], total: 0 });
@@ -129,9 +126,8 @@ describe("PersonPage", () => {
     expect(within(perms).getByText("from the parent organization (Admin)")).toBeTruthy();
 
     const teams = section("Teams");
-    expect(await within(teams).findByText("Sales")).toBeTruthy();
-    expect(within(teams).getByText("team admin")).toBeTruthy();
-    expect(within(teams).queryByText("Ops")).toBeNull();
+    expect(within(teams).getByRole("link", { name: "Sales" })).toBeTruthy();
+    expect(apiFetch.mock.calls.filter((c) => String(c[0]).startsWith("/v1/teams"))).toEqual([]);
   });
 
   it("gives an existing custom role until a date, and takes one away", async () => {

@@ -45,10 +45,10 @@ const labelClass = "mb-1 block text-xs font-medium text-gray-700 dark:text-gray-
 export function PersonPage() {
   const { userId: param } = useParams();
   const uid = Number(param);
-  const { token, sessionKey, userId, isPlatformAdmin } = useAuth();
+  const { token, sessionKey, userId } = useAuth();
   const { t } = useI18n();
   const roleLabel = useRoleLabel();
-  const { orgsRes, active, membersRes, rolesRes, teamsRes, canManage, canSuspend } = usePeopleData();
+  const { orgsRes, active, membersRes, rolesRes, canManage, canSuspend } = usePeopleData();
   const member = membersRes.data?.find((m) => m.user_id === uid);
   const roles = rolesRes.data ?? [];
 
@@ -60,7 +60,7 @@ export function PersonPage() {
     (signal) => fetchMemberPermissions(active!.id, uid, token, signal).then((r) => r.permissions),
     { deps: [sessionKey, active?.id, uid], enabled: !!active && !!member },
   );
-  const teams = teamsRes.data?.get(uid) ?? [];
+  const teams = member?.teams ?? [];
   const systemIds = new Set(roles.filter((r) => r.is_system).map((r) => r.id));
   const customGrants = (grantsRes.data ?? []).filter(
     (g) => !systemIds.has(g.role_id) && !(ORG_ROLES as readonly string[]).includes(g.role_name),
@@ -173,39 +173,26 @@ export function PersonPage() {
         )}
       </section>
 
-      <section className={`mb-4 ${cardClass}`} aria-labelledby="person-teams">
-        <h2 id="person-teams" className={headingClass}>
-          {t("people.person.teamsHeading")}
-        </h2>
-        {isPlatformAdmin ? (
-          <p className={mutedTextClass}>{t("people.person.teamsUnavailable")}</p>
-        ) : teamsRes.error ? (
-          <LoadError
-            quiet
-            title={t("people.person.teamsLoadError")}
-            message={teamsRes.error}
-            onRetry={teamsRes.reload}
-            what={t("people.person.teamsHeading")}
-          />
-        ) : !teamsRes.data ? (
-          <Skeleton className="h-10 w-full" />
-        ) : teams.length === 0 ? (
-          <EmptyState>{t("people.person.teamsEmpty")}</EmptyState>
-        ) : (
-          <ul className="flex flex-col gap-1">
-            {teams.map((team) => (
-              <li key={team.id} className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100">
-                <Link to="/platform/teams" className="hover:underline">
-                  {team.name}
-                </Link>
-                <span className={badgeClass}>
-                  {team.team_role === "team_admin" ? t("people.person.teamAdmin") : t("people.person.teamMember")}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {member.teams && (
+        <section className={`mb-4 ${cardClass}`} aria-labelledby="person-teams">
+          <h2 id="person-teams" className={headingClass}>
+            {t("people.person.teamsHeading")}
+          </h2>
+          {teams.length === 0 ? (
+            <EmptyState>{t("people.person.teamsEmpty")}</EmptyState>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {teams.map((team) => (
+                <li key={team.id} className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100">
+                  <Link to="/platform/teams" className="hover:underline">
+                    {team.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       {!isSelf && (canSuspend || canManage) && (
         <section
