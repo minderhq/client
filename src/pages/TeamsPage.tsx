@@ -6,6 +6,7 @@ import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
 import { RequestButton } from "../components/RequestButton";
 import { StatusLine } from "../components/StatusLine";
+import { useI18n } from "../i18n";
 import { apiFetch, friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import {
@@ -67,13 +68,14 @@ export interface TeamsResponse {
   offset: number;
 }
 
-/** Any authenticated user can create/browse teams (the ADR's own openness --
- * a team roster isn't sensitive); mutating a specific team's membership or
- * settings requires that team's own team_admin or an instance admin, which
- * the server enforces regardless of what this page shows -- these client
- * checks only decide which controls are worth rendering. */
+/** Organization › Teams (route gated on org.teams.manage): every team of the
+ * org, created and managed here. A team's own admins manage it from My team,
+ * which renders the same TeamCard. The server enforces every mutation
+ * regardless of what this page shows -- these client checks only decide
+ * which controls are worth rendering. */
 export function TeamsPage() {
   const { token, username, loginWithToken } = useAuth();
+  const { t } = useI18n();
 
   const teamsRes = useAsyncResource(
     (signal) => apiFetch<TeamsResponse>("/v1/teams", { token, signal, cache: true }),
@@ -117,32 +119,32 @@ export function TeamsPage() {
     <>
       <PageHeader
         icon="teams"
-        title="Teams"
-        subtitle="Group users into teams. Any logged-in user can create a team (and becomes its team admin); managing a team's membership or settings needs that team's own team admin, or an instance admin."
+        title={t("nav.items.teams.title")}
+        subtitle={t("teams.subtitle")}
       />
 
       {!token && (
-        <InfoCallout icon="lock">Log in to view or create teams.</InfoCallout>
+        <InfoCallout icon="lock">{t("teams.loggedOut")}</InfoCallout>
       )}
 
       {token && (
         <>
           <section className="mb-6 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
             <h2 className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
-              Create a Team
+              {t("teams.createHeading")}
             </h2>
             <div className="flex flex-wrap items-center gap-2">
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Team name"
+                placeholder={t("teams.namePlaceholder")}
                 className={`${inlineInputClass} flex-1`}
                 disabled={creating}
               />
               <input
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Description (optional)"
+                placeholder={t("teams.descriptionPlaceholder")}
                 className={`${inlineInputClass} flex-1`}
                 disabled={creating}
               />
@@ -151,7 +153,7 @@ export function TeamsPage() {
                 disabled={creating || !name.trim()}
                 className={primaryButtonClass}
               >
-                {creating ? "Creating…" : "Create Team"}
+                {creating ? t("teams.creating") : t("teams.create")}
               </button>
             </div>
             <StatusLine isError={createIsError} className="mb-0 mt-2">
@@ -160,10 +162,10 @@ export function TeamsPage() {
           </section>
 
           <StatusLine isError={!!teamsRes.error}>
-            {teamsRes.error ?? (teamsRes.loading ? "Loading…" : "")}
+            {teamsRes.error ?? (teamsRes.loading ? t("common.loading") : "")}
           </StatusLine>
           {teamsRes.data?.teams.length === 0 && (
-            <EmptyState>No teams yet — create one above.</EmptyState>
+            <EmptyState>{t("teams.empty")}</EmptyState>
           )}
           {teamsRes.data?.teams.map((t) => (
             <TeamCard
@@ -191,6 +193,7 @@ export function TeamCard({
   currentUsername: string;
   onChanged: () => void;
 }) {
+  const { t, plural } = useI18n();
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [detail, setDetail] = useState<TeamDetail | null>(null);
@@ -198,7 +201,7 @@ export function TeamCard({
   const [isError, setIsError] = useState(false);
 
   async function load() {
-    setStatus("Loading…");
+    setStatus(t("common.loading"));
     setIsError(false);
     try {
       const d = await apiFetch<TeamDetail>(`/v1/teams/${team.id}`, { token });
@@ -228,7 +231,7 @@ export function TeamCard({
           {team.name}
         </span>{" "}
         <span className="text-xs text-gray-500 dark:text-gray-400">
-          {team.member_count} member{team.member_count === 1 ? "" : "s"}
+          {plural("teams.members", team.member_count)}
         </span>
         {team.description && (
           <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
@@ -265,6 +268,7 @@ function TeamDetailPanel({
   currentUsername: string;
   onChanged: () => void;
 }) {
+  const { t } = useI18n();
   const myMembership = detail.members.find((m) => m.username === currentUsername);
   // Who manages the org's teams adds people directly; others ask to join.
   const canManageTeams = useCan("org.teams.manage");
@@ -319,7 +323,7 @@ function TeamDetailPanel({
           token,
           body: { email, team_role: newRole },
         }),
-      `Added ${email}. They must log out and back in before team-shared content becomes visible to them.`,
+      t("teams.added", { email }),
     );
     setNewMemberEmail("");
   }
@@ -327,11 +331,11 @@ function TeamDetailPanel({
   async function handleRemoveMember(member: TeamDetail["members"][number]) {
     const isSelf = member.username === currentUsername;
     const ok = await confirm({
-      title: isSelf ? "Leave this team?" : `Remove ${member.username}?`,
+      title: isSelf ? t("teams.leaveTitle") : t("teams.removeTitle", { name: member.username }),
       message: isSelf
-        ? "You'll lose access to this team's shared knowledge bases and pipelines. You can be re-invited later."
-        : `${member.username} will immediately lose access to this team's shared knowledge bases and pipelines.`,
-      confirmLabel: isSelf ? "Leave" : "Remove",
+        ? t("teams.leaveMessage")
+        : t("teams.removeMessage", { name: member.username }),
+      confirmLabel: isSelf ? t("teams.leave") : t("teams.remove"),
       danger: true,
     });
     if (!ok) return;
@@ -357,7 +361,7 @@ function TeamDetailPanel({
               m.team_role === "team_admin" ? badgeTone.success : ""
             }`}
           >
-            {m.team_role}
+            {t(`teams.roles.${m.team_role}`)}
           </span>
           <div className="ml-auto flex items-center gap-2">
             {canManage && (
@@ -375,8 +379,8 @@ function TeamDetailPanel({
                   )
                 }
               >
-                <option value="member">member</option>
-                <option value="team_admin">team_admin</option>
+                <option value="member">{t("teams.roles.member")}</option>
+                <option value="team_admin">{t("teams.roles.team_admin")}</option>
               </select>
             )}
             {(canManage || m.username === currentUsername) && (
@@ -385,7 +389,7 @@ function TeamDetailPanel({
                 disabled={busy}
                 className={destructiveButtonClass}
               >
-                {m.username === currentUsername ? "Leave" : "Remove"}
+                {m.username === currentUsername ? t("teams.leave") : t("teams.remove")}
               </button>
             )}
           </div>
@@ -404,7 +408,7 @@ function TeamDetailPanel({
             type="email"
             value={newMemberEmail}
             onChange={(e) => setNewMemberEmail(e.target.value)}
-            placeholder="Existing member's email"
+            placeholder={t("teams.memberEmailPlaceholder")}
             className={`${inlineInputClass} w-56`}
             disabled={busy}
           />
@@ -414,15 +418,15 @@ function TeamDetailPanel({
             onChange={(e) => setNewRole(e.target.value as "member" | "team_admin")}
             disabled={busy}
           >
-            <option value="member">member</option>
-            <option value="team_admin">team_admin</option>
+            <option value="member">{t("teams.roles.member")}</option>
+            <option value="team_admin">{t("teams.roles.team_admin")}</option>
           </select>
           <button
             onClick={handleAddMember}
             disabled={busy || !newMemberEmail.trim()}
             className={secondaryButtonClass}
           >
-            Add Member
+            {t("teams.addMember")}
           </button>
         </div>
       )}
@@ -437,6 +441,7 @@ function TeamDetailPanel({
 }
 
 function InvitesSection({ teamId, token }: { teamId: number; token: string }) {
+  const { t } = useI18n();
   const invitesRes = useAsyncResource(
     (signal) =>
       apiFetch<InvitesResponse>(`/v1/invites?team_id=${teamId}`, {
@@ -493,13 +498,13 @@ function InvitesSection({ teamId, token }: { teamId: number; token: string }) {
   return (
     <div className="mt-4 border-t border-gray-200 pt-3 dark:border-gray-800">
       <h3 className="mb-2 text-xs font-semibold text-gray-900 dark:text-gray-100">
-        Invites
+        {t("teams.invitesHeading")}
       </h3>
       <div className="flex flex-wrap items-center gap-2">
         <input
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email address"
+          placeholder={t("teams.inviteEmailPlaceholder")}
           className={`${inlineInputClass} flex-1`}
           disabled={busy}
         />
@@ -509,20 +514,20 @@ function InvitesSection({ teamId, token }: { teamId: number; token: string }) {
           onChange={(e) => setRole(e.target.value as "member" | "team_admin")}
           disabled={busy}
         >
-          <option value="member">member</option>
-          <option value="team_admin">team_admin</option>
+          <option value="member">{t("teams.roles.member")}</option>
+          <option value="team_admin">{t("teams.roles.team_admin")}</option>
         </select>
         <button
           onClick={handleSendInvite}
           disabled={busy || !email.trim()}
           className={secondaryButtonClass}
         >
-          Send Invite
+          {t("teams.sendInvite")}
         </button>
       </div>
       {newLink && (
         <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
-          Share this link with the invitee (no email is sent automatically):{" "}
+          {t("teams.inviteLink")}{" "}
           <span className="font-mono">{newLink}</span>
         </p>
       )}
@@ -530,7 +535,7 @@ function InvitesSection({ teamId, token }: { teamId: number; token: string }) {
         {status}
       </StatusLine>
       <StatusLine isError={!!invitesRes.error} className="mt-2">
-        {invitesRes.error ?? (invitesRes.loading ? "Loading…" : "")}
+        {invitesRes.error ?? (invitesRes.loading ? t("common.loading") : "")}
       </StatusLine>
       {invitesRes.data?.invites.map((inv) => (
         <div
@@ -538,13 +543,13 @@ function InvitesSection({ teamId, token }: { teamId: number; token: string }) {
           className="mt-2 flex flex-wrap items-center gap-2 text-xs"
         >
           <span className="text-gray-900 dark:text-gray-100">{inv.email}</span>
-          <span className={badgeClass}>{inv.team_role}</span>
+          <span className={badgeClass}>{t(`teams.roles.${inv.team_role}`)}</span>
           <span
             className={`${badgeClass} ${
               inv.status === "accepted" ? badgeTone.success : ""
             }`}
           >
-            {inv.status}
+            {t(`teams.inviteStatus.${inv.status}`)}
           </span>
           {inv.status === "pending" && (
             <button
@@ -552,7 +557,7 @@ function InvitesSection({ teamId, token }: { teamId: number; token: string }) {
               disabled={busy}
               className={destructiveButtonClass}
             >
-              Revoke
+              {t("teams.revoke")}
             </button>
           )}
         </div>

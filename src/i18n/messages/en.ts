@@ -274,6 +274,35 @@ export const en = {
       "The model each task uses unless a knowledge base or a question picks its own.",
   },
 
+  teams: {
+    subtitle:
+      "Every team of the organization: create teams, add and remove members, choose team admins and send invites. A team's own admins manage it from My team.",
+    loggedOut: "Log in to view or create teams.",
+    createHeading: "Create a Team",
+    namePlaceholder: "Team name",
+    descriptionPlaceholder: "Description (optional)",
+    creating: "Creating…",
+    create: "Create Team",
+    empty: "No teams yet — create one above.",
+    members: { one: "{count} member", other: "{count} members" },
+    roles: { member: "Member", team_admin: "Team admin" },
+    leave: "Leave",
+    remove: "Remove",
+    leaveTitle: "Leave this team?",
+    leaveMessage: "You'll lose access to this team's shared knowledge bases and pipelines. You can be re-invited later.",
+    removeTitle: "Remove {name}?",
+    removeMessage: "{name} will immediately lose access to this team's shared knowledge bases and pipelines.",
+    memberEmailPlaceholder: "Existing member's email",
+    addMember: "Add Member",
+    added: "Added {email}. They must log out and back in before team-shared content becomes visible to them.",
+    invitesHeading: "Invites",
+    inviteEmailPlaceholder: "Email address",
+    sendInvite: "Send Invite",
+    inviteLink: "Share this link with the invitee (no email is sent automatically):",
+    inviteStatus: { pending: "Pending", accepted: "Accepted", revoked: "Revoked", expired: "Expired" },
+    revoke: "Revoke",
+  },
+
   myTeam: {
     subtitle: "The teams you belong to and their members. Team admins manage their team here.",
     loadError: "Couldn't load the teams.",
@@ -283,7 +312,6 @@ export const en = {
     noTeam: "You're not in a team yet. Ask to join one below; its admins decide.",
     noTeamAdmin: "You're not in a team yet. Add yourself to one under Organization › Teams.",
     noTeams: "Your organization has no teams yet. Ask an organization admin to create one or to add you.",
-    members: { one: "{count} member", other: "{count} members" },
   },
 
   orgPlugins: {

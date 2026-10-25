@@ -87,7 +87,7 @@ export function MyTeamPage() {
             >
               <span className="font-medium text-gray-900 dark:text-gray-100">{team.name}</span>
               <span className="text-xs text-gray-500 dark:text-gray-400">
-                {plural("myTeam.members", team.member_count)}
+                {plural("teams.members", team.member_count)}
               </span>
               <span className="ml-auto">
                 <RequestButton kind="team_join" teamId={team.id} name={team.name} />

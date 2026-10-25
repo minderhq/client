@@ -272,6 +272,35 @@ export const tr: Messages = {
       "Bir bilgi tabanı ya da soru kendi modelini seçmedikçe her görevin kullandığı model.",
   },
 
+  teams: {
+    subtitle:
+      "Kurumun bütün takımları: takım oluşturun, üye ekleyip çıkarın, takım yöneticilerini seçin ve davet gönderin. Takımın kendi yöneticileri onu Takımım sayfasından yönetir.",
+    loggedOut: "Takımları görmek ya da oluşturmak için giriş yapın.",
+    createHeading: "Takım oluştur",
+    namePlaceholder: "Takım adı",
+    descriptionPlaceholder: "Açıklama (isteğe bağlı)",
+    creating: "Oluşturuluyor…",
+    create: "Takım oluştur",
+    empty: "Henüz takım yok. Yukarıdan bir tane oluşturun.",
+    members: { one: "{count} üye", other: "{count} üye" },
+    roles: { member: "Üye", team_admin: "Takım yöneticisi" },
+    leave: "Ayrıl",
+    remove: "Çıkar",
+    leaveTitle: "Bu takımdan ayrılınsın mı?",
+    leaveMessage: "Bu takımın paylaştığı bilgi tabanlarına ve işlem hatlarına erişiminizi kaybedersiniz. Daha sonra yeniden davet edilebilirsiniz.",
+    removeTitle: "{name} çıkarılsın mı?",
+    removeMessage: "{name}, bu takımın paylaştığı bilgi tabanlarına ve işlem hatlarına erişimini hemen kaybeder.",
+    memberEmailPlaceholder: "Mevcut üyenin e-postası",
+    addMember: "Üye ekle",
+    added: "{email} eklendi. Takımla paylaşılanları görmesi için çıkış yapıp yeniden giriş yapması gerekir.",
+    invitesHeading: "Davetler",
+    inviteEmailPlaceholder: "E-posta adresi",
+    sendInvite: "Davet gönder",
+    inviteLink: "Bu bağlantıyı davet ettiğiniz kişiyle paylaşın (otomatik e-posta gönderilmez):",
+    inviteStatus: { pending: "Bekliyor", accepted: "Kabul edildi", revoked: "İptal edildi", expired: "Süresi doldu" },
+    revoke: "İptal et",
+  },
+
   myTeam: {
     subtitle: "Üyesi olduğunuz takımlar ve üyeleri. Takım yöneticileri takımlarını burada yönetir.",
     loadError: "Takımlar yüklenemedi.",
@@ -281,7 +310,6 @@ export const tr: Messages = {
     noTeam: "Henüz bir takımda değilsiniz. Aşağıdan birine katılmak isteyin; kararı takımın yöneticileri verir.",
     noTeamAdmin: "Henüz bir takımda değilsiniz. Kendinizi Kuruluş › Takımlar altından bir takıma ekleyebilirsiniz.",
     noTeams: "Kurumunuzda henüz takım yok. Bir kurum yöneticisinden takım oluşturmasını ya da sizi eklemesini isteyin.",
-    members: { one: "{count} üye", other: "{count} üye" },
   },
 
   orgPlugins: {
