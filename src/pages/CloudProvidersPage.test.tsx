@@ -18,7 +18,13 @@ vi.mock("../lib/api", async (importOriginal) => ({
   friendlyErrorMessage: (e: unknown) => (e instanceof Error ? e.message : "error"),
 }));
 
-let mockAuth: { token: string; role: string; orgRole?: string; isAuthenticated?: boolean } = {
+let mockAuth: {
+  token: string;
+  role: string;
+  orgRole?: string;
+  isAuthenticated?: boolean;
+  isPlatformAdmin?: boolean;
+} = {
   token: "",
   role: "",
 };
@@ -375,29 +381,24 @@ describe("CloudProvidersPage", () => {
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
-  it("lets a custom role holding org.ai.manage manage providers", async () => {
+  it("mirrors the server gate: a custom role holding org.ai.manage, not owner/admin, gets no providers", () => {
     mockAuth = { token: "tok", role: "member", orgRole: "Knowledge manager", ...SERVER_SESSION };
     installApi({ providers: [] });
     serveMyPermissions(apiFetch, myPermissions({ orgKeys: ["org.ai.manage"] }));
     render(<CloudProvidersPage />);
-    await waitFor(() =>
-      expect(apiFetch).toHaveBeenCalledWith("/v1/model-providers/presets", expect.anything()),
-    );
     expect(
-      screen.queryByText("Only the organization's owners and admins can view or manage providers."),
-    ).toBeNull();
+      screen.getByText("Only the organization's owners and admins can view or manage providers."),
+    ).toBeTruthy();
+    expect(apiFetch).not.toHaveBeenCalled();
   });
 
-  it("keeps providers from an org admin role the server grants no org.ai.manage", async () => {
-    mockAuth = { token: "tok", role: "member", orgRole: "admin", ...SERVER_SESSION };
-    installApi({ providers: [] });
-    serveMyPermissions(apiFetch, myPermissions({ orgKeys: ["org.members.view"], orgRole: "admin" }));
+  it("gives a Platform Admin who isn't an org owner/admin no provider controls", () => {
+    mockAuth = { token: "tok", role: "member", orgRole: "member", isAuthenticated: true, isPlatformAdmin: true };
     render(<CloudProvidersPage />);
-    await waitFor(() =>
-      expect(
-        screen.getByText("Only the organization's owners and admins can view or manage providers."),
-      ).toBeTruthy(),
-    );
+    expect(
+      screen.getByText("Only the organization's owners and admins can view or manage providers."),
+    ).toBeTruthy();
+    expect(apiFetch).not.toHaveBeenCalled();
   });
 
   it("warns on a provider whose base URL breaks the network policy", async () => {

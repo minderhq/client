@@ -36,9 +36,9 @@ import { useCan } from "../lib/useCan";
  * page (linked). */
 export function OrganizationPage() {
   const { isAuthenticated, token, sessionKey, activeTenantId, orgRole } = useAuth();
-  // Whoever holds org.settings.manage (the route's gate; owner/admin and any
-  // custom role granted it, or the Platform Admin) manages the org's details.
-  const canManage = useCan("org.settings.manage");
+  // The org PATCH's gate (_require_org_manage) is org.members.manage: owner/
+  // admin, any custom role granted it, or the Platform Admin.
+  const canManage = useCan("org.members.manage");
   const { t } = useI18n();
 
   // #1503: edit the active org's own name/description.
@@ -208,7 +208,7 @@ export function OrganizationPage() {
           )}
 
           {/* #133: the language members see until they pick their own. Gated
-            inside on useCan("org.settings.manage"). */}
+            inside on useCan("org.members.manage"), the same PATCH gate. */}
           <OrgDefaultLanguage org={active} token={token} onSaved={() => void orgsRes.reload()} />
 
           {/* Members, invites and roles live in Organization › People. */}

@@ -247,13 +247,34 @@ describe("useCan reads GET /v1/me/permissions", () => {
     await waitFor(() => expect(apiFetch).toHaveBeenCalledTimes(2));
   });
 
-  it("lets the legacy instance admin manage model providers, and org.ai.manage holders", async () => {
+  it("mirrors the providers gate: instance admin or org owner/admin only", async () => {
     mockAuth = { ...MEMBER, role: "admin" };
+    expect(renderHook(() => useCanManageModelProviders()).result.current).toBe(true);
+    mockAuth = { ...MEMBER, orgRole: "owner" };
     expect(renderHook(() => useCanManageModelProviders()).result.current).toBe(true);
     mockAuth = { ...MEMBER };
     expect(renderHook(() => useCanManageModelProviders()).result.current).toBe(false);
+    // A Platform Admin who isn't owner/admin, and a custom role holding
+    // org.ai.manage, don't pass the server's gate today.
+    mockAuth = { ...MEMBER, isPlatformAdmin: true };
+    expect(renderHook(() => useCanManageModelProviders()).result.current).toBe(false);
     mockAuth = { ...SESSION };
     apiFetch.mockResolvedValue(response({ active_org: { id: 1, org_role: "member", permissions: held("org.ai.manage") } }));
-    await settled(() => useCanManageModelProviders(), (v) => v);
+    await settled(() => useCan("org.ai.manage"), (v) => v);
+    expect(renderHook(() => useCanManageModelProviders()).result.current).toBe(false);
+  });
+
+  it("doesn't ask again in a session whose request failed", async () => {
+    apiFetch.mockRejectedValue(new Error("404"));
+    renderHook(() => useCan("org.members.view"));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledTimes(1));
+    await new Promise((r) => setTimeout(r, 0));
+    renderHook(() => useCan("org.members.view"));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(apiFetch).toHaveBeenCalledTimes(1);
+    // A new session (org switch) retries.
+    mockAuth = { ...SESSION, sessionKey: "u1:2", activeTenantId: "2" };
+    renderHook(() => useCan("org.members.view"));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledTimes(2));
   });
 });

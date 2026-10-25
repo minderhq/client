@@ -181,10 +181,20 @@ describe("OrganizationPage", () => {
     expect(screen.queryByText("Organization details")).toBeNull();
   });
 
-  it("shows the edit form to a custom role holding org.settings.manage", async () => {
+  it("gives a settings-only custom role no edit form (the PATCH needs org.members.manage)", async () => {
     mockAuth = { token: "tok", role: "user", orgRole: "Workspace editor", ...SERVER_SESSION };
     routeApiFetch({});
     serveMyPermissions(apiFetch, myPermissions({ orgKeys: ["org.settings.manage"] }));
+    render(<OrganizationPage />);
+    await screen.findByText("Acme Corporation");
+    await vi.waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/v1/me/permissions", expect.anything()));
+    expect(screen.queryByText("Organization details")).toBeNull();
+  });
+
+  it("shows the edit form to a custom role holding org.members.manage", async () => {
+    mockAuth = { token: "tok", role: "user", orgRole: "People manager", ...SERVER_SESSION };
+    routeApiFetch({});
+    serveMyPermissions(apiFetch, myPermissions({ orgKeys: ["org.members.manage"] }));
     render(<OrganizationPage />);
     expect(await screen.findByText("Organization details")).toBeTruthy();
   });

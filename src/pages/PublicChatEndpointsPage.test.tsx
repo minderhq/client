@@ -144,24 +144,28 @@ describe("PublicChatEndpointsPage", () => {
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
-  it("gates on org.chatbots.manage, not the legacy instance admin role", () => {
+  it("gives the legacy instance admin role no access by itself", () => {
     mockAuth = { isAuthenticated: true, token: "tok", role: "admin", orgRole: "member", isPlatformAdmin: false };
     renderPage();
     expect(screen.getByText("Admin role required to manage public chat endpoints.")).toBeTruthy();
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
-  it("opens to a custom role holding org.chatbots.manage", async () => {
+  it("mirrors the server gate: a custom role holding org.chatbots.manage, not owner/admin, gets no controls", () => {
     mockAuth = { token: "tok", role: "user", orgRole: "Support agent", isPlatformAdmin: false, ...SERVER_SESSION };
     installApi({});
     serveMyPermissions(apiFetch, myPermissions({ orgKeys: ["org.chatbots.manage"] }));
     renderPage();
-    await waitFor(() =>
-      expect(apiFetch).toHaveBeenCalledWith(
-        expect.stringContaining("/v1/public-chat/endpoints"),
-        expect.anything(),
-      ),
-    );
+    expect(screen.getByText("Admin role required to manage public chat endpoints.")).toBeTruthy();
+    // The page never asks: the gate is the session's org role.
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it("opens to the Platform Admin", async () => {
+    mockAuth = { isAuthenticated: true, token: "tok", role: "user", orgRole: "member", isPlatformAdmin: true };
+    installApi({});
+    renderPage();
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
     expect(screen.queryByText("Admin role required to manage public chat endpoints.")).toBeNull();
   });
 

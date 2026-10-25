@@ -20,10 +20,14 @@ import { useTokenRef } from "./useTokenRef";
 /** The server's answer per session identity (`sessionKey`: user + active
  * org, changes on login, logout and org switch), so every component that
  * mounts a gate reads it synchronously instead of flickering through the
- * fallback. Failures are not stored: the next session (or reload) retries.
+ * fallback. A failure (e.g. an older gateway's 404) is remembered per
+ * session too, so it isn't re-requested on every gate mount; the next session
+ * (login, org switch) or a reload retries.
  * shortcut: no refetch on `permission_version`/`next_expires_at` within a
  * session; a role change shows after the next login or org switch. */
 const serverCache = new Map<string, EffectivePermissions>();
+/** Session identities whose request failed: they stay on the fallback. */
+const failed = new Set<string>();
 /** One shared request per session identity while in flight. */
 const inflight = new Map<string, Promise<EffectivePermissions | null>>();
 
@@ -36,12 +40,18 @@ function loadServerPermissions(sessionKey: string, token: string) {
         (r) => {
           // Anything but the documented shape (an older gateway, a proxy
           // page) is a failure: keep the role-claim fallback.
-          if (typeof r?.is_platform_admin !== "boolean" || !Array.isArray(r.teams)) return null;
+          if (typeof r?.is_platform_admin !== "boolean" || !Array.isArray(r.teams)) {
+            failed.add(sessionKey);
+            return null;
+          }
           const effective = effectivePermissionsFromServer(r);
           serverCache.set(sessionKey, effective);
           return effective;
         },
-        () => null,
+        () => {
+          failed.add(sessionKey);
+          return null;
+        },
       )
       .finally(() => inflight.delete(sessionKey));
     inflight.set(sessionKey, pending);
@@ -61,9 +71,10 @@ function useServerPermissions(): EffectivePermissions | null {
     if (!isAuthenticated || !token || !sessionKey) {
       // Signed out: forget every session's answer.
       serverCache.clear();
+      failed.clear();
       return;
     }
-    if (serverCache.has(sessionKey)) return;
+    if (serverCache.has(sessionKey) || failed.has(sessionKey)) return;
     let current = true;
     loadServerPermissions(sessionKey, token).then((value) => {
       if (current && value) setLoaded({ key: sessionKey, value });
@@ -107,6 +118,7 @@ export function useEffectivePermissions(): EffectivePermissions | null {
 /** Test hook: forget what the server said. */
 export function resetServerPermissionsCache(): void {
   serverCache.clear();
+  failed.clear();
   inflight.clear();
 }
 
@@ -129,11 +141,12 @@ export function useAllows(requirement: Requirement): boolean {
   return allows(useAccess(), requirement);
 }
 
-/** May the caller list and manage the org's model providers? model-management's
- * `require_admin_or_org_admin` still accepts the legacy instance role
- * `role == "admin"` (outside the permission engine, and no longer a bypass on
- * the gateway's org gates), so it is ORed in here and nowhere else. */
+/** May the caller list and manage the org's model providers? Mirrors
+ * model-management's `require_admin_or_org_admin` as it runs today: the
+ * legacy instance role `role == "admin"`, or org role owner/admin. Neither
+ * `org.ai.manage` nor the Platform Admin flag passes it, so this is not
+ * `useCan`; switch to `useCan("org.ai.manage")` once the server enforces it. */
 export function useCanManageModelProviders(): boolean {
-  const { role } = useAuth();
-  return useCan("org.ai.manage") || role === "admin";
+  const { role, orgRole } = useAuth();
+  return role === "admin" || orgRole === "owner" || orgRole === "admin";
 }
