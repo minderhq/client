@@ -640,7 +640,21 @@ export const tr: Messages = {
       email: "E-posta adresi",
       emailPlaceholder: "kisi@ornek.com",
       send: "Davet gönder",
-      sent: "{email} için davet oluşturuldu. Aşağıdan bağlantısını kopyalayıp kişiye gönderin.",
+      sent: "{email} için davet oluşturuldu.",
+      delivery: {
+        queued: "E-posta gönderildi",
+        none: "E-posta gönderilmedi. Bağlantıyı kopyalayıp kişiye kendiniz gönderin.",
+        reasons: {
+          email_not_configured:
+            "Bu sunucuda e-posta ayarlanmamış, bu yüzden e-posta gönderilmedi. Bağlantıyı kopyalayıp kişiye kendiniz gönderin.",
+          recipient_capped:
+            "Bu adrese bugün çok fazla e-posta gönderildi, bu yüzden gönderilmedi. Bağlantıyı kopyalayıp kişiye kendiniz gönderin.",
+          suppressed:
+            "Bu adres e-postalarımızı almıyor (daha önce geri döndü ya da abonelikten çıktı). Bağlantıyı kopyalayıp kişiye kendiniz gönderin.",
+          invalid_address: "E-posta bu adrese iletilemedi. Adresi kontrol edin ya da bağlantıyı kopyalayıp kendiniz gönderin.",
+          error: "E-posta gönderilemedi. Bağlantıyı kopyalayıp kişiye kendiniz gönderin.",
+        },
+      },
       bulkHeading: "Bir listeyi davet et",
       bulkLabel: "E-posta adresleri",
       bulkPlaceholder: "bir@ornek.com, iki@ornek.com",
@@ -680,8 +694,20 @@ export const tr: Messages = {
       revokeTitle: "Davet iptal edilsin mi?",
       revokeMessage: "{email} için davet bağlantısı artık çalışmaz.",
       revoked: "Davet iptal edildi.",
+      resend: "Yeniden gönder",
+      resendFor: "{email} adresine davet e-postasını yeniden gönder",
+      resent: "Davet e-postası {email} adresine yeniden gönderildi.",
+      resendNotSent: "{email} adresine yeniden gönderilmedi. {reason}",
+      resendErrors: {
+        invite_revoked: "Bu davet iptal edildiği için yeniden gönderilemez.",
+        invite_accepted: "Bu davet zaten kabul edildi.",
+        invite_expired: "Bu davetin süresi doldu. Bunun yerine yeni bir davet oluşturun.",
+        not_found: "Bu davet bulunamadı. Silinmiş olabilir ya da yalnızca kendi gönderdiğiniz davetleri yeniden gönderebilirsiniz.",
+      },
+      resendWait: "Bu davet kısa süre önce e-postayla gönderildi. {time} itibarıyla yeniden gönderebilirsiniz.",
+      resendWaitLater: "Bu davet kısa süre önce e-postayla gönderildi. Daha sonra tekrar deneyin.",
       howTo:
-        "Minder davetleri henüz e-postayla göndermiyor: bağlantıyı kopyalayıp kendiniz gönderin. Kişi bu e-posta adresiyle giriş yapar (ya da kaydolur), ardından {org} kuruluşuna katılmak için bağlantıyı açar.",
+        "Bu sunucuda e-posta ayarlıysa her davet e-postayla gönderilir; bağlantıyı kopyalayıp kendiniz de gönderebilirsiniz. Kişi bu e-posta adresiyle giriş yapar (ya da kaydolur), ardından {org} kuruluşuna katılmak için bağlantıyı açar.",
     },
     domains: {
       what:
@@ -730,11 +756,7 @@ export const tr: Messages = {
       fromGroup: "{role} › {group} üzerinden",
       fromParent: "üst kuruluştan ({role})",
       teamsHeading: "Ekipler",
-      teamsLoadError: "Ekipleri yüklenemedi.",
       teamsEmpty: "Hiçbir ekipte değil.",
-      teamsUnavailable: "Ekip üyelikleri Platform yöneticilerine henüz gösterilmiyor.",
-      teamAdmin: "ekip yöneticisi",
-      teamMember: "üye",
       accessHeading: "Erişim",
       accessHint: "Askıya almak ya da çıkarmak yalnızca {org} kuruluşunu etkiler. Her ikisi de onay ister ve kişinin neyi kaybedeceğini gösterir.",
     },

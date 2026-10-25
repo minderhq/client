@@ -43,6 +43,8 @@ const KNOWN_MISSING: Record<string, string> = {
   "GET /v1/access-requests/inbox": "gateway routes it; published spec not re-synced yet",
   "POST /v1/organizations/{}/access-requests/{}/approve": "gateway routes it; published spec not re-synced yet",
   "POST /v1/organizations/{}/access-requests/{}/deny": "gateway routes it; published spec not re-synced yet",
+  // Resending an org invite's email: same.
+  "POST /v1/organizations/{}/invites/{}/resend": "gateway routes it; published spec not re-synced yet",
 };
 
 // Where the concrete values of an interpolated action segment are read from:

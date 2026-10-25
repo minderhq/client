@@ -8,18 +8,20 @@ import { PeopleHeader } from "../components/PeopleHeader";
 import { Skeleton } from "../components/Skeleton";
 import { StatusLine } from "../components/StatusLine";
 import { useI18n, type Messages } from "../i18n";
-import { friendlyErrorMessage } from "../lib/api";
+import { ApiError, friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { copyText } from "../lib/browser";
 import {
   createOrgInvite,
   fetchMyOrgs,
   fetchOrgInvites,
+  type InviteEmailDelivery,
   type MyOrg,
   type OrgInvite,
   ORG_ROLES,
   orgRoleTone,
   pickActiveOrg,
+  resendOrgInvite,
   revokeOrgInvite,
 } from "../lib/orgs";
 import { BULK_INVITE_MAX, bulkInvite, type BulkInviteResult, parseEmailList } from "../lib/people";
@@ -50,13 +52,28 @@ const STATUS_TONE: Record<InviteStatus, string> = {
 const labelClass = "mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300";
 const headingClass = "mb-3 flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100";
 
+const inviteLink = (inv: OrgInvite) => `${window.location.origin}/invite/${inv.token}`;
+
+/** Whether an invite's email went out, in words; every "not sent" reason
+ * points at Copy link. */
+function useDeliveryText(): (d: InviteEmailDelivery | null | undefined) => string {
+  const { t, messages } = useI18n();
+  return (d) => {
+    if (!d) return t("people.invites.delivery.none");
+    if (d.queued) return t("people.invites.delivery.queued");
+    const reasons: Record<string, string> = messages.people.invites.delivery.reasons;
+    return d.reason && Object.hasOwn(reasons, d.reason) ? reasons[d.reason] : reasons.error;
+  };
+}
+
 /** Organization › People › Invites (UX step 7, scenario S36): invite one
- * person or a pasted / uploaded list, see each address's outcome, and the
- * org's invites with Copy link and Revoke. The gateway sends no invite
- * email yet, so the admin shares the link. */
+ * person or a pasted / uploaded list, see each address's outcome (and
+ * whether its email went out), and the org's invites with Copy link, Resend
+ * and Revoke. */
 export function PeopleInvitesPage() {
   const { isAuthenticated, token, sessionKey, activeTenantId } = useAuth();
-  const { t } = useI18n();
+  const { t, messages, formatDate } = useI18n();
+  const deliveryText = useDeliveryText();
   const { confirm, dialog } = useConfirm();
   const pendingHeadingId = useId();
 
@@ -93,8 +110,47 @@ export function PeopleInvitesPage() {
     }
   }
 
+  /** A refused resend in words: the invite's state (409), not found (404),
+   * or when it may be emailed again (429 with Retry-After). */
+  function resendError(e: unknown): string {
+    if (!(e instanceof ApiError)) return friendlyErrorMessage(e);
+    const errors: Record<string, string> = messages.people.invites.resendErrors;
+    if (e.status === 409 && Object.hasOwn(errors, e.message)) return errors[e.message];
+    if (e.status === 404) return errors.not_found;
+    if (e.status === 429 && e.message === "invite_email_rate_limited") {
+      const wait = e.retryAfterSeconds;
+      if (wait === null) return t("people.invites.resendWaitLater");
+      // The daily cap can push it up to a day away: name the date then too.
+      const options: Intl.DateTimeFormatOptions =
+        wait > 12 * 3600 ? { dateStyle: "medium", timeStyle: "short" } : { timeStyle: "short" };
+      return t("people.invites.resendWait", { time: formatDate(Date.now() + wait * 1000, options) });
+    }
+    return friendlyErrorMessage(e);
+  }
+
+  async function handleResend(inv: OrgInvite) {
+    if (!active) return;
+    setListStatus(t("common.sending"));
+    setListError(false);
+    try {
+      const out = await resendOrgInvite(active.id, inv.id, token);
+      const queued = !!out.email_delivery?.queued;
+      setListStatus(
+        queued
+          ? t("people.invites.resent", { email: inv.email })
+          : t("people.invites.resendNotSent", { email: inv.email, reason: deliveryText(out.email_delivery) }),
+      );
+      setListError(!queued);
+    } catch (e) {
+      setListStatus(resendError(e));
+      setListError(true);
+      // The invite is no longer pending (revoked, accepted, expired): show that.
+      if (e instanceof ApiError && e.status === 409) invitesRes.reload();
+    }
+  }
+
   async function handleCopy(inv: OrgInvite) {
-    const ok = await copyText(`${window.location.origin}/invite/${inv.token}`);
+    const ok = await copyText(inviteLink(inv));
     setListStatus(ok ? t("people.invites.copied") : t("people.invites.copyFailed"));
     setListError(!ok);
   }
@@ -149,6 +205,7 @@ export function PeopleInvitesPage() {
                     key={inv.id}
                     invite={inv}
                     onCopy={() => handleCopy(inv)}
+                    onResend={() => handleResend(inv)}
                     onRevoke={() => handleRevoke(inv)}
                   />
                 ))}
@@ -165,10 +222,12 @@ export function PeopleInvitesPage() {
 function InviteRow({
   invite: inv,
   onCopy,
+  onResend,
   onRevoke,
 }: {
   invite: OrgInvite;
   onCopy: () => void;
+  onResend: () => void;
   onRevoke: () => void;
 }) {
   const { t, messages, formatDate } = useI18n();
@@ -203,6 +262,15 @@ function InviteRow({
           </button>
           <button
             type="button"
+            onClick={onResend}
+            className={`${secondaryButtonClass} shrink-0`}
+            aria-label={t("people.invites.resendFor", { email: inv.email })}
+          >
+            <Icon name="send" size={15} />
+            <span className="hidden sm:inline">{t("people.invites.resend")}</span>
+          </button>
+          <button
+            type="button"
             onClick={onRevoke}
             className={`${secondaryButtonClass} shrink-0 text-red-600 dark:text-red-400`}
             aria-label={t("people.invites.revokeFor", { email: inv.email })}
@@ -213,6 +281,38 @@ function InviteRow({
         </>
       )}
     </li>
+  );
+}
+
+/** A just-created invite's email outcome; when it wasn't sent, a Copy link
+ * button so the admin can share it themselves. */
+function DeliveryResult({ invite: inv }: { invite: OrgInvite }) {
+  const { t } = useI18n();
+  const deliveryText = useDeliveryText();
+  const [copied, setCopied] = useState<boolean | null>(null);
+  const queued = !!inv.email_delivery?.queued;
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      {queued ? (
+        <span className={`${badgeBaseClass} ${badgeTone.success}`}>{deliveryText(inv.email_delivery)}</span>
+      ) : (
+        <>
+          <span className="text-amber-800 dark:text-amber-300">{deliveryText(inv.email_delivery)}</span>
+          <button
+            type="button"
+            onClick={async () => setCopied(await copyText(inviteLink(inv)))}
+            className={`${secondaryButtonClass} shrink-0`}
+            aria-label={t("people.invites.copyFor", { email: inv.email })}
+          >
+            <Icon name="copy" size={15} />
+            {t("people.invites.copy")}
+          </button>
+          <span aria-live="polite" className="text-xs text-gray-500 dark:text-gray-400">
+            {copied === null ? "" : copied ? t("people.invites.copied") : t("people.invites.copyFailed")}
+          </span>
+        </>
+      )}
+    </span>
   );
 }
 
@@ -246,6 +346,7 @@ function SingleInvite({ org, onSent }: { org: MyOrg; onSent: () => void }) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [isError, setIsError] = useState(false);
+  const [created, setCreated] = useState<OrgInvite | null>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -254,8 +355,9 @@ function SingleInvite({ org, onSent }: { org: MyOrg; onSent: () => void }) {
     setBusy(true);
     setStatus(t("common.sending"));
     setIsError(false);
+    setCreated(null);
     try {
-      await createOrgInvite(org.id, { email: address, org_role: role }, token);
+      setCreated(await createOrgInvite(org.id, { email: address, org_role: role }, token));
       onSent();
       setStatus(t("people.invites.sent", { email: address }));
       setEmail("");
@@ -305,6 +407,11 @@ function SingleInvite({ org, onSent }: { org: MyOrg; onSent: () => void }) {
         <StatusLine isError={isError} className="mb-0">
           {status}
         </StatusLine>
+        {created && (
+          <div className="text-sm">
+            <DeliveryResult invite={created} />
+          </div>
+        )}
       </form>
     </section>
   );
@@ -443,7 +550,10 @@ function BulkInvite({ org, onSent }: { org: MyOrg; onSent: () => void }) {
                   <td className="py-1.5 pr-3 font-mono text-xs">{r.email}</td>
                   <td className="py-1.5">
                     {r.status === "created" ? (
-                      <span className={`${badgeBaseClass} ${badgeTone.success}`}>{t("people.invites.created")}</span>
+                      <span className="flex flex-col items-start gap-1">
+                        <span className={`${badgeBaseClass} ${badgeTone.success}`}>{t("people.invites.created")}</span>
+                        {r.invite && <DeliveryResult invite={r.invite} />}
+                      </span>
                     ) : (
                       <span className="text-red-700 dark:text-red-400">{reason(r)}</span>
                     )}

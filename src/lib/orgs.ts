@@ -37,7 +37,12 @@ export const ORG_USERS_PATH = ROUTES.people;
  * (the org-scoped password reset would be accepted). Both are hints for which
  * actions to offer; the action routes re-check everything. `is_oidc_linked`
  * and `must_change_password` are null unless the account is managed. */
-export type OrgMember = components["schemas"]["OrgMemberListItem"];
+export type OrgMember = components["schemas"]["OrgMemberListItem"] & {
+  /** The member's teams in THIS org (the gateway scopes them, also for a
+   * Platform Admin). Not in the published spec yet; absent from an older
+   * gateway, so the list shows no team line then. */
+  teams?: { id: number; name: string }[];
+};
 
 export interface OrgMembersResponse {
   members: OrgMember[];
@@ -256,6 +261,17 @@ export interface OrgInvite {
   expires_at: string | null;
   max_uses: number;
   uses: number;
+  /** Set when the invite was just created or resent (null when listing). */
+  email_delivery?: InviteEmailDelivery | null;
+}
+
+/** Whether the gateway queued the invite email. `reason` when not queued:
+ * `email_not_configured`, `recipient_capped`, `suppressed`,
+ * `invalid_address` or `error` (plain strings; render an unknown one
+ * generically). Not in the published spec yet. */
+export interface InviteEmailDelivery {
+  queued: boolean;
+  reason?: string | null;
 }
 
 export function fetchOrgInvites(orgId: number, token: string, signal?: AbortSignal) {
@@ -280,6 +296,16 @@ export function createOrgInvite(
 export function revokeOrgInvite(orgId: number, inviteId: number, token: string) {
   return apiFetch<OrgInvite>(
     `/v1/organizations/${orgId}/invites/${inviteId}/revoke`,
+    { method: "POST", token },
+  );
+}
+
+/** Email a pending invite again, with the same link. 409 `invite_revoked`
+ * / `invite_accepted` / `invite_expired`, 404 when the caller may not see
+ * it, 429 `invite_email_rate_limited` with Retry-After. */
+export function resendOrgInvite(orgId: number, inviteId: number, token: string) {
+  return apiFetch<OrgInvite>(
+    `/v1/organizations/${orgId}/invites/${inviteId}/resend`,
     { method: "POST", token },
   );
 }
