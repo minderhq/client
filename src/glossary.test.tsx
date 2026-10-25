@@ -7,13 +7,20 @@ import { setLocale } from "./i18n";
 import { CATALOGS } from "./i18n/catalog";
 
 // The decided user-facing vocabulary (client#126): Assistant, not pipeline;
-// Website chatbots, not public chat; Module, not service bundle; Discover,
-// not marketplace; Tool, not AI tool; and in Turkish Kurum / Takım / Sohbet /
-// Plan ve fatura. Search keywords keep the old words on purpose, so a user
-// typing "pipeline" still finds Assistants.
+// Website chatbots, not public chat; Module, not service bundle; Tool, not AI
+// tool; and in Turkish Kurum / Takım / Sohbet. Search keywords keep the old
+// words on purpose, so a user typing "pipeline" still finds Assistants.
 const RETIRED = {
-  en: /pipeline|public chat|service bundle|marketplace|\bAI tools?\b|model management|merge review/i,
-  tr: /işlem hatt|kuruluş|\bekip|\bekib|faturalandırma|pazar yeri|herkese açık sohbet|hizmet paket|model yönetimi/i,
+  en: /pipeline|public chat|service bundle|\bAI tools?\b|model management|merge review/i,
+  tr: /işlem hatt|kuruluş|\bekip|\bekib|herkese açık sohbet|hizmet paket|model yönetimi/i,
+};
+
+// Marketplace stays a valid concept in running copy ("a plugin you install
+// from the Marketplace"), and so does billing; only menu labels and page
+// titles must say Discover / Keşfet and Plan & billing / Plan ve fatura.
+const RETIRED_LABELS = {
+  en: /marketplace|^billing$/i,
+  tr: /pazar yeri|faturalandırma/i,
 };
 
 function copyStrings(tree: unknown, out: string[] = []): string[] {
@@ -39,6 +46,15 @@ afterEach(() => {
 describe("glossary", () => {
   it.each(["en", "tr"] as const)("no %s message uses a retired term", (locale) => {
     expect(copyStrings(CATALOGS[locale]).filter((s) => RETIRED[locale].test(s))).toEqual([]);
+  });
+
+  it.each(["en", "tr"] as const)("no %s menu label or page title uses a retired label", (locale) => {
+    const labels = Object.values(CATALOGS[locale].nav.items).flatMap((item) => [
+      item.label,
+      ...("title" in item ? [item.title] : []),
+    ]);
+    const banned = new RegExp(`${RETIRED[locale].source}|${RETIRED_LABELS[locale].source}`, "i");
+    expect(labels.filter((l) => banned.test(l))).toEqual([]);
   });
 
   it("keeps the old words as search keywords", () => {
@@ -71,7 +87,7 @@ describe("glossary", () => {
     for (const group of ["Kullan", "Oluştur", "Ben", "Kurum", "Platform"]) {
       expect(screen.getByRole("group", { name: group })).toBeTruthy();
     }
-    expect(labels.filter((l) => RETIRED.tr.test(l))).toEqual([]);
+    expect(labels.filter((l) => RETIRED.tr.test(l) || RETIRED_LABELS.tr.test(l))).toEqual([]);
   });
 
   it("titles the key pages with the decided terms in both languages", () => {

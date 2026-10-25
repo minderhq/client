@@ -285,9 +285,9 @@ export const tr: Messages = {
     leave: "Ayrıl",
     remove: "Çıkar",
     leaveTitle: "Bu takımdan ayrılınsın mı?",
-    leaveMessage: "Bu takımın paylaştığı bilgi tabanlarına ve asistanlarına erişiminizi kaybedersiniz. Daha sonra yeniden davet edilebilirsiniz.",
+    leaveMessage: "Bu takımın paylaştığı bilgi tabanlarına ve asistanlara erişiminizi kaybedersiniz. Daha sonra yeniden davet edilebilirsiniz.",
     removeTitle: "{name} çıkarılsın mı?",
-    removeMessage: "{name}, bu takımın paylaştığı bilgi tabanlarına ve asistanlarına erişimini hemen kaybeder.",
+    removeMessage: "{name}, bu takımın paylaştığı bilgi tabanlarına ve asistanlara erişimini hemen kaybeder.",
     memberEmailPlaceholder: "Mevcut üyenin e-postası",
     addMember: "Üye ekle",
     added: "{email} eklendi. Takımla paylaşılanları görmesi için çıkış yapıp yeniden giriş yapması gerekir.",
@@ -357,7 +357,7 @@ export const tr: Messages = {
 
   assistants: {
     subtitle:
-      "Asistan, soru sorduğunuz şeydir: bir ya da daha fazla bilgi tabanında (yüklediğiniz belgelerde) arar ve kaynaklarını göstererek oradan yanıt verir. Aşağıda bir tane oluşturun, sonra Sohbet'te onunla konuşun.",
+      "Asistan, sorularınızı yanıtlayan yardımcınızdır: bir ya da daha fazla bilgi tabanında (yüklediğiniz belgelerde) arar ve kaynaklarını göstererek yanıt verir. Aşağıda bir tane oluşturun, sonra Sohbet'te onunla konuşun.",
     openChat: "Sohbeti aç",
     create: "Asistan oluştur",
     needsKb: "Önce bir bilgi tabanı oluşturun; bir asistanın arayacağı en az bir bilgi tabanı olmalı.",
@@ -373,7 +373,7 @@ export const tr: Messages = {
     logInToEdit: "Bu asistanı düzenlemek ya da silmek için giriş yapın.",
     chatWith: "Bu asistanla sohbet et",
     empty: "Henüz asistan yok; yukarıdan en az bir bilgi tabanı seçin.",
-    filter: "Asistanları süz",
+    filter: "Asistanlarda ara",
     noMatch: "“{filter}” ile eşleşen asistan yok.",
     localOnly: "Yalnızca yerel: bu asistanın bilgi tabanı içeriği hiçbir zaman bulut modeline gönderilmez.",
     default: "(asistan varsayılanı)",
@@ -423,9 +423,9 @@ export const tr: Messages = {
 
   modules: {
     availableSubtitle:
-      "Henüz açmadığınız isteğe bağlı modüller. Her biri bir grup servisi üstlenir; gerektiğinde bunları başka modüllerle paylaşır. Göz atmak herkese açık; açmak için Platform yöneticisi gerekir.",
+      "Henüz açmadığınız isteğe bağlı modüller. Her biri bir grup servisi üstlenir; gerektiğinde bunları başka modüllerle paylaşır. Göz atmak herkese açık; açmak için Platform yöneticisi yetkisi gerekir.",
     installedSubtitle:
-      "Şu an açık olan modüller, üstlendikleri her servisin gerçekte çalıştırdığı Docker imajı ve bütün kümenin dışa/içe aktarımı. Kapatmak, uzlaştırmak ya da içe aktarmak için Platform yöneticisi gerekir.",
+      "Şu an açık olan modüller, üstlendikleri her servisin gerçekte çalıştırdığı Docker imajı ve bütün kümenin dışa/içe aktarımı. Kapatmak, uzlaştırmak (“Reconcile”) ya da içe aktarmak için Platform yöneticisi yetkisi gerekir.",
     neverStarted:
       "Açmak yalnızca zaten var olan kapsayıcıları başlatır. Hiç ayağa kaldırılmamış bir servis (örneğin bu modül kurulumdan beri kapalıysa) ana makinede yeniden kurulum gerektiriyor olarak görünür; onu gerçekten oluşturmak için ana makinede {start} ya da {restart} çalıştırın.",
     loading: "Modüller yükleniyor…",
@@ -435,7 +435,7 @@ export const tr: Messages = {
     allEnabled: "Bütün modüller zaten açık; bkz. {link}.",
     enabled: "Açık modüller",
     noneEnabled: "Henüz açık modül yok; bkz. {link}.",
-    orphaned: "Sahipsiz servisler (hiçbir açık modül üstlenmiyor, durdurulmalı): {list}. Temizlemek için aşağıdaki Reconcile düğmesini kullanın.",
+    orphaned: "Sahipsiz servisler (hiçbir açık modül üstlenmiyor, durdurulmalı): {list}. Temizlemek için aşağıdaki “Reconcile” (uzlaştır) düğmesini kullanın.",
   },
 
   tools: {
@@ -444,7 +444,7 @@ export const tr: Messages = {
     discoverSubtitle:
       "Eklentilerin sunduğu araçların kataloğu, plan bilgisiyle. Şu an çalışmayan eklentilerin araçlarını da içerir ve bir eklenti yeniden yüklendiğinde güncellendiği için {installed} sayfasının gerisinde kalabilir. Bu sayfa için giriş gerekmez; her durumda salt okunurdur.",
     discoverCallout:
-      "Bu katalogdur, şu an çağrılabilenler değil. Burada listelenen bir araç, onu sağlayan eklenti kurulup çalıştığında çağrılabilir; şu an canlı olanlar için {installed} sayfasına bakın.",
+      "Bu bir katalogdur; şu an çağrılabilen araçların listesi değildir. Burada listelenen bir araç, onu sağlayan eklenti kurulup çalıştığında çağrılabilir; şu an canlı olanlar için {installed} sayfasına bakın.",
     loading: "Araçlar yükleniyor…",
     catalog: "Araç kataloğu",
     catalogError: "Araç kataloğu yüklenemedi.",
@@ -455,7 +455,7 @@ export const tr: Messages = {
     installedSubtitle:
       "Bu kurulumda şu an çalışan eklentilerden, gerçekten çağrılabilen bütün araçlar: bir asistanın sohbette kullanabileceklerinin tam listesi. Göz atmak için giriş gerekmez; veriyi değiştiren bir aracı çalıştırmak için, Minder'ın her yerinde olduğu gibi, gerekir.",
     installedCallout:
-      "Bu, şu anda canlı olanlardır; her istekte yeniden hesaplanır. Bir eklenti çalışmıyorsa, araçları {discover} sayfasında olsa bile burada görünmez; onları canlı yapan, eklentiyi kurup açmaktır.",
+      "Burada şu an canlı olan araçlar görünür; liste her istekte yeniden hesaplanır. Bir eklenti çalışmıyorsa araçları, {discover} sayfasında listelense bile burada görünmez; araçları canlı yapmak için eklentiyi kurup açın.",
     callable: "Çağrılabilen araçlar",
     liveError: "Şu an canlı olan araçlar yüklenemedi.",
     liveWhat: "kurulu araçlar",
