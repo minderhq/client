@@ -8,7 +8,8 @@
  * billing visibility comes out of a real 200-or-403 on
  * GET /v1/billing/subscription, exactly as in production. Every other request
  * gets the same "safe empty" body App.test.tsx uses, which every page renders
- * as a normal empty state.
+ * as a normal empty state. GET /v1/me/permissions answers what the server
+ * would grant the persona's roles, so the shell's gates run the server path.
  *
  * Call `resetApp()` in afterEach.
  */
@@ -18,7 +19,9 @@ import { vi } from "vitest";
 
 import { App } from "../App";
 import { storeToken } from "../lib/api";
+import { ORG_ROLE_PERMISSIONS, TEAM_ROLE_PERMISSIONS } from "../lib/permissions";
 import { resetBillingAccessCache } from "../lib/useBillingAccess";
+import { resetServerPermissionsCache } from "../lib/useCan";
 import { LocationProbe } from "./LocationProbe";
 import { BASELINE_TIER, type Persona, personaToken } from "./personas";
 
@@ -73,6 +76,31 @@ export function personaResponse(persona: Persona, url: string): Response {
       provider: null,
       manageable: false,
       can_manage: persona.billing.canManage,
+    });
+  }
+  if (path === "/v1/me/permissions" && claims) {
+    const held = (keys: readonly string[]) =>
+      keys.map((key) => ({ key, sources: [{ kind: "role", role_id: 1 }] }));
+    const orgKeys: string[] = [...(ORG_ROLE_PERMISSIONS[claims.org_role ?? "member"] ?? [])];
+    if (persona.billing.view) orgKeys.push("org.billing.view");
+    return json({
+      user_id: Number(claims.sub),
+      is_platform_admin: !!claims.is_platform_admin,
+      active_org: {
+        id: Number(claims.active_tenant_id),
+        org_role: claims.org_role ?? "member",
+        permissions: held(orgKeys),
+        org_wide_team_permissions: orgKeys.includes("org.teams.manage")
+          ? held(TEAM_ROLE_PERMISSIONS.team_admin)
+          : [],
+      },
+      teams: persona.teams.map((t) => ({
+        id: t.id,
+        name: t.name,
+        team_role: t.team_role,
+        permissions: held(TEAM_ROLE_PERMISSIONS[t.team_role] ?? []),
+      })),
+      permission_version: `${claims.sub}.1`,
     });
   }
   if (path === "/v1/profile/me" && claims) {
@@ -197,6 +225,7 @@ export interface RenderAppResult extends RenderResult {
 /** Render the whole app at `path` as `persona`. */
 export function renderApp(persona: Persona, path = "/"): RenderAppResult {
   resetBillingAccessCache();
+  resetServerPermissionsCache();
   sessionStorage.clear();
   const token = personaToken(persona);
   if (token) storeToken(token);
@@ -231,6 +260,7 @@ export function resetApp(): void {
   cleanup();
   sessionStorage.clear();
   resetBillingAccessCache();
+  resetServerPermissionsCache();
   vi.unstubAllGlobals();
   currentLocation = null;
   traffic = { inFlight: 0 };

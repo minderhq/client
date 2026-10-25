@@ -26,6 +26,7 @@ import {
   primaryButtonClass,
 } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
+import { useCan } from "../lib/useCan";
 
 /** The Organization home: which org you're acting in and its details.
  * Together with the topbar OrgSwitcher this is where multi-org membership
@@ -34,10 +35,10 @@ import { useAsyncResource } from "../lib/useAsyncResource";
  * Organization › People (linked); team-level membership stays on the Teams
  * page (linked). */
 export function OrganizationPage() {
-  const { isAuthenticated, token, sessionKey, role, activeTenantId, orgRole } = useAuth();
-  const isAdmin = role === "admin";
-  // An org owner/admin manages their OWN org's details and its people.
-  const canManage = isAdmin || orgRole === "owner" || orgRole === "admin";
+  const { isAuthenticated, token, sessionKey, activeTenantId, orgRole } = useAuth();
+  // The org PATCH's gate (_require_org_manage) is org.members.manage: owner/
+  // admin, any custom role granted it, or the Platform Admin.
+  const canManage = useCan("org.members.manage");
   const { t } = useI18n();
 
   // #1503: edit the active org's own name/description.
@@ -207,7 +208,7 @@ export function OrganizationPage() {
           )}
 
           {/* #133: the language members see until they pick their own. Gated
-            inside on useCan("org.settings.manage"). */}
+            inside on useCan("org.members.manage"), the same PATCH gate. */}
           <OrgDefaultLanguage org={active} token={token} onSaved={() => void orgsRes.reload()} />
 
           {/* Members, invites and roles live in Organization › People. */}

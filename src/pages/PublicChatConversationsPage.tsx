@@ -445,14 +445,11 @@ function ConversationDetail({
 
 export function PublicChatConversationsPage() {
   const { endpointId = "", sessionId } = useParams();
-  const { token, role, orgRole, isPlatformAdmin } = useAuth();
-  // Same gate as PublicChatEndpointsPage / the backend's _require_endpoint_admin:
-  // reading an endpoint's conversations is an owner/admin action.
-  const isAdmin =
-    isPlatformAdmin ||
-    role === "admin" ||
-    orgRole === "owner" ||
-    orgRole === "admin";
+  const { token, orgRole, isPlatformAdmin } = useAuth();
+  // Mirrors the server gate (_require_endpoint_admin): the Platform Admin or an
+  // owner/admin of the active org. Switch to useCan("org.chatbots.manage")
+  // once the server enforces that key.
+  const isAdmin = !!isPlatformAdmin || orgRole === "owner" || orgRole === "admin";
 
   // The endpoint's own metadata — gives the header its name AND is the ownership
   // gate: a cross-tenant/other-owner id 404s here (server-enforced), so we never

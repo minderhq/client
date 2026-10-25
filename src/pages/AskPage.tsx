@@ -22,6 +22,7 @@ import {
 } from "../lib/modelDefaults";
 import { type ScopeDocument, fetchScopeDocuments } from "../lib/ragDocuments";
 import type { KnowledgeBase } from "../lib/types";
+import { useCanManageModelProviders } from "../lib/useCan";
 import { useModelChoices } from "../lib/useModelChoices";
 import {
   cardClass,
@@ -124,7 +125,9 @@ type Turn = UserTurn | AssistantTurn;
  * QueryResultCard the Pipelines page uses, so answers look identical wherever
  * you ask from. */
 export function AskPage() {
-  const { token, sessionKey, isAuthenticated, role, orgRole } = useAuth();
+  const { token, sessionKey, isAuthenticated } = useAuth();
+  // The model-providers gate (see CloudProvidersPage).
+  const canListProviders = useCanManageModelProviders();
   const tokenRef = useTokenRef();
   // Deep-link entry points (#1229): "Ask this pipeline" from a pipeline card
   // (?pipeline=<id>) and "Continue →" from Conversations (?conversation_id=<id>).
@@ -253,7 +256,7 @@ export function AskPage() {
   // without model-management (or an empty model list) still asks fine — the
   // picker just falls back to its single "(pipeline default)" option.
   const choices = useModelChoices(token, {
-    canListProviders: role === "admin" || orgRole === "owner" || orgRole === "admin",
+    canListProviders,
     sessionKey,
   });
   const llmModels = generationModels(choices.models);

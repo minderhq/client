@@ -594,14 +594,11 @@ function EndpointRow({
 }
 
 export function PublicChatEndpointsPage() {
-  const { token, role, orgRole, isPlatformAdmin } = useAuth();
-  // Mirror the backend's _require_endpoint_admin: platform admin, an instance
-  // admin (role), or an org owner/admin may manage public endpoints.
-  const isAdmin =
-    isPlatformAdmin ||
-    role === "admin" ||
-    orgRole === "owner" ||
-    orgRole === "admin";
+  const { token, orgRole, isPlatformAdmin } = useAuth();
+  // Mirrors the server gate (_require_endpoint_admin): the Platform Admin or an
+  // owner/admin of the active org. Switch to useCan("org.chatbots.manage")
+  // once the server enforces that key.
+  const isAdmin = !!isPlatformAdmin || orgRole === "owner" || orgRole === "admin";
   const { confirm, dialog } = useConfirm();
 
   const endpointsRes = useAsyncResource(

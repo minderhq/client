@@ -2,6 +2,8 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { myPermissions, SERVER_SESSION, serveMyPermissions } from "../test/myPermissions";
+
 import { TeamsPage, type Team, type TeamDetail } from "./TeamsPage";
 
 const apiFetch = vi.fn();
@@ -12,7 +14,7 @@ vi.mock("../lib/api", () => ({
 }));
 
 const loginWithToken = vi.fn();
-let mockAuth = { token: "", username: "", role: "", loginWithToken };
+let mockAuth: Record<string, unknown> = { token: "", username: "", role: "", loginWithToken };
 vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
 }));
@@ -291,19 +293,37 @@ describe("TeamsPage", () => {
     await screen.findByText(/log out and back in/i);
   });
 
-  it("an instance admin sees management controls even without team membership", async () => {
-    mockAuth = { token: "tok", username: "carol", role: "admin", loginWithToken };
+  /** Open team 1 as `carol` (not a member) and wait for its roster. */
+  async function openTeamAsOutsider() {
     apiFetch.mockImplementation((path: string) => {
       if (path === "/v1/teams/1") return Promise.resolve(detail());
       if (path.startsWith("/v1/invites"))
         return Promise.resolve({ invites: [], total: 0, limit: 50, offset: 0 });
       return Promise.resolve({ teams: [team()], total: 1, limit: 50, offset: 0 });
     });
-    render(<TeamsPage />);
-    await screen.findByText("Engineering");
-    fireEvent.click(screen.getByText("Engineering"));
-    await screen.findByText("bob");
+    return async () => {
+      render(
+        <MemoryRouter>
+          <TeamsPage />
+        </MemoryRouter>,
+      );
+      await screen.findByText("Engineering");
+      fireEvent.click(screen.getByText("Engineering"));
+      await screen.findByText("bob");
+    };
+  }
 
+  it("an org admin (org.teams.manage) sees management controls without team membership", async () => {
+    mockAuth = {
+      token: "tok",
+      username: "carol",
+      role: "user",
+      loginWithToken,
+      isAuthenticated: true,
+      orgRole: "admin",
+      activeTenantId: "1",
+    };
+    await (await openTeamAsOutsider())();
     expect(screen.getByRole("button", { name: "Add Member" })).toBeTruthy();
     await vi.waitFor(() =>
       expect(apiFetch).toHaveBeenCalledWith(
@@ -311,6 +331,29 @@ describe("TeamsPage", () => {
         expect.anything(),
       ),
     );
+  });
+
+  it("gives the legacy instance admin role no team management by itself", async () => {
+    mockAuth = { token: "tok", username: "carol", role: "admin", loginWithToken, isAuthenticated: true, orgRole: "member" };
+    await (await openTeamAsOutsider())();
+    expect(screen.queryByRole("button", { name: "Add Member" })).toBeNull();
+  });
+
+  it("lets a custom role holding team.members.manage on this team manage it", async () => {
+    mockAuth = { token: "tok", username: "carol", role: "user", loginWithToken, orgRole: "Team lead", ...SERVER_SESSION };
+    const open = await openTeamAsOutsider();
+    serveMyPermissions(apiFetch, myPermissions({ teams: [{ id: 1, keys: ["team.members.manage"] }] }));
+    await open();
+    expect(await screen.findByRole("button", { name: "Add Member" })).toBeTruthy();
+  });
+
+  it("does not let a grant on another team manage this one", async () => {
+    mockAuth = { token: "tok", username: "carol", role: "user", loginWithToken, orgRole: "Team lead", ...SERVER_SESSION };
+    const open = await openTeamAsOutsider();
+    serveMyPermissions(apiFetch, myPermissions({ teams: [{ id: 2, keys: ["team.members.manage"] }] }));
+    await open();
+    await vi.waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/v1/me/permissions", expect.anything()));
+    expect(screen.queryByRole("button", { name: "Add Member" })).toBeNull();
   });
 
   it("removing a member issues a DELETE and reloads", async () => {

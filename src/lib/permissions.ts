@@ -12,12 +12,14 @@
  *  - `isMember` for the product itself (any signed-in caller).
  *
  * All three are answered from an {@link EffectivePermissions} value, shaped
- * like the server's "my effective permissions" response. Today that value is
- * built from the session's role claims ({@link effectivePermissionsFromRoles},
- * one table: {@link ORG_ROLE_PERMISSIONS}); later `usePermissions` (useCan.ts)
- * fetches it from the API instead. Nothing else changes: not the keys, not
- * {@link accessFrom}, not any caller.
+ * like the server's "my effective permissions" response. `useEffectivePermissions`
+ * (useCan.ts) reads it from `GET /v1/me/permissions`
+ * ({@link effectivePermissionsFromServer}); until that answers, or if it
+ * fails, it is built from the session's role claims
+ * ({@link effectivePermissionsFromRoles}, one table: {@link ORG_ROLE_PERMISSIONS}).
  */
+
+import type { components } from "./api-types.gen";
 
 /** Org-level permission keys, as the server's catalogue names them. The last
  * two are product permissions the catalogue does not have yet, named the
@@ -82,10 +84,13 @@ export interface EffectivePermissions {
     id: string;
     org_role: string;
     permissions: PermissionGrant[];
+    /** Team keys held on EVERY team of the org (from `org.teams.manage`);
+     * a team's effective keys are its own OR these. */
+    org_wide_team_permissions?: PermissionGrant[];
   } | null;
   teams: { id: string; team_role: string; permissions: PermissionGrant[] }[];
-  /** Bumped by the server whenever the caller's access changes. */
-  permission_version: number;
+  /** Changes whenever the caller's access changes (opaque on the server). */
+  permission_version: number | string;
 }
 
 /** The answers every gate reads. */
@@ -119,6 +124,9 @@ export function accessFrom(effective: EffectivePermissions | null): Access {
     return { isMember: false, isPlatformAdmin: false, can: () => false };
   }
   const orgKeys = new Set(effective.active_org?.permissions.map((p) => p.key));
+  const orgWideTeamKeys = new Set(
+    effective.active_org?.org_wide_team_permissions?.map((p) => p.key),
+  );
   return {
     isMember: true,
     isPlatformAdmin: effective.is_platform_admin,
@@ -128,6 +136,7 @@ export function accessFrom(effective: EffectivePermissions | null): Access {
       if (!org || (scope?.orgId !== undefined && scope.orgId !== org.id)) return false;
       if (orgKeys.has(key)) return true;
       if (!key.startsWith("team.")) return false;
+      if (orgWideTeamKeys.has(key)) return true;
       return effective.teams.some(
         (team) =>
           (scope?.teamId === undefined || scope.teamId === team.id) &&
@@ -137,7 +146,42 @@ export function accessFrom(effective: EffectivePermissions | null): Access {
   };
 }
 
-// --- Today: effective permissions derived from the role claims -------------
+// --- From the server: GET /v1/me/permissions --------------------------------
+
+export type MyPermissionsResponse = components["schemas"]["MyPermissionsResponse"];
+type HeldPermission = components["schemas"]["HeldPermission"];
+
+function grantsFrom(held: HeldPermission[] | undefined): PermissionGrant[] {
+  return (held ?? []).map((p) => {
+    const first = p.sources[0];
+    // Keys outside the client's catalogue are kept: no gate asks for them.
+    return { key: p.key as PermissionKey, source: first?.role_name ?? first?.kind ?? "" };
+  });
+}
+
+/** The server's answer in the client's shape (ids as strings, one source per
+ * grant). Nothing is added or dropped: what the server lists is what holds. */
+export function effectivePermissionsFromServer(r: MyPermissionsResponse): EffectivePermissions {
+  return {
+    is_platform_admin: r.is_platform_admin,
+    active_org: r.active_org
+      ? {
+          id: String(r.active_org.id),
+          org_role: r.active_org.org_role,
+          permissions: grantsFrom(r.active_org.permissions),
+          org_wide_team_permissions: grantsFrom(r.active_org.org_wide_team_permissions),
+        }
+      : null,
+    teams: (r.teams ?? []).map((t) => ({
+      id: String(t.id),
+      team_role: t.team_role,
+      permissions: grantsFrom(t.permissions),
+    })),
+    permission_version: r.permission_version,
+  };
+}
+
+// --- Fallback: effective permissions derived from the role claims ----------
 
 /** The keys each org role holds today: the permission each page and API
  * actually checks, written once. Billing view is not here: the server

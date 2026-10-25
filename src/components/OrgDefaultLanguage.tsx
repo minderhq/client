@@ -25,7 +25,8 @@ export function OrgDefaultLanguage({
   /** Called after a successful save, e.g. to reload the org list. */
   onSaved?: () => void;
 }) {
-  const canManage = useCan("org.settings.manage");
+  // Saved through the org PATCH, whose gate is org.members.manage.
+  const canManage = useCan("org.members.manage");
   const { t } = useI18n();
   const selectId = useId();
   const hintId = useId();

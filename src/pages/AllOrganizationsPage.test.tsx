@@ -14,7 +14,7 @@ vi.mock("../lib/api", async () => {
   };
 });
 
-let mockAuth = { isAuthenticated: false, token: "", role: "" };
+let mockAuth = { isAuthenticated: false, token: "", role: "", isPlatformAdmin: false };
 vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
 }));
@@ -39,11 +39,20 @@ describe("AllOrganizationsPage", () => {
   afterEach(() => {
     cleanup();
     apiFetch.mockReset();
-    mockAuth = { isAuthenticated: false, token: "", role: "" };
+    mockAuth = { isAuthenticated: false, token: "", role: "", isPlatformAdmin: false };
   });
 
   it("gates the page behind admin and never fetches otherwise", () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "user" };
+    mockAuth = { isAuthenticated: true, token: "tok", role: "user", isPlatformAdmin: false };
+    render(<AllOrganizationsPage />);
+    expect(
+      screen.getByText("Admins only — log in with an admin account to manage organizations."),
+    ).toBeTruthy();
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it("gates on the Platform Admin, not the legacy instance role", () => {
+    mockAuth = { isAuthenticated: true, token: "tok", role: "admin", isPlatformAdmin: false };
     render(<AllOrganizationsPage />);
     expect(
       screen.getByText("Admins only — log in with an admin account to manage organizations."),
@@ -60,7 +69,7 @@ describe("AllOrganizationsPage", () => {
   });
 
   it("fetches and renders organizations for an admin", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin" };
+    mockAuth = { isAuthenticated: true, token: "tok", role: "user", isPlatformAdmin: true };
     apiFetch.mockImplementation((path: string) => {
       if (path.startsWith("/v1/organizations"))
         return Promise.resolve({ organizations: [org()], total: 1, limit: 200, offset: 0 });
@@ -75,7 +84,7 @@ describe("AllOrganizationsPage", () => {
   });
 
   it("shows an empty state when there are no organizations", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin" };
+    mockAuth = { isAuthenticated: true, token: "tok", role: "user", isPlatformAdmin: true };
     apiFetch.mockImplementation((path: string) => {
       if (path.startsWith("/v1/organizations"))
         return Promise.resolve({ organizations: [], total: 0, limit: 200, offset: 0 });
@@ -88,7 +97,7 @@ describe("AllOrganizationsPage", () => {
   });
 
   it("auto-derives the slug from the name until the slug field is edited directly", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin" };
+    mockAuth = { isAuthenticated: true, token: "tok", role: "user", isPlatformAdmin: true };
     apiFetch.mockImplementation((path: string) => {
       if (path.startsWith("/v1/organizations"))
         return Promise.resolve({ organizations: [], total: 0, limit: 200, offset: 0 });
@@ -113,7 +122,7 @@ describe("AllOrganizationsPage", () => {
   });
 
   it("creates an organization and reloads the list", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin" };
+    mockAuth = { isAuthenticated: true, token: "tok", role: "user", isPlatformAdmin: true };
     apiFetch.mockImplementation((path: string, opts?: { method?: string }) => {
       if (opts?.method === "POST" && path === "/v1/organizations") {
         return Promise.resolve({ id: "2", name: "Widget Co", slug: "widget-co" });
@@ -142,7 +151,7 @@ describe("AllOrganizationsPage", () => {
   });
 
   it("rejects submission when name or slug is blank, without calling the API", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin" };
+    mockAuth = { isAuthenticated: true, token: "tok", role: "user", isPlatformAdmin: true };
     apiFetch.mockImplementation((path: string) => {
       if (path.startsWith("/v1/organizations"))
         return Promise.resolve({ organizations: [], total: 0, limit: 200, offset: 0 });
@@ -162,7 +171,7 @@ describe("AllOrganizationsPage", () => {
   });
 
   it("shows a friendly error when creation fails", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin" };
+    mockAuth = { isAuthenticated: true, token: "tok", role: "user", isPlatformAdmin: true };
     apiFetch.mockImplementation((path: string, opts?: { method?: string }) => {
       if (opts?.method === "POST" && path === "/v1/organizations") {
         return Promise.reject(new Error("slug already taken"));
@@ -184,7 +193,7 @@ describe("AllOrganizationsPage", () => {
   });
 
   it("filters the list by name or slug once there are more than 5 organizations", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin" };
+    mockAuth = { isAuthenticated: true, token: "tok", role: "user", isPlatformAdmin: true };
     const orgs = Array.from({ length: 6 }, (_, i) =>
       org({ id: i + 1, name: `Org ${i + 1}`, slug: `org-${i + 1}` }),
     );
@@ -206,7 +215,7 @@ describe("AllOrganizationsPage", () => {
   });
 
   it("shows a no-match empty state when the filter matches nothing", async () => {
-    mockAuth = { isAuthenticated: true, token: "tok", role: "admin" };
+    mockAuth = { isAuthenticated: true, token: "tok", role: "user", isPlatformAdmin: true };
     const orgs = Array.from({ length: 6 }, (_, i) =>
       org({ id: i + 1, name: `Org ${i + 1}`, slug: `org-${i + 1}` }),
     );

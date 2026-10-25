@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../lib/api";
+import { myPermissions, SERVER_SESSION, serveMyPermissions } from "../test/myPermissions";
 
 import {
   CloudProvidersPage,
@@ -17,7 +18,16 @@ vi.mock("../lib/api", async (importOriginal) => ({
   friendlyErrorMessage: (e: unknown) => (e instanceof Error ? e.message : "error"),
 }));
 
-let mockAuth: { token: string; role: string; orgRole?: string } = { token: "", role: "" };
+let mockAuth: {
+  token: string;
+  role: string;
+  orgRole?: string;
+  isAuthenticated?: boolean;
+  isPlatformAdmin?: boolean;
+} = {
+  token: "",
+  role: "",
+};
 vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
 }));
@@ -330,7 +340,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("lets an org owner manage providers without being an instance admin", async () => {
-    mockAuth = { token: "tok", role: "member", orgRole: "owner" };
+    mockAuth = { token: "tok", role: "member", orgRole: "owner", isAuthenticated: true };
     installApi({
       providers: [
         provider({ id: "cloud", is_local: false }),
@@ -351,7 +361,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("lets an org admin manage providers too", async () => {
-    mockAuth = { token: "tok", role: "member", orgRole: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providers: [] });
     render(<CloudProvidersPage />);
     await waitFor(() =>
@@ -363,7 +373,27 @@ describe("CloudProvidersPage", () => {
   });
 
   it("keeps providers hidden from an org member", () => {
-    mockAuth = { token: "tok", role: "member", orgRole: "member" };
+    mockAuth = { token: "tok", role: "member", orgRole: "member", isAuthenticated: true };
+    render(<CloudProvidersPage />);
+    expect(
+      screen.getByText("Only the organization's owners and admins can view or manage providers."),
+    ).toBeTruthy();
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it("mirrors the server gate: a custom role holding org.ai.manage, not owner/admin, gets no providers", () => {
+    mockAuth = { token: "tok", role: "member", orgRole: "Knowledge manager", ...SERVER_SESSION };
+    installApi({ providers: [] });
+    serveMyPermissions(apiFetch, myPermissions({ orgKeys: ["org.ai.manage"] }));
+    render(<CloudProvidersPage />);
+    expect(
+      screen.getByText("Only the organization's owners and admins can view or manage providers."),
+    ).toBeTruthy();
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it("gives a Platform Admin who isn't an org owner/admin no provider controls", () => {
+    mockAuth = { token: "tok", role: "member", orgRole: "member", isAuthenticated: true, isPlatformAdmin: true };
     render(<CloudProvidersPage />);
     expect(
       screen.getByText("Only the organization's owners and admins can view or manage providers."),

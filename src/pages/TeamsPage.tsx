@@ -73,8 +73,7 @@ interface TeamsResponse {
  * the server enforces regardless of what this page shows -- these client
  * checks only decide which controls are worth rendering. */
 export function TeamsPage() {
-  const { token, username, role, loginWithToken } = useAuth();
-  const isInstanceAdmin = role === "admin";
+  const { token, username, loginWithToken } = useAuth();
 
   const teamsRes = useAsyncResource(
     (signal) => apiFetch<TeamsResponse>("/v1/teams", { token, signal, cache: true }),
@@ -172,7 +171,6 @@ export function TeamsPage() {
               team={t}
               token={token}
               currentUsername={username}
-              isInstanceAdmin={isInstanceAdmin}
               onChanged={teamsRes.reload}
             />
           ))}
@@ -186,13 +184,11 @@ function TeamCard({
   team,
   token,
   currentUsername,
-  isInstanceAdmin,
   onChanged,
 }: {
   team: Team;
   token: string;
   currentUsername: string;
-  isInstanceAdmin: boolean;
   onChanged: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -247,7 +243,6 @@ function TeamCard({
             detail={detail}
             token={token}
             currentUsername={currentUsername}
-            isInstanceAdmin={isInstanceAdmin}
             onChanged={async () => {
               await load();
               onChanged();
@@ -263,19 +258,23 @@ function TeamDetailPanel({
   detail,
   token,
   currentUsername,
-  isInstanceAdmin,
   onChanged,
 }: {
   detail: TeamDetail;
   token: string;
   currentUsername: string;
-  isInstanceAdmin: boolean;
   onChanged: () => void;
 }) {
   const myMembership = detail.members.find((m) => m.username === currentUsername);
-  const canManage = isInstanceAdmin || myMembership?.team_role === "team_admin";
   // Who manages the org's teams adds people directly; others ask to join.
   const canManageTeams = useCan("org.teams.manage");
+  // The server's team gate: team.members.manage on this team (own grant or
+  // org-wide), org.teams.manage, or the Platform Admin. The team_role check
+  // covers the role-claim fallback, which knows no team grants.
+  const canManage =
+    useCan("team.members.manage", { teamId: String(detail.id) }) ||
+    canManageTeams ||
+    myMembership?.team_role === "team_admin";
 
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [newRole, setNewRole] = useState<"member" | "team_admin">("member");
