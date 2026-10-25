@@ -78,6 +78,8 @@ export const I18N_MIGRATED_FILES = [
   "src/pages/NotFoundPage.tsx",
   "src/pages/OrgUsersPage.tsx",
   "src/pages/PeopleDomainsPage.tsx",
+  "src/pages/OrgPluginsPage.tsx",
+  "src/pages/ModelDefaultsPage.tsx",
   "src/pages/PeopleInvitesPage.tsx",
   "src/pages/PersonPage.tsx",
   "src/pages/RequestsPage.tsx",

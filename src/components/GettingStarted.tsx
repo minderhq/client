@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { useI18n } from "../i18n";
 import { CARD_STEP, type Onboarding, type OnboardingChanges, orderSteps } from "../lib/onboarding";
+import { ROUTES } from "../lib/routes";
 import { MODEL_PROVIDERS_DOCS_URL, type ReadinessCheck, useReadiness } from "../lib/readiness";
 import type { AsyncResource } from "../lib/useAsyncResource";
 import { useAccess, useCan } from "../lib/useCan";
@@ -93,7 +94,7 @@ export function GettingStarted({
     ? [
         {
           id: "model",
-          to: "/platform/providers",
+          to: ROUTES.orgAi,
           icon: "models",
           check: model,
           title: t("onboarding.model.title"),
@@ -150,7 +151,7 @@ export function GettingStarted({
           {canSetUp ? (
             <>
               {modelHint}{" "}
-              <Link to="/platform/providers" className="font-medium underline">
+              <Link to={ROUTES.orgAi} className="font-medium underline">
                 {t("onboarding.model.providers")}
               </Link>
             </>

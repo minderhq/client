@@ -85,7 +85,7 @@ const MEMBER_NAV: NavModel = {
  * hidden although its page lets them manage endpoints. */
 const ORG_ADMIN_NAV: NavModel = {
   ...MEMBER_NAV,
-  Organization: ["Overview", "People", "Public Chat", "Providers & defaults", "Billing", "Audit Log"],
+  Organization: ["Overview", "People", "Public Chat", "AI", "Plugins", "Billing", "Audit Log"],
 };
 
 const PLATFORM_ADMIN_NAV: NavModel = {
@@ -262,6 +262,11 @@ const GATED_ROUTES: GatedRoute[] = [
   { path: ROUTES.peopleInvites, heading: "Invites", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
   { path: ROUTES.peopleDomains, heading: "Email domains", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
   { path: ROUTES.sources, heading: "MindHub & sources", open: ["platformAdmin"] },
+  // Organization › AI and › Plugins (UX step 9, Q2/Q3): org admins only;
+  // members keep the read-only Models and Installed pages.
+  { path: ROUTES.orgAi, heading: "AI providers", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
+  { path: ROUTES.orgAiDefaults, heading: "Model defaults", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
+  { path: ROUTES.orgPlugins, heading: "Organization plugins", open: ["platformAdmin", "orgOwner", "orgAdmin"] },
 ];
 
 const ROUTE_CASES = GATED_ROUTES.flatMap((route) =>
