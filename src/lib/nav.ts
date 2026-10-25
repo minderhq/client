@@ -91,7 +91,7 @@ interface NavSectionDef {
  * The app's information architecture (#126, #131): one panel for everyone,
  * grouped by what the user is trying to DO rather than by which backend
  * service powers it. Everyone gets the sections they work in (Knowledge,
- * Marketplace, AI & system, Team, My account); the administration sections
+ * Marketplace, AI & system, My account); the administration sections
  * (Organization, Platform) sit below a divider and appear only to callers
  * who hold their permissions. Each row names the permission it needs; the
  * sidebar, tabs and palette filter through useCan, never through role names.
@@ -189,13 +189,12 @@ const NAV_MODEL: NavSectionDef[] = [
     ],
   },
   {
-    id: "team",
-    items: [{ to: "/platform/teams", id: "teams", icon: "teams", requires: MEMBER }],
-  },
-  {
-    // Personal settings live together: profile, voice, your own licenses.
+    // Personal settings live together: your team, profile, voice, your own
+    // licenses. My team is every member's: with no team it is where they ask
+    // to join one (client#126 menu decision).
     id: "account",
     items: [
+      { to: ROUTES.myTeam, id: "myTeam", icon: "teams", requires: MEMBER },
       { to: "/settings", id: "account", icon: "settings", end: true, requires: MEMBER },
       { to: "/platform/voice", id: "voice", icon: "voice", requires: MEMBER },
       { to: ROUTES.licenses, id: "licenses", icon: "licenses", requires: MEMBER },
@@ -229,6 +228,8 @@ const NAV_MODEL: NavSectionDef[] = [
           },
         ],
       },
+      // Organization › Teams: every team of the org, created and managed here.
+      { to: ROUTES.orgTeams, id: "teams", icon: "teams", requires: "org.teams.manage" },
       { to: "/rag/public-chat", id: "publicChat", icon: "ask", requires: "org.chatbots.manage" },
       {
         // Organization › AI (UX step 9): the org's providers and its default

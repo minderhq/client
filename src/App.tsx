@@ -40,6 +40,7 @@ import { InstalledPluginsPage } from "./pages/InstalledPluginsPage";
 import { InstalledToolsPage } from "./pages/InstalledToolsPage";
 import { InviteRedeemPage } from "./pages/InviteRedeemPage";
 import { KnowledgeBasesPage } from "./pages/KnowledgeBasesPage";
+import { MyTeamPage } from "./pages/MyTeamPage";
 import { ModelDefaultsPage } from "./pages/ModelDefaultsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ModelManagementPage } from "./pages/ModelManagementPage";
@@ -297,7 +298,23 @@ export function App() {
                         </RequirePermission>
                       }
                     />
-                    <Route path="/platform/teams" element={<TeamsPage />} />
+                    {/* My team (every member); /platform/teams redirects here. */}
+                    <Route
+                      path={ROUTES.myTeam}
+                      element={
+                        <RequirePermission requires={MEMBER}>
+                          <MyTeamPage />
+                        </RequirePermission>
+                      }
+                    />
+                    <Route
+                      path={ROUTES.orgTeams}
+                      element={
+                        <RequirePermission requires="org.teams.manage">
+                          <TeamsPage />
+                        </RequirePermission>
+                      }
+                    />
                     <Route path="/organization" element={<OrganizationPage />} />
                     {/* Organization › People (UX step 7); /organization/users redirects here. */}
                     <Route

@@ -11,6 +11,8 @@
  *   Organization › Billing              /billing
  *   My account › Licenses               /billing/licenses
  *   Platform › MindHub & sources         /settings/sources(/:repositoryId)
+ *   Organization › Teams                /organization/teams
+ *   My account › My team                /team
  *
  * "Service bundle" (a runtime grouping of services the bundle reconciler turns
  * on and off) is kept distinct from plugins in both the label and the path.
@@ -38,6 +40,8 @@ export const ROUTES = {
   orgAi: "/organization/ai",
   orgAiDefaults: "/organization/ai/defaults",
   orgPlugins: "/organization/plugins",
+  orgTeams: "/organization/teams",
+  myTeam: "/team",
 } as const;
 
 /** One member's person page (Organization › People). */
@@ -102,4 +106,7 @@ export const LEGACY_REDIRECTS: Redirect[] = [
   { from: "/organization/users", to: ROUTES.people },
   // Providers & defaults before Organization › AI (UX step 9).
   { from: "/platform/providers", to: ROUTES.orgAi },
+  // The member Teams page before the Teams split (Organization › Teams for
+  // admins, My team for everyone).
+  { from: "/platform/teams", to: ROUTES.myTeam },
 ];

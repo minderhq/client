@@ -119,7 +119,6 @@ export const en = {
       knowledge: "Knowledge",
       marketplace: "Marketplace",
       ai: "AI & system",
-      team: "Team",
       account: "My account",
       organization: "Organization",
       platform: "Platform",
@@ -162,7 +161,8 @@ export const en = {
       billing: { label: "Billing", title: "Billing", description: "Your plan, subscription & upgrades", keywords: "subscription plan upgrade payment tier pricing invoice" },
       licenses: { label: "Licenses", title: "Plugin licenses", description: "The plugin tiers licensed to your account (display-only)", keywords: "my licenses tier plugin" },
       account: { label: "Profile & settings", description: "Your profile, password and preferences", keywords: "account profile password settings preferences me" },
-      teams: { label: "Teams", description: "Group people & share resources", keywords: "groups members sharing collaborate" },
+      teams: { label: "Teams", title: "Teams", description: "Every team in the organization: create teams, manage their members", keywords: "teams groups members sharing collaborate create organization admin" },
+      myTeam: { label: "My team", title: "My team", description: "Your team's members, or ask to join a team", keywords: "team teams my team members join group sharing collaborate" },
       requests: { label: "Requests", title: "Requests", description: "What you asked for, and requests waiting for your decision", keywords: "request approve reject inbox pending install model join team" },
       allOrganizations: { label: "All Organizations", description: "Every org on the instance + provisioning (admin)", keywords: "organizations tenants provision create admin" },
       allUsers: { label: "All Users", description: "Every account on the installation, across orgs (Platform Admin)", keywords: "users accounts roles platform admin people members instance" },
@@ -272,6 +272,18 @@ export const en = {
       "Connect an OpenAI-compatible or Anthropic provider, or a self-hosted server such as vLLM, so its models appear next to the local ones. Providers hold the organization's own API credentials; only its owners and admins see them.",
     defaultsSubtitle:
       "The model each task uses unless a knowledge base or a question picks its own.",
+  },
+
+  myTeam: {
+    subtitle: "The teams you belong to and their members. Team admins manage their team here.",
+    loadError: "Couldn't load the teams.",
+    manageAll: "Create and manage every team of the organization under Organization › Teams.",
+    openOrgTeams: "Open Teams",
+    noTeamHeading: "Teams",
+    noTeam: "You're not in a team yet. Ask to join one below; its admins decide.",
+    noTeamAdmin: "You're not in a team yet. Add yourself to one under Organization › Teams.",
+    noTeams: "Your organization has no teams yet. Ask an organization admin to create one or to add you.",
+    members: { one: "{count} member", other: "{count} members" },
   },
 
   orgPlugins: {
@@ -509,7 +521,7 @@ export const en = {
       inboxEmpty: "No requests are waiting for you.",
       inboxLoadError: "Couldn't load the requests routed to you.",
       mineHeading: "My requests",
-      mineEmpty: "You haven't asked for anything yet. Request a plugin in Discover plugins, a model under Models, or to join a team under Teams.",
+      mineEmpty: "You haven't asked for anything yet. Request a plugin in Discover plugins, a model under Models, or to join a team under My team.",
       mineLoadError: "Couldn't load your requests.",
       sentOn: "Sent {date}",
       expiresOn: "closes on its own on {date}",

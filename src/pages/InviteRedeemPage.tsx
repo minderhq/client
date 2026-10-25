@@ -8,6 +8,7 @@ import { StatusLine } from "../components/StatusLine";
 import { ApiError, apiFetch, friendlyErrorMessage, oidcLoginUrl } from "../lib/api";
 import { type RegisterLanding, useAuth } from "../lib/auth";
 import { useRegistrationMode } from "../lib/registration";
+import { ROUTES } from "../lib/routes";
 import { primaryButtonClass, secondaryButtonClass } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
 import { useNoReferrer } from "../lib/useNoReferrer";
@@ -51,16 +52,16 @@ async function fetchInvite(inviteToken: string, signal: AbortSignal): Promise<In
 }
 
 /** Where a new member lands: org invites on the Organization page, team
- * invites on Teams. */
+ * invites on My team. */
 function landingPath(info: InviteInfo | null): string {
-  return info?.organization_id ? "/organization" : "/platform/teams";
+  return info?.organization_id ? "/organization" : ROUTES.myTeam;
 }
 
 /** Where a just-registered account lands: the register response's hint when
  * the API gives one (the team for a team invite, else the org), otherwise the
  * invite's own target. */
 function signUpLandingPath(landing: RegisterLanding | undefined, info: InviteInfo | null): string {
-  if (landing?.team_id != null) return "/platform/teams";
+  if (landing?.team_id != null) return ROUTES.myTeam;
   if (landing?.organization_id != null) return "/organization";
   return landingPath(info);
 }

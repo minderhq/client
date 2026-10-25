@@ -214,7 +214,7 @@ describe("InviteRedeemPage", () => {
       await openAsNewcomer({ organization_id: 5, org_name: "Acme", org_role: "member" });
       fillSignUp();
       await vi.waitFor(() =>
-        expect(navigate).toHaveBeenCalledWith("/platform/teams", { replace: true }),
+        expect(navigate).toHaveBeenCalledWith("/team", { replace: true }),
       );
     });
 
@@ -284,7 +284,7 @@ describe("InviteRedeemPage", () => {
       fillSignUp();
 
       await vi.waitFor(() =>
-        expect(navigate).toHaveBeenCalledWith("/platform/teams", { replace: true }),
+        expect(navigate).toHaveBeenCalledWith("/team", { replace: true }),
       );
       expect(register).toHaveBeenCalledWith(
         "ada",
@@ -445,7 +445,7 @@ describe("InviteRedeemPage", () => {
       );
       fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
       expect(navigate).toHaveBeenCalledWith("/login", {
-        state: { from: "/platform/teams" },
+        state: { from: "/team" },
       });
       expect(apiFetch).not.toHaveBeenCalledWith(
         expect.stringContaining("/redeem"),
@@ -490,7 +490,7 @@ describe("InviteRedeemPage", () => {
         expect(loginWithToken).toHaveBeenCalledWith("fresh.jwt.token", expect.any(Number)),
       );
       await vi.waitFor(() =>
-        expect(navigate).toHaveBeenCalledWith("/platform/teams", { replace: true }),
+        expect(navigate).toHaveBeenCalledWith("/team", { replace: true }),
       );
       expect(register).not.toHaveBeenCalled();
     });

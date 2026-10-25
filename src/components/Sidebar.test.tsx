@@ -110,7 +110,7 @@ describe("Sidebar", () => {
     );
 
     // Billing is visible (mockBilling), so the Organization section shows.
-    for (const label of ["Knowledge", "Marketplace", "AI & system", "Team", "My account", "Organization"]) {
+    for (const label of ["Knowledge", "Marketplace", "AI & system", "My account", "Organization"]) {
       expect(screen.getByText(label)).toBeTruthy();
     }
   });

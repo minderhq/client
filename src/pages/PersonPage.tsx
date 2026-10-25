@@ -184,7 +184,7 @@ export function PersonPage() {
             <ul className="flex flex-col gap-1">
               {teams.map((team) => (
                 <li key={team.id} className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100">
-                  <Link to="/platform/teams" className="hover:underline">
+                  <Link to={ROUTES.orgTeams} className="hover:underline">
                     {team.name}
                   </Link>
                 </li>

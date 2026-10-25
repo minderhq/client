@@ -117,7 +117,6 @@ export const tr: Messages = {
       knowledge: "Bilgi",
       marketplace: "Pazar yeri",
       ai: "Yapay zekâ ve sistem",
-      team: "Ekip",
       account: "Hesabım",
       organization: "Kuruluş",
       platform: "Platform",
@@ -160,7 +159,8 @@ export const tr: Messages = {
       billing: { label: "Faturalandırma", title: "Faturalandırma", description: "Planınız, aboneliğiniz ve yükseltmeler", keywords: "abonelik plan yükselt ödeme fiyat fatura billing upgrade invoice" },
       licenses: { label: "Lisanslar", title: "Eklenti lisansları", description: "Hesabınıza lisanslanan eklenti seviyeleri (yalnızca görüntüleme)", keywords: "lisanslarım seviye eklenti licenses tier" },
       account: { label: "Profil ve ayarlar", description: "Profiliniz, parolanız ve tercihleriniz", keywords: "hesap profil parola ayarlar tercihler account profile password settings" },
-      teams: { label: "Ekipler", description: "Kişileri gruplayın ve kaynakları paylaşın", keywords: "ekip grup üyeler paylaşım iş birliği teams groups" },
+      teams: { label: "Takımlar", title: "Takımlar", description: "Kurumdaki bütün takımlar: takım oluşturun, üyelerini yönetin", keywords: "takım takımlar grup üyeler paylaşım oluştur kurum yönetici teams groups" },
+      myTeam: { label: "Takımım", title: "Takımım", description: "Takımınızın üyeleri ya da bir takıma katılma isteği", keywords: "takım takımım üyeler katıl grup paylaşım my team teams join" },
       requests: { label: "İstekler", title: "İstekler", description: "İstedikleriniz ve kararınızı bekleyen istekler", keywords: "istek onay ret gelen kutusu bekleyen kurulum model katılma ekip request approve inbox" },
       allOrganizations: { label: "Tüm kuruluşlar", description: "Bu kurulumdaki tüm kuruluşlar ve oluşturma (yönetici)", keywords: "kuruluşlar oluştur yönetici organizations tenants provision" },
       allUsers: { label: "Tüm kullanıcılar", description: "Kurulumdaki tüm hesaplar, kuruluşlar genelinde (platform yöneticisi)", keywords: "kullanıcılar hesaplar roller platform yöneticisi users accounts admin" },
@@ -270,6 +270,18 @@ export const tr: Messages = {
       "OpenAI uyumlu ya da Anthropic bir sağlayıcıyı veya vLLM gibi kendi sunucunuzu bağlayın; modelleri yerel modellerin yanında görünür. Sağlayıcılar kuruluşun kendi API kimlik bilgilerini tutar; onları yalnızca sahipleri ve yöneticileri görür.",
     defaultsSubtitle:
       "Bir bilgi tabanı ya da soru kendi modelini seçmedikçe her görevin kullandığı model.",
+  },
+
+  myTeam: {
+    subtitle: "Üyesi olduğunuz takımlar ve üyeleri. Takım yöneticileri takımlarını burada yönetir.",
+    loadError: "Takımlar yüklenemedi.",
+    manageAll: "Kurumun bütün takımlarını Kuruluş › Takımlar altında oluşturup yönetebilirsiniz.",
+    openOrgTeams: "Takımlar'ı aç",
+    noTeamHeading: "Takımlar",
+    noTeam: "Henüz bir takımda değilsiniz. Aşağıdan birine katılmak isteyin; kararı takımın yöneticileri verir.",
+    noTeamAdmin: "Henüz bir takımda değilsiniz. Kendinizi Kuruluş › Takımlar altından bir takıma ekleyebilirsiniz.",
+    noTeams: "Kurumunuzda henüz takım yok. Bir kurum yöneticisinden takım oluşturmasını ya da sizi eklemesini isteyin.",
+    members: { one: "{count} üye", other: "{count} üye" },
   },
 
   orgPlugins: {
@@ -507,7 +519,7 @@ export const tr: Messages = {
       inboxEmpty: "Kararınızı bekleyen istek yok.",
       inboxLoadError: "Size gelen istekler yüklenemedi.",
       mineHeading: "İsteklerim",
-      mineEmpty: "Henüz bir şey istemediniz. Eklenti keşfet sayfasından eklenti, Modeller sayfasından model isteyebilir ya da Ekipler sayfasından bir ekibe katılmak isteyebilirsiniz.",
+      mineEmpty: "Henüz bir şey istemediniz. Eklenti keşfet sayfasından eklenti, Modeller sayfasından model isteyebilir ya da Takımım sayfasından bir takıma katılmak isteyebilirsiniz.",
       mineLoadError: "İstekleriniz yüklenemedi.",
       sentOn: "Gönderildi: {date}",
       expiresOn: "{date} tarihinde kendiliğinden kapanır",

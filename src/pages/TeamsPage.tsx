@@ -60,7 +60,7 @@ interface InvitesResponse {
   offset: number;
 }
 
-interface TeamsResponse {
+export interface TeamsResponse {
   teams: Team[];
   total: number;
   limit: number;
@@ -180,7 +180,7 @@ export function TeamsPage() {
   );
 }
 
-function TeamCard({
+export function TeamCard({
   team,
   token,
   currentUsername,

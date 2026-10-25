@@ -238,7 +238,7 @@ export function OrganizationPage() {
                   </>
                 )}
                 <Link
-                  to="/platform/teams"
+                  to={ROUTES.myTeam}
                   className="flex items-center gap-1 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400"
                 >
                   {t("people.overview.teams")}
