@@ -331,9 +331,16 @@ export const tr: Messages = {
   },
 
   publicChat: {
-    apiAddressLabel: "API adresi (geliştiriciler için)",
-    apiAddressHint: "Ziyaretçi sohbet sayfası ve yerleştirme kodu yakında geliyor.",
-    copyApiAddress: "API adresini kopyala",
+    copyEmbed: "Yerleştirme kodunu kopyala",
+    embedCopied: "Yerleştirme kodu kopyalandı",
+    preview: "Önizle",
+    previewHint: "Sohbet botunun sayfasını yeni bir sekmede açar. Önizleme bağlantısı 10 dakika geçerlidir.",
+    shareableLink: "Paylaşılabilir bağlantı",
+    shareableLinkHint: "Kapalı: sohbet botu yalnızca web sitenizin içinde açılır. Açık: bağlantıya sahip herkes açabilir.",
+    publicLinkLabel: "Herkese açık bağlantı",
+    copyPublicLink: "Herkese açık bağlantıyı kopyala",
+    allowedSites: "Yerleştirme kodu yalnızca bu sohbet botunun izin verilen sitelerinde çalışır: {origins}.",
+    noAllowedSites: "Bu sohbet botunun henüz izin verilen sitesi yok, bu yüzden yerleştirme kodu hiçbir web sitesinde çalışmaz.",
     subtitle:
       "Asistanlarınızdan birine dayanan bir sohbet botunu web sitenizde yayınlayın. Her sohbet botu yalnızca asistanının bilgi tabanlarından yanıt verir, kendi herkese açık adresinden erişilir ve dakikalık kendi istek sınırıyla kısıtlanır. Yalnızca yöneticiler içindir ve bu kurumla sınırlıdır.",
     needsAssistant: "Önce bir asistan oluşturun; web sitesi sohbet botu yanıt vermek için bir asistana ihtiyaç duyar.",

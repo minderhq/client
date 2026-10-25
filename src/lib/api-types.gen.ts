@@ -4757,6 +4757,8 @@ export interface components {
         };
         /** MyOrgItem */
         MyOrgItem: {
+            /** Chat History Retention Days */
+            chat_history_retention_days?: number | null;
             /** Default Locale */
             default_locale?: string | null;
             /** Description */
@@ -4889,6 +4891,8 @@ export interface components {
         };
         /** OrgDetailOut */
         OrgDetailOut: {
+            /** Chat History Retention Days */
+            chat_history_retention_days?: number | null;
             /** Created At */
             created_at?: string | null;
             /** Created Via */
@@ -5407,6 +5411,8 @@ export interface components {
         };
         /** OrgUpdateRequest */
         OrgUpdateRequest: {
+            /** Chat History Retention Days */
+            chat_history_retention_days?: (30 | 90 | 365) | null;
             /** Default Locale */
             default_locale?: ("en" | "tr") | null;
             /** Description */

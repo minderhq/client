@@ -333,9 +333,16 @@ export const en = {
   },
 
   publicChat: {
-    apiAddressLabel: "API address (for developers)",
-    apiAddressHint: "The visitor chat page and embed code are coming soon.",
-    copyApiAddress: "Copy API address",
+    copyEmbed: "Copy embed code",
+    embedCopied: "Embed code copied",
+    preview: "Preview",
+    previewHint: "Opens the chatbot's page in a new tab. The preview link works for 10 minutes.",
+    shareableLink: "Shareable link",
+    shareableLinkHint: "Off: the chatbot only opens inside your website. On: anyone with the link can open it.",
+    publicLinkLabel: "Public link",
+    copyPublicLink: "Copy public link",
+    allowedSites: "The embed code only works on this chatbot's allowed sites: {origins}.",
+    noAllowedSites: "This chatbot has no allowed sites yet, so the embed code won't work on any website.",
     subtitle:
       "Publish a chatbot on your website, backed by one of your assistants. Each chatbot answers only from its assistant's knowledge bases, is reachable at its own public address, and is capped by its own per-minute rate limit. Admin-only, and scoped to this organization.",
     needsAssistant: "Create an assistant first — a website chatbot needs one to answer from.",
