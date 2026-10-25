@@ -13,6 +13,7 @@ import { fetchCatalogToolsPage, type CatalogTool } from "../lib/marketplace";
 import { badgeClass, secondaryButtonClass } from "../lib/ui";
 import { usePaginatedList } from "../lib/usePaginatedList";
 import { ROUTES } from "../lib/routes";
+import { useI18n } from "../i18n";
 
 function CatalogToolCard({ tool }: { tool: CatalogTool }) {
   return (
@@ -48,6 +49,7 @@ function CatalogToolCard({ tool }: { tool: CatalogTool }) {
  * JSON-Schema parameter list to build one from. This page has nothing to log
  * in for -- it's read-only either way. */
 export function AvailableToolsPage() {
+  const { t, rich } = useI18n();
   const fetchCatalogPage = useCallback(async (offset: number) => {
     const res = await fetchCatalogToolsPage(offset, 20);
     return { items: res.tools, total: res.total };
@@ -75,50 +77,45 @@ export function AvailableToolsPage() {
     <>
       <PageHeader
         icon="ai-tools"
-        title="Discover AI tools"
-        subtitle={
-          <>
-            The durable catalog of AI tools plugins offer, with tier info —
-            includes tools from plugins that aren't running right now, and can
-            lag behind{" "}
+        title={t("tools.discoverTitle")}
+        subtitle={rich("tools.discoverSubtitle", {
+          installed: (
             <Link to={ROUTES.installedAiTools} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
-              Installed AI tools
-            </Link>{" "}
-            since it's only updated when a plugin (re)loads. This page has
-            nothing to log in for — it's read-only either way.
-          </>
-        }
+              {t("tools.installedTitle")}
+            </Link>
+          ),
+        })}
       />
       <InfoCallout icon="info">
-        This is the catalog, not what's callable right now. A tool listed
-        here is only callable once the plugin that provides it is installed
-        and running — see{" "}
-        <Link to={ROUTES.installedAiTools} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
-          Installed AI tools
-        </Link>{" "}
-        for what's live this moment.
+        {rich("tools.discoverCallout", {
+          installed: (
+            <Link to={ROUTES.installedAiTools} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+              {t("tools.installedTitle")}
+            </Link>
+          ),
+        })}
       </InfoCallout>
-      <StatusLine>{loading ? "Loading AI tools…" : ""}</StatusLine>
-      <h2 className="sr-only">AI tool catalog</h2>
+      <StatusLine>{loading ? t("tools.loading") : ""}</StatusLine>
+      <h2 className="sr-only">{t("tools.catalog")}</h2>
       {showSkeleton && <CardListSkeleton count={3} />}
       {error && !errorOnMore && (
         <LoadError
-          title="Couldn't load the AI tool catalog."
+          title={t("tools.catalogError")}
           message={error}
-          what="the AI tool catalog"
+          what={t("tools.catalogWhat")}
           onRetry={retry}
         />
       )}
-      {isEmpty && <EmptyState>No AI tools in the catalog yet.</EmptyState>}
+      {isEmpty && <EmptyState>{t("tools.catalogEmpty")}</EmptyState>}
       {/* Only while the tools answer the current request (`loaded`). */}
       {loaded &&
         !(error && !errorOnMore) &&
         catalogTools.map((t) => <CatalogToolCard key={t.id} tool={t} />)}
       {error && errorOnMore && (
         <LoadError
-          title="Couldn't load more AI tools."
+          title={t("tools.moreError")}
           message={error}
-          what="more AI tools"
+          what={t("tools.moreWhat")}
           onRetry={retry}
         />
       )}

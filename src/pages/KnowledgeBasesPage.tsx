@@ -49,6 +49,7 @@ import {
 import { useCanManageModelProviders } from "../lib/useCan";
 import { useModelChoices, type ModelChoices } from "../lib/useModelChoices";
 import { useTokenRef } from "../lib/useTokenRef";
+import { useI18n } from "../i18n";
 
 export interface ModelInfo {
   id: string;
@@ -864,6 +865,7 @@ export function CreateKbForm({
   choices?: ModelChoices;
   onCreated: (kb: KnowledgeBase) => void;
 }) {
+  const { t } = useI18n();
   const nameId = useId();
   const descriptionId = useId();
   const embeddingModelId = useId();
@@ -1028,9 +1030,7 @@ export function CreateKbForm({
               <LocalOnlyModelHint choices={choices} current={llmModel} />
             ) : (
               <p className={fieldHintClass}>
-                Generates the actual answer from retrieved chunks when this KB
-                is queried through a RAG Pipeline. "Org default" follows the
-                organization's answer model, even when it changes.
+                {t("knowledgeBases.answerModelHint")}
               </p>
             )}
           </div>
@@ -1121,6 +1121,7 @@ export function CreateKbForm({
 }
 
 export function KnowledgeBasesPage() {
+  const { t } = useI18n();
   const { token, sessionKey } = useAuth();
   // The model-providers gate (see CloudProvidersPage).
   const canListProviders = useCanManageModelProviders();
@@ -1191,13 +1192,7 @@ export function KnowledgeBasesPage() {
       <PageHeader
         icon="knowledge-bases"
         title="Knowledge Bases"
-        subtitle={
-          <>
-            Create knowledge bases and upload documents — this is the data your{" "}
-            <em>RAG Pipelines</em> actually search over. Knowledge bases belong to
-            your organization, so log in to see, create, upload, or delete them.
-          </>
-        }
+        subtitle={t("knowledgeBases.subtitle")}
       />
       {/* A count-based key, not the array (#141): a new array identity with the
           same counts must not refetch the stepper's lists. */}
@@ -1213,7 +1208,7 @@ export function KnowledgeBasesPage() {
               to="/rag/pipelines"
               className="font-medium underline hover:no-underline"
             >
-              create a pipeline over it →
+              {t("knowledgeBases.createAssistant")}
             </Link>
           </InfoCallout>
         </div>

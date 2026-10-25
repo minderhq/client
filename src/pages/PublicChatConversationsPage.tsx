@@ -21,6 +21,7 @@ import { usePaginatedList } from "../lib/usePaginatedList";
 import { useTokenRef } from "../lib/useTokenRef";
 import type { PublicChatEndpoint } from "./PublicChatEndpointsPage";
 import { chatbotConversationsRoute, ROUTES } from "../lib/routes";
+import { useI18n } from "../i18n";
 
 // #1582 (client half): the creator conversation dashboard. An endpoint owner
 // reads the anonymous conversations that flowed through THEIR public chat
@@ -445,6 +446,7 @@ function ConversationDetail({
 }
 
 export function PublicChatConversationsPage() {
+  const { t } = useI18n();
   const { endpointId = "", sessionId } = useParams();
   const { token, orgRole, isPlatformAdmin } = useAuth();
   // Mirrors the server gate (_require_endpoint_admin): the Platform Admin or an
@@ -473,12 +475,12 @@ export function PublicChatConversationsPage() {
         title="Conversations"
         subtitle={
           endpointName
-            ? `Anonymous conversations through your "${endpointName}" public chat endpoint, read-only.`
-            : "Anonymous conversations through your public chat endpoint, read-only."
+            ? t("publicChat.conversationsSubtitleNamed", { name: endpointName })
+            : t("publicChat.conversationsSubtitle")
         }
         actions={
           <Link to={ROUTES.chatbots} className={secondaryButtonClass}>
-            <Icon name="arrow" size={14} /> All endpoints
+            <Icon name="arrow" size={14} /> {t("publicChat.allChatbots")}
           </Link>
         }
       />
@@ -486,8 +488,8 @@ export function PublicChatConversationsPage() {
       {!isAdmin && (
         <InfoCallout icon="lock">
           {token
-            ? "Admin role required to view public chat conversations."
-            : "Log in as an admin to view public chat conversations."}
+            ? t("publicChat.conversationsAdminRequired")
+            : t("publicChat.conversationsLogIn")}
         </InfoCallout>
       )}
 

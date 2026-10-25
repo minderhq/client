@@ -163,9 +163,9 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "Discover modules" })).toBeTruthy();
   });
 
-  it("redirects the old section-index /ai-tools path to Discover AI tools", () => {
+  it("redirects the old section-index /ai-tools path to Discover tools", () => {
     renderAt("/ai-tools");
-    expect(screen.getByRole("heading", { name: "Discover AI tools" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Discover tools" })).toBeTruthy();
   });
 
   it("redirects the old /knowledge-bases path to the RAG section", () => {

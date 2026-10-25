@@ -10,6 +10,7 @@ import { useAuth } from "../lib/auth";
 import { mutedTextClass, secondaryButtonClass } from "../lib/ui";
 import { usePaginatedList } from "../lib/usePaginatedList";
 import { useTokenRef } from "../lib/useTokenRef";
+import { useI18n } from "../i18n";
 
 export interface ConversationSummary {
   conversation_id: string;
@@ -64,6 +65,7 @@ function ConversationCard({
  * backend's `list_owned_conversations`); this is "conversations I began,"
  * not "conversations I can see." */
 export function ConversationsPage() {
+  const { t, rich } = useI18n();
   const { token, sessionKey } = useAuth();
   const tokenRef = useTokenRef();
   const navigate = useNavigate();
@@ -104,7 +106,7 @@ export function ConversationsPage() {
       <PageHeader
         icon="conversations"
         title="Conversations"
-        subtitle="Conversations you've started, across any pipeline, most recently active first."
+        subtitle={t("conversations.subtitle")}
       />
       {!token && (
         <InfoCallout icon="lock">Log in to see your conversation history.</InfoCallout>
@@ -114,9 +116,7 @@ export function ConversationsPage() {
           <StatusLine isError={isStatusError}>{status}</StatusLine>
           {conversations.length === 0 && !status && (
             <EmptyState>
-              No conversations yet — start one in{" "}
-              <strong>Ask</strong> (its follow-up questions form a thread you
-              can return to here).
+              {rich("conversations.empty", { chat: <strong>{t("nav.items.chat.label")}</strong> })}
             </EmptyState>
           )}
           {conversations.map((c) => (

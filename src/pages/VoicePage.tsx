@@ -13,6 +13,7 @@ import {
 } from "../lib/rewriteModel";
 import { badgeClass, cardClass, confidenceBadgeColor, fieldHintClass, inputClass, primaryButtonClass, secondaryButtonClass, surfaceMutedClass } from "../lib/ui";
 import { formatElapsed, useElapsedSeconds } from "../lib/useElapsedSeconds";
+import { useI18n } from "../i18n";
 
 interface LanguagesResponse {
   languages: Record<string, string>;
@@ -81,6 +82,7 @@ export function TextToSpeechCard({
   token: string;
   seed: Seed | null;
 }) {
+  const { t } = useI18n();
   const textId = useId();
   const languageId = useId();
   const voiceId = useId();
@@ -262,7 +264,7 @@ export function TextToSpeechCard({
     if (!text.trim() || !style) return;
     if (!rewriteModel) {
       setStatus(
-        "No ready model available to rewrite text — pull one on Model Management first.",
+        t("voice.noRewriteModel"),
       );
       setIsError(true);
       return;

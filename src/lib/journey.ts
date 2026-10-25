@@ -51,8 +51,8 @@ export interface JourneyStep {
 export const JOURNEY_STEPS: JourneyStep[] = [
   { key: "kb", label: "Knowledge base", to: "/rag", icon: "knowledge-bases" },
   { key: "upload", label: "Upload docs", to: "/rag", icon: "upload" },
-  { key: "pipeline", label: "Pipeline", to: "/rag/pipelines", icon: "pipelines" },
-  { key: "ask", label: "Ask", to: "/ask", icon: "ask" },
+  { key: "pipeline", label: "Assistant", to: "/rag/pipelines", icon: "pipelines" },
+  { key: "ask", label: "Chat", to: "/ask", icon: "ask" },
 ];
 
 /** How many leading steps are DONE — which is also the index of the current
@@ -128,8 +128,8 @@ export function primaryAction(counts: JourneyCounts | null): PrimaryAction {
       return {
         to: "/rag/pipelines",
         icon: "pipelines",
-        title: "Build a pipeline",
-        body: `You have ${n} knowledge base${n === 1 ? "" : "s"} ready — combine them into a pipeline to start asking questions.`,
+        title: "Set up an assistant",
+        body: `You have ${n} knowledge base${n === 1 ? "" : "s"} ready — combine them into an assistant to start asking questions.`,
       };
     }
     default: {
@@ -138,7 +138,7 @@ export function primaryAction(counts: JourneyCounts | null): PrimaryAction {
         to: "/ask",
         icon: "ask",
         title: "Ask a question",
-        body: `Jump into Ask to query your ${n} pipeline${n === 1 ? "" : "s"} — answers cite their sources.`,
+        body: `Jump into Chat to ask your ${n} assistant${n === 1 ? "" : "s"} — answers cite their sources.`,
       };
     }
   }

@@ -374,7 +374,7 @@ export function PluginCard({
   const [justInstalled, setJustInstalled] = useState(false);
   const loginHintId = useId();
   const scheduleTimeout = useAutoClearTimeout();
-  const { t } = useI18n();
+  const { t, rich } = useI18n();
   const { status, isError, busy, installRefused, install, uninstall, toggleEnabled } = usePluginLifecycle({
     pluginId: plugin.id,
     displayName: plugin.display_name,
@@ -505,14 +505,16 @@ export function PluginCard({
       {justInstalled && (
         <p className="mt-2 rounded-lg bg-green-50 p-2 text-xs text-green-900 dark:bg-green-950 dark:text-green-100">
           <Icon name="check" size={13} className="mr-1 inline-block align-[-2px]" />
-          Installed. If this plugin exposes an AI tool,{" "}
-          <Link
-            to={ROUTES.installedAiTools}
-            className="underline hover:text-green-700 dark:hover:text-green-300"
-          >
-            check Installed AI tools
-          </Link>{" "}
-          to confirm it's live.
+          {rich("tools.justInstalled", {
+            check: (
+              <Link
+                to={ROUTES.installedAiTools}
+                className="underline hover:text-green-700 dark:hover:text-green-300"
+              >
+                {t("tools.checkInstalled")}
+              </Link>
+            ),
+          })}
         </p>
       )}
     </section>

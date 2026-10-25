@@ -105,6 +105,7 @@ function CreateEndpointForm({
   pipelines: PipelineOption[];
   onCreated: () => void;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -127,7 +128,7 @@ function CreateEndpointForm({
     e.preventDefault();
     if (busy) return; // already in flight — ignore a double-submit
     if (!pipelineId) {
-      setStatus("Pick a pipeline to bind to this endpoint.");
+      setStatus(t("publicChat.pickAssistant"));
       setIsError(true);
       return;
     }
@@ -160,8 +161,7 @@ function CreateEndpointForm({
   if (pipelines.length === 0) {
     return (
       <EmptyState className="mb-4">
-        Create a RAG pipeline first — a public chat endpoint needs one to answer
-        from.
+        {t("publicChat.needsAssistant")}
       </EmptyState>
     );
   }
@@ -169,7 +169,7 @@ function CreateEndpointForm({
   if (!open) {
     return (
       <button onClick={() => setOpen(true)} className={primaryButtonClass}>
-        <Icon name="plus" size={15} /> New Endpoint
+        <Icon name="plus" size={15} /> {t("publicChat.newChatbot")}
       </button>
     );
   }
@@ -212,7 +212,7 @@ function CreateEndpointForm({
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Pipeline
+          {t("publicChat.assistant")}
         </label>
         <select
           className={inputClass}
@@ -221,7 +221,7 @@ function CreateEndpointForm({
           required
         >
           <option value="" disabled>
-            Choose a pipeline…
+            {t("publicChat.chooseAssistant")}
           </option>
           {pipelines.map((p) => (
             <option key={p.id} value={p.id}>
@@ -230,8 +230,7 @@ function CreateEndpointForm({
           ))}
         </select>
         <p className={fieldHintClass}>
-          The knowledge bases this pipeline searches are what the public chatbot
-          answers from.
+          {t("publicChat.assistantHint")}
         </p>
       </div>
       <div>
@@ -259,7 +258,7 @@ function CreateEndpointForm({
           value={method}
           onChange={(e) => setMethod(e.target.value)}
         >
-          <option value="">(pipeline default)</option>
+          <option value="">{t("assistants.default")}</option>
           {RAG_METHODS.map((m) => (
             <option key={m} value={m}>
               {m}
@@ -392,7 +391,7 @@ function EndpointRow({
   async function handleDelete() {
     if (
       !(await confirm({
-        title: "Delete endpoint",
+        title: t("publicChat.deleteTitle"),
         message: `Remove "${endpoint.name}"? Its public address (/${endpoint.slug}) will stop working immediately.`,
         confirmLabel: "Delete",
         danger: true,
@@ -429,19 +428,19 @@ function EndpointRow({
               className={inputClass}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              aria-label="Endpoint name"
+              aria-label={t("publicChat.nameLabel")}
               disabled={busy}
             />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
-              Pipeline
+              {t("publicChat.assistant")}
             </label>
             <select
               className={inputClass}
               value={pipelineId}
               onChange={(e) => setPipelineId(e.target.value)}
-              aria-label="Bound pipeline"
+              aria-label={t("publicChat.boundAssistant")}
               disabled={busy}
             >
               {/* Keep the current binding selectable even if it's no longer in
@@ -484,7 +483,7 @@ function EndpointRow({
               aria-label="RAG method"
               disabled={busy}
             >
-              <option value="">(pipeline default)</option>
+              <option value="">{t("assistants.default")}</option>
               {RAG_METHODS.map((m) => (
                 <option key={m} value={m}>
                   {m}
@@ -558,7 +557,7 @@ function EndpointRow({
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
             <span>
-              Pipeline:{" "}
+              {t("publicChat.assistant")}:{" "}
               <span className="font-medium text-gray-700 dark:text-gray-300">
                 {pipelineName}
               </span>
@@ -595,6 +594,7 @@ function EndpointRow({
 }
 
 export function PublicChatEndpointsPage() {
+  const { t } = useI18n();
   const { token, orgRole, isPlatformAdmin } = useAuth();
   // Mirrors the server gate (_require_endpoint_admin): the Platform Admin or an
   // owner/admin of the active org. Switch to useCan("org.chatbots.manage")
@@ -632,15 +632,15 @@ export function PublicChatEndpointsPage() {
       {dialog}
       <PageHeader
         icon="ask"
-        title="Public Chat"
-        subtitle="Publish a public chatbot backed by one of your RAG pipelines. Each endpoint answers only from its bound pipeline's knowledge bases, is reachable at its own public slug, and is capped by its own per-minute rate limit. Admin-only, and scoped to this organization."
+        title={t("nav.items.publicChat.label")}
+        subtitle={t("publicChat.subtitle")}
       />
 
       {!isAdmin && (
         <InfoCallout icon="lock">
           {token
-            ? "Admin role required to manage public chat endpoints."
-            : "Log in as an admin to manage public chat endpoints."}
+            ? t("publicChat.adminRequired")
+            : t("publicChat.logInAsAdmin")}
         </InfoCallout>
       )}
 
@@ -662,7 +662,7 @@ export function PublicChatEndpointsPage() {
           {!endpointsRes.loading &&
             !endpointsRes.error &&
             endpoints.length === 0 && (
-              <EmptyState>No public chat endpoints yet.</EmptyState>
+              <EmptyState>{t("publicChat.empty")}</EmptyState>
             )}
 
           {endpoints.map((ep) => (

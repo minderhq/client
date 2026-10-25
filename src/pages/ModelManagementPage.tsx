@@ -24,6 +24,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from "../lib/ui";
+import { useI18n } from "../i18n";
 
 type ModelType = "local" | "remote";
 type ModelStatusValue = "ready" | "loading" | "error";
@@ -311,6 +312,7 @@ export function PullModelForm({
 }
 
 export function ModelManagementPage() {
+  const { t } = useI18n();
   const { token, isPlatformAdmin } = useAuth();
   const isAdmin = isPlatformAdmin;
   // Who connects providers and default models adds models directly; everyone
@@ -343,7 +345,7 @@ export function ModelManagementPage() {
       {dialog}
       <PageHeader
         icon="models"
-        title="Model Management"
+        title={t("nav.items.models.label")}
         subtitle="Pull, delete, and test Ollama models on Minder's own model-management service. Browsing is open for everyone; log in to test a prompt. Pulling and deleting require a Platform Admin."
         actions={canAddModels ? undefined : <RequestButton kind="model_request" />}
       />

@@ -41,6 +41,7 @@ import {
   QueryResultCard,
   type RagPipeline,
 } from "./RagPipelinesPage";
+import { useI18n } from "../i18n";
 
 // Semantic Intent Router (backend #1733): the Method/Top K/Rerank/Hybrid/Compress/
 // Parent context controls below double as "manual overrides" once touched -- these
@@ -125,6 +126,7 @@ type Turn = UserTurn | AssistantTurn;
  * QueryResultCard the Pipelines page uses, so answers look identical wherever
  * you ask from. */
 export function AskPage() {
+  const { t, rich } = useI18n();
   const { token, sessionKey, isAuthenticated } = useAuth();
   // The model-providers gate (see CloudProvidersPage).
   const canListProviders = useCanManageModelProviders();
@@ -427,7 +429,7 @@ export function AskPage() {
     } catch (e) {
       const msg =
         e instanceof ApiError && e.status === 404
-          ? "This pipeline no longer exists on the server. Reloading your pipelines…"
+          ? t("chat.gone")
           : isLocalOnlyRefusal(e)
             ? `Not sent to a cloud model: ${(e as ApiError).message}`
             : friendlyErrorMessage(e);
@@ -459,8 +461,8 @@ export function AskPage() {
     <>
       <PageHeader
         icon="ask"
-        title="Ask"
-        subtitle="Chat with your knowledge bases using Minder's own retrieval — pick a pipeline and ask."
+        title={t("nav.items.chat.label")}
+        subtitle={t("chat.subtitle")}
         actions={
           turns.length > 0 ? (
             <button type="button" onClick={newChat} className={secondaryButtonClass}>
@@ -491,11 +493,13 @@ export function AskPage() {
 
       {!loading && pipelines.length === 0 && !loadError && (
         <EmptyState className="mt-2">
-          You have no pipelines yet. Create a knowledge base and a{" "}
-          <Link to="/rag/pipelines" className="font-medium text-indigo-600 underline dark:text-indigo-400">
-            pipeline
-          </Link>{" "}
-          to start asking questions.
+          {rich("chat.noAssistants", {
+            link: (
+              <Link to="/rag/pipelines" className="font-medium text-indigo-600 underline dark:text-indigo-400">
+                {t("chat.assistantLink")}
+              </Link>
+            ),
+          })}
         </EmptyState>
       )}
 
@@ -505,13 +509,13 @@ export function AskPage() {
           <div className={`mb-4 flex flex-wrap items-center gap-3 ${cardClass}`}>
             <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
               <Icon name="pipelines" size={16} className="text-gray-400" />
-              Pipeline
+              {t("publicChat.assistant")}
             </label>
             <select
               className={`${inputClass} w-auto min-w-52 flex-1`}
               value={pipelineId}
               onChange={(e) => switchPipeline(e.target.value)}
-              aria-label="Pipeline to query"
+              aria-label={t("chat.picker")}
             >
               {pipelines.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -552,8 +556,7 @@ export function AskPage() {
                     Ask anything about your documents
                   </p>
                   <p className={`mt-1 ${mutedTextClass}`}>
-                    Answers are grounded in{" "}
-                    {selectedPipeline?.name ?? "your pipeline"} and cite their sources.
+                    {t("chat.grounded", { name: selectedPipeline?.name ?? t("chat.yourAssistant") })}
                   </p>
                 </div>
                 <div className="flex max-w-lg flex-wrap justify-center gap-2">
@@ -619,10 +622,13 @@ export function AskPage() {
           {/* Composer. */}
           {!token && (
             <InfoCallout icon="lock">
-              <Link to="/login" className="font-medium underline">
-                Log in
-              </Link>{" "}
-              to ask questions. Browsing your pipelines is open to everyone.
+              {rich("chat.logInToAsk", {
+                login: (
+                  <Link to="/login" className="font-medium underline">
+                    {t("chat.logInLink")}
+                  </Link>
+                ),
+              })}
             </InfoCallout>
           )}
 
@@ -770,7 +776,7 @@ export function AskPage() {
                         onChange={(e) => setLlmModel(e.target.value)}
                         className={inputClass}
                       >
-                        <option value="">(pipeline default)</option>
+                        <option value="">{t("assistants.default")}</option>
                         {llmModels.map((m) => {
                           const blocked =
                             localOnly && isCloudModel(m.id, choices.localProviders);
@@ -783,15 +789,11 @@ export function AskPage() {
                         })}
                       </select>
                       <span className={fieldHintClass}>
-                        Answer this question with a specific model instead of the
-                        pipeline's configured one — e.g. a stronger model for a
-                        hard question. Retrieval is unchanged.
+                        {t("chat.modelHint")}
                       </span>
                       {localOnly && (
                         <span className={fieldHintClass}>
-                          This pipeline searches a Local only knowledge base, so
-                          its content is never sent to a cloud model: cloud
-                          models can't be picked here.
+                          {t("chat.localOnlyHint")}
                         </span>
                       )}
                       {localOnly && !llmModel && defaultIsCloud && (

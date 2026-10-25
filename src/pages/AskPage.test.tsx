@@ -126,11 +126,11 @@ describe("AskPage", () => {
     searchParams = new URLSearchParams();
   });
 
-  it("shows an empty state pointing at Pipelines when there are none yet", async () => {
+  it("shows an empty state pointing at Assistants when there are none yet", async () => {
     routeApiFetch({ pipelines: [] });
     render(<AskPage />);
 
-    await screen.findByText("You have no pipelines yet. Create a knowledge base and a", {
+    await screen.findByText("You have no assistants yet. Create a knowledge base and an", {
       exact: false,
     });
   });
@@ -153,7 +153,7 @@ describe("AskPage", () => {
 
     expect(screen.getByRole("link", { name: "Log in" })).toBeTruthy();
     expect(
-      screen.getByText(/to ask questions\. Browsing your pipelines is open to everyone\./),
+      screen.getByText(/to ask questions\. Browsing your assistants is open to everyone\./),
     ).toBeTruthy();
     expect((screen.getByLabelText("Your question") as HTMLTextAreaElement).disabled).toBe(true);
     expect(
@@ -407,7 +407,7 @@ describe("AskPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
 
     await screen.findByText(
-      "This pipeline no longer exists on the server. Reloading your pipelines…",
+      "This assistant no longer exists on the server. Reloading your assistants…",
     );
     // The 404 handler calls load() again -- the still-mocked query error
     // doesn't matter here, only that capabilities/pipelines got re-fetched.
@@ -440,7 +440,7 @@ describe("AskPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
     await screen.findByText("The refund window is 30 days.");
 
-    fireEvent.change(screen.getByLabelText("Pipeline to query"), { target: { value: "p-2" } });
+    fireEvent.change(screen.getByLabelText("Assistant to ask"), { target: { value: "p-2" } });
 
     expect(screen.queryByText("The refund window is 30 days.")).toBeNull();
   });

@@ -42,6 +42,7 @@ import {
 import { useCan } from "../lib/useCan";
 import { useTokenRef } from "../lib/useTokenRef";
 import { ROUTES } from "../lib/routes";
+import { useI18n } from "../i18n";
 
 /** Maps json_schema/ui_schema onto the existing ConfigField shape so the flat
  * schema's rendering/submission logic (FieldInput, handleSubmit's int/float
@@ -568,6 +569,7 @@ export function InstalledPluginCard({
   onToggleEnabled: (pluginId: string, enabled: boolean) => void;
   confirm: ReturnType<typeof useConfirm>["confirm"];
 }) {
+  const { t } = useI18n();
   const { installation, runtime } = entry;
   const orgInstall = !!installation?.tenant_id;
   const hasVersion = entry.installedVersion !== null;
@@ -599,8 +601,7 @@ export function InstalledPluginCard({
           )}
           {!installation && runtime && (
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Loaded by this installation for everyone — there's no marketplace install
-              of yours to enable, disable or uninstall.
+              {t("installedPlugins.notYours")}
             </p>
           )}
         </div>
@@ -626,6 +627,7 @@ export function InstalledPluginCard({
 }
 
 export function InstalledPluginsPage() {
+  const { t, rich } = useI18n();
   const { token, sessionKey, isAuthenticated } = useAuth();
   const tokenRef = useTokenRef();
   const { confirm, dialog } = useConfirm();
@@ -654,7 +656,7 @@ export function InstalledPluginsPage() {
       <PageHeader
         icon="plugins"
         title="Installed plugins"
-        subtitle="Everything running on this installation, plus the plugins you've installed from the marketplace — check versions and health, enable, disable, uninstall, or edit their settings. Requires login."
+        subtitle={t("installedPlugins.subtitle")}
       />
       {!isAuthenticated && (
         <InfoCallout icon="lock">
@@ -666,7 +668,7 @@ export function InstalledPluginsPage() {
           {loading && <StatusLine>Loading installed plugins…</StatusLine>}
           {installationsError && (
             <StatusLine isError>
-              Couldn't load your marketplace installs: {installationsError}
+              {t("installedPlugins.installsError", { error: installationsError })}
             </StatusLine>
           )}
           {runtimeError && (
@@ -707,11 +709,13 @@ export function InstalledPluginsPage() {
           {entries.length > 0 && <SourceLegend className="mb-3" />}
           {entries.length > 0 && (
             <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
-              Some of these expose AI tools the assistant can call —{" "}
-              <Link to={ROUTES.installedAiTools} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
-                check Installed AI tools
-              </Link>{" "}
-              to see which are live right now.
+              {rich("tools.someExpose", {
+                check: (
+                  <Link to={ROUTES.installedAiTools} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+                    {t("tools.checkInstalled")}
+                  </Link>
+                ),
+              })}
             </p>
           )}
           {entries.map((entry) => (

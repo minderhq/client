@@ -52,13 +52,13 @@ describe("AvailableToolsPage", () => {
     apiFetch.mockReset();
   });
 
-  it("renders the Discover AI tools heading and points to Installed AI tools", async () => {
+  it("renders the Discover tools heading and points to Installed tools", async () => {
     apiFetch.mockResolvedValue({ tools: [], count: 0, total: 0, limit: 20, offset: 0 });
     renderPage();
 
-    expect(screen.getByRole("heading", { name: "Discover AI tools" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Discover tools" })).toBeTruthy();
     expect(
-      screen.getAllByText("Installed AI tools")[0].closest("a")?.getAttribute("href"),
+      screen.getAllByText("Installed tools")[0].closest("a")?.getAttribute("href"),
     ).toBe("/marketplace/installed/ai-tools");
   });
 
@@ -66,7 +66,7 @@ describe("AvailableToolsPage", () => {
     apiFetch.mockResolvedValue({ tools: [], count: 0, total: 0, limit: 20, offset: 0 });
     renderPage();
 
-    await screen.findByText("No AI tools in the catalog yet.");
+    await screen.findByText("No tools in the catalog yet.");
     expect(apiFetch).toHaveBeenCalledWith(
       "/v1/marketplace/ai/tools?active_only=false&limit=20&offset=0",
     );
@@ -89,7 +89,7 @@ describe("AvailableToolsPage", () => {
     expect(badge.querySelector("svg")).toBeTruthy();
     // Badges sit beside the title (h3 under the catalog's h2), not inside it.
     expect(screen.getByRole("heading", { level: 3, name: "send_email" })).toBeTruthy();
-    expect(screen.getByRole("heading", { level: 2, name: "AI tool catalog" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Tool catalog" })).toBeTruthy();
   });
 
   it("falls back to a placeholder when a tool has no description", async () => {
@@ -151,11 +151,11 @@ describe("AvailableToolsPage", () => {
     renderPage();
 
     expect(screen.getByTestId("card-list-skeleton")).toBeTruthy();
-    expect(screen.getByText("Loading AI tools…")).toBeTruthy();
-    expect(screen.queryByText("No AI tools in the catalog yet.")).toBeNull();
+    expect(screen.getByText("Loading tools…")).toBeTruthy();
+    expect(screen.queryByText("No tools in the catalog yet.")).toBeNull();
 
     resolve({ tools: [], count: 0, total: 0, limit: 20, offset: 0 });
-    await screen.findByText("No AI tools in the catalog yet.");
+    await screen.findByText("No tools in the catalog yet.");
     expect(screen.queryByTestId("card-list-skeleton")).toBeNull();
   });
 
@@ -164,12 +164,12 @@ describe("AvailableToolsPage", () => {
     renderPage();
 
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toContain("Couldn't load the AI tool catalog.");
+    expect(alert.textContent).toContain("Couldn't load the tool catalog.");
     expect(alert.textContent).toContain("network down");
-    expect(screen.queryByText("No AI tools in the catalog yet.")).toBeNull();
+    expect(screen.queryByText("No tools in the catalog yet.")).toBeNull();
 
     apiFetch.mockResolvedValueOnce({ tools: [tool()], count: 1, total: 1, limit: 20, offset: 0 });
-    fireEvent.click(screen.getByRole("button", { name: "Retry loading the AI tool catalog" }));
+    fireEvent.click(screen.getByRole("button", { name: "Retry loading the tool catalog" }));
 
     await screen.findByText("get_weather");
     await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());

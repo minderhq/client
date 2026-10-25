@@ -97,15 +97,15 @@ export const en = {
     escape: "Esc",
     groupActions: "Actions",
     groupKnowledgeBase: "Knowledge base",
-    groupPipeline: "Pipeline",
+    groupPipeline: "Assistant",
     groupPlugin: "Plugin",
     openInKnowledgeBases: "Open in Knowledge Bases",
-    openInPipelines: "Open in Pipelines",
+    openInPipelines: "Open in Assistants",
     openInDiscoverPlugins: "Open in Discover plugins",
     actions: {
       ask: { label: "Ask a question", sublabel: "Query your knowledge", keywords: "chat rag query" },
       kb: { label: "New knowledge base", sublabel: "Upload documents", keywords: "create add upload" },
-      pipeline: { label: "New pipeline", sublabel: "Combine knowledge bases", keywords: "create add" },
+      pipeline: { label: "New assistant", sublabel: "Combine knowledge bases", keywords: "create add pipeline" },
       model: { label: "Pull a model", sublabel: "Ollama model lifecycle", keywords: "download install ollama" },
       theme: { label: "Toggle theme", sublabel: "System / light / dark", keywords: "dark light mode appearance" },
     },
@@ -158,7 +158,7 @@ export const en = {
       billing: { label: "Plan & billing", title: "Plan & billing", description: "Your plan, subscription, upgrades and licenses", keywords: "subscription plan upgrade payment tier pricing invoice billing licenses entitlements" },
       status: { label: "Status & logs", description: "Service health & recent logs", keywords: "health services uptime logs status" },
       models: { label: "Local models", description: "Local LLMs (Ollama): pull, test, remove", keywords: "models ollama llm pull download" },
-      modules: { label: "Modules", description: "Service bundles this installation can run", keywords: "modules service bundles services capabilities enable monitoring inference voice" },
+      modules: { label: "Modules", description: "Groups of platform services you turn on or off together", keywords: "modules service bundles services capabilities enable monitoring inference voice" },
       modulesDiscover: { label: "Discover", title: "Discover modules", description: "Modules you can turn on", keywords: "service bundles available enable" },
       modulesInstalled: { label: "Installed", title: "Installed modules", description: "Modules turned on, their images, export and import", keywords: "service bundles enabled reconcile export import docker" },
       allOrganizations: { label: "All organizations", description: "Every organization on the installation + provisioning", keywords: "organizations tenants provision create admin" },
@@ -287,9 +287,9 @@ export const en = {
     leave: "Leave",
     remove: "Remove",
     leaveTitle: "Leave this team?",
-    leaveMessage: "You'll lose access to this team's shared knowledge bases and pipelines. You can be re-invited later.",
+    leaveMessage: "You'll lose access to this team's shared knowledge bases and assistants. You can be re-invited later.",
     removeTitle: "Remove {name}?",
-    removeMessage: "{name} will immediately lose access to this team's shared knowledge bases and pipelines.",
+    removeMessage: "{name} will immediately lose access to this team's shared knowledge bases and assistants.",
     memberEmailPlaceholder: "Existing member's email",
     addMember: "Add Member",
     added: "Added {email}. They must log out and back in before team-shared content becomes visible to them.",
@@ -336,6 +336,146 @@ export const en = {
     apiAddressLabel: "API address (for developers)",
     apiAddressHint: "The visitor chat page and embed code are coming soon.",
     copyApiAddress: "Copy API address",
+    subtitle:
+      "Publish a chatbot on your website, backed by one of your assistants. Each chatbot answers only from its assistant's knowledge bases, is reachable at its own public address, and is capped by its own per-minute rate limit. Admin-only, and scoped to this organization.",
+    needsAssistant: "Create an assistant first — a website chatbot needs one to answer from.",
+    newChatbot: "New chatbot",
+    pickAssistant: "Pick an assistant for this chatbot.",
+    assistant: "Assistant",
+    chooseAssistant: "Choose an assistant…",
+    assistantHint: "The chatbot answers from the knowledge bases this assistant searches.",
+    boundAssistant: "Chatbot's assistant",
+    nameLabel: "Chatbot name",
+    deleteTitle: "Delete chatbot",
+    adminRequired: "Org Admin role required to manage website chatbots.",
+    logInAsAdmin: "Log in as an admin to manage website chatbots.",
+    empty: "No website chatbots yet.",
+    conversationsSubtitleNamed: "Anonymous conversations through your “{name}” website chatbot, read-only.",
+    conversationsSubtitle: "Anonymous conversations through your website chatbot, read-only.",
+    allChatbots: "All chatbots",
+    conversationsAdminRequired: "Org Admin role required to view website chatbot conversations.",
+    conversationsLogIn: "Log in as an admin to view website chatbot conversations.",
+  },
+
+  assistants: {
+    subtitle:
+      "An assistant is what you ask questions: it searches one or more knowledge bases (your uploaded documents) and answers from them, citing its sources. Create one below, then talk to it in Chat.",
+    openChat: "Open Chat",
+    create: "Create an assistant",
+    needsKb: "Create a knowledge base first — an assistant needs at least one to search over.",
+    noReadyKb:
+      "None of the selected knowledge bases have documents yet — an assistant over them will return empty answers until you upload some.",
+    logInToCreate: "Log in to create an assistant.",
+    chooseTeam: "Choose a team to share this assistant with.",
+    deleteTitle: "Delete assistant?",
+    deleteMessage: "This permanently deletes “{name}”. The knowledge bases it searches over are not affected.",
+    gone: "This assistant no longer exists on the server — removed from your list.",
+    nameLabel: "Assistant name",
+    copyId: "Copy full assistant id",
+    logInToEdit: "Log in to edit or delete this assistant.",
+    chatWith: "Chat with this assistant",
+    empty: "No assistants yet — pick at least one knowledge base above.",
+    filter: "Filter assistants",
+    noMatch: "No assistants match “{filter}”.",
+    localOnly: "Local only: this assistant's knowledge base content is never sent to a cloud model.",
+    default: "(assistant default)",
+  },
+
+  chat: {
+    subtitle: "Chat with your knowledge bases — pick an assistant and ask.",
+    noAssistants: "You have no assistants yet. Create a knowledge base and an {link} to start asking questions.",
+    assistantLink: "assistant",
+    picker: "Assistant to ask",
+    grounded: "Answers are grounded in {name} and cite their sources.",
+    yourAssistant: "your assistant",
+    logInToAsk: "{login} to ask questions. Browsing your assistants is open to everyone.",
+    logInLink: "Log in",
+    gone: "This assistant no longer exists on the server. Reloading your assistants…",
+    modelHint:
+      "Answer this question with a specific model instead of the assistant's configured one — e.g. a stronger model for a hard question. Retrieval is unchanged.",
+    localOnlyHint:
+      "This assistant searches a Local only knowledge base, so its content is never sent to a cloud model: cloud models can't be picked here.",
+  },
+
+  conversations: {
+    subtitle: "Conversations you've started, with any assistant, most recently active first.",
+    empty: "No conversations yet — start one in {chat} (its follow-up questions form a thread you can return to here).",
+  },
+
+  knowledgeBases: {
+    subtitle:
+      "Create knowledge bases and upload documents — this is the data your assistants search over. Knowledge bases belong to your organization, so log in to see, create, upload, or delete them.",
+    createAssistant: "create an assistant over it →",
+    answerModelHint:
+      "Writes the answer from what an assistant finds in this knowledge base. “Org default” follows the organization's answer model, even when it changes.",
+  },
+
+  graph: {
+    subtitle:
+      "Build and explore a knowledge graph from your text: the people, organizations, places and topics in it, and how they connect. Where an assistant finds similar passages, this finds {connected}.",
+    connected: "who's connected to whom",
+    exploreHint:
+      "Search the graph by meaning, find entities by name, or look up a specific entity's neighbors and source documents — a different way in than an assistant's search, over the same knowledge.",
+    separate: "This graph is separate from the plugin dependency graph shown under Discover — unrelated data.",
+  },
+
+  knowledgeQuality: {
+    entityMerges: "Entity merges",
+  },
+
+  modules: {
+    availableSubtitle:
+      "Optional modules you haven't turned on yet — each claims a set of services, shared with other modules where needed. Browsing is open for everyone; enabling requires a Platform Admin.",
+    installedSubtitle:
+      "Modules currently turned on, the Docker image each claimed service actually runs, and export/import for the whole set. Disabling, reconciling or importing requires a Platform Admin.",
+    neverStarted:
+      "Enabling only starts containers that already exist. A service that was never brought up (e.g. this module has been off since install) shows as needing a host converge — run {start} or {restart} on the host to actually create it.",
+    loading: "Loading modules…",
+    loadError: "Couldn't load the modules.",
+    what: "modules",
+    canEnable: "Modules you can enable",
+    allEnabled: "Every module is already enabled — see {link}.",
+    enabled: "Enabled modules",
+    noneEnabled: "No modules are enabled yet — see {link}.",
+    orphaned: "Orphaned services (claimed by no enabled module, should be stopped): {list}. Run Reconcile below to clean these up.",
+  },
+
+  tools: {
+    discoverTitle: "Discover tools",
+    installedTitle: "Installed tools",
+    discoverSubtitle:
+      "The catalog of tools plugins offer, with tier info — includes tools from plugins that aren't running right now, and can lag behind {installed} since it's only updated when a plugin (re)loads. This page has nothing to log in for — it's read-only either way.",
+    discoverCallout:
+      "This is the catalog, not what's callable right now. A tool listed here is only callable once the plugin that provides it is installed and running — see {installed} for what's live this moment.",
+    loading: "Loading tools…",
+    catalog: "Tool catalog",
+    catalogError: "Couldn't load the tool catalog.",
+    catalogWhat: "the tool catalog",
+    catalogEmpty: "No tools in the catalog yet.",
+    moreError: "Couldn't load more tools.",
+    moreWhat: "more tools",
+    installedSubtitle:
+      "Every tool actually callable right now, from plugins currently running on this installation — exactly what an assistant can use in chat. Browsing needs no login; running a tool that changes data does, same as anywhere else in Minder.",
+    installedCallout:
+      "This is what's live this moment, computed fresh on every request. If a plugin isn't running, its tools won't appear here even when they're in {discover} — installing and enabling that plugin is what makes them live.",
+    callable: "Callable tools",
+    liveError: "Couldn't load the tools that are live right now.",
+    liveWhat: "installed tools",
+    liveEmpty: "No plugin is currently exposing a tool.",
+    justInstalled: "Installed. If this plugin brings a tool, {check} to confirm it's live.",
+    checkInstalled: "check Installed tools",
+    someExpose: "Some of these bring tools an assistant can use in chat — {check} to see which are live right now.",
+  },
+
+  installedPlugins: {
+    subtitle:
+      "Everything running on this installation, plus the plugins you've installed from Discover — check versions and health, enable, disable, uninstall, or edit their settings. Requires login.",
+    notYours: "Loaded by this installation for everyone — there's no install of yours to enable, disable or uninstall.",
+    installsError: "Couldn't load your installs: {error}",
+  },
+
+  voice: {
+    noRewriteModel: "No ready model available to rewrite text — pull one under Local models first.",
   },
 
   settings: {
@@ -411,6 +551,7 @@ export const en = {
       "No models listed: this server's models won't appear in model pickers until you fetch them. After adding it, use Fetch models on its card and save the list.",
     adapterNote: "Served by the {adapter} adapter (port {port})",
     adapterNoteNoPort: "Served by the {adapter} adapter",
+    modelIdsHint: "The model ids this provider offers. Only these can be used in chat and assistants.",
     piiMasking: "Mask personal data before it is sent to this provider",
     piiMaskingHelp:
       "Emails, phone numbers, IBAN and card numbers, national IDs and IP addresses are replaced with placeholders and restored in the reply.",
@@ -421,9 +562,9 @@ export const en = {
       step: "Model",
       title: "Connect a model",
       noModel:
-        "No language model is available yet, so uploads can't be embedded and Ask can't answer. Pull a model into Ollama or connect a vLLM or cloud provider first.",
+        "No language model is available yet, so uploads can't be embedded and Chat can't answer. Pull a model into Ollama or connect a vLLM or cloud provider first.",
       unavailable:
-        "The model service isn't answering, so uploads can't be embedded and Ask can't answer. Check the model backend, or connect a vLLM or cloud provider.",
+        "The model service isn't answering, so uploads can't be embedded and Chat can't answer. Check the model backend, or connect a vLLM or cloud provider.",
       providers: "Open AI providers",
       docs: "How to connect your models",
       askAdmin: "No model is connected yet. Ask an administrator to connect a model.",
@@ -452,7 +593,7 @@ export const en = {
         },
         assistant: {
           title: "Set up an assistant",
-          hint: "An assistant answers questions from one or more knowledge bases. You'll find it under Pipelines.",
+          hint: "An assistant answers questions from one or more knowledge bases. You'll find it under Assistants.",
         },
         ask: {
           title: "Ask your first question",
@@ -510,7 +651,7 @@ export const en = {
     followUp: {
       install_plugin: "Approved. Now install the plugin from Discover plugins.",
       enable_model: "Approved. Now pull the model or connect its provider.",
-      change_plan: "Approved. Now change the plan under Billing.",
+      change_plan: "Approved. Now change the plan under Plan & billing.",
     },
     send: {
       pluginInstall: "Request install",
@@ -673,7 +814,7 @@ export const en = {
       "org.suborgs.create": "Create sub-organizations",
       "org.suborgs.manage": "Manage sub-organizations",
       "org.ai.manage": "Manage AI providers and default models",
-      "org.chatbots.manage": "Manage public chatbots",
+      "org.chatbots.manage": "Manage website chatbots",
     },
     invites: {
       subtitle: "Invite one person or a whole list, and follow the invites you've sent.",

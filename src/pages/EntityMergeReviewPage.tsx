@@ -23,6 +23,7 @@ import {
   secondaryButtonClass,
 } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
+import { useI18n } from "../i18n";
 
 function CandidateCard({
   candidate,
@@ -110,6 +111,7 @@ function CandidateCard({
  * SAME_AS link is written only once BOTH owners approve. A platform operator
  * additionally sees every candidate and can trigger the cross-tenant scan. */
 export function EntityMergeReviewPage() {
+  const { t } = useI18n();
   const { token, isAuthenticated, isPlatformAdmin } = useAuth();
   const [detecting, setDetecting] = useState(false);
   const [detectStatus, setDetectStatus] = useState("");
@@ -145,7 +147,7 @@ export function EntityMergeReviewPage() {
   if (!isAuthenticated) {
     return (
       <>
-        <PageHeader icon="merge" title="Entity Merge Review" />
+        <PageHeader icon="merge" title={t("knowledgeQuality.entityMerges")} />
         <InfoCallout icon="lock">
           Log in to review cross-organization entity-merge candidates.
         </InfoCallout>
@@ -159,7 +161,7 @@ export function EntityMergeReviewPage() {
     <>
       <PageHeader
         icon="merge"
-        title="Entity Merge Review"
+        title={t("knowledgeQuality.entityMerges")}
         subtitle={
           <>
             When the graph finds the same entity (a person, company, or concept)
