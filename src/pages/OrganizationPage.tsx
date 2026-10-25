@@ -26,6 +26,7 @@ import {
   primaryButtonClass,
 } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
+import { useCan } from "../lib/useCan";
 
 /** The Organization home: which org you're acting in and its details.
  * Together with the topbar OrgSwitcher this is where multi-org membership
@@ -34,10 +35,10 @@ import { useAsyncResource } from "../lib/useAsyncResource";
  * Organization › People (linked); team-level membership stays on the Teams
  * page (linked). */
 export function OrganizationPage() {
-  const { isAuthenticated, token, sessionKey, role, activeTenantId, orgRole } = useAuth();
-  const isAdmin = role === "admin";
-  // An org owner/admin manages their OWN org's details and its people.
-  const canManage = isAdmin || orgRole === "owner" || orgRole === "admin";
+  const { isAuthenticated, token, sessionKey, activeTenantId, orgRole } = useAuth();
+  // Whoever holds org.settings.manage (the route's gate; owner/admin and any
+  // custom role granted it, or the Platform Admin) manages the org's details.
+  const canManage = useCan("org.settings.manage");
   const { t } = useI18n();
 
   // #1503: edit the active org's own name/description.

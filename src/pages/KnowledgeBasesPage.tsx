@@ -46,6 +46,7 @@ import {
   type CatalogModel,
   type DataPolicy,
 } from "../lib/modelDefaults";
+import { useCanManageModelProviders } from "../lib/useCan";
 import { useModelChoices, type ModelChoices } from "../lib/useModelChoices";
 import { useTokenRef } from "../lib/useTokenRef";
 
@@ -1120,9 +1121,11 @@ export function CreateKbForm({
 }
 
 export function KnowledgeBasesPage() {
-  const { token, sessionKey, role, orgRole } = useAuth();
+  const { token, sessionKey } = useAuth();
+  // The model-providers gate (see CloudProvidersPage).
+  const canListProviders = useCanManageModelProviders();
   const choices = useModelChoices(token, {
-    canListProviders: role === "admin" || orgRole === "owner" || orgRole === "admin",
+    canListProviders,
     sessionKey,
   });
   const tokenRef = useTokenRef();

@@ -38,6 +38,7 @@ import {
   secondaryButtonClass,
 } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
+import { useCanManageModelProviders } from "../lib/useCan";
 
 // #1207 Increment 4: admin-only management of cloud/remote model provider
 // credentials (openai_compatible / anthropic) -- create, enable/disable,
@@ -869,12 +870,12 @@ function AddProviderForm({
 }
 
 export function CloudProvidersPage() {
-  const { token, role, orgRole, sessionKey } = useAuth();
-  // Defaults (#2523) and providers both sit behind model-management's
+  const { token, sessionKey } = useAuth();
+  // Defaults and providers both sit behind model-management's
   // require_admin_or_org_admin: an instance admin, or an owner/admin of the org
-  // being acted in. Every other member sees the defaults read-only and no
-  // providers.
-  const canManage = role === "admin" || orgRole === "owner" || orgRole === "admin";
+  // being acted in (org.ai.manage, the route's gate). Every other member sees
+  // the defaults read-only and no providers.
+  const canManage = useCanManageModelProviders();
   const { confirm, dialog } = useConfirm();
 
   // Also feeds the Defaults pickers, so self-hosted provider models are

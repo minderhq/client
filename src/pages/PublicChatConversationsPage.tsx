@@ -17,6 +17,7 @@ import {
   surfaceMutedClass,
 } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
+import { useCan } from "../lib/useCan";
 import { usePaginatedList } from "../lib/usePaginatedList";
 import { useTokenRef } from "../lib/useTokenRef";
 import type { PublicChatEndpoint } from "./PublicChatEndpointsPage";
@@ -445,14 +446,10 @@ function ConversationDetail({
 
 export function PublicChatConversationsPage() {
   const { endpointId = "", sessionId } = useParams();
-  const { token, role, orgRole, isPlatformAdmin } = useAuth();
-  // Same gate as PublicChatEndpointsPage / the backend's _require_endpoint_admin:
-  // reading an endpoint's conversations is an owner/admin action.
-  const isAdmin =
-    isPlatformAdmin ||
-    role === "admin" ||
-    orgRole === "owner" ||
-    orgRole === "admin";
+  const { token } = useAuth();
+  // Same gate as PublicChatEndpointsPage and the route: reading an endpoint's
+  // conversations is an org.chatbots.manage action (or the Platform Admin's).
+  const isAdmin = useCan("org.chatbots.manage");
 
   // The endpoint's own metadata — gives the header its name AND is the ownership
   // gate: a cross-tenant/other-owner id 404s here (server-enforced), so we never

@@ -110,7 +110,9 @@ describe("RequestsPage: my requests", () => {
   it("explains how to ask when there are none, and shows no inbox to a plain member", async () => {
     renderPage();
     expect(await screen.findByText(/You haven't asked for anything yet/)).toBeTruthy();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    // Both lists, and nothing else (useCan's GET /v1/me/permissions aside).
+    const requests = () => fetchMock.mock.calls.filter(([u]) => String(u).includes("/v1/access-requests"));
+    await waitFor(() => expect(requests()).toHaveLength(2));
     expect(screen.queryByRole("region", { name: "Waiting for your decision" })).toBeNull();
   });
 

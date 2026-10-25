@@ -25,14 +25,16 @@ import {
   primaryButtonClass,
 } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
+import { useAccess } from "../lib/useCan";
 
 /** Platform-operator (admin) view of EVERY organization on the instance, and
  * where new tenants are provisioned. Distinct from the Organization page, which
  * is the current user's own org. Both org create and the all-orgs list are
- * admin-only endpoints, so the whole page is gated to instance admins. */
+ * Platform Admin endpoints, so the whole page is gated to the Platform Admin. */
 export function AllOrganizationsPage() {
-  const { isAuthenticated, token, sessionKey, role } = useAuth();
-  const isAdmin = role === "admin";
+  const { isAuthenticated, token, sessionKey } = useAuth();
+  // Both endpoints are Platform Admin only (the route's gate too).
+  const isAdmin = useAccess().isPlatformAdmin;
   const nameId = useId();
   const slugId = useId();
   const ownerId = useId();

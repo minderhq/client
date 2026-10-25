@@ -4,6 +4,7 @@ import {
   accessFrom,
   allows,
   effectivePermissionsFromRoles,
+  effectivePermissionsFromServer,
   MEMBER,
   PERMISSION_KEYS,
   PLATFORM_ADMIN,
@@ -148,5 +149,50 @@ describe("accessFrom: the gates, from any effective permissions", () => {
     expect(allows(access, PLATFORM_ADMIN)).toBe(false);
     expect(allows(access, "org.billing.view")).toBe(true);
     expect(allows(accessFrom(null), MEMBER)).toBe(false);
+  });
+});
+
+describe("effectivePermissionsFromServer", () => {
+  const source = { kind: "role" as const, role_id: 7, role_name: "Knowledge manager" };
+  it("maps the response to the client's shape", () => {
+    const effective = effectivePermissionsFromServer({
+      user_id: 1,
+      is_platform_admin: false,
+      active_org: {
+        id: 3,
+        org_role: "member",
+        suspended: false,
+        permissions: [{ key: "org.ai.manage", sources: [source] }],
+        org_wide_team_permissions: [{ key: "team.members.view", sources: [{ kind: "role", role_id: 2 }] }],
+      },
+      teams: [{ id: 10, team_role: "member", permissions: [] }],
+      permission_version: "1.4",
+    });
+    expect(effective).toEqual({
+      is_platform_admin: false,
+      active_org: {
+        id: "3",
+        org_role: "member",
+        permissions: [{ key: "org.ai.manage", source: "Knowledge manager" }],
+        org_wide_team_permissions: [{ key: "team.members.view", source: "role" }],
+      },
+      teams: [{ id: "10", team_role: "member", permissions: [] }],
+      permission_version: "1.4",
+    });
+    const access = accessFrom(effective);
+    expect(access.can("org.ai.manage", { orgId: "3" })).toBe(true);
+    expect(access.can("team.members.view", { teamId: "42" })).toBe(true);
+  });
+
+  it("has no org without an active membership", () => {
+    const effective = effectivePermissionsFromServer({
+      user_id: 1,
+      is_platform_admin: false,
+      active_org: null,
+      teams: [],
+      permission_version: "1.1",
+    });
+    expect(accessFrom(effective).can("org.members.view")).toBe(false);
+    expect(accessFrom(effective).isMember).toBe(true);
   });
 });

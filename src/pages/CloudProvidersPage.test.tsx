@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../lib/api";
+import { myPermissions, SERVER_SESSION, serveMyPermissions } from "../test/myPermissions";
 
 import {
   CloudProvidersPage,
@@ -17,7 +18,10 @@ vi.mock("../lib/api", async (importOriginal) => ({
   friendlyErrorMessage: (e: unknown) => (e instanceof Error ? e.message : "error"),
 }));
 
-let mockAuth: { token: string; role: string; orgRole?: string } = { token: "", role: "" };
+let mockAuth: { token: string; role: string; orgRole?: string; isAuthenticated?: boolean } = {
+  token: "",
+  role: "",
+};
 vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
 }));
@@ -347,7 +351,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("lets an org owner manage providers and defaults without being an instance admin", async () => {
-    mockAuth = { token: "tok", role: "member", orgRole: "owner" };
+    mockAuth = { token: "tok", role: "member", orgRole: "owner", isAuthenticated: true };
     installApi({
       providers: [
         provider({ id: "cloud", is_local: false }),
@@ -368,7 +372,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("lets an org admin manage providers too", async () => {
-    mockAuth = { token: "tok", role: "member", orgRole: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providers: [] });
     render(<CloudProvidersPage />);
     await waitFor(() =>
@@ -380,12 +384,35 @@ describe("CloudProvidersPage", () => {
   });
 
   it("keeps providers hidden from an org member", () => {
-    mockAuth = { token: "tok", role: "member", orgRole: "member" };
+    mockAuth = { token: "tok", role: "member", orgRole: "member", isAuthenticated: true };
     render(<CloudProvidersPage />);
     expect(
       screen.getByText("Only the organization's owners and admins can view or manage providers."),
     ).toBeTruthy();
     expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it("lets a custom role holding org.ai.manage manage providers", async () => {
+    mockAuth = { token: "tok", role: "member", orgRole: "Knowledge manager", ...SERVER_SESSION };
+    installApi({ providers: [] });
+    serveMyPermissions(apiFetch, myPermissions({ orgKeys: ["org.ai.manage"] }));
+    render(<CloudProvidersPage />);
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith("/v1/model-providers/presets", expect.anything()),
+    );
+    expect(screen.getByTestId("defaults-panel").textContent).toMatch(/^defaults: editable/);
+  });
+
+  it("keeps providers from an org admin role the server grants no org.ai.manage", async () => {
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", ...SERVER_SESSION };
+    installApi({ providers: [] });
+    serveMyPermissions(apiFetch, myPermissions({ orgKeys: ["org.members.view"], orgRole: "admin" }));
+    render(<CloudProvidersPage />);
+    await waitFor(() =>
+      expect(
+        screen.getByText("Only the organization's owners and admins can view or manage providers."),
+      ).toBeTruthy(),
+    );
   });
 
   it("hides the defaults section when signed out", () => {

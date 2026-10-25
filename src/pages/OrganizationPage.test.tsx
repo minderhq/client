@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { MyOrg } from "../lib/orgs";
+import { myPermissions, SERVER_SESSION, serveMyPermissions } from "../test/myPermissions";
 import { OrganizationPage } from "./OrganizationPage";
 
 const apiFetch = vi.fn();
@@ -24,7 +25,7 @@ vi.mock("../components/ConfirmDialog", () => ({
   useConfirm: () => ({ confirm: confirmMock, dialog: null }),
 }));
 
-let mockAuth = {
+let mockAuth: Record<string, unknown> = {
   isAuthenticated: false,
   token: "",
   role: "",
@@ -170,6 +171,22 @@ describe("OrganizationPage", () => {
     await screen.findByText("Acme Corporation");
 
     expect(screen.queryByText("Organization details")).toBeNull();
+  });
+
+  it("gives the legacy instance admin role no edit form by itself", async () => {
+    mockAuth = { isAuthenticated: true, token: "tok", role: "admin", activeTenantId: "1", orgRole: "member" };
+    routeApiFetch({});
+    render(<OrganizationPage />);
+    await screen.findByText("Acme Corporation");
+    expect(screen.queryByText("Organization details")).toBeNull();
+  });
+
+  it("shows the edit form to a custom role holding org.settings.manage", async () => {
+    mockAuth = { token: "tok", role: "user", orgRole: "Workspace editor", ...SERVER_SESSION };
+    routeApiFetch({});
+    serveMyPermissions(apiFetch, myPermissions({ orgKeys: ["org.settings.manage"] }));
+    render(<OrganizationPage />);
+    expect(await screen.findByText("Organization details")).toBeTruthy();
   });
 
   it("#1503: an org owner can edit the organization's name and description", async () => {
