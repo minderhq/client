@@ -265,7 +265,7 @@ export const tr: Messages = {
 
   orgAi: {
     providersSubtitle:
-      "OpenAI uyumlu ya da Anthropic bir sağlayıcıyı veya vLLM gibi kendi sunucunuzu bağlayın; modelleri yerel modellerin yanında görünür. Sağlayıcılar kurumun kendi API kimlik bilgilerini tutar; onları yalnızca sahipleri ve yöneticileri görür.",
+      "OpenAI uyumlu ya da Anthropic bir sağlayıcıyı veya vLLM gibi kendi sunucunuzu bağlayın; modelleri yerel modellerin yanında görünür. Sağlayıcılar kurumun kendi API kimlik bilgilerini tutar; onları yalnızca sağlayıcıları görme yetkisi olanlar görür.",
     defaultsSubtitle:
       "Bir bilgi tabanı ya da soru kendi modelini seçmedikçe her görevin kullandığı model.",
   },
@@ -352,13 +352,13 @@ export const tr: Messages = {
     boundAssistant: "Sohbet botunun asistanı",
     nameLabel: "Sohbet botu adı",
     deleteTitle: "Sohbet botunu sil",
-    adminRequired: "Web sitesi sohbet botlarını yönetmek için yönetici rolü gerekir.",
+    adminRequired: "Web sitesi sohbet botlarını yönetmek için yetkiniz olmalı.",
     logInAsAdmin: "Web sitesi sohbet botlarını yönetmek için yönetici olarak giriş yapın.",
     empty: "Henüz web sitesi sohbet botu yok.",
     conversationsSubtitleNamed: "“{name}” web sitesi sohbet botunuz üzerinden yapılan anonim konuşmalar; salt okunur.",
     conversationsSubtitle: "Web sitesi sohbet botunuz üzerinden yapılan anonim konuşmalar; salt okunur.",
     allChatbots: "Tüm sohbet botları",
-    conversationsAdminRequired: "Web sitesi sohbet botu konuşmalarını görmek için yönetici rolü gerekir.",
+    conversationsAdminRequired: "Web sitesi sohbet botu konuşmalarını görmek için sohbet botlarını yönetme yetkiniz olmalı.",
     conversationsLogIn: "Web sitesi sohbet botu konuşmalarını görmek için yönetici olarak giriş yapın.",
   },
 
@@ -818,7 +818,10 @@ export const tr: Messages = {
       "org.audit.view": "Denetim kaydını okuma",
       "org.suborgs.create": "Alt kurum oluşturma",
       "org.suborgs.manage": "Alt kurumları yönetme",
-      "org.ai.manage": "Yapay zekâ sağlayıcılarını ve varsayılan modelleri yönetme",
+      "org.ai.providers.view": "Model sağlayıcılarını görme",
+      "org.ai.providers.manage": "Model sağlayıcılarını yönetme",
+      "org.ai.defaults.manage": "Varsayılan modelleri değiştirme",
+      "org.ai.usage.view": "Model kullanımını görme",
       "org.chatbots.manage": "Web sitesi sohbet botlarını yönetme",
     },
     invites: {

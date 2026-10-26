@@ -71,7 +71,7 @@ describe("role defaults", () => {
   });
 
   it("maps save errors per status", () => {
-    expect(modelDefaultsErrorMessage(new ApiError("nope", 403))).toMatch(/org owner or admin/);
+    expect(modelDefaultsErrorMessage(new ApiError("nope", 403))).toMatch(/permission to change the default models/);
     expect(
       modelDefaultsErrorMessage(new ApiError("answer: local model 'x' is not pulled", 422)),
     ).toBe("That model can't be used: answer: local model 'x' is not pulled");

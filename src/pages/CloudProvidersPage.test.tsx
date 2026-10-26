@@ -206,7 +206,7 @@ describe("CloudProvidersPage self-hosted servers", () => {
   const keyInput = () => document.querySelector('input[type="password"]') as HTMLInputElement;
 
   it("makes the API key optional for a local preset and sends none when blank", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ presets: [...PRESETS, LOCAL_PRESET] });
     await openAddForm("lmstudio");
     expect(screen.getByText("(optional)")).toBeTruthy();
@@ -232,7 +232,7 @@ describe("CloudProvidersPage self-hosted servers", () => {
   });
 
   it("keeps the API key required for a cloud preset", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi();
     await openAddForm("openai_compatible");
     expect(screen.queryByText("(optional)")).toBeNull();
@@ -240,7 +240,7 @@ describe("CloudProvidersPage self-hosted servers", () => {
   });
 
   it("explains loopback for localhost but not for a LAN IP", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi();
     await openAddForm("vllm");
     const url = screen.getByPlaceholderText("http://localhost:8000/v1");
@@ -252,14 +252,14 @@ describe("CloudProvidersPage self-hosted servers", () => {
   });
 
   it("warns that a local row with no models won't show in pickers", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi();
     await openAddForm("vllm");
     expect(screen.getByText(/won't appear in model pickers until you fetch them/)).toBeTruthy();
   });
 
   it("notes when a row is served by a different adapter", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({
       providers: [
         provider({
@@ -276,7 +276,7 @@ describe("CloudProvidersPage self-hosted servers", () => {
   });
 
   it("sends PII masking on create for a cloud preset and hides it for a local one", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi();
     await openAddForm("openai_compatible");
     const pii = screen.getByRole("checkbox", { name: /Mask personal data/ });
@@ -304,7 +304,7 @@ describe("CloudProvidersPage self-hosted servers", () => {
   });
 
   it("toggles PII masking on a cloud row via PATCH, and hides it on a local row", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({
       providers: [provider(), provider({ id: "v", name: "vLLM box", is_local: true })],
     });
@@ -330,16 +330,16 @@ describe("CloudProvidersPage", () => {
     mockConfirm.mockReset();
   });
 
-  it("shows an owner/admin-required message and never fetches providers for a plain member", () => {
+  const NO_VIEW = "You need permission to see model providers.";
+
+  it("shows a permission message and never fetches providers for a plain member", () => {
     mockAuth = { token: "tok", role: "member" };
     render(<CloudProvidersPage />);
-    expect(
-      screen.getByText("Only the organization's owners and admins can view or manage providers."),
-    ).toBeTruthy();
+    expect(screen.getByText(NO_VIEW)).toBeTruthy();
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
-  it("lets an org owner manage providers without being an instance admin", async () => {
+  it("lets an org owner manage providers", async () => {
     mockAuth = { token: "tok", role: "member", orgRole: "owner", isAuthenticated: true };
     installApi({
       providers: [
@@ -350,14 +350,10 @@ describe("CloudProvidersPage", () => {
     render(<CloudProvidersPage />);
     // The default models moved to their own tab (Organization › AI › Model defaults).
     expect(screen.queryByRole("region", { name: "Default models" })).toBeNull();
-    // model-management's require_admin_or_org_admin lets an org owner/admin
-    // manage the org's providers, so the client offers it too.
     await waitFor(() =>
       expect(apiFetch).toHaveBeenCalledWith("/v1/model-providers/presets", expect.anything()),
     );
-    expect(
-      screen.queryByText("Only the organization's owners and admins can view or manage providers."),
-    ).toBeNull();
+    expect(screen.queryByText(NO_VIEW)).toBeNull();
   });
 
   it("lets an org admin manage providers too", async () => {
@@ -367,44 +363,69 @@ describe("CloudProvidersPage", () => {
     await waitFor(() =>
       expect(apiFetch).toHaveBeenCalledWith("/v1/model-providers/presets", expect.anything()),
     );
-    expect(
-      screen.queryByText("Only the organization's owners and admins can view or manage providers."),
-    ).toBeNull();
+    expect(screen.queryByText(NO_VIEW)).toBeNull();
   });
 
   it("keeps providers hidden from an org member", () => {
     mockAuth = { token: "tok", role: "member", orgRole: "member", isAuthenticated: true };
     render(<CloudProvidersPage />);
-    expect(
-      screen.getByText("Only the organization's owners and admins can view or manage providers."),
-    ).toBeTruthy();
+    expect(screen.getByText(NO_VIEW)).toBeTruthy();
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
-  it("mirrors the server gate: a custom role holding org.ai.manage, not owner/admin, gets no providers", () => {
-    mockAuth = { token: "tok", role: "member", orgRole: "Knowledge manager", ...SERVER_SESSION };
-    installApi({ providers: [] });
-    serveMyPermissions(apiFetch, myPermissions({ orgKeys: ["org.ai.manage"] }));
+  it("gives a role with only org.ai.providers.view the list, read-only", async () => {
+    mockAuth = { token: "tok", role: "member", orgRole: "Viewer", ...SERVER_SESSION };
+    installApi({ providers: [provider()] });
+    serveMyPermissions(apiFetch, myPermissions({ orgKeys: ["org.ai.providers.view"] }));
     render(<CloudProvidersPage />);
-    expect(
-      screen.getByText("Only the organization's owners and admins can view or manage providers."),
-    ).toBeTruthy();
-    expect(apiFetch).not.toHaveBeenCalled();
+    expect(await screen.findByText("OpenAI (production)")).toBeTruthy();
+    expect(screen.queryByText("Add Provider")).toBeNull();
+    for (const label of ["Test", "Delete", "Disable", "Fetch models"]) {
+      expect(screen.queryByRole("button", { name: new RegExp(label) })).toBeNull();
+    }
+    const mask = screen.getByRole("checkbox", { name: /Mask personal data/ }) as HTMLInputElement;
+    expect(mask.disabled).toBe(true);
+    expect(apiFetch).not.toHaveBeenCalledWith("/v1/model-providers/presets", expect.anything());
   });
 
-  it("gives a Platform Admin who isn't an org owner/admin no provider controls", () => {
+  it("gives a role with org.ai.providers.view and .manage the edit controls", async () => {
+    mockAuth = { token: "tok", role: "member", orgRole: "AI manager", ...SERVER_SESSION };
+    installApi({ providers: [provider()] });
+    serveMyPermissions(
+      apiFetch,
+      myPermissions({ orgKeys: ["org.ai.providers.view", "org.ai.providers.manage"] }),
+    );
+    render(<CloudProvidersPage />);
+    expect(await screen.findByRole("button", { name: /Delete/ })).toBeTruthy();
+    expect(screen.getByText("Add Provider")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Test" })).toBeTruthy();
+  });
+
+  it("blocks an org admin whose role lacks org.ai.providers.view", async () => {
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", ...SERVER_SESSION };
+    installApi({ providers: [provider()] });
+    serveMyPermissions(
+      apiFetch,
+      myPermissions({ orgRole: "admin", orgKeys: ["org.members.manage", "org.ai.usage.view"] }),
+    );
+    render(<CloudProvidersPage />);
+    // The org admin role-claim fallback would pass; the server's answer wins.
+    expect(await screen.findByText(NO_VIEW)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Delete/ })).toBeNull();
+  });
+
+  it("lets a Platform Admin who isn't an org owner/admin manage providers", async () => {
     mockAuth = { token: "tok", role: "member", orgRole: "member", isAuthenticated: true, isPlatformAdmin: true };
+    installApi({ providers: [provider()] });
     render(<CloudProvidersPage />);
-    expect(
-      screen.getByText("Only the organization's owners and admins can view or manage providers."),
-    ).toBeTruthy();
-    expect(apiFetch).not.toHaveBeenCalled();
+    expect(await screen.findByRole("button", { name: /Delete/ })).toBeTruthy();
+    expect(screen.queryByText(NO_VIEW)).toBeNull();
   });
 
   it("warns on a provider whose base URL breaks the network policy", async () => {
     // #2548: policy_error = why the stored row violates the current egress
     // policy; every call through it is refused.
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({
       providers: [
         provider({ policy_error: "base_url resolves to a private address." }),
@@ -418,7 +439,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("shows the backend's reason when creating a provider is refused (422)", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providers: [] });
     const route = apiFetch.getMockImplementation()!;
     apiFetch.mockImplementation((path: string, options: { method?: string } = {}) =>
@@ -456,12 +477,12 @@ describe("CloudProvidersPage", () => {
     mockAuth = { token: "", role: "" };
     render(<CloudProvidersPage />);
     expect(
-      screen.getByText("Log in as an organization owner or admin to view or manage providers."),
+      screen.getByText("Log in with permission to see model providers."),
     ).toBeTruthy();
   });
 
   it("lists configured providers for an admin", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({
       providers: [
         provider({ name: "OpenAI (production)" }),
@@ -476,7 +497,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("shows an empty state when no providers are configured", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providers: [] });
     render(<CloudProvidersPage />);
     expect(
@@ -485,7 +506,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("renders the add-provider dropdown from the presets endpoint", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providers: [] });
     render(<CloudProvidersPage />);
     await screen.findByText("No cloud providers configured yet.");
@@ -513,7 +534,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("creates a provider from the default preset", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providers: [] });
     render(<CloudProvidersPage />);
     await screen.findByText("No cloud providers configured yet.");
@@ -551,7 +572,7 @@ describe("CloudProvidersPage", () => {
     // #1467: picking the vLLM preset must send adapter=openai_compatible (the
     // only backend concept vLLM maps to) plus is_local=true, both pre-filled
     // from the backend preset -- the user never sets either field directly.
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providers: [] });
     render(<CloudProvidersPage />);
     await screen.findByText("No cloud providers configured yet.");
@@ -595,7 +616,7 @@ describe("CloudProvidersPage", () => {
   it("requires acknowledging the privacy tradeoff before a cloud provider can be added", async () => {
     // #1511: with a cloud preset selected the disclosure + acknowledgment
     // checkbox appear, and Add stays disabled until it's checked.
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providers: [] });
     render(<CloudProvidersPage />);
     await screen.findByText("No cloud providers configured yet.");
@@ -623,7 +644,7 @@ describe("CloudProvidersPage", () => {
   it("shows no acknowledgment checkbox for a self-hosted (local) provider", async () => {
     // #1511: an is_local preset never leaves the box, so the privacy
     // disclosure/checkbox must not appear and Add is immediately available.
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providers: [] });
     render(<CloudProvidersPage />);
     await screen.findByText("No cloud providers configured yet.");
@@ -639,7 +660,7 @@ describe("CloudProvidersPage", () => {
     // #1511: enabling is the other activation point -- a disabled cloud row that
     // was never acknowledged must surface the disclosure via a confirm and send
     // privacy_acknowledged=true alongside enabled=true.
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({
       providers: [provider({ enabled: false, privacy_acknowledged: false })],
     });
@@ -660,7 +681,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("does not re-prompt when enabling an already-acknowledged cloud provider", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({
       providers: [provider({ enabled: false, privacy_acknowledged: true })],
     });
@@ -680,7 +701,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("shows an error in the add form when the presets fail to load", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({
       providers: [],
       presetsError: new Error("model-management unreachable"),
@@ -700,14 +721,14 @@ describe("CloudProvidersPage", () => {
   });
 
   it("shows a self-hosted badge for an is_local provider", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providers: [provider({ is_local: true })] });
     render(<CloudProvidersPage />);
     expect(await screen.findByText("self-hosted")).toBeTruthy();
   });
 
   it("toggles a provider's enabled state", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providers: [provider({ enabled: true })] });
     render(<CloudProvidersPage />);
     await screen.findByText("OpenAI (production)");
@@ -724,7 +745,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("shows the test result via the status line", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({
       providers: [provider()],
       testResult: { ok: true, detail: "connection verified" },
@@ -742,7 +763,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("shows a bad-key test result as an error, without a thrown exception", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({
       providers: [provider()],
       testResult: {
@@ -761,7 +782,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("deletes a provider only after confirmation", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providers: [provider()] });
     render(<CloudProvidersPage />);
     await screen.findByText("OpenAI (production)");
@@ -788,7 +809,7 @@ describe("CloudProvidersPage", () => {
   it("renames a provider via PATCH name", async () => {
     // #1718: rename is a first-class inline edit reusing the existing PATCH
     // endpoint's `name` field -- no delete-and-recreate.
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providers: [provider({ name: "OpenAI (production)" })] });
     render(<CloudProvidersPage />);
     await screen.findByText("OpenAI (production)");
@@ -809,7 +830,7 @@ describe("CloudProvidersPage", () => {
 
   it("does not send a rename request when the name is unchanged", async () => {
     // A blank/unchanged rename just closes the form -- no pointless PATCH.
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providers: [provider({ name: "OpenAI (production)" })] });
     render(<CloudProvidersPage />);
     await screen.findByText("OpenAI (production)");
@@ -831,7 +852,7 @@ describe("CloudProvidersPage", () => {
     // #1718: rotating replaces the stored key on the SAME provider row (keeps
     // its id, so routed models keep working) -- the old delete-and-recreate is
     // gone. The new key is write-only, sent via the existing PATCH `api_key`.
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providers: [provider()] });
     render(<CloudProvidersPage />);
     await screen.findByText("OpenAI (production)");
@@ -854,7 +875,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("keeps the rotate submit disabled until a new key is entered", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providers: [provider()] });
     render(<CloudProvidersPage />);
     await screen.findByText("OpenAI (production)");
@@ -876,7 +897,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("surfaces a fetch error via the status line", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providersError: new Error("model-management unreachable") });
     render(<CloudProvidersPage />);
     expect(await screen.findByText("model-management unreachable")).toBeTruthy();
@@ -900,7 +921,7 @@ describe("CloudProvidersPage", () => {
   }
 
   it("offers the z.ai and OpenRouter presets and pre-fills suggested models", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providers: [] });
     render(<CloudProvidersPage />);
     const select = await openAddForm();
@@ -919,7 +940,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("adds, removes and validates model ids in the editor, and sends them on create", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providers: [] });
     render(<CloudProvidersPage />);
     fireEvent.change(await openAddForm(), { target: { value: "zai" } });
@@ -974,7 +995,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("keeps only the rejected remainder in the input when a later id is a duplicate", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providers: [] });
     render(<CloudProvidersPage />);
     await openAddForm();
@@ -995,7 +1016,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("explains that an empty list falls back to the built-in catalog", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providers: [provider({ models: [], effective_models: ["gpt-4o", "o1"] })] });
     render(<CloudProvidersPage />);
     await screen.findByText("OpenAI (production)");
@@ -1006,7 +1027,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("de-duplicates fetched ids and enables Select all/none only when they'd change something", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({
       providers: [provider()],
       fetchModels: { models: ["m1", "m2", "m1"], source: "vendor" },
@@ -1033,7 +1054,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("shows a row's model count and first few models", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({
       providers: [
         provider({ effective_models: ["m1", "m2", "m3", "m4", "m5", "m6"] }),
@@ -1047,7 +1068,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("warns 'Set models' only on a non-local row with no effective models", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({
       providers: [
         provider({ id: "z", name: "z.ai", effective_models: [] }),
@@ -1061,7 +1082,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("fetches models, merges the selected ones and saves them via PATCH models", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({
       providers: [provider({ id: "z", name: "z.ai", effective_models: [] })],
       fetchModels: {
@@ -1096,7 +1117,7 @@ describe("CloudProvidersPage", () => {
   });
 
   it("filters a long fetched list and keeps already-added ids locked", async () => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     const many = Array.from({ length: 12 }, (_, i) => `vendor/model-${i}`);
     installApi({
       providers: [
@@ -1152,7 +1173,7 @@ describe("CloudProvidersPage", () => {
       "The provider didn't answer in time — try again, or enter the model ids manually.",
     ],
   ])("renders a fetch-models %s error and keeps manual entry", async (_label, err, message) => {
-    mockAuth = { token: "tok", role: "admin" };
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
     installApi({ providers: [provider()], fetchModels: err });
     render(<CloudProvidersPage />);
     await screen.findByText("OpenAI (production)");

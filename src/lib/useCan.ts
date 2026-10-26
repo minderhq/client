@@ -163,13 +163,3 @@ export function useCan(key: PermissionKey, scope?: PermissionScope): boolean {
 export function useAllows(requirement: Requirement): boolean {
   return allows(useAccess(), requirement);
 }
-
-/** May the caller list and manage the org's model providers? Mirrors
- * model-management's `require_admin_or_org_admin` as it runs today: the
- * legacy instance role `role == "admin"`, or org role owner/admin. Neither
- * `org.ai.manage` nor the Platform Admin flag passes it, so this is not
- * `useCan`; switch to `useCan("org.ai.manage")` once the server enforces it. */
-export function useCanManageModelProviders(): boolean {
-  const { role, orgRole } = useAuth();
-  return role === "admin" || orgRole === "owner" || orgRole === "admin";
-}

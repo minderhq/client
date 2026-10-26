@@ -80,7 +80,7 @@ describe("ModelDefaultsPanel", () => {
     installApi();
     render(<ModelDefaultsPanel token="tok" canEdit={false} />);
     await waitFor(() => expect(select("Answer").value).toBe("llama3"));
-    expect(screen.getByText("Only an org owner or admin can change the default models.")).toBeTruthy();
+    expect(screen.getByText("You need permission to change the default models.")).toBeTruthy();
     expect(select("Answer").closest("fieldset")?.disabled).toBe(true);
     expect(screen.queryByRole("button", { name: "Save defaults" })).toBeNull();
   });
@@ -105,7 +105,7 @@ describe("ModelDefaultsPanel", () => {
 
   it.each([
     [new ApiError("chat: provider is disabled", 422), "That model can't be used: chat: provider is disabled"],
-    [new ApiError("Insufficient permissions", 403), "Only an org owner or admin can change the default models."],
+    [new ApiError("Insufficient permissions", 403), "You need permission to change the default models."],
     [
       new ApiError("Ollama is unreachable; cannot validate local model ids", 503),
       "The local model server is unreachable, so the local models can't be checked. Try again shortly.",

@@ -52,7 +52,7 @@ export function GettingStarted({
   const { t } = useI18n();
   const readiness = useReadiness();
   const journey = useJourney();
-  const canSetUp = useCan("org.ai.manage");
+  const canSetUp = useCan("org.ai.providers.manage");
   const canInvite = useCan("org.members.invite");
   const { isPlatformAdmin } = useAccess();
   const [saveFailed, setSaveFailed] = useState(false);

@@ -27,7 +27,7 @@ import { Icon } from "./Icon";
  * Self-fetches its counts; a page that mutates KB/pipeline state can pass a
  * `refreshKey` it bumps so the bar re-syncs without a navigation.
  *
- * A caller who can connect a model (org owner/admin, instance admin) also gets
+ * A caller who can connect a model (org.ai.providers.manage) also gets
  * a leading Model step, done when the readiness endpoint's `model` check
  * passes. It appears once that check has been read; everyone else sees the
  * four steps unchanged. */
@@ -35,7 +35,7 @@ export function GoldenPathStepper({ refreshKey }: { refreshKey?: unknown }) {
   const { token } = useAuth();
   const journey = useJourney(refreshKey);
   const readiness = useReadiness();
-  const canConnectModel = useCan("org.ai.manage");
+  const canConnectModel = useCan("org.ai.providers.manage");
   const { t } = useI18n();
 
   // The golden path is about creating things, which needs a login — nothing to

@@ -22,7 +22,7 @@ import {
 } from "../lib/modelDefaults";
 import { type ScopeDocument, fetchScopeDocuments } from "../lib/ragDocuments";
 import type { KnowledgeBase } from "../lib/types";
-import { useCanManageModelProviders } from "../lib/useCan";
+import { useCan } from "../lib/useCan";
 import { useModelChoices } from "../lib/useModelChoices";
 import {
   cardClass,
@@ -128,8 +128,8 @@ type Turn = UserTurn | AssistantTurn;
 export function AskPage() {
   const { t, rich } = useI18n();
   const { token, sessionKey, isAuthenticated } = useAuth();
-  // The model-providers gate (see CloudProvidersPage).
-  const canListProviders = useCanManageModelProviders();
+  // The model-providers list gate (see CloudProvidersPage).
+  const canListProviders = useCan("org.ai.providers.view");
   const tokenRef = useTokenRef();
   // Deep-link entry points (#1229): "Ask this pipeline" from a pipeline card
   // (?pipeline=<id>) and "Continue →" from Conversations (?conversation_id=<id>).

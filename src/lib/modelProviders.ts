@@ -241,7 +241,7 @@ export function fetchModelsErrorMessage(e: unknown): string {
   if (e instanceof ApiError) {
     switch (e.status) {
       case 403:
-        return "Only the organization's owners and admins can fetch models.";
+        return "You need permission to manage model providers to fetch models.";
       case 404:
         return "This provider no longer exists — reload the page.";
       case 429:
@@ -264,7 +264,7 @@ export function fetchModelsErrorMessage(e: unknown): string {
 export function providerSaveErrorMessage(e: unknown): string {
   if (e instanceof ApiError) {
     if (e.status === 422) return `The provider was refused: ${e.message}`;
-    if (e.status === 403) return "Only the organization's owners and admins can manage providers.";
+    if (e.status === 403) return "You need permission to manage model providers.";
   }
   return friendlyErrorMessage(e);
 }

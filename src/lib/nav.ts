@@ -216,11 +216,13 @@ const NAV_MODEL: NavSectionDef[] = [
         to: ROUTES.orgAi,
         id: "orgAi",
         icon: "models",
-        requires: "org.ai.manage",
+        requires: "org.ai.providers.view",
         match: ROUTES.orgAi,
         tabs: [
-          { to: ROUTES.orgAi, id: "orgAiProviders", icon: "globe", end: true, requires: "org.ai.manage" },
-          { to: ROUTES.orgAiDefaults, id: "orgAiDefaults", icon: "models", requires: "org.ai.manage" },
+          { to: ROUTES.orgAi, id: "orgAiProviders", icon: "globe", end: true, requires: "org.ai.providers.view" },
+          // Any member may read the defaults (the page is read-only without
+          // the key); the tab is for those who change them.
+          { to: ROUTES.orgAiDefaults, id: "orgAiDefaults", icon: "models", requires: "org.ai.defaults.manage" },
         ],
       },
       // Organization › Plugins: what is installed for the whole org. The

@@ -317,7 +317,7 @@ export function ModelManagementPage() {
   const isAdmin = isPlatformAdmin;
   // Who connects providers and default models adds models directly; everyone
   // else asks them (client#126 Q2).
-  const canAddModels = useCan("org.ai.manage");
+  const canAddModels = useCan("org.ai.providers.manage");
   const { confirm, dialog } = useConfirm();
   // Single list read → useAsyncResource (cancels on unmount, stale-guard). Pull
   // and delete refresh via reload() rather than local optimistic edits, so the

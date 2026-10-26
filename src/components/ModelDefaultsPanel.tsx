@@ -118,7 +118,7 @@ export function ModelDefaultsPanel({
       {!canEdit && (
         <div className="mb-3">
           <InfoCallout icon="lock">
-            Only an org owner or admin can change the default models.
+            You need permission to change the default models.
           </InfoCallout>
         </div>
       )}
