@@ -181,20 +181,33 @@ describe("OrganizationPage", () => {
     expect(screen.queryByText("Organization details")).toBeNull();
   });
 
-  it("gives a settings-only custom role no edit form (the PATCH needs org.members.manage)", async () => {
+  it("shows the edit form and default language to a custom role holding only org.settings.manage", async () => {
     mockAuth = { token: "tok", role: "user", orgRole: "Workspace editor", ...SERVER_SESSION };
     routeApiFetch({});
     serveMyPermissions(apiFetch, myPermissions({ orgKeys: ["org.settings.manage"] }));
     render(<OrganizationPage />);
-    await screen.findByText("Acme Corporation");
-    await vi.waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/v1/me/permissions", expect.anything()));
-    expect(screen.queryByText("Organization details")).toBeNull();
+    expect(await screen.findByText("Organization details")).toBeTruthy();
+    expect(screen.getByLabelText("Default language for members")).toBeTruthy();
+    // Member management stays org.members.manage.
+    expect(screen.queryByRole("link", { name: /Manage people/ })).toBeNull();
   });
 
-  it("shows the edit form to a custom role holding org.members.manage", async () => {
-    mockAuth = { token: "tok", role: "user", orgRole: "People manager", ...SERVER_SESSION };
+  it("gives an org admin whose role lacks org.settings.manage no edit form", async () => {
+    mockAuth = { token: "tok", role: "user", orgRole: "admin", ...SERVER_SESSION };
     routeApiFetch({});
-    serveMyPermissions(apiFetch, myPermissions({ orgKeys: ["org.members.manage"] }));
+    serveMyPermissions(apiFetch, myPermissions({ orgRole: "admin", orgKeys: ["org.members.manage"] }));
+    render(<OrganizationPage />);
+    await screen.findByText("Acme Corporation");
+    await vi.waitFor(() => expect(screen.queryByText("Organization details")).toBeNull());
+    expect(screen.queryByLabelText("Default language for members")).toBeNull();
+    // ...but keeps member management.
+    expect(screen.getByRole("link", { name: /Manage people/ })).toBeTruthy();
+  });
+
+  it("shows the edit form to the Platform Admin", async () => {
+    mockAuth = { token: "tok", role: "user", orgRole: "", ...SERVER_SESSION };
+    routeApiFetch({});
+    serveMyPermissions(apiFetch, myPermissions({ isPlatformAdmin: true }));
     render(<OrganizationPage />);
     expect(await screen.findByText("Organization details")).toBeTruthy();
   });

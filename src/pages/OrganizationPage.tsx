@@ -36,9 +36,11 @@ import { useCan } from "../lib/useCan";
  * page (linked). */
 export function OrganizationPage() {
   const { isAuthenticated, token, sessionKey, activeTenantId, orgRole } = useAuth();
-  // The org PATCH's gate (_require_org_manage) is org.members.manage: owner/
-  // admin, any custom role granted it, or the Platform Admin.
+  // Member management (People links) is org.members.manage; the org PATCH
+  // (name, description, default language) is org.settings.manage. useCan
+  // grants both to the Platform Admin.
   const canManage = useCan("org.members.manage");
+  const canEditSettings = useCan("org.settings.manage");
   const canManageTeams = useCan("org.teams.manage");
   const { t } = useI18n();
 
@@ -156,10 +158,9 @@ export function OrganizationPage() {
             )}
           </section>
 
-          {/* #1503: edit the active org's own name/description. Owner/admin
-            only -- same `canManage` gate as the member-management section
-            below (mirrors the backend's `_require_org_manage` authority). */}
-          {canManage && (
+          {/* #1503: edit the active org's own name/description. Same gate as
+            the org PATCH: org.settings.manage. */}
+          {canEditSettings && (
             <section className={`mb-4 ${cardClass}`}>
               <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
                 <Icon name="edit" size={17} className="text-indigo-500 dark:text-indigo-400" />
@@ -209,7 +210,7 @@ export function OrganizationPage() {
           )}
 
           {/* #133: the language members see until they pick their own. Gated
-            inside on useCan("org.members.manage"), the same PATCH gate. */}
+            inside on useCan("org.settings.manage"), the same PATCH gate. */}
           <OrgDefaultLanguage org={active} token={token} onSaved={() => void orgsRes.reload()} />
 
           {/* Members, invites and roles live in Organization › People. */}
