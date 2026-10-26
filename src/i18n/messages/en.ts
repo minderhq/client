@@ -562,6 +562,14 @@ export const en = {
     piiMasking: "Mask personal data before it is sent to this provider",
     piiMaskingHelp:
       "Emails, phone numbers, IBAN and card numbers, national IDs and IP addresses are replaced with placeholders and restored in the reply.",
+    tools: {
+      yes: "Tools: yes",
+      no: "Tools: no",
+      unknown: "Tools: unknown",
+      noHelp:
+        "This model can't call tools, so chats that use it as the default lose tool use (search, actions). Pick a tool-capable model, or enable tool calling on the server (vLLM: --enable-auto-tool-choice --tool-call-parser …).",
+      unknownHelp: "Tool support couldn't be determined for this model.",
+    },
   },
 
   onboarding: {

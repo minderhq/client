@@ -92,6 +92,8 @@ export interface ProviderUpdate {
 export interface ProviderTestResult {
   ok: boolean;
   detail: string;
+  /** Whether the tested model can call tools. Absent on older servers. */
+  tools?: "yes" | "no" | "unknown";
 }
 
 /** POST /v1/model-providers/{id}/fetch-models: the ids the vendor reports
