@@ -44,7 +44,10 @@ const ORG_ADMIN_KEYS: PermissionKey[] = [
   "org.teams.manage",
   "org.settings.manage",
   "org.audit.view",
-  "org.ai.manage",
+  "org.ai.providers.view",
+  "org.ai.providers.manage",
+  "org.ai.defaults.manage",
+  "org.ai.usage.view",
   "org.chatbots.manage",
 ];
 
@@ -162,7 +165,7 @@ describe("effectivePermissionsFromServer", () => {
         id: 3,
         org_role: "member",
         suspended: false,
-        permissions: [{ key: "org.ai.manage", sources: [source] }],
+        permissions: [{ key: "org.ai.providers.view", sources: [source] }],
         org_wide_team_permissions: [{ key: "team.members.view", sources: [{ kind: "role", role_id: 2 }] }],
       },
       teams: [{ id: 10, team_role: "member", permissions: [] }],
@@ -173,14 +176,14 @@ describe("effectivePermissionsFromServer", () => {
       active_org: {
         id: "3",
         org_role: "member",
-        permissions: [{ key: "org.ai.manage", source: "Knowledge manager" }],
+        permissions: [{ key: "org.ai.providers.view", source: "Knowledge manager" }],
         org_wide_team_permissions: [{ key: "team.members.view", source: "role" }],
       },
       teams: [{ id: "10", team_role: "member", permissions: [] }],
       permission_version: "1.4",
     });
     const access = accessFrom(effective);
-    expect(access.can("org.ai.manage", { orgId: "3" })).toBe(true);
+    expect(access.can("org.ai.providers.view", { orgId: "3" })).toBe(true);
     expect(access.can("team.members.view", { teamId: "42" })).toBe(true);
   });
 

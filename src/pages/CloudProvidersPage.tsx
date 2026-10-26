@@ -37,7 +37,7 @@ import {
   secondaryButtonClass,
 } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
-import { useCanManageModelProviders } from "../lib/useCan";
+import { useCan } from "../lib/useCan";
 
 // #1207 Increment 4: admin-only management of cloud/remote model provider
 // credentials (openai_compatible / anthropic) -- create, enable/disable,
@@ -104,11 +104,14 @@ function ProviderRow({
   token,
   onChanged,
   confirm,
+  canManage,
 }: {
   provider: Provider;
   token: string;
   onChanged: () => void;
   confirm: ReturnType<typeof useConfirm>["confirm"];
+  /** org.ai.providers.manage: without it the row is read-only. */
+  canManage: boolean;
 }) {
   const { t } = useI18n();
   const [busy, setBusy] = useState(false);
@@ -363,38 +366,40 @@ function ProviderRow({
         <span className="font-mono text-xs text-gray-400 dark:text-gray-500">
           {provider.api_key_masked}
         </span>
-        <div className="ml-auto flex items-center gap-2">
-          <button onClick={handleTest} disabled={busy} className={secondaryButtonClass}>
-            Test
-          </button>
-          <button
-            onClick={() => (editMode === "rename" ? closeEdit() : openEdit("rename"))}
-            disabled={busy}
-            className={ghostButtonClass}
-          >
-            <Icon name="edit" size={14} /> Rename
-          </button>
-          <button
-            onClick={() => (editMode === "rotate" ? closeEdit() : openEdit("rotate"))}
-            disabled={busy}
-            className={ghostButtonClass}
-          >
-            <Icon name="reset" size={14} /> Rotate key
-          </button>
-          <button
-            onClick={() => (editMode === "models" ? closeEdit() : openEdit("models"))}
-            disabled={busy}
-            className={ghostButtonClass}
-          >
-            <Icon name="models" size={14} /> Edit models
-          </button>
-          <button onClick={handleToggle} disabled={busy} className={ghostButtonClass}>
-            {provider.enabled ? "Disable" : "Enable"}
-          </button>
-          <button onClick={handleDelete} disabled={busy} className={destructiveButtonClass}>
-            <Icon name="delete" size={14} /> Delete
-          </button>
-        </div>
+        {canManage && (
+          <div className="ml-auto flex items-center gap-2">
+            <button onClick={handleTest} disabled={busy} className={secondaryButtonClass}>
+              Test
+            </button>
+            <button
+              onClick={() => (editMode === "rename" ? closeEdit() : openEdit("rename"))}
+              disabled={busy}
+              className={ghostButtonClass}
+            >
+              <Icon name="edit" size={14} /> Rename
+            </button>
+            <button
+              onClick={() => (editMode === "rotate" ? closeEdit() : openEdit("rotate"))}
+              disabled={busy}
+              className={ghostButtonClass}
+            >
+              <Icon name="reset" size={14} /> Rotate key
+            </button>
+            <button
+              onClick={() => (editMode === "models" ? closeEdit() : openEdit("models"))}
+              disabled={busy}
+              className={ghostButtonClass}
+            >
+              <Icon name="models" size={14} /> Edit models
+            </button>
+            <button onClick={handleToggle} disabled={busy} className={ghostButtonClass}>
+              {provider.enabled ? "Disable" : "Enable"}
+            </button>
+            <button onClick={handleDelete} disabled={busy} className={destructiveButtonClass}>
+              <Icon name="delete" size={14} /> Delete
+            </button>
+          </div>
+        )}
       </div>
       {servedBy && (
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -409,7 +414,7 @@ function ProviderRow({
             type="checkbox"
             checked={provider.pii_masking_enabled}
             onChange={(e) => handlePiiMasking(e.target.checked)}
-            disabled={busy}
+            disabled={busy || !canManage}
           />
           <span title={t("providers.piiMaskingHelp")}>{t("providers.piiMasking")}</span>
         </label>
@@ -426,7 +431,7 @@ function ProviderRow({
           </InfoCallout>
         </div>
       )}
-      {needsModels && editMode !== "models" && (
+      {canManage && needsModels && editMode !== "models" && (
         <div className="mt-2">
           <InfoCallout icon="warning">
             <p className="font-medium">Set models</p>
@@ -467,13 +472,15 @@ function ProviderRow({
           {effective.length > CARD_MODEL_PREVIEW && (
             <span>+{effective.length - CARD_MODEL_PREVIEW} more</span>
           )}
-          <button
-            onClick={handleFetchModels}
-            disabled={busy || fetching}
-            className={ghostButtonClass}
-          >
-            <Icon name="download" size={14} /> Fetch models
-          </button>
+          {canManage && (
+            <button
+              onClick={handleFetchModels}
+              disabled={busy || fetching}
+              className={ghostButtonClass}
+            >
+              <Icon name="download" size={14} /> Fetch models
+            </button>
+          )}
         </div>
       )}
       {editMode === "rename" && (
@@ -871,19 +878,19 @@ function AddProviderForm({
 export function CloudProvidersPage() {
   const { token } = useAuth();
   const { t } = useI18n();
-  // Providers sit behind model-management's require_admin_or_org_admin: an
-  // instance admin, or an owner/admin of the org being acted in (org.ai.manage,
-  // the route's gate). The route (Organization › AI) is gated too; this keeps
-  // the page honest if reached another way. The defaults are the next tab
-  // (ModelDefaultsPage).
-  const canManage = useCanManageModelProviders();
+  // The server's gates: org.ai.providers.view reads the list and presets,
+  // org.ai.providers.manage changes them. The route is gated on the view key
+  // too; this keeps the page honest if reached another way. The defaults are
+  // the next tab (ModelDefaultsPage).
+  const canView = useCan("org.ai.providers.view");
+  const canManage = useCan("org.ai.providers.manage");
   const { confirm, dialog } = useConfirm();
 
   // Also feeds the Defaults pickers, so self-hosted provider models are
   // labelled Local there, the same as the knowledge-base and Ask pickers.
   const providersRes = useAsyncResource(
     (signal) => listProviders(token, signal),
-    { enabled: canManage },
+    { enabled: canView },
   );
 
   // The add-provider dropdown is backend-driven (#1467/#1585): the preset list
@@ -893,7 +900,7 @@ export function CloudProvidersPage() {
   const presetsRes = useAsyncResource(
     (signal) =>
       listProviderPresets(token, signal),
-    { enabled: canManage },
+    { enabled: canView && canManage },
   );
 
   return (
@@ -905,25 +912,27 @@ export function CloudProvidersPage() {
         subtitle={t("orgAi.providersSubtitle")}
       />
 
-      {!canManage && (
+      {!canView && (
         <InfoCallout icon="lock">
           {token
-            ? "Only the organization's owners and admins can view or manage providers."
-            : "Log in as an organization owner or admin to view or manage providers."}
+            ? "You need permission to see model providers."
+            : "Log in with permission to see model providers."}
         </InfoCallout>
       )}
 
-      {canManage && (
+      {canView && (
         <>
-          <div className="mb-4">
-            <AddProviderForm
-              token={token}
-              onCreated={providersRes.reload}
-              presets={presetsRes.data}
-              presetsLoading={presetsRes.loading}
-              presetsError={presetsRes.error}
-            />
-          </div>
+          {canManage && (
+            <div className="mb-4">
+              <AddProviderForm
+                token={token}
+                onCreated={providersRes.reload}
+                presets={presetsRes.data}
+                presetsLoading={presetsRes.loading}
+                presetsError={presetsRes.error}
+              />
+            </div>
+          )}
 
           <StatusLine isError={!!providersRes.error}>
             {providersRes.error ?? (providersRes.loading ? "Loading…" : "")}
@@ -938,6 +947,7 @@ export function CloudProvidersPage() {
               token={token}
               onChanged={providersRes.reload}
               confirm={confirm}
+              canManage={canManage}
             />
           ))}
         </>

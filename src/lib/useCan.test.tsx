@@ -8,7 +8,6 @@ import {
   useAccess,
   useAllows,
   useCan,
-  useCanManageModelProviders,
   useEffectivePermissions,
 } from "./useCan";
 
@@ -247,21 +246,38 @@ describe("useCan reads GET /v1/me/permissions", () => {
     await waitFor(() => expect(apiFetch).toHaveBeenCalledTimes(2));
   });
 
-  it("mirrors the providers gate: instance admin or org owner/admin only", async () => {
-    mockAuth = { ...MEMBER, role: "admin" };
-    expect(renderHook(() => useCanManageModelProviders()).result.current).toBe(true);
+  it("answers the model-provider keys from the role claims: org owner/admin, Platform Admin", () => {
+    const AI_KEYS = [
+      "org.ai.providers.view",
+      "org.ai.providers.manage",
+      "org.ai.defaults.manage",
+      "org.ai.usage.view",
+    ] as const;
+    const all = () => AI_KEYS.map((key) => renderHook(() => useCan(key)).result.current);
     mockAuth = { ...MEMBER, orgRole: "owner" };
-    expect(renderHook(() => useCanManageModelProviders()).result.current).toBe(true);
+    expect(all()).toEqual([true, true, true, true]);
+    mockAuth = { ...MEMBER, orgRole: "admin" };
+    expect(all()).toEqual([true, true, true, true]);
     mockAuth = { ...MEMBER };
-    expect(renderHook(() => useCanManageModelProviders()).result.current).toBe(false);
-    // A Platform Admin who isn't owner/admin, and a custom role holding
-    // org.ai.manage, don't pass the server's gate today.
+    expect(all()).toEqual([false, false, false, false]);
+    // The legacy instance role grants nothing here; the Platform Admin flag does.
+    mockAuth = { ...MEMBER, role: "admin" };
+    expect(all()).toEqual([false, false, false, false]);
     mockAuth = { ...MEMBER, isPlatformAdmin: true };
-    expect(renderHook(() => useCanManageModelProviders()).result.current).toBe(false);
+    expect(all()).toEqual([true, true, true, true]);
+  });
+
+  it("holds only the model-provider keys the server grants (custom role)", async () => {
     mockAuth = { ...SESSION };
-    apiFetch.mockResolvedValue(response({ active_org: { id: 1, org_role: "member", permissions: held("org.ai.manage") } }));
-    await settled(() => useCan("org.ai.manage"), (v) => v);
-    expect(renderHook(() => useCanManageModelProviders()).result.current).toBe(false);
+    apiFetch.mockResolvedValue(
+      response({
+        active_org: { id: 1, org_role: "custom", permissions: held("org.ai.usage.view", "org.ai.defaults.manage") },
+      }),
+    );
+    await settled(() => useCan("org.ai.usage.view"), (v) => v);
+    expect(renderHook(() => useCan("org.ai.defaults.manage")).result.current).toBe(true);
+    expect(renderHook(() => useCan("org.ai.providers.view")).result.current).toBe(false);
+    expect(renderHook(() => useCan("org.ai.providers.manage")).result.current).toBe(false);
   });
 
   it("doesn't ask again in a session whose request failed", async () => {

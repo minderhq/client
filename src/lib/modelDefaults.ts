@@ -96,7 +96,7 @@ export function modelDefaultsErrorMessage(e: unknown): string {
   if (e instanceof ApiError) {
     switch (e.status) {
       case 403:
-        return "Only an org owner or admin can change the default models.";
+        return "You need permission to change the default models.";
       case 422:
         return `That model can't be used: ${e.message}`;
       case 503:

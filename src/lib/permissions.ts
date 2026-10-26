@@ -21,9 +21,8 @@
 
 import type { components } from "./api-types.gen";
 
-/** Org-level permission keys, as the server's catalogue names them. The last
- * two are product permissions the catalogue does not have yet, named the
- * same way so adopting them is a lookup, not a rename. */
+/** Org-level permission keys, as the server's catalogue names them: the
+ * management keys, then the product keys the client gates on. */
 export const ORG_PERMISSION_KEYS = [
   "org.members.view",
   "org.members.invite",
@@ -37,9 +36,15 @@ export const ORG_PERMISSION_KEYS = [
   "org.audit.view",
   "org.suborgs.create",
   "org.suborgs.manage",
-  /** Configure AI providers and default models (product permission). */
-  "org.ai.manage",
-  /** Manage public (website) chatbots and their conversations (product permission). */
+  /** See the org's model providers and provider presets. */
+  "org.ai.providers.view",
+  /** Add, edit, test or delete model providers and rotate their keys. */
+  "org.ai.providers.manage",
+  /** Change the org's default models (any member may read them). */
+  "org.ai.defaults.manage",
+  /** See the org's model token usage. */
+  "org.ai.usage.view",
+  /** Manage public (website) chatbots and their conversations. */
   "org.chatbots.manage",
 ] as const;
 
@@ -197,7 +202,10 @@ export const ORG_ROLE_PERMISSIONS: Record<string, readonly OrgPermissionKey[]> =
     "org.teams.manage",
     "org.settings.manage",
     "org.billing.manage",
-    "org.ai.manage",
+    "org.ai.providers.view",
+    "org.ai.providers.manage",
+    "org.ai.defaults.manage",
+    "org.ai.usage.view",
     "org.chatbots.manage",
     "org.audit.view",
   ],
@@ -209,7 +217,10 @@ export const ORG_ROLE_PERMISSIONS: Record<string, readonly OrgPermissionKey[]> =
     "org.roles.manage",
     "org.teams.manage",
     "org.settings.manage",
-    "org.ai.manage",
+    "org.ai.providers.view",
+    "org.ai.providers.manage",
+    "org.ai.defaults.manage",
+    "org.ai.usage.view",
     "org.chatbots.manage",
     "org.audit.view",
   ],

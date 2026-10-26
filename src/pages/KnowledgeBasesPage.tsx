@@ -46,7 +46,7 @@ import {
   type CatalogModel,
   type DataPolicy,
 } from "../lib/modelDefaults";
-import { useCanManageModelProviders } from "../lib/useCan";
+import { useCan } from "../lib/useCan";
 import { useModelChoices, type ModelChoices } from "../lib/useModelChoices";
 import { useTokenRef } from "../lib/useTokenRef";
 import { useI18n } from "../i18n";
@@ -1123,8 +1123,8 @@ export function CreateKbForm({
 export function KnowledgeBasesPage() {
   const { t } = useI18n();
   const { token, sessionKey } = useAuth();
-  // The model-providers gate (see CloudProvidersPage).
-  const canListProviders = useCanManageModelProviders();
+  // The model-providers list gate (see CloudProvidersPage).
+  const canListProviders = useCan("org.ai.providers.view");
   const choices = useModelChoices(token, {
     canListProviders,
     sessionKey,

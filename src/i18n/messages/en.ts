@@ -267,7 +267,7 @@ export const en = {
 
   orgAi: {
     providersSubtitle:
-      "Connect an OpenAI-compatible or Anthropic provider, or a self-hosted server such as vLLM, so its models appear next to the local ones. Providers hold the organization's own API credentials; only its owners and admins see them.",
+      "Connect an OpenAI-compatible or Anthropic provider, or a self-hosted server such as vLLM, so its models appear next to the local ones. Providers hold the organization's own API credentials; only people allowed to see providers see them.",
     defaultsSubtitle:
       "The model each task uses unless a knowledge base or a question picks its own.",
   },
@@ -354,13 +354,13 @@ export const en = {
     boundAssistant: "Chatbot's assistant",
     nameLabel: "Chatbot name",
     deleteTitle: "Delete chatbot",
-    adminRequired: "Org Admin role required to manage website chatbots.",
+    adminRequired: "You need permission to manage website chatbots.",
     logInAsAdmin: "Log in as an admin to manage website chatbots.",
     empty: "No website chatbots yet.",
     conversationsSubtitleNamed: "Anonymous conversations through your “{name}” website chatbot, read-only.",
     conversationsSubtitle: "Anonymous conversations through your website chatbot, read-only.",
     allChatbots: "All chatbots",
-    conversationsAdminRequired: "Org Admin role required to view website chatbot conversations.",
+    conversationsAdminRequired: "You need permission to manage website chatbots to see their conversations.",
     conversationsLogIn: "Log in as an admin to view website chatbot conversations.",
   },
 
@@ -820,7 +820,10 @@ export const en = {
       "org.audit.view": "Read the audit log",
       "org.suborgs.create": "Create sub-organizations",
       "org.suborgs.manage": "Manage sub-organizations",
-      "org.ai.manage": "Manage AI providers and default models",
+      "org.ai.providers.view": "See model providers",
+      "org.ai.providers.manage": "Manage model providers",
+      "org.ai.defaults.manage": "Change the default models",
+      "org.ai.usage.view": "See model usage",
       "org.chatbots.manage": "Manage website chatbots",
     },
     invites: {

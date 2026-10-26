@@ -339,7 +339,8 @@ const GATED_ROUTES: GatedRoute[] = [
   // Organization › AI and › Plugins (UX step 9, Q2/Q3): org admins only;
   // members keep the read-only Models and Installed pages.
   { path: ROUTES.orgAi, heading: "AI providers", open: ORG_ADMINS },
-  { path: ROUTES.orgAiDefaults, heading: "Model defaults", open: ORG_ADMINS },
+  // Any member may read the defaults (read-only without org.ai.defaults.manage).
+  { path: ROUTES.orgAiDefaults, heading: "Model defaults", open: SIGNED_IN },
   { path: ROUTES.orgPlugins, heading: "Organization plugins", open: ORG_ADMINS },
   // Organization › Teams: org.teams.manage (team admins manage their own team
   // from My team). My team itself is every member's.

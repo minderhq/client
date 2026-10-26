@@ -139,7 +139,7 @@ describe("PublicChatEndpointsPage", () => {
     mockAuth = { isAuthenticated: true, token: "tok", role: "member", orgRole: "member", isPlatformAdmin: false };
     renderPage();
     expect(
-      screen.getByText("Org Admin role required to manage website chatbots."),
+      screen.getByText("You need permission to manage website chatbots."),
     ).toBeTruthy();
     expect(apiFetch).not.toHaveBeenCalled();
   });
@@ -147,7 +147,7 @@ describe("PublicChatEndpointsPage", () => {
   it("gives the legacy instance admin role no access by itself", () => {
     mockAuth = { isAuthenticated: true, token: "tok", role: "admin", orgRole: "member", isPlatformAdmin: false };
     renderPage();
-    expect(screen.getByText("Org Admin role required to manage website chatbots.")).toBeTruthy();
+    expect(screen.getByText("You need permission to manage website chatbots.")).toBeTruthy();
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
@@ -156,7 +156,7 @@ describe("PublicChatEndpointsPage", () => {
     installApi({});
     serveMyPermissions(apiFetch, myPermissions({ orgKeys: ["org.chatbots.manage"] }));
     renderPage();
-    await waitFor(() => expect(screen.queryByText("Org Admin role required to manage website chatbots.")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("You need permission to manage website chatbots.")).toBeNull());
   });
 
   it("gates an org admin whose role lacks org.chatbots.manage", async () => {
@@ -164,7 +164,7 @@ describe("PublicChatEndpointsPage", () => {
     installApi({});
     serveMyPermissions(apiFetch, myPermissions({ orgRole: "admin", orgKeys: ["org.members.manage"] }));
     renderPage();
-    expect(await screen.findByText("Org Admin role required to manage website chatbots.")).toBeTruthy();
+    expect(await screen.findByText("You need permission to manage website chatbots.")).toBeTruthy();
   });
 
   it("opens to the Platform Admin", async () => {
@@ -172,7 +172,7 @@ describe("PublicChatEndpointsPage", () => {
     installApi({});
     renderPage();
     await waitFor(() => expect(apiFetch).toHaveBeenCalled());
-    expect(screen.queryByText("Org Admin role required to manage website chatbots.")).toBeNull();
+    expect(screen.queryByText("You need permission to manage website chatbots.")).toBeNull();
   });
 
   it("prompts to log in when unauthenticated", () => {

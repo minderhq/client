@@ -345,7 +345,7 @@ export function App() {
                     <Route
                       path={ROUTES.orgAi}
                       element={
-                        <RequirePermission requires="org.ai.manage">
+                        <RequirePermission requires="org.ai.providers.view">
                           <CloudProvidersPage />
                         </RequirePermission>
                       }
@@ -353,7 +353,7 @@ export function App() {
                     <Route
                       path={ROUTES.orgAiDefaults}
                       element={
-                        <RequirePermission requires="org.ai.manage">
+                        <RequirePermission requires={MEMBER}>
                           <ModelDefaultsPage />
                         </RequirePermission>
                       }
