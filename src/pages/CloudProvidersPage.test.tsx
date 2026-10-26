@@ -135,7 +135,7 @@ function installApi(
     presets?: ProviderPreset[];
     providersError?: Error;
     presetsError?: Error;
-    testResult?: { ok: boolean; detail: string };
+    testResult?: { ok: boolean; detail: string; tools?: string };
     fetchModels?: { models: string[]; source: string } | Error;
   } = {},
 ) {
@@ -1181,5 +1181,50 @@ describe("CloudProvidersPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Fetch models" }));
     expect(await screen.findByText(message)).toBeTruthy();
     expect(screen.getByLabelText("Add model id")).toBeTruthy();
+  });
+});
+
+describe("CloudProvidersPage tool-support badge", () => {
+  afterEach(() => {
+    cleanup();
+    apiFetch.mockReset();
+  });
+
+  async function runTest(testResult: { ok: boolean; detail: string; tools?: string }) {
+    mockAuth = { token: "tok", role: "member", orgRole: "admin", isAuthenticated: true };
+    installApi({ providers: [provider()], testResult });
+    render(<CloudProvidersPage />);
+    await screen.findByText("OpenAI (production)");
+    expect(screen.queryByText(/^Tools:/)).toBeNull(); // nothing before a test
+    fireEvent.click(screen.getByRole("button", { name: "Test" }));
+    await screen.findByText(testResult.detail);
+  }
+
+  it("shows Tools: yes without a tooltip", async () => {
+    await runTest({ ok: true, detail: "ok", tools: "yes" });
+    expect(screen.getByText("Tools: yes")).toBeTruthy();
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
+  it.each([
+    ["no", "Tools: no", /can't call tools/],
+    ["unknown", "Tools: unknown", /couldn't be determined/],
+  ])("shows Tools: %s with a keyboard-reachable explanation", async (tools, label, help) => {
+    await runTest({ ok: true, detail: "ok", tools });
+    const trigger = screen.getByText(label).closest("[tabindex]") as HTMLElement;
+    expect(trigger.tabIndex).toBe(0);
+    const tip = screen.getByRole("tooltip", { hidden: true });
+    expect(tip.textContent).toMatch(help);
+    expect(trigger.getAttribute("aria-describedby")).toBe(tip.id);
+  });
+
+  it("shows no badge when the test failed", async () => {
+    await runTest({ ok: false, detail: "auth failed", tools: "no" });
+    expect(screen.queryByText(/^Tools:/)).toBeNull();
+  });
+
+  it("shows no badge when the server omits tools", async () => {
+    await runTest({ ok: true, detail: "ok" });
+    expect(screen.queryByText(/^Tools:/)).toBeNull();
   });
 });

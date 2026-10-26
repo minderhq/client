@@ -5,6 +5,7 @@ import { Icon } from "../components/Icon";
 import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
+import { ToolSupportBadge } from "../components/ToolSupportBadge";
 import { useConfirm } from "../components/ConfirmDialog";
 import {
   FetchedModelsPicker,
@@ -26,6 +27,7 @@ import {
   type FetchModelsResult,
   type Provider,
   type ProviderPreset,
+  type ProviderTestResult,
 } from "../lib/modelProviders";
 import {
   badgeClass,
@@ -117,6 +119,7 @@ function ProviderRow({
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [isError, setIsError] = useState(false);
+  const [tools, setTools] = useState<ProviderTestResult["tools"]>();
   // #1718: the currently-open inline edit form, plus its drafts. `nameDraft`
   // seeds from the current name (a rename is an edit of the existing value);
   // `keyDraft` always starts empty -- the stored key is write-only, never
@@ -255,10 +258,12 @@ function ProviderRow({
     setBusy(true);
     setIsError(false);
     setStatus("Testing…");
+    setTools(undefined);
     try {
       const result = await testProvider(token, provider.id);
       setStatus(result.detail);
       setIsError(!result.ok);
+      setTools(result.ok ? result.tools : undefined);
     } catch (e) {
       setStatus(providerSaveErrorMessage(e));
       setIsError(true);
@@ -366,6 +371,7 @@ function ProviderRow({
         <span className="font-mono text-xs text-gray-400 dark:text-gray-500">
           {provider.api_key_masked}
         </span>
+        <ToolSupportBadge tools={tools} />
         {canManage && (
           <div className="ml-auto flex items-center gap-2">
             <button onClick={handleTest} disabled={busy} className={secondaryButtonClass}>

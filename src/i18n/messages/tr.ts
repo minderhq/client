@@ -560,6 +560,14 @@ export const tr: Messages = {
     piiMasking: "Kişisel verileri bu sağlayıcıya gönderilmeden önce maskele",
     piiMaskingHelp:
       "E-posta adresleri, telefon numaraları, IBAN ve kart numaraları, kimlik numaraları ve IP adresleri yer tutucularla değiştirilir ve yanıtta geri yerleştirilir.",
+    tools: {
+      yes: "Araçlar: evet",
+      no: "Araçlar: hayır",
+      unknown: "Araçlar: bilinmiyor",
+      noHelp:
+        "Bu model araç çağıramaz; bu yüzden onu varsayılan olarak kullanan sohbetler araç kullanımını (arama, eylemler) kaybeder. Araç çağırabilen bir model seçin ya da sunucuda araç çağırmayı etkinleştirin (vLLM: --enable-auto-tool-choice --tool-call-parser …).",
+      unknownHelp: "Bu modelin araç desteği belirlenemedi.",
+    },
   },
 
   onboarding: {
