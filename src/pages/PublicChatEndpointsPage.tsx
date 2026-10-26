@@ -23,6 +23,7 @@ import {
   secondaryButtonClass,
 } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
+import { useCan } from "../lib/useCan";
 import { chatbotConversationsRoute } from "../lib/routes";
 
 // #1581 (client half of #1522): admin-only management of PUBLIC chat endpoints.
@@ -698,11 +699,10 @@ function EndpointRow({
 
 export function PublicChatEndpointsPage() {
   const { t } = useI18n();
-  const { token, orgRole, isPlatformAdmin } = useAuth();
-  // Mirrors the server gate (_require_endpoint_admin): the Platform Admin or an
-  // owner/admin of the active org. Switch to useCan("org.chatbots.manage")
-  // once the server enforces that key.
-  const isAdmin = !!isPlatformAdmin || orgRole === "owner" || orgRole === "admin";
+  const { token } = useAuth();
+  // The server gate: org.chatbots.manage in the active org, or the Platform
+  // Admin (useCan grants every key to the Platform Admin).
+  const isAdmin = useCan("org.chatbots.manage");
   const { confirm, dialog } = useConfirm();
 
   const endpointsRes = useAsyncResource(

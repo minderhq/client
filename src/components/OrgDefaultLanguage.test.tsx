@@ -14,7 +14,7 @@ vi.mock("../lib/api", () => ({
 }));
 let canManage = true;
 vi.mock("../lib/useCan", () => ({
-  useCan: (key: string) => key === "org.members.manage" && canManage,
+  useCan: (key: string) => key === "org.settings.manage" && canManage,
 }));
 
 function org(overrides: Partial<MyOrg> = {}): MyOrg {
