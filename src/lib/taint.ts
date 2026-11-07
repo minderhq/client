@@ -31,7 +31,7 @@ export function describeTaintSource(
   if (name && (kind === "kb" || kind === "tool")) {
     return t(`toolApproval.source.${kind}`, { name: names[name] || name });
   }
-  return t(FIXED_SOURCES[source] ?? "toolApproval.source.other");
+  return t(FIXED_SOURCES[source] ?? "toolApproval.source.unknown");
 }
 
 /** "Suggested after reading X, Y and Z." for a tainted item; null otherwise. */

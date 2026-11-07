@@ -985,7 +985,7 @@ export const tr: Messages = {
       unverifiedHistory: "doğrulanamayan önceki mesajlardan",
       visitor: "bir site ziyaretçisinin mesajından",
       externalCaller: "dışarıdan gelen bir çağrıdan",
-      other: "dış bir kaynaktan gelen içerikten",
+      unknown: "dış bir kaynaktan gelen içerikten",
     },
     localOnlyRisk:
       "Yerel tutulması gereken veri okunduktan sonra dışarı veri gönderebilen bir eklenti.",

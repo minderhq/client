@@ -987,7 +987,7 @@ export const en = {
       unverifiedHistory: "earlier messages that couldn't be verified",
       visitor: "a website visitor's message",
       externalCaller: "a request from an outside caller",
-      other: "content from an outside source",
+      unknown: "content from an outside source",
     },
     localOnlyRisk:
       "A plugin that can send data outside, after data that must stay local was read.",
