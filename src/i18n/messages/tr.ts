@@ -1051,7 +1051,7 @@ export const tr: Messages = {
     invitedOrg: "{target} kurumuna {role} olarak katılmaya davet edildiniz{email}.",
     invitedTeam: "{target} takımına {role} olarak katılmaya davet edildiniz{email}.",
     join: "Katıl: {name}",
-    joining: "Katılınıyor…",
+    joining: "Katılım sağlanıyor…",
     signIn: "Giriş yap",
     signInToAccept: "Kabul etmek için giriş yap",
     haveAccount: "Zaten hesabınız var mı?",
