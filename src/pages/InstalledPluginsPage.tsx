@@ -605,8 +605,8 @@ export function InstalledPluginCard({
             </p>
           )}
         </div>
-        {runtime && (
-          // A running plugin's tools can be tried (#186); the page says so when it has none.
+        {runtime?.enabled && (
+          // An enabled running plugin's tools can be tried (#186); the page says so when it has none.
           <Link
             to={`${ROUTES.installedAiTools}?plugin=${encodeURIComponent(entry.name)}`}
             aria-label={t("tools.tryLabel", { plugin: entry.displayName })}

@@ -628,6 +628,12 @@ describe("InstalledPluginCard — try its tools (#186)", () => {
     expect(link.getAttribute("href")).toBe("/marketplace/installed/ai-tools?plugin=weather");
   });
 
+  it("offers no Try link for a disabled running plugin", () => {
+    renderCard(mergeInstalledPlugins([], [runtimePlugin({ enabled: false })], null)[0]);
+
+    expect(screen.queryByRole("link", { name: /Try the tools/ })).toBeNull();
+  });
+
   it("offers no Try link for a plugin that is not running", () => {
     renderCard(entryOf(installation({ enabled: true })));
 

@@ -236,8 +236,8 @@ export function App() {
                     />
 
                     {/* Build › Discover: the plugin catalog and what is installed.
-                      The AI tools pages have no menu row (a tool is a facet of
-                      a plugin); the plugin pages link to them. */}
+                      Installed tools is a Discover tab (where a tool can be
+                      tried); the tools catalog is linked from the plugin pages. */}
                     <Route path={ROUTES.discoverPlugins} element={<AvailablePluginsPage />} />
                     <Route path={ROUTES.discoverAiTools} element={<AvailableToolsPage />} />
                     <Route path={ROUTES.installedPlugins} element={<InstalledPluginsPage />} />

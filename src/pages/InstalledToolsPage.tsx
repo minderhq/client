@@ -237,10 +237,10 @@ export function InstalledToolsPage() {
           {plugin ? t("tools.pluginNoTools", { plugin }) : t("tools.liveEmpty")}
         </EmptyState>
       )}
-      {!liveTools.error && shown?.map((t, i) => (
+      {!liveTools.error && shown?.map((tool, i) => (
         <LiveToolCard
-          key={`${t.metadata.plugin}:${t.function.name}`}
-          tool={t}
+          key={`${tool.metadata.plugin}:${tool.function.name}`}
+          tool={tool}
           token={token}
           defaultOpen={!!plugin && i === 0}
         />
