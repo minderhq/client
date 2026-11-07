@@ -175,7 +175,7 @@ function pollDocumentStatus(
 /** Document and image types the server's extractors ingest (#147). Audio,
  * video and data formats (parquet, avro, sql…) are left to the API: they
  * need optional services or are rarely a knowledge-base upload. Anything else
- * still reaches the server via "All files" and comes back with its reason. */
+ * picked anyway (most browsers allow it) comes back with the server's reason. */
 export const UPLOAD_ACCEPT = [
   ".pdf", ".doc", ".docx", ".xlsx", ".pptx", ".csv", ".tsv",
   ".txt", ".md", ".html", ".htm", ".epub", ".json",
