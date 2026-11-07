@@ -37,7 +37,7 @@ each also has a matching `ARG` default in the `Dockerfile`.
 
 | Var | Default | Meaning |
 |-----|---------|---------|
-| `VITE_API_BASE_URL` | `http://localhost:8000` | api-gateway base for all `fetch()` calls. Works over the direct-port bypass. |
+| `VITE_API_BASE_URL` | `/api` (image) | api-gateway base for all `fetch()` calls. The image default is relative: the proxy in front serves the console at `/` and the gateway at `/api` on one hostname, so one image works on any domain. Set an absolute URL (e.g. `http://localhost:8000`) when the gateway is elsewhere; `npm run dev` falls back to `http://localhost:8000`. |
 | `VITE_OIDC_LOGIN_URL` | *(empty)* | SSO login entry (full-page nav into Authelia's OIDC flow). **No default** — only a real Traefik + DNS + TLS deployment has it. When unset, the SSO button is **hidden** and local login is the only option (over localhost the `*.minder.local` host can't resolve, so a baked URL would dead-end). |
 | `VITE_AUTHELIA_PORTAL_URL` | *(empty)* | Authelia self-service portal link on the Settings page. Same opt-in rule; plain text shown when unset. |
 | `VITE_DEPLOYMENT_MODE` | `self-hosted` | `saas`, `self-hosted` or `air-gapped`. Decides the plan notices' actions: SaaS billing owners get Upgrade / trial; self-hosted shows "requires a licence" with no buy buttons; air-gapped never links outside. |

@@ -16,15 +16,12 @@ COPY . .
 # rebuild, not just a container restart. See docker-compose.yml's build.args
 # and .env.example's CLIENT_API_BASE_URL.
 #
-# Defaults to the gateway's own loopback dev port, NOT the Traefik hostname:
-# confirmed live that api.minder.local isn't resolvable without a manual
-# /etc/hosts entry (same as every other *.minder.local route -- "no real DNS
-# by default"). localhost:8000 is what a fresh clone can already reach with
-# zero setup (api-gateway's own loopback port), matching the zero-config
-# property the old same-origin pages had. Override for a real deployment
-# where client.minder.local is set up (which already implies api.minder.local
-# is too).
-ARG VITE_API_BASE_URL=http://localhost:8000
+# Defaults to /api on the page's own origin: the reverse proxy in front serves
+# the console at / and the gateway at /api on one hostname, so the same image
+# works on any domain with no cross-origin calls. Set an absolute URL only
+# when the gateway lives elsewhere (e.g. http://localhost:8000 for a
+# loopback-only dev setup without the proxy).
+ARG VITE_API_BASE_URL=/api
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 # The SSO login trigger -- a full-page navigation into Authelia's forward-auth +
@@ -70,8 +67,8 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # every start, so CLIENT_SECURITY_HEADERS / CLIENT_CSP apply on a restart. Run
 # once here too, so the snippets nginx.conf includes exist even without the
 # entrypoint. connect-src gets the gateway origin from the same build arg the
-# app's fetch() calls were built with.
-ARG VITE_API_BASE_URL=http://localhost:8000
+# app's fetch() calls were built with ('self' already covers the /api default).
+ARG VITE_API_BASE_URL=/api
 ENV MINDER_API_BASE_URL=$VITE_API_BASE_URL
 COPY docker/security-headers.sh /docker-entrypoint.d/15-minder-security-headers.sh
 RUN chmod 755 /docker-entrypoint.d/15-minder-security-headers.sh \
