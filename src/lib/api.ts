@@ -402,6 +402,9 @@ async function sendWithRefresh(
 
   const res = await send(token);
   // Only an authenticated request's 401 can speak for the session (#109).
+  // Every such 401 gets one refresh + replay: an expired token, and also
+  // `claims_changed` (a team change shrank the session's teams; the refresh
+  // re-derives them, so the user stays signed in).
   const done = { res, logoutOn401: Boolean(token), bearer: token ?? "" };
   if (res.status !== 401 || !token) return done;
 
