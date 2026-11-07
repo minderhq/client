@@ -16,6 +16,7 @@ import {
 } from "../lib/ui";
 import { EmptyState } from "./EmptyState";
 import { StatusLine } from "./StatusLine";
+import { parseServerTimestamp } from "../lib/time";
 
 /** The rating shapes live in lib/marketplace.ts (#119); re-exported for
  * existing importers. */
@@ -24,7 +25,7 @@ export type { PluginRating, PluginRatingsResponse };
 const MAX_REVIEW_LENGTH = 4000;
 
 function formatShortDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
+  return (parseServerTimestamp(iso) ?? new Date(iso)).toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
     day: "numeric",

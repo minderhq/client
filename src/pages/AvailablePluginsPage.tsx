@@ -60,6 +60,7 @@ import {
 } from "../lib/ui";
 import { useTokenRef } from "../lib/useTokenRef";
 import { ROUTES } from "../lib/routes";
+import { parseServerTimestamp } from "../lib/time";
 
 /** A marketplace catalog row. The shape lives in lib/marketplace.ts (#119);
  * re-exported under its historical name for existing importers. */
@@ -74,7 +75,7 @@ function PricingBadge({ plugin }: { plugin: Plugin }) {
 }
 
 function formatShortDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
+  return (parseServerTimestamp(iso) ?? new Date(iso)).toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
     day: "numeric",

@@ -20,3 +20,9 @@ describe("server times (#148)", () => {
     expect(formatServerTime("nope", "nope")).toBe("nope");
   });
 });
+
+describe("date-only server values (#148)", () => {
+  it("leaves a date-only string as the UTC date JS already reads it as", () => {
+    expect(parseServerTimestamp("2026-11-07")?.getTime()).toBe(Date.UTC(2026, 10, 7));
+  });
+});
