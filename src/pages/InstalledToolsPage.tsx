@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { CardListSkeleton } from "../components/CardListSkeleton";
 import { Icon } from "../components/Icon";
@@ -26,7 +26,15 @@ export type { LiveTool };
  * the tool's real endpoint with whatever's in the box. GET tools send the
  * parameters as a query string (matching how plugin-registry's read-action
  * route actually reads them); everything else sends a JSON body. */
-export function TryItPanel({ tool, token }: { tool: LiveTool; token: string }) {
+export function TryItPanel({
+  tool,
+  token,
+  defaultOpen = false,
+}: {
+  tool: LiveTool;
+  token: string;
+  defaultOpen?: boolean;
+}) {
   const textareaId = useId();
   const [paramsText, setParamsText] = useState(() =>
     JSON.stringify(exampleForSchema(tool.function.parameters), null, 2),
@@ -79,7 +87,7 @@ export function TryItPanel({ tool, token }: { tool: LiveTool; token: string }) {
   }
 
   return (
-    <details className="group mt-2">
+    <details className="group mt-2" open={defaultOpen}>
       <summary
         aria-label={`Try it: ${tool.function.name}`}
         className="flex cursor-pointer list-none items-center gap-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400"
@@ -134,7 +142,15 @@ export function TryItPanel({ tool, token }: { tool: LiveTool; token: string }) {
   );
 }
 
-function LiveToolCard({ tool, token }: { tool: LiveTool; token: string }) {
+function LiveToolCard({
+  tool,
+  token,
+  defaultOpen = false,
+}: {
+  tool: LiveTool;
+  token: string;
+  defaultOpen?: boolean;
+}) {
   return (
     <section className="mb-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
       <div className="flex flex-wrap items-center gap-2">
@@ -152,7 +168,7 @@ function LiveToolCard({ tool, token }: { tool: LiveTool; token: string }) {
       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
         {tool.metadata.method} {tool.metadata.endpoint}
       </p>
-      <TryItPanel tool={tool} token={token} />
+      <TryItPanel tool={tool} token={token} defaultOpen={defaultOpen} />
     </section>
   );
 }
@@ -165,6 +181,8 @@ function LiveToolCard({ tool, token }: { tool: LiveTool; token: string }) {
 export function InstalledToolsPage() {
   const { t, rich } = useI18n();
   const { token } = useAuth();
+  const [searchParams] = useSearchParams();
+  const plugin = searchParams.get("plugin");
   const liveTools = useAsyncResource(
     (signal) =>
       // `?? []`: a response omitting `tools` would otherwise resolve this
@@ -174,6 +192,10 @@ export function InstalledToolsPage() {
       fetchLiveTools(signal),
     { timeoutMs: 15_000 },
   );
+
+  const shown = plugin
+    ? liveTools.data?.filter((tool) => tool.metadata.plugin === plugin)
+    : liveTools.data;
 
   return (
     <>
@@ -191,6 +213,14 @@ export function InstalledToolsPage() {
           ),
         })}
       </InfoCallout>
+      {plugin && (
+        <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">
+          {t("tools.filteredBy", { plugin })}{" "}
+          <Link to={ROUTES.installedAiTools} className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+            {t("tools.showAll")}
+          </Link>
+        </p>
+      )}
       <StatusLine>{liveTools.loading ? t("tools.loading") : ""}</StatusLine>
       <h2 className="sr-only">{t("tools.callable")}</h2>
       {liveTools.loading && liveTools.data === null && <CardListSkeleton />}
@@ -202,16 +232,17 @@ export function InstalledToolsPage() {
           onRetry={liveTools.reload}
         />
       )}
-      {!liveTools.loading && !liveTools.error && liveTools.data?.length === 0 && (
+      {!liveTools.loading && !liveTools.error && shown?.length === 0 && (
         <EmptyState className="mb-6">
-          {t("tools.liveEmpty")}
+          {plugin ? t("tools.pluginNoTools", { plugin }) : t("tools.liveEmpty")}
         </EmptyState>
       )}
-      {!liveTools.error && liveTools.data?.map((t) => (
+      {!liveTools.error && shown?.map((tool, i) => (
         <LiveToolCard
-          key={`${t.metadata.plugin}:${t.function.name}`}
-          tool={t}
+          key={`${tool.metadata.plugin}:${tool.function.name}`}
+          tool={tool}
           token={token}
+          defaultOpen={!!plugin && i === 0}
         />
       ))}
     </>

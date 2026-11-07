@@ -146,9 +146,9 @@ const NAV_MODEL: NavSectionDef[] = [
       { to: "/rag/pipelines", id: "pipelines", icon: "pipelines", requires: MEMBER },
       {
         // Discover: ONE catalog screen for plugins, with what is installed as
-        // a view of it. A plugin's source is a filter and badge. AI tools are
-        // a facet of a plugin (their pages stay reachable from the plugin
-        // pages, without a row of their own); modules are Platform-only.
+        // a view of it. A plugin's source is a filter and badge. The live
+        // tools (where a tool can be tried) are a tab of their own (#186);
+        // modules are Platform-only.
         to: ROUTES.discoverPlugins,
         id: "discover",
         icon: "available-plugins",
@@ -157,6 +157,7 @@ const NAV_MODEL: NavSectionDef[] = [
         tabs: [
           { to: ROUTES.discoverPlugins, id: "discoverPlugins", icon: "plugins", requires: MEMBER },
           { to: ROUTES.installedPlugins, id: "installedPlugins", icon: "installed", requires: MEMBER },
+          { to: ROUTES.installedAiTools, id: "installedAiTools", icon: "ai-tools", requires: MEMBER },
         ],
       },
     ],
