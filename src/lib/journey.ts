@@ -121,7 +121,7 @@ export function primaryAction(counts: JourneyCounts | null): PrimaryAction {
         to: "/rag",
         icon: "upload",
         title: "Upload a document",
-        body: "Your knowledge base is empty — upload a PDF, TXT, or MD file so there's something to search over.",
+        body: "Your knowledge base is empty — upload a document (PDF, Word, Excel, text…) so there's something to search over.",
       };
     case 2: {
       const n = counts!.readyKbCount;

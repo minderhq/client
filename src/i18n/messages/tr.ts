@@ -409,6 +409,7 @@ export const tr: Messages = {
   },
 
   knowledgeBases: {
+    uploadLabel: "Belge yükleyin (PDF, Word, Excel, PowerPoint, metin, Markdown, CSV, HTML ya da görsel)",
     subtitle:
       "Bilgi tabanları oluşturun ve belge yükleyin: asistanlarınız bu veriler üzerinde arama yapar. Bilgi tabanları kurumunuza aittir; görmek, oluşturmak, yüklemek ya da silmek için giriş yapın.",
     createAssistant: "üzerinde bir asistan oluşturun →",
@@ -608,7 +609,7 @@ export const tr: Messages = {
         },
         upload: {
           title: "Bir belge yükleyin",
-          hint: "Aranacak bir şey olsun diye bir PDF, TXT ya da Markdown dosyası ekleyin.",
+          hint: "Aranacak bir şey olsun diye bir belge ekleyin (PDF, Word, Excel, metin…).",
         },
         assistant: {
           title: "Bir asistan kurun",

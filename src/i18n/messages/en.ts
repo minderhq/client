@@ -411,6 +411,7 @@ export const en = {
   },
 
   knowledgeBases: {
+    uploadLabel: "Upload documents (PDF, Word, Excel, PowerPoint, text, Markdown, CSV, HTML or images)",
     subtitle:
       "Create knowledge bases and upload documents — this is the data your assistants search over. Knowledge bases belong to your organization, so log in to see, create, upload, or delete them.",
     createAssistant: "create an assistant over it →",
@@ -610,7 +611,7 @@ export const en = {
         },
         upload: {
           title: "Upload a document",
-          hint: "Add a PDF, TXT or Markdown file so there is something to search.",
+          hint: "Add a document (PDF, Word, Excel, text…) so there is something to search.",
         },
         assistant: {
           title: "Set up an assistant",

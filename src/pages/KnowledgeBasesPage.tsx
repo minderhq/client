@@ -172,6 +172,16 @@ function pollDocumentStatus(
   );
 }
 
+/** Document and image types the server's extractors ingest (#147). Audio,
+ * video and data formats (parquet, avro, sql…) are left to the API: they
+ * need optional services or are rarely a knowledge-base upload. Anything else
+ * still reaches the server via "All files" and comes back with its reason. */
+export const UPLOAD_ACCEPT = [
+  ".pdf", ".doc", ".docx", ".xlsx", ".pptx", ".csv", ".tsv",
+  ".txt", ".md", ".html", ".htm", ".epub", ".json",
+  ".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff",
+].join(",");
+
 export function UploadWidget({
   kb,
   token,
@@ -181,6 +191,7 @@ export function UploadWidget({
   token: string;
   onUploaded: () => void;
 }) {
+  const { t } = useI18n();
   const fileInputId = useId();
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -264,14 +275,14 @@ export function UploadWidget({
         htmlFor={fileInputId}
         className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
       >
-        Upload documents (.pdf, .txt, .md)
+        {t("knowledgeBases.uploadLabel")}
       </label>
       <input
         id={fileInputId}
         className="block text-sm text-gray-600 disabled:cursor-not-allowed disabled:opacity-60 dark:text-gray-400"
         type="file"
         multiple
-        accept=".pdf,.txt,.md"
+        accept={UPLOAD_ACCEPT}
         onChange={handleSelect}
         disabled={!token || uploading}
       />
