@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
+import { type MessageKey, useI18n } from "../i18n";
+import type { Translator } from "../i18n/translator";
 import { InfoCallout } from "../components/InfoCallout";
 import { InviteSignUpForm, type SignUpOutcome } from "../components/InviteSignUpForm";
 import { PageHeader } from "../components/PageHeader";
@@ -39,14 +41,11 @@ export interface InviteInfo {
 }
 
 
-const INVALID_LINK =
-  "This invite link isn't valid. Check that you copied the whole link, or ask the person who invited you for a new one.";
-
-async function fetchInvite(inviteToken: string, signal: AbortSignal): Promise<InviteInfo> {
+async function fetchInvite(inviteToken: string, signal: AbortSignal, t: Translator["t"]): Promise<InviteInfo> {
   try {
     return await apiFetch<InviteInfo>(`/v1/invites/by-token/${inviteToken}`, { signal });
   } catch (e) {
-    if (e instanceof ApiError && e.status === 404) throw new Error(INVALID_LINK);
+    if (e instanceof ApiError && e.status === 404) throw new Error(t("inviteRedeem.invalidLink"));
     throw e;
   }
 }
@@ -72,35 +71,39 @@ function signUpLandingPath(landing: RegisterLanding | undefined, info: InviteInf
 const NO_LONGER_AVAILABLE = "Invite is no longer available";
 
 /** Message for a failed redeem by a signed-in user. */
-function redeemErrorMessage(e: unknown, info: InviteInfo | null, myEmail: string): string {
+function redeemErrorMessage(
+  e: unknown,
+  info: InviteInfo | null,
+  myEmail: string,
+  t: Translator["t"],
+): string {
   if (e instanceof ApiError) {
     if (e.status === 403) {
-      const who = myEmail ? `, but you're signed in as ${myEmail}` : "";
-      return `This invite was sent to ${info?.email || "a different address"}${who}. Sign out and sign in with the invited account, or ask for an invite to your own address.`;
+      const email = info?.email || t("inviteRedeem.differentAddress");
+      return myEmail
+        ? t("inviteRedeem.wrongAccount", { email, me: myEmail })
+        : t("inviteRedeem.wrongAccountNoMe", { email });
     }
     if (e.status === 409) {
       return e.message === NO_LONGER_AVAILABLE
-        ? "This invite is no longer available: it was withdrawn, or it has already been used. Ask the person who invited you for a new link."
-        : "This invite has already been used.";
+        ? t("inviteRedeem.withdrawnOrUsed")
+        : t("inviteRedeem.alreadyUsed");
     }
     if (e.status === 410) {
-      return "This invite has expired. Ask the person who invited you for a new link.";
+      return t("inviteRedeem.expired");
     }
-    if (e.status === 404) return INVALID_LINK;
+    if (e.status === 404) return t("inviteRedeem.invalidLink");
   }
   return friendlyErrorMessage(e);
 }
 
-const UNAVAILABLE: Record<Exclude<InviteInfo["status"], "pending">, [string, string]> = {
-  expired: [
-    "This invite has expired.",
-    "Ask the person who invited you to send a new one.",
-  ],
-  revoked: [
-    "This invite was withdrawn.",
-    "If you still need access, ask the person who invited you for a new invite.",
-  ],
-  accepted: ["This invite has already been used.", ""],
+const UNAVAILABLE: Record<
+  Exclude<InviteInfo["status"], "pending">,
+  [MessageKey, MessageKey | null]
+> = {
+  expired: ["inviteRedeem.expiredTitle", "inviteRedeem.expiredHint"],
+  revoked: ["inviteRedeem.withdrawnTitle", "inviteRedeem.withdrawnHint"],
+  accepted: ["inviteRedeem.alreadyUsed", null],
 };
 
 /** Landing page for an invite link (`/invite/:token`). Three ways in:
@@ -112,6 +115,7 @@ const UNAVAILABLE: Record<Exclude<InviteInfo["status"], "pending">, [string, str
  *   team/org. (Not offered where the instance has sign-up turned off, or when
  *   the invite can't create accounts: `can_create_account: false`.) */
 export function InviteRedeemPage() {
+  const { t, rich } = useI18n();
   const { token: invitedTokenParam } = useParams<{ token: string }>();
   const inviteToken = invitedTokenParam ?? "";
   const { token, email: myEmail, isAuthenticated, loginWithToken } = useAuth();
@@ -120,7 +124,7 @@ export function InviteRedeemPage() {
   // Only a signed-out visitor is offered sign-up, so only they need the mode.
   const registration = useRegistrationMode({ enabled: !isAuthenticated });
 
-  const infoRes = useAsyncResource((signal) => fetchInvite(inviteToken, signal), {
+  const infoRes = useAsyncResource((signal) => fetchInvite(inviteToken, signal, t), {
     deps: [inviteToken],
   });
 
@@ -163,7 +167,7 @@ export function InviteRedeemPage() {
       loginWithToken(result.access_token, sentAt);
       navigate(landingPath(info), { replace: true });
     } catch (e) {
-      setStatus(redeemErrorMessage(e, info, myEmail));
+      setStatus(redeemErrorMessage(e, info, myEmail, t));
       setIsError(true);
       setRedeeming(false);
       // No longer pending: re-read the invite, so the page says whether it
@@ -190,9 +194,9 @@ export function InviteRedeemPage() {
 
   return (
     <div className="mx-auto max-w-md">
-      <PageHeader icon="mail" title="Invitation" />
+      <PageHeader icon="mail" title={t("inviteRedeem.title")} />
 
-      <StatusLine>{infoRes.loading ? "Loading invite…" : ""}</StatusLine>
+      <StatusLine>{infoRes.loading ? t("inviteRedeem.loading") : ""}</StatusLine>
 
       {infoRes.error && (
         <div role="alert">
@@ -203,21 +207,23 @@ export function InviteRedeemPage() {
       {info && info.status !== "pending" && (
         <div role="alert">
           <InfoCallout icon="warning">
-            {UNAVAILABLE[info.status]?.[0] ?? `This invite is ${info.status}.`}{" "}
-            {UNAVAILABLE[info.status]?.[1]}
+            {UNAVAILABLE[info.status]
+              ? t(UNAVAILABLE[info.status][0])
+              : t("inviteRedeem.statusFallback", { status: info.status })}{" "}
+            {UNAVAILABLE[info.status]?.[1] ? t(UNAVAILABLE[info.status][1]!) : null}
             {info.status === "accepted" &&
               (isAuthenticated ? (
                 <Link to={landingPath(info)} className="underline">
-                  Go to {targetName ?? "your team"}
+                  {t("inviteRedeem.goTo", { name: targetName ?? t("inviteRedeem.yourTeam") })}
                 </Link>
               ) : (
-                <>
-                  If you accepted it,{" "}
-                  <Link to="/login" className="underline">
-                    sign in
-                  </Link>{" "}
-                  to continue.
-                </>
+                rich("inviteRedeem.acceptedSignIn", {
+                  link: (
+                    <Link to="/login" className="underline">
+                      {t("inviteRedeem.signInLink")}
+                    </Link>
+                  ),
+                })
               ))}
           </InfoCallout>
         </div>
@@ -226,22 +232,26 @@ export function InviteRedeemPage() {
       {info && info.status === "pending" && (
         <>
           <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-            {info.invited_by_name ? (
-              <>
-                <strong>{info.invited_by_name}</strong> invited you
-              </>
-            ) : (
-              "You've been invited"
-            )}{" "}
-            to join <strong>{targetName}</strong>
-            {isOrg ? " (organization)" : " (team)"} as a <strong>{targetRole}</strong>
-            {info.email ? (
-              <>
-                {" "}
-                (<span className="break-all">{info.email}</span>)
-              </>
-            ) : null}
-            .
+            {rich(
+              info.invited_by_name
+                ? isOrg
+                  ? "inviteRedeem.invitedOrgNamed"
+                  : "inviteRedeem.invitedTeamNamed"
+                : isOrg
+                  ? "inviteRedeem.invitedOrg"
+                  : "inviteRedeem.invitedTeam",
+              {
+                inviter: <strong>{info.invited_by_name}</strong>,
+                target: <strong>{targetName}</strong>,
+                role: <strong>{targetRole}</strong>,
+                email: info.email ? (
+                  <>
+                    {" "}
+                    (<span className="break-all">{info.email}</span>)
+                  </>
+                ) : null,
+              },
+            )}
           </p>
 
           {isAuthenticated && (
@@ -251,7 +261,7 @@ export function InviteRedeemPage() {
                 disabled={redeeming}
                 className={`w-full sm:w-auto ${primaryButtonClass}`}
               >
-                {redeeming ? "Joining…" : `Join ${targetName}`}
+                {redeeming ? t("inviteRedeem.joining") : t("inviteRedeem.join", { name: targetName ?? "" })}
               </button>
               <StatusLine isError={isError} className="mt-2">
                 {status}
@@ -287,8 +297,8 @@ export function InviteRedeemPage() {
                   className={`w-full sm:w-auto ${primaryButtonClass}`}
                 >
                   {signUpOutcome.kind === "created-not-signed-in"
-                    ? "Sign in"
-                    : "Sign in to accept"}
+                    ? t("inviteRedeem.signIn")
+                    : t("inviteRedeem.signInToAccept")}
                 </button>
               )}
             </div>
@@ -304,7 +314,7 @@ export function InviteRedeemPage() {
                   id="invite-signin-heading"
                   className="text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  Already have an account?
+                  {t("inviteRedeem.haveAccount")}
                 </h2>
                 <button
                   type="button"
@@ -313,16 +323,15 @@ export function InviteRedeemPage() {
                     existingAccountsOnly ? primaryButtonClass : secondaryButtonClass
                   }`}
                 >
-                  Sign in to accept
+                  {t("inviteRedeem.signInToAccept")}
                 </button>
               </section>
 
               {existingAccountsOnly && (
                 <InfoCallout icon="lock">
-                  This invite can only be accepted by someone who already has an
-                  account: sign in to accept it. If you don't have an account yet,
-                  ask an administrator of {targetName ?? "the organization"} for an
-                  invite that creates one.
+                  {t("inviteRedeem.existingOnly", {
+                    name: targetName ?? t("inviteRedeem.theOrganization"),
+                  })}
                 </InfoCallout>
               )}
 
@@ -343,10 +352,7 @@ export function InviteRedeemPage() {
                 !registration.loading &&
                 registration.mode === "sso_only" && (
                 <InfoCallout icon="lock">
-                  New accounts can't be created here on this instance.{" "}
-                  {oidcLoginUrl
-                    ? "Choose “Sign in to accept” above, then sign in with SSO; your account is set up the first time you do."
-                    : "Ask an administrator to create an account for you, then sign in to accept."}
+                  {t(oidcLoginUrl ? "inviteRedeem.ssoOnlyWithSso" : "inviteRedeem.ssoOnlyNoSso")}
                 </InfoCallout>
               )}
             </div>

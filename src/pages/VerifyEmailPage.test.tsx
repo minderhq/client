@@ -2,7 +2,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { EMAIL_VERIFIED_NOTICE, VerifyEmailPage } from "./VerifyEmailPage";
+import { VerifyEmailPage } from "./VerifyEmailPage";
+import { setLocale } from "../i18n";
 
 let isAuthenticated = false;
 let token = "";
@@ -86,6 +87,16 @@ describe("VerifyEmailPage (#2447)", () => {
     );
   });
 
+  it("renders in Turkish", async () => {
+    setLocale("tr");
+    try {
+      renderAt("/verify-email#token=mev_tr");
+      expect(await screen.findByRole("button", { name: "E-postamı doğrula" })).toBeTruthy();
+    } finally {
+      setLocale("en");
+    }
+  });
+
   it("explains a URL without a token", async () => {
     renderAt("/verify-email");
     expect(await screen.findByText(/needs the link from your verification email/)).toBeTruthy();
@@ -101,7 +112,7 @@ describe("VerifyEmailPage (#2447)", () => {
     expect(vi.mocked(fetch).mock.calls[0][1]?.body).toBe(JSON.stringify({ token: "mev_ok" }));
     expect(screen.queryByRole("button", { name: "Confirm my email" })).toBeNull();
     fireEvent.click(screen.getByRole("link", { name: "Log in to continue" }));
-    expect((await screen.findByTestId("login")).textContent).toBe(EMAIL_VERIFIED_NOTICE);
+    expect((await screen.findByTestId("login")).textContent).toBe("Your email address is confirmed. Log in to continue.");
     expect(loginWithToken).not.toHaveBeenCalled();
   });
 

@@ -4,7 +4,7 @@ import { useLocation } from "react-router-dom";
 import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
-import { adoptProfileLocale } from "../i18n";
+import { adoptProfileLocale, useI18n } from "../i18n";
 import {
   ApiError,
   EMAIL_VERIFICATION_REQUIRED_EVENT,
@@ -48,6 +48,7 @@ export function WaitingRoomPage({
   state: WorkspaceState;
   canCreate: boolean;
 }) {
+  const { t } = useI18n();
   const { sessionKey, loginWithToken, switchOrg, logout } = useAuth();
   const tokenRef = useTokenRef();
   const [busy, setBusy] = useState(false);
@@ -81,12 +82,12 @@ export function WaitingRoomPage({
     } catch (e) {
       setError(
         e instanceof ApiError && e.status === 409
-          ? "You already have a workspace. Reload the page to continue."
+          ? t("waitingRoom.workspaceExists")
           : friendlyErrorMessage(e),
       );
       setBusy(false);
     }
-  }, [tokenRef, loginWithToken]);
+  }, [tokenRef, loginWithToken, t]);
 
   const choose = useCallback(
     async (org: MyOrg) => {
@@ -104,7 +105,7 @@ export function WaitingRoomPage({
 
   const signOut = (
     <button type="button" onClick={logout} className={secondaryButtonClass}>
-      Sign out
+      {t("common.signOut")}
     </button>
   );
   const errorLine = error ? (
@@ -118,11 +119,11 @@ export function WaitingRoomPage({
       <>
         <PageHeader
           icon="org"
-          title="Choose an organization"
-          subtitle="You belong to an organization, but none is active right now. Pick one to continue."
+          title={t("waitingRoom.chooseOrgTitle")}
+          subtitle={t("waitingRoom.chooseOrgSubtitle")}
         />
         {orgs === null ? (
-          <p className="text-sm text-gray-500">Loading your organizations…</p>
+          <p className="text-sm text-gray-500">{t("waitingRoom.loadingOrgs")}</p>
         ) : (
           <ul className="space-y-2">
             {orgs.map((org) => (
@@ -152,19 +153,17 @@ export function WaitingRoomPage({
     <>
       <PageHeader
         icon="org"
-        title="No workspace yet"
+        title={t("waitingRoom.noWorkspaceTitle")}
         subtitle={
           state === "pending_request"
-            ? "Your request to join an organization is waiting for approval."
-            : "Your account isn't part of a workspace yet."
+            ? t("waitingRoom.pendingSubtitle")
+            : t("waitingRoom.noWorkspaceSubtitle")
         }
       />
       {canCreate ? (
         <>
           <InfoCallout icon="info">
-            A workspace is where your knowledge bases, models and plugins live.
-            Create your own, or ask an administrator to invite you to an
-            existing one.
+            {t("waitingRoom.createCallout")}
           </InfoCallout>
           <button
             type="button"
@@ -172,13 +171,12 @@ export function WaitingRoomPage({
             onClick={create}
             className={primaryButtonClass}
           >
-            {busy ? "Creating…" : "Create my workspace"}
+            {busy ? t("waitingRoom.creating") : t("waitingRoom.create")}
           </button>
         </>
       ) : (
         <InfoCallout icon="info">
-          An administrator has to invite you to a workspace before you can use
-          Minder. Ask one to send you an invite link, then open it here.
+          {t("waitingRoom.needInvite")}
         </InfoCallout>
       )}
       {/* Request access (minder#2235) is not built yet; it goes here. */}
@@ -206,6 +204,7 @@ export function WaitingRoomPage({
  * tenant. A profile that can't be read, or that predates the field, lets the
  * app through (the API still enforces access). Never logs out otherwise. */
 export function WorkspaceGate({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   const {
     isAuthenticated,
     mustChangePassword,
@@ -300,20 +299,20 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
     return error ? (
       <>
         <p className="text-sm text-gray-700 dark:text-gray-300">
-          Your email address is confirmed, but signing you in didn't finish.
+          {t("waitingRoom.signInNotFinished")}
         </p>
         <StatusLine isError>{error}</StatusLine>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={finishSignIn} className={primaryButtonClass}>
-            Retry
+            {t("common.retry")}
           </button>
           <button type="button" onClick={logout} className={secondaryButtonClass}>
-            Sign out
+            {t("common.signOut")}
           </button>
         </div>
       </>
     ) : (
-      <StatusLine>Finishing sign-in…</StatusLine>
+      <StatusLine>{t("verifyEmail.finishing")}</StatusLine>
     );
   }
   const required = requiredKey === sessionKey;

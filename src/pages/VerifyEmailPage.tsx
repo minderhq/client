@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
+import { useI18n } from "../i18n";
 import { InfoCallout } from "../components/InfoCallout";
 import { ResendVerificationButton } from "../components/ResendVerificationButton";
 import { StatusLine } from "../components/StatusLine";
@@ -8,15 +9,12 @@ import { friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import {
   confirmEmailVerification,
-  formatWait,
   useContinueAfterVerification,
   type VerifyResult,
 } from "../lib/emailVerification";
 import { cardClass, primaryButtonClass, secondaryButtonClass } from "../lib/ui";
 import { takeTokenFromUrlFragment } from "../lib/passwordReset";
 import { useNoReferrer } from "../lib/useNoReferrer";
-
-export const EMAIL_VERIFIED_NOTICE = "Your email address is confirmed. Log in to continue.";
 
 /** `/verify-email#token=mev_...`: the page a verification email links to
  * (#2447).
@@ -30,6 +28,7 @@ export const EMAIL_VERIFIED_NOTICE = "Your email address is confirmed. Log in to
  * signed-in user; a signed-out one logs in first, which leads to "Check your
  * email"). */
 export function VerifyEmailPage() {
+  const { t, plural, rich } = useI18n();
   const { isAuthenticated } = useAuth();
   const continueAfterVerification = useContinueAfterVerification();
   const navigate = useNavigate();
@@ -94,26 +93,34 @@ export function VerifyEmailPage() {
   const signedOut = !isAuthenticated;
   const loginLink = (
     <Link to="/login" className="underline">
-      Log in
+      {t("verifyEmail.logInLink")}
     </Link>
   );
+
+  // A wait in words, in the active language ("45 seconds", "2 minutes", "3 hours").
+  function waitText(seconds: number): string {
+    const s = Math.max(1, Math.ceil(seconds));
+    if (s < 60) return plural("verifyEmail.seconds", s);
+    const m = Math.ceil(s / 60);
+    return m < 60 ? plural("verifyEmail.minutes", m) : plural("verifyEmail.hours", Math.ceil(m / 60));
+  }
 
   let outcome: ReactNode = null;
   if (result?.kind === "verified") {
     outcome = (
       <>
-        <InfoCallout icon="check">Your email address is confirmed.</InfoCallout>
+        <InfoCallout icon="check">{t("verifyEmail.verified")}</InfoCallout>
         {signedOut ? (
           <Link
             to="/login"
-            state={{ notice: EMAIL_VERIFIED_NOTICE }}
+            state={{ notice: t("verifyEmail.verifiedNotice") }}
             className={`mt-3 inline-block ${primaryButtonClass}`}
           >
-            Log in to continue
+            {t("verifyEmail.logInToContinue")}
           </Link>
         ) : continued ? (
           <Link to="/" className={`mt-3 inline-block ${primaryButtonClass}`}>
-            Continue to Minder
+            {t("verifyEmail.continueToMinder")}
           </Link>
         ) : continueError ? (
           <div className="mt-3 flex flex-col gap-2">
@@ -123,11 +130,11 @@ export function VerifyEmailPage() {
               onClick={moveSessionOn}
               className={`self-start ${secondaryButtonClass}`}
             >
-              Try again
+              {t("common.tryAgain")}
             </button>
           </div>
         ) : (
-          <StatusLine>Finishing sign-in…</StatusLine>
+          <StatusLine>{t("verifyEmail.finishing")}</StatusLine>
         )}
       </>
     );
@@ -136,14 +143,13 @@ export function VerifyEmailPage() {
       <>
         <InfoCallout icon="warning">
           {result.kind === "expired"
-            ? "This link has expired. Links work for a limited time; ask for a new one."
-            : "This link can't be used. It may have been used already, or a newer link replaced it. If you've already confirmed your address, just log in."}
+            ? t("verifyEmail.expired")
+            : t("verifyEmail.invalid")}
         </InfoCallout>
         <div className="mt-3">
           {signedOut ? (
             <p className="text-sm text-gray-700 dark:text-gray-300">
-              {loginLink} to continue, or to get a new link if your address
-              isn't confirmed yet.
+              {rich("verifyEmail.signedOutResend", { login: loginLink })}
             </p>
           ) : (
             <ResendVerificationButton onAlreadyVerified={() => navigate("/", { replace: true })} />
@@ -154,8 +160,8 @@ export function VerifyEmailPage() {
   } else if (result?.kind === "unavailable") {
     outcome = (
       <InfoCallout icon="warning">
-        This server doesn't verify email addresses, so there is nothing to
-        confirm. {signedOut ? <>{loginLink} to continue.</> : null}
+        {t("verifyEmail.unavailable")}{" "}
+        {signedOut ? rich("verifyEmail.loginToContinue", { login: loginLink }) : null}
       </InfoCallout>
     );
   }
@@ -163,7 +169,7 @@ export function VerifyEmailPage() {
   return (
     <div className="mx-auto w-full max-w-sm">
       <h1 className="mb-4 text-2xl font-bold text-gray-900 dark:text-gray-100">
-        Confirm your email
+        {t("verifyEmail.title")}
       </h1>
 
       <div ref={outcomeRef} tabIndex={-1} className="outline-none">
@@ -172,13 +178,12 @@ export function VerifyEmailPage() {
 
       {checked && !token && !result && (
         <InfoCallout icon="warning">
-          This page needs the link from your verification email. Open the
-          newest one we sent you.{" "}
+          {t("verifyEmail.needsLink")}{" "}
           {signedOut ? (
-            <>{loginLink} to ask for a new link.</>
+            rich("verifyEmail.loginForNewLink", { login: loginLink })
           ) : (
             <Link to="/" className="underline">
-              Ask for a new link
+              {t("verifyEmail.askNewLink")}
             </Link>
           )}
         </InfoCallout>
@@ -187,7 +192,7 @@ export function VerifyEmailPage() {
       {token && (
         <div className={`flex flex-col gap-3 ${cardClass}`}>
           <p className="text-sm text-gray-700 dark:text-gray-300">
-            Press the button to confirm the email address this link was sent to.
+            {t("verifyEmail.pressButton")}
           </p>
           <button
             type="button"
@@ -195,11 +200,11 @@ export function VerifyEmailPage() {
             disabled={busy}
             className={primaryButtonClass}
           >
-            {busy ? "Confirming…" : "Confirm my email"}
+            {busy ? t("verifyEmail.confirming") : t("verifyEmail.confirm")}
           </button>
           {result?.kind === "rate_limited" && (
             <StatusLine isError>
-              Too many attempts. Wait {formatWait(result.retryAfterSeconds)}, then try again.
+              {t("verifyEmail.rateLimited", { wait: waitText(result.retryAfterSeconds) })}
             </StatusLine>
           )}
           {result?.kind === "error" && <StatusLine isError>{result.message}</StatusLine>}

@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { apiFetch } from "../lib/api";
+import { setLocale } from "../i18n";
 import { AuthProvider } from "../lib/auth";
 import { ForcePasswordChangeGate } from "./ForcePasswordChangePage";
 import { WorkspaceGate } from "./WaitingRoomPage";
@@ -88,6 +89,20 @@ describe("WorkspaceGate / check your email (#2447)", () => {
     expect(await screen.findByText(/it works for 24 hours/)).toBeTruthy();
     expect(screen.queryByText("app routes")).toBeNull();
     expect(screen.queryByText("No workspace yet")).toBeNull();
+  });
+
+  it("renders in Turkish", async () => {
+    mockApi({
+      "GET /v1/profile/me": () => json(pending),
+      "GET /v1/auth/capabilities": () => json({}),
+    });
+    setLocale("tr");
+    try {
+      renderGate();
+      expect(await screen.findByRole("heading", { name: "E-postanızı kontrol edin" })).toBeTruthy();
+    } finally {
+      setLocale("en");
+    }
   });
 
   it("shows it right after a login that said so, before the profile answers", async () => {

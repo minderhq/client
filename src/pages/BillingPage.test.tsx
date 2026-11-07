@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BillingPage, PlanCard } from "./BillingPage";
+import { setLocale } from "../i18n";
 import type { Subscription } from "../lib/billing";
 import { redirectTo } from "../lib/redirect";
 
@@ -42,6 +43,21 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+});
+
+describe("BillingPage in Turkish", () => {
+  it("renders the page copy in Turkish", async () => {
+    apiFetch.mockResolvedValueOnce(sub());
+    setLocale("tr");
+    try {
+      render(<BillingPage />);
+      expect(await screen.findByText("ücretsiz plan")).toBeTruthy();
+      expect(screen.getByText("Plan ve fatura")).toBeTruthy();
+      expect(screen.getByText("Pro planına yükselt")).toBeTruthy();
+    } finally {
+      setLocale("en");
+    }
+  });
 });
 
 describe("PlanCard", () => {
