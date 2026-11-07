@@ -6,6 +6,7 @@ import {
   type Messages,
   type PluralMessageKey,
 } from "./catalog";
+import { parseServerTimestamp } from "../lib/time";
 import type { MessageParams, PluralForms } from "./types";
 
 /** Everything a component needs to speak the active language. */
@@ -87,7 +88,10 @@ export function createTranslator(locale: Locale): Translator {
         : numberFormat.format(value);
     },
     formatDate(value, options) {
-      const date = value instanceof Date ? value : new Date(value);
+      const date =
+        value instanceof Date
+          ? value
+          : (typeof value === "string" ? parseServerTimestamp(value) : null) ?? new Date(value);
       if (Number.isNaN(date.getTime())) return String(value);
       return new Intl.DateTimeFormat(locale, options).format(date);
     },

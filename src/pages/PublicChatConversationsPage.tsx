@@ -23,6 +23,7 @@ import { useTokenRef } from "../lib/useTokenRef";
 import type { PublicChatEndpoint } from "./PublicChatEndpointsPage";
 import { chatbotConversationsRoute, ROUTES } from "../lib/routes";
 import { useI18n } from "../i18n";
+import { formatServerTime } from "../lib/time";
 
 // #1582 (client half): the creator conversation dashboard. An endpoint owner
 // reads the anonymous conversations that flowed through THEIR public chat
@@ -120,9 +121,7 @@ export interface ConversationDetailResponse {
 /** Human timestamp, or an em-dash when the backend sent null/garbage — never
  * render a raw ISO string or "Invalid Date" at the user. */
 function formatTimestamp(value: string | null | undefined): string {
-  if (!value) return "—";
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
+  return formatServerTime(value);
 }
 
 /** A session id is opaque and long; show a short, monospaced prefix so the list

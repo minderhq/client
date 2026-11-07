@@ -43,6 +43,7 @@ import { useCan } from "../lib/useCan";
 import { useTokenRef } from "../lib/useTokenRef";
 import { ROUTES } from "../lib/routes";
 import { useI18n } from "../i18n";
+import { formatServerTime } from "../lib/time";
 
 /** Maps json_schema/ui_schema onto the existing ConfigField shape so the flat
  * schema's rendering/submission logic (FieldInput, handleSubmit's int/float
@@ -415,8 +416,7 @@ const HEALTH_TONE: Record<string, string> = {
 };
 
 function formatTimestamp(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
+  return formatServerTime(iso, iso);
 }
 
 /** What plugin-registry reports for this plugin on this installation: whether
