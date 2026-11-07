@@ -19,6 +19,7 @@ import {
   surfaceMutedClass,
 } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
+import { formatServerTime } from "../lib/time";
 
 interface AuditEntry {
   id: number;
@@ -217,7 +218,7 @@ export function AuditLogPage({ scope }: { scope: "org" | "platform" }) {
                   <span className={`ml-auto text-xs ${mutedTextClass}`}>
                     {e.actor_id != null ? `actor #${e.actor_id}` : "system"}
                     {e.ip_address && ` · ${e.ip_address}`}
-                    {e.created_at && ` · ${new Date(e.created_at).toLocaleString()}`}
+                    {e.created_at && ` · ${formatServerTime(e.created_at)}`}
                   </span>
                   {hasDetail && (
                     <button

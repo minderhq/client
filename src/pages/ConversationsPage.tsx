@@ -13,6 +13,7 @@ import { destructiveButtonClass, mutedTextClass, secondaryButtonClass } from "..
 import { usePaginatedList } from "../lib/usePaginatedList";
 import { useTokenRef } from "../lib/useTokenRef";
 import { useI18n } from "../i18n";
+import { formatServerTime } from "../lib/time";
 
 export interface ConversationSummary {
   conversation_id: string;
@@ -49,7 +50,7 @@ function ConversationCard({
           </p>
           <p className={`mt-1 text-xs ${mutedTextClass}`}>
             {t("conversations.lastActive", {
-              time: new Date(conversation.last_activity).toLocaleString(),
+              time: formatServerTime(conversation.last_activity),
             })}
           </p>
         </div>

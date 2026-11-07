@@ -24,6 +24,7 @@ import {
 } from "../lib/modelDefaults";
 import { cardClass, fieldHintClass, inputClass, primaryButtonClass } from "../lib/ui";
 import { useAsyncResource } from "../lib/useAsyncResource";
+import { formatServerTime } from "../lib/time";
 
 const NO_LOCAL_PROVIDERS: LocalProviderIds = new Set();
 
@@ -180,8 +181,8 @@ export function ModelDefaultsPanel({
             </button>
             {saved?.updated_at && (
               <span className="text-xs text-gray-500 dark:text-gray-400">
-                Last changed {new Date(saved.updated_at).toLocaleString()}
-                {saved.updated_by ? ` by ${saved.updated_by}` : ""}
+                {/* updated_by is a bare user id, not a name (#148): leave it out. */}
+                Last changed {formatServerTime(saved.updated_at)}
               </span>
             )}
           </div>
