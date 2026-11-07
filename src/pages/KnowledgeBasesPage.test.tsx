@@ -168,6 +168,14 @@ describe("UploadWidget", () => {
     ).toBe(true);
   });
 
+  it("accepts Word, Excel, PowerPoint and image files, not only PDF and text (#147)", () => {
+    render(<UploadWidget kb={kb()} token="tok" onUploaded={vi.fn()} />);
+    const accept = (screen.getByLabelText(/Upload documents/) as HTMLInputElement).accept.split(",");
+    for (const ext of [".pdf", ".txt", ".md", ".docx", ".xlsx", ".pptx", ".png", ".jpg"]) {
+      expect(accept).toContain(ext);
+    }
+  });
+
   it("queues selected files and does not show the upload button until files are chosen", () => {
     render(<UploadWidget kb={kb()} token="tok" onUploaded={vi.fn()} />);
     expect(screen.queryByText("Upload all")).toBeNull();
