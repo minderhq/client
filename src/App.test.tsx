@@ -330,7 +330,6 @@ describe("App — page titles match the nav (#2197)", () => {
    * name) or that have no nav entry at all. */
   const UNTITLED: string[] = [
     ROUTES.discoverAiTools,
-    ROUTES.installedAiTools,
     ROUTES.chatHistory,
     ROUTES.account,
     ROUTES.voice,

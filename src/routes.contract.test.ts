@@ -43,7 +43,6 @@ const AUTH_ROUTES = [
 const UTILITY_ROUTES: Record<string, string> = {
   "*": "unmatched paths get the 404 page",
   [ROUTES.discoverAiTools]: "a tool is a facet of a plugin: linked from the plugin pages, no menu row",
-  [ROUTES.installedAiTools]: "a tool is a facet of a plugin: linked from the plugin pages, no menu row",
   "/requests": "the old Requests URL: redirects to the inbox or to My requests, by permission",
 };
 

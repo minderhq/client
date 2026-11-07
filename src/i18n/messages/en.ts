@@ -135,6 +135,7 @@ export const en = {
       discover: { label: "Discover", description: "Find plugins to add, and see what is installed", keywords: "marketplace catalog browse store available install extensions plugins" },
       discoverPlugins: { label: "Plugins", title: "Discover plugins", description: "The plugin catalog, filterable by source", keywords: "plugin connectors source first-party private git mindhub ai tools" },
       installedPlugins: { label: "Installed", title: "Installed plugins", description: "What runs on this installation, plus your installs", keywords: "plugin running runtime version health first-party config settings enable disable uninstall ai tools" },
+      installedAiTools: { label: "Tools", title: "Installed tools", description: "Try the tools your running plugins expose", keywords: "ai tools try run test plugin action function" },
       myTeam: { label: "My team", title: "My team", description: "Your team's members, or ask to join a team", keywords: "team teams my team members join group sharing collaborate" },
       account: { label: "My account", description: "Your profile, voice settings and requests", keywords: "account me" },
       profile: { label: "Profile", description: "Your profile, password and preferences", keywords: "account profile password settings preferences me language" },
@@ -472,6 +473,11 @@ export const en = {
     justInstalled: "Installed. If this plugin brings a tool, {check} to confirm it's live.",
     checkInstalled: "check Installed tools",
     someExpose: "Some of these bring tools an assistant can use in chat — {check} to see which are live right now.",
+    try: "Try",
+    tryLabel: "Try the tools of {plugin}",
+    filteredBy: "Showing the tools of {plugin}.",
+    showAll: "Show all tools",
+    pluginNoTools: "{plugin} exposes no tool right now.",
   },
 
   installedPlugins: {

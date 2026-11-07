@@ -26,8 +26,8 @@ vi.mock("../components/ConfirmDialog", () => ({
   useConfirm: () => ({ confirm: mockConfirm, dialog: null }),
 }));
 vi.mock("react-router-dom", () => ({
-  Link: ({ children, to }: { children: ReactNode; to: string }) => (
-    <a href={to}>{children}</a>
+  Link: ({ children, to, ...rest }: { children: ReactNode; to: string; "aria-label"?: string }) => (
+    <a href={to} aria-label={rest["aria-label"]}>{children}</a>
   ),
 }));
 
@@ -604,6 +604,34 @@ describe("InstalledPluginCard — accessibility (#2195)", () => {
     const badge = screen.getByText("Your install: Enabled");
     expect(badge.querySelector("svg")).toBeTruthy();
     expect(badge.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
+  });
+});
+
+describe("InstalledPluginCard — try its tools (#186)", () => {
+  function renderCard(entry: ReturnType<typeof entryOf>) {
+    render(
+      <InstalledPluginCard
+        entry={entry}
+        token="tok"
+        runtimeKnown
+        onUninstalled={vi.fn()}
+        onToggleEnabled={vi.fn()}
+        confirm={vi.fn()}
+      />,
+    );
+  }
+
+  it("links a running plugin to its tools on the AI tools page", () => {
+    renderCard(mergeInstalledPlugins([], [runtimePlugin()], null)[0]);
+
+    const link = screen.getByRole("link", { name: "Try the tools of weather" });
+    expect(link.getAttribute("href")).toBe("/marketplace/installed/ai-tools?plugin=weather");
+  });
+
+  it("offers no Try link for a plugin that is not running", () => {
+    renderCard(entryOf(installation({ enabled: true })));
+
+    expect(screen.queryByRole("link", { name: /Try the tools/ })).toBeNull();
   });
 });
 

@@ -115,17 +115,17 @@ describe("nav — menu IA (client#126 menu decision)", () => {
     ]);
   });
 
-  it("shows Discover as plugins with Installed as a view, and no AI tools or modules", () => {
-    for (const path of [ROUTES.discoverPlugins, ROUTES.installedPlugins]) {
-      expect(tabLabels(path, MEMBER)).toEqual(["Plugins", "Installed"]);
+  it("shows Discover as plugins with Installed and Tools as views, and no modules", () => {
+    for (const path of [ROUTES.discoverPlugins, ROUTES.installedPlugins, ROUTES.installedAiTools]) {
+      expect(tabLabels(path, MEMBER)).toEqual(["Plugins", "Installed", "Tools"]);
     }
     const discoverLinks = section("Build")
       .items.flatMap((i) => [i, ...(i.tabs ?? [])])
       .map((l) => l.to);
     expect(discoverLinks).not.toContain(ROUTES.discoverAiTools);
-    expect(discoverLinks).not.toContain(ROUTES.installedAiTools);
+    // The tool runner has a stable place in the menu (#186).
+    expect(discoverLinks).toContain(ROUTES.installedAiTools);
     expect(discoverLinks.some((to) => to.includes("bundles") || to.includes("modules"))).toBe(false);
-    // The AI tools pages, reached from the plugin pages, sit under Discover.
     expect(entryIsActive(section("Build").items[2], ROUTES.installedAiTools)).toBe(true);
   });
 
@@ -361,7 +361,7 @@ describe("nav — breadcrumb trail (#131)", () => {
   it("names the section, entry and tab of a page", () => {
     expect(trail("/rag/taxonomy-review")).toEqual(["Build", "Knowledge", "Taxonomy Review"]);
     expect(trail(ROUTES.installedPlugins)).toEqual(["Build", "Discover", "Installed"]);
-    expect(trail(ROUTES.installedAiTools)).toEqual(["Build", "Discover", null]);
+    expect(trail(ROUTES.installedAiTools)).toEqual(["Build", "Discover", "Tools"]);
     expect(trail("/rag/pipelines")).toEqual(["Build", "Assistants", null]);
     expect(trail(ROUTES.chatHistory)).toEqual(["Use", "Chat", "History"]);
     expect(trail(`${ROUTES.sources}/r1`)).toEqual(["Platform", "MindHub & sources", null]);

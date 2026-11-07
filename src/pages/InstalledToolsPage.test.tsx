@@ -5,9 +5,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../lib/api";
 import { InstalledToolsPage, TryItPanel, type LiveTool } from "./InstalledToolsPage";
 
-function renderPage() {
+function renderPage(path = "/") {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path]}>
       <InstalledToolsPage />
     </MemoryRouter>,
   );
@@ -245,5 +245,26 @@ describe("InstalledToolsPage", () => {
     renderPage();
 
     await screen.findByText("No plugin is currently exposing a tool.");
+  });
+
+  it("filters to one plugin from ?plugin= and opens its first tool (#186)", async () => {
+    apiFetch.mockResolvedValue({
+      tools: [tool(), { ...tool({ plugin: "news" }), function: { ...tool().function, name: "get_news" } }],
+    });
+    renderPage("/?plugin=news");
+    await screen.findByRole("heading", { level: 3, name: "get_news" });
+
+    expect(screen.queryByRole("heading", { level: 3, name: "get_weather" })).toBeNull();
+    expect(screen.getByText(/Showing the tools of news\./)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Show all tools" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Run get_news" })).toBeTruthy();
+    expect((screen.getByText("Try it", { selector: "summary" }).parentElement as HTMLDetailsElement).open).toBe(true);
+  });
+
+  it("says when the filtered plugin exposes no tool", async () => {
+    apiFetch.mockResolvedValue({ tools: [tool()] });
+    renderPage("/?plugin=news");
+
+    await screen.findByText("news exposes no tool right now.");
   });
 });

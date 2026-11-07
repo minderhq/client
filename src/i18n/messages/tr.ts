@@ -133,6 +133,7 @@ export const tr: Messages = {
       discover: { label: "Keşfet", description: "Eklenecek eklentileri bulun, kurulu olanları görün", keywords: "pazar yeri katalog mağaza kur eklenti marketplace catalog store install plugins" },
       discoverPlugins: { label: "Eklentiler", title: "Eklentileri keşfet", description: "Kaynağa göre filtrelenebilen eklenti kataloğu", keywords: "eklenti bağlayıcı kaynak birinci taraf özel git plugin mindhub araç" },
       installedPlugins: { label: "Kurulu", title: "Kurulu eklentiler", description: "Bu kurulumda çalışanlar ve sizin kurduklarınız", keywords: "eklenti çalışan sürüm sağlık ayarlar etkinleştir devre dışı bırak kaldır plugin uninstall araç" },
+      installedAiTools: { label: "Araçlar", title: "Kurulu araçlar", description: "Çalışan eklentilerin araçlarını deneyin", keywords: "ai araç dene çalıştır test eklenti plugin eylem" },
       myTeam: { label: "Takımım", title: "Takımım", description: "Takımınızın üyeleri ya da bir takıma katılma isteği", keywords: "takım takımım üyeler katıl grup paylaşım my team teams join" },
       account: { label: "Hesabım", description: "Profiliniz, ses ayarlarınız ve istekleriniz", keywords: "hesap ben account me" },
       profile: { label: "Profil", description: "Profiliniz, parolanız ve tercihleriniz", keywords: "hesap profil parola ayarlar tercihler dil account profile password settings" },
@@ -470,6 +471,11 @@ export const tr: Messages = {
     justInstalled: "Kuruldu. Bu eklenti bir araç getiriyorsa, canlı olduğunu doğrulamak için {check}.",
     checkInstalled: "Kurulu araçlara bakın",
     someExpose: "Bunların bazıları bir asistanın sohbette kullanabileceği araçlar getirir; hangilerinin şu an canlı olduğunu görmek için {check}.",
+    try: "Dene",
+    tryLabel: "{plugin} araçlarını dene",
+    filteredBy: "{plugin} eklentisinin araçları gösteriliyor.",
+    showAll: "Tüm araçları göster",
+    pluginNoTools: "{plugin} şu an hiçbir araç sunmuyor.",
   },
 
   installedPlugins: {
