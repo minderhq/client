@@ -65,6 +65,7 @@ export const I18N_MIGRATED_FILES = [
   "src/components/PeopleHeader.tsx",
   "src/components/PlanBadge.tsx",
   "src/components/RequestButton.tsx",
+  "src/components/TaintNotice.tsx",
   "src/components/RequirePermission.tsx",
   "src/components/Sidebar.tsx",
   "src/components/ThemeToggle.tsx",

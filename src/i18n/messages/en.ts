@@ -978,4 +978,21 @@ export const en = {
     seats: "{used}/{max} {plan} seats in use",
     seatsHard: "New members can't join until a seat frees up.",
   },
+  toolApproval: {
+    taintedAfter: "Suggested after reading {sources}.",
+    source: {
+      kb: "a passage from the “{name}” knowledge base",
+      tool: "the output of the “{name}” tool",
+      history: "tool output from earlier in this conversation",
+      unverifiedHistory: "earlier messages that couldn't be verified",
+      visitor: "a website visitor's message",
+      externalCaller: "a request from an outside caller",
+      other: "content from an outside source",
+    },
+    localOnlyRisk:
+      "A plugin that can send data outside, after data that must stay local was read.",
+    outsideContent: "Contains outside content",
+    outsideContentHelp:
+      "Content Minder doesn't control (a document, a tool's output, a message) was read in this conversation. Check each suggested action before approving it.",
+  },
 } satisfies MessageTree;
