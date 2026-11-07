@@ -98,10 +98,14 @@ export function ConversationsPage() {
   // Server-side deletions shift later pages back; the hook counts the hidden
   // rows in its offset, so subtract them or "Load more" skips a row each.
   const deletedSinceReload = useRef(0);
+  // Deletions since the last page arrived, to correct that page's stale total.
+  const deletedSinceFetch = useRef(0);
+  const statusRef = useRef<HTMLDivElement>(null);
 
   const fetchConversationsPage = useCallback(
     async (offset: number) => {
       if (offset === 0) deletedSinceReload.current = 0;
+      deletedSinceFetch.current = 0;
       const res = await apiFetch<ConversationsResponse>(
         `/v1/conversations/mine?limit=20&offset=${Math.max(0, offset - deletedSinceReload.current)}`,
         { token: tokenRef.current },
@@ -114,11 +118,11 @@ export function ConversationsPage() {
   );
   const {
     items: conversations,
+    total,
     status,
     isError: isStatusError,
     reload,
     loadMore,
-    hasMore,
   } = usePaginatedList(fetchConversationsPage);
 
   useEffect(() => {
@@ -146,8 +150,11 @@ export function ConversationsPage() {
         token: tokenRef.current,
       });
       deletedSinceReload.current += 1;
+      deletedSinceFetch.current += 1;
       setDeleted((prev) => new Set(prev).add(c.conversation_id));
       setDeleteStatus({ text: t("conversations.deleted"), error: false });
+      // The focused Delete button is gone; keep keyboard focus on the result.
+      statusRef.current?.focus();
     } catch (e) {
       setDeleteStatus({
         text: t("conversations.deleteFailed", { error: friendlyErrorMessage(e) }),
@@ -159,6 +166,8 @@ export function ConversationsPage() {
   }
 
   const shown = conversations.filter((c) => !deleted.has(c.conversation_id));
+  // What's still on the server vs. what's still on screen, both net of deletes.
+  const hasMore = total - deletedSinceFetch.current > conversations.length - deletedSinceReload.current;
 
   return (
     <>
@@ -174,10 +183,12 @@ export function ConversationsPage() {
       {token && (
         <>
           <StatusLine isError={isStatusError}>{status}</StatusLine>
-          {deleteStatus && (
-            <StatusLine isError={deleteStatus.error}>{deleteStatus.text}</StatusLine>
-          )}
-          {shown.length === 0 && !status && (
+          <div ref={statusRef} tabIndex={-1} className="outline-none">
+            {deleteStatus && (
+              <StatusLine isError={deleteStatus.error}>{deleteStatus.text}</StatusLine>
+            )}
+          </div>
+          {shown.length === 0 && !status && !hasMore && (
             <EmptyState>
               {rich("conversations.empty", { chat: <strong>{t("nav.items.chat.label")}</strong> })}
             </EmptyState>
