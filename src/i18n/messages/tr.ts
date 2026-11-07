@@ -976,4 +976,21 @@ export const tr: Messages = {
     seats: "{used}/{max} {plan} koltuğu kullanılıyor",
     seatsHard: "Bir koltuk boşalana kadar yeni üye katılamaz.",
   },
+  toolApproval: {
+    taintedAfter: "Bu istek, {sources} sonra geldi.",
+    source: {
+      kb: "“{name}” bilgi tabanından gelen bir metinden",
+      tool: "“{name}” aracının çıktısından",
+      history: "bu sohbette daha önce gelen araç çıktılarından",
+      unverifiedHistory: "doğrulanamayan önceki mesajlardan",
+      visitor: "bir site ziyaretçisinin mesajından",
+      externalCaller: "dışarıdan gelen bir çağrıdan",
+      unknown: "dış bir kaynaktan gelen içerikten",
+    },
+    localOnlyRisk:
+      "Yerel tutulması gereken veri okunduktan sonra dışarı veri gönderebilen bir eklenti.",
+    outsideContent: "Dış içerik içeriyor",
+    outsideContentHelp:
+      "Bu sohbette Minder'ın denetlemediği bir içerik (bir belge, bir aracın çıktısı, bir mesaj) okundu. Önerilen her işlemi onaylamadan önce kontrol edin.",
+  },
 };
