@@ -262,6 +262,17 @@ export const tr: Messages = {
       saved: "Varsayılan dil kaydedildi.",
       saveFailed: "Varsayılan dil kaydedilemedi, önceki değere geri dönüldü. {error}",
     },
+    chatRetention: {
+      heading: "Sohbet geçmişi",
+      label: "Üyelerin sohbet geçmişi saklama süresi",
+      days30: "30 gün",
+      days90: "90 gün",
+      days365: "1 yıl",
+      forever: "Süresiz",
+      hint: "Daha eski sohbet geçmişi otomatik olarak silinir. Üyeler kendi sohbetlerini her zaman silebilir.",
+      saved: "Sohbet geçmişi ayarı kaydedildi.",
+      saveFailed: "Sohbet geçmişi ayarı kaydedilemedi, önceki değere geri dönüldü. {error}",
+    },
   },
 
   orgAi: {
@@ -406,6 +417,15 @@ export const tr: Messages = {
   conversations: {
     subtitle: "Başlattığınız sohbetler, hangi asistanla olursa olsun; en son etkin olan en üstte.",
     empty: "Henüz sohbet yok. {chat} ekranında bir tane başlatın (ardından sorduğunuz sorular buraya dönebileceğiniz bir konu oluşturur).",
+    lastActive: "Son etkinlik {time}",
+    noQuestion: "(kayıtlı soru yok)",
+    continue: "Devam et",
+    delete: "Sil",
+    deleteLabel: "Sohbeti sil: {snippet}",
+    deleteTitle: "Bu sohbet silinsin mi?",
+    deleteMessage: "Soruları ve cevapları, varsa paylaşım linkiyle birlikte kalıcı olarak silinir. Bu işlem geri alınamaz.",
+    deleted: "Sohbet silindi.",
+    deleteFailed: "Sohbet silinemedi. {error}",
   },
 
   knowledgeBases: {

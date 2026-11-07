@@ -264,6 +264,17 @@ export const en = {
       saved: "Default language saved.",
       saveFailed: "Couldn't save the default language, so the previous one is back. {error}",
     },
+    chatRetention: {
+      heading: "Chat history",
+      label: "Keep members' chat history for",
+      days30: "30 days",
+      days90: "90 days",
+      days365: "1 year",
+      forever: "Forever",
+      hint: "Older chat history is deleted automatically. Members can always delete their own conversations.",
+      saved: "Chat history setting saved.",
+      saveFailed: "Couldn't save the chat history setting, so the previous one is back. {error}",
+    },
   },
 
   orgAi: {
@@ -408,6 +419,15 @@ export const en = {
   conversations: {
     subtitle: "Conversations you've started, with any assistant, most recently active first.",
     empty: "No conversations yet — start one in {chat} (its follow-up questions form a thread you can return to here).",
+    lastActive: "Last active {time}",
+    noQuestion: "(no question recorded)",
+    continue: "Continue",
+    delete: "Delete",
+    deleteLabel: "Delete conversation: {snippet}",
+    deleteTitle: "Delete this conversation?",
+    deleteMessage: "Its questions and answers are deleted for good, along with any share link to it. This can't be undone.",
+    deleted: "Conversation deleted.",
+    deleteFailed: "Couldn't delete the conversation. {error}",
   },
 
   knowledgeBases: {
