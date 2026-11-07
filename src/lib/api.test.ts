@@ -424,6 +424,42 @@ describe("silent refresh on 401 (#53)", () => {
     expect(onSessionExpired).toHaveBeenCalledTimes(1);
   });
 
+  describe("401 claims_changed (a team change shrank this session's claims)", () => {
+    function mockClaimsChanged(refresh: () => Promise<Response>) {
+      vi.mocked(fetch).mockImplementation(async (url, init) => {
+        if (url === REFRESH_URL) return refresh();
+        return authOf(init) === "Bearer new-token"
+          ? json(200, { ok: true })
+          : json(401, { detail: "claims_changed" });
+      });
+    }
+
+    it("refreshes exactly once and retries, keeping the session", async () => {
+      mockClaimsChanged(async () => json(200, { access_token: "new-token" }));
+
+      await expect(apiFetch("/v1/things", { token: "old-token" })).resolves.toEqual({
+        ok: true,
+      });
+
+      expect(refreshCalls()).toHaveLength(1);
+      expect(vi.mocked(fetch).mock.calls).toHaveLength(3);
+      expect(sessionStorage.getItem(TOKEN_KEY)).toBe("new-token");
+      expect(onSessionExpired).not.toHaveBeenCalled();
+    });
+
+    it("signs out as before when the refresh is refused", async () => {
+      mockClaimsChanged(async () => json(401, { detail: "Session is no longer valid" }));
+
+      await expect(apiFetch("/v1/things", { token: "old-token" })).rejects.toMatchObject({
+        status: 401,
+      });
+
+      expect(refreshCalls()).toHaveLength(1);
+      expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
+      expect(onSessionExpired).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("replays only once: a 401 on the replay logs out without another refresh", async () => {
     vi.mocked(fetch).mockImplementation(async (url) =>
       url === REFRESH_URL
