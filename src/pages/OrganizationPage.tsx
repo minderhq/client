@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { EmptyState } from "../components/EmptyState";
 import { Icon } from "../components/Icon";
 import { InfoCallout } from "../components/InfoCallout";
+import { OrgChatRetention } from "../components/OrgChatRetention";
 import { OrgDefaultLanguage } from "../components/OrgDefaultLanguage";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
@@ -212,6 +213,7 @@ export function OrganizationPage() {
           {/* #133: the language members see until they pick their own. Gated
             inside on useCan("org.settings.manage"), the same PATCH gate. */}
           <OrgDefaultLanguage org={active} token={token} onSaved={() => void orgsRes.reload()} />
+          <OrgChatRetention org={active} token={token} onSaved={() => void orgsRes.reload()} />
 
           {/* Members, invites and roles live in Organization › People. */}
           <section className={cardClass}>

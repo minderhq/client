@@ -17,7 +17,11 @@ export interface MyOrg {
    * (#133); null when it has none. Absent from an older gateway (and from
    * the published OpenAPI snapshot, which hasn't been re-synced yet). */
   default_locale?: Locale | null;
+  /** Days the members' chat history is kept (30/90/365); null = forever. */
+  chat_history_retention_days?: ChatHistoryRetentionDays | null;
 }
+
+export type ChatHistoryRetentionDays = 30 | 90 | 365;
 
 export interface MyOrgsResponse {
   organizations: MyOrg[];
@@ -96,6 +100,8 @@ export interface UpdateOrgBody {
   description?: string;
   /** The org's default UI language; null clears it. Owner/admin only. */
   default_locale?: Locale | null;
+  /** Chat-history retention in days; null keeps history forever. */
+  chat_history_retention_days?: ChatHistoryRetentionDays | null;
 }
 
 /** An updated org's own details (PATCH /v1/organizations/{id} response). */

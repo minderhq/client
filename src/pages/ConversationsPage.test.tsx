@@ -16,6 +16,11 @@ vi.mock("../lib/auth", () => ({
   useAuth: () => mockAuth,
 }));
 
+const confirmMock = vi.fn();
+vi.mock("../components/ConfirmDialog", () => ({
+  useConfirm: () => ({ confirm: confirmMock, dialog: null }),
+}));
+
 const navigate = vi.fn();
 vi.mock("react-router-dom", () => ({
   useNavigate: () => navigate,
@@ -211,6 +216,125 @@ describe("ConversationsPage", () => {
         { token: "tok-org2" },
       );
       expect(screen.queryByText("second one")).toBeNull();
+    });
+  });
+
+  describe("delete a conversation (#172)", () => {
+    function page(items: ReturnType<typeof conversation>[], total = items.length, offset = 0) {
+      return { items, total, limit: 20, offset };
+    }
+
+    it("deletes after confirmation and hides the row", async () => {
+      mockAuth = { token: "tok", sessionKey: SESSION };
+      confirmMock.mockResolvedValue(true);
+      apiFetch.mockResolvedValueOnce(page([conversation()])).mockResolvedValueOnce({});
+      render(<ConversationsPage />);
+
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Delete conversation: what is the refund policy?" }),
+      );
+
+      await screen.findByText("Conversation deleted.");
+      expect(apiFetch).toHaveBeenLastCalledWith("/v1/conversations/conv-1", {
+        method: "DELETE",
+        token: "tok",
+      });
+      expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ danger: true }));
+      expect(screen.queryByText("what is the refund policy?")).toBeNull();
+    });
+
+    it("moves focus to the result, and drops Load more when the deleted row was the last one left", async () => {
+      mockAuth = { token: "tok", sessionKey: SESSION };
+      confirmMock.mockResolvedValue(true);
+      // 21 on the server, 20 loaded; deleting one leaves 20 on the server and 19 shown.
+      const first = Array.from({ length: 20 }, (_, n) =>
+        conversation({ conversation_id: `c${n}`, snippet: `question ${n}` }),
+      );
+      apiFetch.mockResolvedValueOnce(page(first, 21)).mockResolvedValueOnce({});
+      render(<ConversationsPage />);
+
+      expect(await screen.findByText("Load more")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Delete conversation: question 3" }));
+
+      const done = await screen.findByText("Conversation deleted.");
+      expect(done.closest("[tabindex='-1']")).toBe(document.activeElement);
+      expect(screen.getByText("Load more")).toBeTruthy();
+    });
+
+    it("shows no empty state while more pages remain after deleting every loaded row", async () => {
+      mockAuth = { token: "tok", sessionKey: SESSION };
+      confirmMock.mockResolvedValue(true);
+      apiFetch.mockResolvedValueOnce(page([conversation()], 5)).mockResolvedValueOnce({});
+      render(<ConversationsPage />);
+
+      fireEvent.click(await screen.findByRole("button", { name: /Delete conversation/ }));
+      await screen.findByText("Conversation deleted.");
+
+      expect(screen.queryByText(/No conversations yet/)).toBeNull();
+      expect(screen.getByText("Load more")).toBeTruthy();
+    });
+
+    it("hides Load more once the server has nothing left beyond what is shown", async () => {
+      mockAuth = { token: "tok", sessionKey: SESSION };
+      confirmMock.mockResolvedValue(true);
+      apiFetch
+        .mockResolvedValueOnce(page([conversation(), conversation({ conversation_id: "c2", snippet: "two" })], 2))
+        .mockResolvedValueOnce({});
+      render(<ConversationsPage />);
+
+      fireEvent.click(await screen.findByRole("button", { name: "Delete conversation: two" }));
+      await screen.findByText("Conversation deleted.");
+
+      expect(screen.queryByText("Load more")).toBeNull();
+    });
+
+    it("does nothing when the confirmation is cancelled", async () => {
+      mockAuth = { token: "tok", sessionKey: SESSION };
+      confirmMock.mockResolvedValue(false);
+      apiFetch.mockResolvedValueOnce(page([conversation()]));
+      render(<ConversationsPage />);
+
+      fireEvent.click(await screen.findByRole("button", { name: /Delete conversation/ }));
+
+      await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+      expect(apiFetch).toHaveBeenCalledTimes(1);
+      expect(screen.getByText("what is the refund policy?")).toBeTruthy();
+    });
+
+    it("keeps the row and reports the error when the delete fails", async () => {
+      mockAuth = { token: "tok", sessionKey: SESSION };
+      confirmMock.mockResolvedValue(true);
+      apiFetch
+        .mockResolvedValueOnce(page([conversation()]))
+        .mockRejectedValueOnce(new Error("Conversation not found"));
+      render(<ConversationsPage />);
+
+      fireEvent.click(await screen.findByRole("button", { name: /Delete conversation/ }));
+
+      await screen.findByText("Couldn't delete the conversation. Conversation not found");
+      expect(screen.getByText("what is the refund policy?")).toBeTruthy();
+    });
+
+    it("loads the next page from the shifted offset after a delete", async () => {
+      mockAuth = { token: "tok", sessionKey: SESSION };
+      confirmMock.mockResolvedValue(true);
+      const first = Array.from({ length: 20 }, (_, n) =>
+        conversation({ conversation_id: `c${n}`, snippet: `question ${n}` }),
+      );
+      apiFetch
+        .mockResolvedValueOnce(page(first, 25))
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce(page([conversation({ conversation_id: "c20", snippet: "question 20" })], 25, 19));
+      render(<ConversationsPage />);
+
+      fireEvent.click(await screen.findByRole("button", { name: "Delete conversation: question 0" }));
+      await screen.findByText("Conversation deleted.");
+      fireEvent.click(screen.getByText("Load more"));
+
+      await screen.findByText("question 20");
+      expect(apiFetch).toHaveBeenLastCalledWith("/v1/conversations/mine?limit=20&offset=19", {
+        token: "tok",
+      });
     });
   });
 });
