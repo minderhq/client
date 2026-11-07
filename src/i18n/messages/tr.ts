@@ -406,7 +406,7 @@ export const tr: Messages = {
     grounded: "Yanıtlar {name} üzerinden gelir ve kaynaklarını gösterir.",
     yourAssistant: "asistanınız",
     logInToAsk: "{login}, sonra soru sorun. Asistanlarınıza göz atmak herkese açık.",
-    logInLink: "Giriş yapın",
+    logInLink: "giriş yapın",
     gone: "Bu asistan artık sunucuda yok. Asistanlarınız yeniden yükleniyor…",
     modelHint:
       "Bu soruyu asistanın ayarlı modeli yerine belirli bir modelle yanıtlayın; örneğin zor bir soru için daha güçlü bir model. Arama değişmez.",
@@ -1041,7 +1041,7 @@ export const tr: Messages = {
     withdrawnHint:
       "Hâlâ erişime ihtiyacınız varsa sizi davet eden kişiden yeni bir davet isteyin.",
     statusFallback: "Bu davetin durumu: {status}.",
-    goTo: "{name} sayfasına git",
+    goTo: "Git: {name}",
     yourTeam: "takımınız",
     acceptedSignIn: "Daveti kabul ettiyseniz devam etmek için {link}.",
     signInLink: "giriş yapın",
@@ -1069,8 +1069,8 @@ export const tr: Messages = {
     subtitle: "Hesabınızın kurulumunu tamamlamak için e-posta adresinizi doğrulayın.",
     callout:
       "{address} adresine bir doğrulama bağlantısı gönderdik. Adresi doğrulamak için bağlantıyı açın{validity}. Bulamazsanız spam klasörünüze bakın ya da yeni bir bağlantı isteyin.",
-    signedUpAddress: "kaydolurken kullandığınız adres",
-    validFor: { one: "; bağlantı {count} saat geçerlidir", other: "; bağlantı {count} saat geçerlidir" },
+    signedUpAddress: "kaydolurken kullandığınız",
+    validFor: { one: "; bağlantı {count} saat boyunca geçerlidir", other: "; bağlantı {count} saat boyunca geçerlidir" },
     notConfirmed:
       "Adresiniz henüz doğrulanmadı. Gönderdiğimiz en yeni e-postadaki bağlantıyı açın, sonra yeniden deneyin.",
     checking: "Kontrol ediliyor…",
@@ -1090,7 +1090,7 @@ export const tr: Messages = {
       "Bu bağlantı kullanılamıyor. Daha önce kullanılmış ya da yerine daha yeni bir bağlantı gönderilmiş olabilir. Adresinizi zaten doğruladıysanız giriş yapmanız yeterli.",
     logInLink: "Giriş yapın",
     signedOutResend:
-      "Devam etmek için {login}; adresiniz henüz doğrulanmadıysa yeni bir bağlantı için de aynısını yapın.",
+      "Devam etmek için {login}; adresiniz henüz doğrulanmadıysa giriş yaptıktan sonra yeni bir bağlantı isteyebilirsiniz.",
     unavailable: "Bu sunucu e-posta adreslerini doğrulamıyor, yani doğrulanacak bir şey yok.",
     loginToContinue: "Devam etmek için {login}.",
     needsLink:
@@ -1127,7 +1127,7 @@ export const tr: Messages = {
   billing: {
     title: "Plan ve fatura",
     subtitle:
-      "Kurumunuzun planı ve aboneliği. Yükseltme ve ödeme yönetimi sağlayıcının güvenli barındırılan sayfalarında yapılır.",
+      "Kurumunuzun planı ve aboneliği. Yükseltme ve ödeme yönetimi sağlayıcının güvenli ödeme sayfalarında yapılır.",
     freePlan: "ücretsiz plan",
     statusActive: "etkin",
     validUntil: "Yenilenme / geçerlilik tarihi",
