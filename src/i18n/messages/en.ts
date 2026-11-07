@@ -1022,4 +1022,124 @@ export const en = {
     outsideContentHelp:
       "Content Minder doesn't control (a document, a tool's output, a message) was read in this conversation. Check each suggested action before approving it.",
   },
+
+  inviteRedeem: {
+    title: "Invitation",
+    loading: "Loading invite…",
+    invalidLink:
+      "This invite link isn't valid. Check that you copied the whole link, or ask the person who invited you for a new one.",
+    differentAddress: "a different address",
+    wrongAccount:
+      "This invite was sent to {email}, but you're signed in as {me}. Sign out and sign in with the invited account, or ask for an invite to your own address.",
+    wrongAccountNoMe:
+      "This invite was sent to {email}. Sign out and sign in with the invited account, or ask for an invite to your own address.",
+    withdrawnOrUsed:
+      "This invite is no longer available: it was withdrawn, or it has already been used. Ask the person who invited you for a new link.",
+    alreadyUsed: "This invite has already been used.",
+    expired: "This invite has expired. Ask the person who invited you for a new link.",
+    expiredTitle: "This invite has expired.",
+    expiredHint: "Ask the person who invited you to send a new one.",
+    withdrawnTitle: "This invite was withdrawn.",
+    withdrawnHint:
+      "If you still need access, ask the person who invited you for a new invite.",
+    statusFallback: "This invite is {status}.",
+    goTo: "Go to {name}",
+    yourTeam: "your team",
+    acceptedSignIn: "If you accepted it, {link} to continue.",
+    signInLink: "sign in",
+    invitedOrgNamed:
+      "{inviter} invited you to join {target} (organization) as a {role}{email}.",
+    invitedTeamNamed: "{inviter} invited you to join {target} (team) as a {role}{email}.",
+    invitedOrg: "You've been invited to join {target} (organization) as a {role}{email}.",
+    invitedTeam: "You've been invited to join {target} (team) as a {role}{email}.",
+    join: "Join {name}",
+    joining: "Joining…",
+    signIn: "Sign in",
+    signInToAccept: "Sign in to accept",
+    haveAccount: "Already have an account?",
+    existingOnly:
+      "This invite can only be accepted by someone who already has an account: sign in to accept it. If you don't have an account yet, ask an administrator of {name} for an invite that creates one.",
+    theOrganization: "the organization",
+    ssoOnlyWithSso:
+      "New accounts can't be created here on this instance. Choose “Sign in to accept” above, then sign in with SSO; your account is set up the first time you do.",
+    ssoOnlyNoSso:
+      "New accounts can't be created here on this instance. Ask an administrator to create an account for you, then sign in to accept.",
+  },
+
+  checkEmail: {
+    title: "Check your email",
+    subtitle: "Confirm your email address to finish setting up your account.",
+    callout:
+      "We sent a confirmation link to {address}. Open it to confirm the address{validity}. If you can't find it, check your spam folder or ask for a new link.",
+    signedUpAddress: "the address you signed up with",
+    validFor: { one: "; it works for {count} hour", other: "; it works for {count} hours" },
+    notConfirmed:
+      "Your address isn't confirmed yet. Open the link in the newest email we sent, then try again.",
+    checking: "Checking…",
+    confirmed: "I've confirmed my email",
+  },
+
+  verifyEmail: {
+    title: "Confirm your email",
+    verifiedNotice: "Your email address is confirmed. Log in to continue.",
+    verified: "Your email address is confirmed.",
+    logInToContinue: "Log in to continue",
+    continueToMinder: "Continue to Minder",
+    finishing: "Finishing sign-in…",
+    expired: "This link has expired. Links work for a limited time; ask for a new one.",
+    invalid:
+      "This link can't be used. It may have been used already, or a newer link replaced it. If you've already confirmed your address, just log in.",
+    logInLink: "Log in",
+    signedOutResend:
+      "{login} to continue, or to get a new link if your address isn't confirmed yet.",
+    unavailable: "This server doesn't verify email addresses, so there is nothing to confirm.",
+    loginToContinue: "{login} to continue.",
+    needsLink:
+      "This page needs the link from your verification email. Open the newest one we sent you.",
+    loginForNewLink: "{login} to ask for a new link.",
+    askNewLink: "Ask for a new link",
+    pressButton: "Press the button to confirm the email address this link was sent to.",
+    confirm: "Confirm my email",
+    confirming: "Confirming…",
+    rateLimited: "Too many attempts. Wait {wait}, then try again.",
+    seconds: { one: "{count} second", other: "{count} seconds" },
+    minutes: { one: "{count} minute", other: "{count} minutes" },
+    hours: { one: "{count} hour", other: "{count} hours" },
+  },
+
+  waitingRoom: {
+    workspaceExists: "You already have a workspace. Reload the page to continue.",
+    chooseOrgTitle: "Choose an organization",
+    chooseOrgSubtitle:
+      "You belong to an organization, but none is active right now. Pick one to continue.",
+    loadingOrgs: "Loading your organizations…",
+    noWorkspaceTitle: "No workspace yet",
+    pendingSubtitle: "Your request to join an organization is waiting for approval.",
+    noWorkspaceSubtitle: "Your account isn't part of a workspace yet.",
+    createCallout:
+      "A workspace is where your knowledge bases, models and plugins live. Create your own, or ask an administrator to invite you to an existing one.",
+    create: "Create my workspace",
+    creating: "Creating…",
+    needInvite:
+      "An administrator has to invite you to a workspace before you can use Minder. Ask one to send you an invite link, then open it here.",
+    signInNotFinished: "Your email address is confirmed, but signing you in didn't finish.",
+  },
+
+  billing: {
+    title: "Plan & billing",
+    subtitle:
+      "Your organization's plan and subscription. Upgrades and payment management happen on the provider's secure hosted pages.",
+    freePlan: "free plan",
+    statusActive: "active",
+    validUntil: "Renews / valid until",
+    provider: "Provider",
+    startingCheckout: "Starting checkout for {tier}…",
+    openingPortal: "Opening the customer portal…",
+    logInToView: "Log in to view your organization's plan.",
+    loading: "Loading your plan…",
+    ownersOnly:
+      "Only your organization's owners and billing managers can change the plan or payment details.",
+    manage: "Manage subscription",
+    upgradeTo: "Upgrade to {tier}",
+  },
 } satisfies MessageTree;

@@ -66,6 +66,19 @@ describe("WorkspaceGate / waiting room (#116)", () => {
     vi.unstubAllGlobals();
   });
 
+  it("renders the waiting room in Turkish", async () => {
+    mockApi({
+      "GET /v1/profile/me": () => json({ user_id: 7, workspace_state: "none" }),
+    });
+    setLocale("tr");
+    try {
+      renderGate();
+      expect(await screen.findByText("Henüz çalışma alanı yok")).toBeTruthy();
+    } finally {
+      setLocale("en");
+    }
+  });
+
   it("renders the app when the workspace is ready and the token has a tenant", async () => {
     sessionStorage.setItem(TOKEN_KEY, tenanted);
     mockApi({

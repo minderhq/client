@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../lib/api";
+import { setLocale } from "../i18n";
 import type { RegistrationModeState } from "../lib/registration";
 import { InviteRedeemPage } from "./InviteRedeemPage";
 
@@ -98,6 +99,18 @@ describe("InviteRedeemPage", () => {
     registrationState = { mode: "invite", loading: false };
     useRegistrationMode.mockClear();
     oidcLoginUrl = "";
+  });
+
+  it("renders in Turkish", async () => {
+    setLocale("tr");
+    try {
+      apiFetch.mockResolvedValue(inviteInfo());
+      renderAt("/invite/tok123");
+      expect(await screen.findByText("Zaten hesabınız var mı?")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Kabul etmek için giriş yap" })).toBeTruthy();
+    } finally {
+      setLocale("en");
+    }
   });
 
   describe("signed out, no account", () => {

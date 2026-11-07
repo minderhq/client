@@ -1020,4 +1020,125 @@ export const tr: Messages = {
     outsideContentHelp:
       "Bu sohbette Minder'ın denetlemediği bir içerik (bir belge, bir aracın çıktısı, bir mesaj) okundu. Önerilen her işlemi onaylamadan önce kontrol edin.",
   },
+
+  inviteRedeem: {
+    title: "Davet",
+    loading: "Davet yükleniyor…",
+    invalidLink:
+      "Bu davet bağlantısı geçerli değil. Bağlantının tamamını kopyaladığınızdan emin olun ya da sizi davet eden kişiden yeni bir bağlantı isteyin.",
+    differentAddress: "başka bir adres",
+    wrongAccount:
+      "Bu davet {email} adresine gönderilmiş, ancak siz {me} olarak oturum açtınız. Oturumu kapatıp davet edilen hesapla giriş yapın ya da kendi adresinize yeni bir davet isteyin.",
+    wrongAccountNoMe:
+      "Bu davet {email} adresine gönderilmiş. Oturumu kapatıp davet edilen hesapla giriş yapın ya da kendi adresinize yeni bir davet isteyin.",
+    withdrawnOrUsed:
+      "Bu davet artık kullanılamıyor: geri çekilmiş ya da zaten kullanılmış. Sizi davet eden kişiden yeni bir bağlantı isteyin.",
+    alreadyUsed: "Bu davet zaten kullanılmış.",
+    expired: "Bu davetin süresi dolmuş. Sizi davet eden kişiden yeni bir bağlantı isteyin.",
+    expiredTitle: "Bu davetin süresi dolmuş.",
+    expiredHint: "Sizi davet eden kişiden yeni bir davet göndermesini isteyin.",
+    withdrawnTitle: "Bu davet geri çekilmiş.",
+    withdrawnHint:
+      "Hâlâ erişime ihtiyacınız varsa sizi davet eden kişiden yeni bir davet isteyin.",
+    statusFallback: "Bu davetin durumu: {status}.",
+    goTo: "{name} sayfasına git",
+    yourTeam: "takımınız",
+    acceptedSignIn: "Daveti kabul ettiyseniz devam etmek için {link}.",
+    signInLink: "giriş yapın",
+    invitedOrgNamed:
+      "{inviter} sizi {target} kurumuna {role} olarak katılmaya davet etti{email}.",
+    invitedTeamNamed: "{inviter} sizi {target} takımına {role} olarak katılmaya davet etti{email}.",
+    invitedOrg: "{target} kurumuna {role} olarak katılmaya davet edildiniz{email}.",
+    invitedTeam: "{target} takımına {role} olarak katılmaya davet edildiniz{email}.",
+    join: "Katıl: {name}",
+    joining: "Katılınıyor…",
+    signIn: "Giriş yap",
+    signInToAccept: "Kabul etmek için giriş yap",
+    haveAccount: "Zaten hesabınız var mı?",
+    existingOnly:
+      "Bu davet yalnızca hesabı olan biri tarafından kabul edilebilir: kabul etmek için giriş yapın. Henüz hesabınız yoksa {name} yöneticilerinden hesap oluşturan bir davet isteyin.",
+    theOrganization: "kurum",
+    ssoOnlyWithSso:
+      "Bu kurulumda yeni hesap oluşturulamıyor. Yukarıdaki “Kabul etmek için giriş yap” düğmesini seçip SSO ile giriş yapın; hesabınız ilk girişinizde hazırlanır.",
+    ssoOnlyNoSso:
+      "Bu kurulumda yeni hesap oluşturulamıyor. Bir yöneticiden sizin için hesap oluşturmasını isteyin, ardından kabul etmek için giriş yapın.",
+  },
+
+  checkEmail: {
+    title: "E-postanızı kontrol edin",
+    subtitle: "Hesabınızın kurulumunu tamamlamak için e-posta adresinizi doğrulayın.",
+    callout:
+      "{address} adresine bir doğrulama bağlantısı gönderdik. Adresi doğrulamak için bağlantıyı açın{validity}. Bulamazsanız spam klasörünüze bakın ya da yeni bir bağlantı isteyin.",
+    signedUpAddress: "kaydolurken kullandığınız adres",
+    validFor: { one: "; bağlantı {count} saat geçerlidir", other: "; bağlantı {count} saat geçerlidir" },
+    notConfirmed:
+      "Adresiniz henüz doğrulanmadı. Gönderdiğimiz en yeni e-postadaki bağlantıyı açın, sonra yeniden deneyin.",
+    checking: "Kontrol ediliyor…",
+    confirmed: "E-postamı doğruladım",
+  },
+
+  verifyEmail: {
+    title: "E-postanızı doğrulayın",
+    verifiedNotice: "E-posta adresiniz doğrulandı. Devam etmek için giriş yapın.",
+    verified: "E-posta adresiniz doğrulandı.",
+    logInToContinue: "Devam etmek için giriş yap",
+    continueToMinder: "Minder'e devam et",
+    finishing: "Giriş tamamlanıyor…",
+    expired:
+      "Bu bağlantının süresi dolmuş. Bağlantılar sınırlı bir süre geçerlidir; yeni bir bağlantı isteyin.",
+    invalid:
+      "Bu bağlantı kullanılamıyor. Daha önce kullanılmış ya da yerine daha yeni bir bağlantı gönderilmiş olabilir. Adresinizi zaten doğruladıysanız giriş yapmanız yeterli.",
+    logInLink: "Giriş yapın",
+    signedOutResend:
+      "Devam etmek için {login}; adresiniz henüz doğrulanmadıysa yeni bir bağlantı için de aynısını yapın.",
+    unavailable: "Bu sunucu e-posta adreslerini doğrulamıyor, yani doğrulanacak bir şey yok.",
+    loginToContinue: "Devam etmek için {login}.",
+    needsLink:
+      "Bu sayfa, doğrulama e-postanızdaki bağlantıyla açılmalıdır. Size gönderdiğimiz en yeni e-postayı açın.",
+    loginForNewLink: "Yeni bağlantı istemek için {login}.",
+    askNewLink: "Yeni bağlantı iste",
+    pressButton: "Bu bağlantının gönderildiği e-posta adresini doğrulamak için düğmeye basın.",
+    confirm: "E-postamı doğrula",
+    confirming: "Doğrulanıyor…",
+    rateLimited: "Çok fazla deneme yapıldı. {wait} bekleyin, sonra yeniden deneyin.",
+    seconds: { one: "{count} saniye", other: "{count} saniye" },
+    minutes: { one: "{count} dakika", other: "{count} dakika" },
+    hours: { one: "{count} saat", other: "{count} saat" },
+  },
+
+  waitingRoom: {
+    workspaceExists: "Zaten bir çalışma alanınız var. Devam etmek için sayfayı yenileyin.",
+    chooseOrgTitle: "Bir kurum seçin",
+    chooseOrgSubtitle:
+      "Bir kuruma üyesiniz, ancak şu anda hiçbiri etkin değil. Devam etmek için birini seçin.",
+    loadingOrgs: "Kurumlarınız yükleniyor…",
+    noWorkspaceTitle: "Henüz çalışma alanı yok",
+    pendingSubtitle: "Bir kuruma katılma isteğiniz onay bekliyor.",
+    noWorkspaceSubtitle: "Hesabınız henüz bir çalışma alanına bağlı değil.",
+    createCallout:
+      "Çalışma alanı; bilgi tabanlarınızın, modellerinizin ve eklentilerinizin bulunduğu yerdir. Kendi çalışma alanınızı oluşturun ya da bir yöneticiden sizi mevcut birine davet etmesini isteyin.",
+    create: "Çalışma alanımı oluştur",
+    creating: "Oluşturuluyor…",
+    needInvite:
+      "Minder'i kullanabilmeniz için bir yöneticinin sizi bir çalışma alanına davet etmesi gerekir. Bir yöneticiden size davet bağlantısı göndermesini isteyin, sonra bağlantıyı burada açın.",
+    signInNotFinished: "E-posta adresiniz doğrulandı, ancak oturum açma işlemi tamamlanamadı.",
+  },
+
+  billing: {
+    title: "Plan ve fatura",
+    subtitle:
+      "Kurumunuzun planı ve aboneliği. Yükseltme ve ödeme yönetimi sağlayıcının güvenli barındırılan sayfalarında yapılır.",
+    freePlan: "ücretsiz plan",
+    statusActive: "etkin",
+    validUntil: "Yenilenme / geçerlilik tarihi",
+    provider: "Sağlayıcı",
+    startingCheckout: "{tier} için ödeme başlatılıyor…",
+    openingPortal: "Müşteri portalı açılıyor…",
+    logInToView: "Kurumunuzun planını görmek için giriş yapın.",
+    loading: "Planınız yükleniyor…",
+    ownersOnly:
+      "Planı ya da ödeme bilgilerini yalnızca kurumunuzun sahipleri ve fatura yöneticileri değiştirebilir.",
+    manage: "Aboneliği yönet",
+    upgradeTo: "{tier} planına yükselt",
+  },
 };

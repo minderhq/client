@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { useI18n } from "../i18n";
 import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
 import { ResendVerificationButton } from "../components/ResendVerificationButton";
@@ -22,6 +23,7 @@ import { useTokenRef } from "../lib/useTokenRef";
  * server's cooldown), or say "I've confirmed it" after confirming on another
  * device. */
 export function CheckEmailPage() {
+  const { t, plural, rich } = useI18n();
   const { email, logout } = useAuth();
   const tokenRef = useTokenRef();
   const continueAfterVerification = useContinueAfterVerification();
@@ -49,7 +51,7 @@ export function CheckEmailPage() {
       const profile = await fetchMyProfile(tokenRef.current);
       if (profile.email_verification_required === true) {
         setStatus({
-          text: "Your address isn't confirmed yet. Open the link in the newest email we sent, then try again.",
+          text: t("checkEmail.notConfirmed"),
           isError: true,
         });
         setChecking(false);
@@ -67,15 +69,14 @@ export function CheckEmailPage() {
     <>
       <PageHeader
         icon="mail"
-        title="Check your email"
-        subtitle="Confirm your email address to finish setting up your account."
+        title={t("checkEmail.title")}
+        subtitle={t("checkEmail.subtitle")}
       />
       <InfoCallout icon="mail">
-        We sent a confirmation link to{" "}
-        {email ? <strong>{email}</strong> : "the address you signed up with"}.
-        Open it to confirm the address
-        {hours ? `; it works for ${hours} hour${hours === 1 ? "" : "s"}` : ""}.
-        If you can't find it, check your spam folder or ask for a new link.
+        {rich("checkEmail.callout", {
+          address: email ? <strong>{email}</strong> : t("checkEmail.signedUpAddress"),
+          validity: hours ? plural("checkEmail.validFor", hours) : "",
+        })}
       </InfoCallout>
       <div className="mt-4 flex flex-col gap-4">
         <ResendVerificationButton onAlreadyVerified={proceed} />
@@ -86,10 +87,10 @@ export function CheckEmailPage() {
             disabled={checking}
             className={primaryButtonClass}
           >
-            {checking ? "Checking…" : "I've confirmed my email"}
+            {checking ? t("checkEmail.checking") : t("checkEmail.confirmed")}
           </button>
           <button type="button" onClick={logout} className={secondaryButtonClass}>
-            Sign out
+            {t("common.signOut")}
           </button>
         </div>
         <StatusLine isError={status.isError}>{status.text}</StatusLine>

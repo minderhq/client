@@ -71,10 +71,13 @@ export const I18N_MIGRATED_FILES = [
   "src/components/ThemeToggle.tsx",
   "src/components/UserMenu.tsx",
   "src/pages/AuthCallbackPage.tsx",
+  "src/pages/BillingPage.tsx",
+  "src/pages/CheckEmailPage.tsx",
   "src/pages/ForbiddenPage.tsx",
   "src/pages/ForcePasswordChangePage.tsx",
   "src/pages/ForgotPasswordPage.tsx",
   "src/pages/HomePage.tsx",
+  "src/pages/InviteRedeemPage.tsx",
   "src/pages/LoginPage.tsx",
   "src/pages/NotFoundPage.tsx",
   "src/pages/OrgUsersPage.tsx",
@@ -88,6 +91,8 @@ export const I18N_MIGRATED_FILES = [
   "src/pages/RequestsPage.tsx",
   "src/pages/ResetPasswordPage.tsx",
   "src/pages/SettingsPage.tsx",
+  "src/pages/VerifyEmailPage.tsx",
+  "src/pages/WaitingRoomPage.tsx",
 ];
 const WORDS = "/[A-Za-z]{2,}/";
 const READ_ATTRS =

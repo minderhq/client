@@ -4,6 +4,7 @@ import { Icon } from "../components/Icon";
 import { InfoCallout } from "../components/InfoCallout";
 import { PageHeader } from "../components/PageHeader";
 import { StatusLine } from "../components/StatusLine";
+import { useI18n } from "../i18n";
 import { friendlyErrorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import {
@@ -33,6 +34,7 @@ function statusTone(status: string | null): string {
 }
 
 export function PlanCard({ sub }: { sub: Subscription }) {
+  const { t } = useI18n();
   return (
     <div className="mb-4 rounded-lg border border-gray-200 p-4 dark:border-gray-700">
       <div className="flex flex-wrap items-center gap-2">
@@ -41,23 +43,23 @@ export function PlanCard({ sub }: { sub: Subscription }) {
           {titleCase(sub.tier)}
         </span>
         {sub.baseline ? (
-          <span className={`${badgeClass} ${neutralTone}`}>free plan</span>
+          <span className={`${badgeClass} ${neutralTone}`}>{t("billing.freePlan")}</span>
         ) : (
           <span className={`${badgeClass} ${statusTone(sub.status)}`}>
-            {sub.status ?? "active"}
+            {sub.status ?? t("billing.statusActive")}
           </span>
         )}
       </div>
       <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1 text-sm text-gray-600 dark:text-gray-400 sm:grid-cols-2">
         {sub.valid_until && (
           <div className="flex justify-between gap-2">
-            <dt>Renews / valid until</dt>
+            <dt>{t("billing.validUntil")}</dt>
             <dd className="font-mono text-xs">{sub.valid_until.slice(0, 10)}</dd>
           </div>
         )}
         {sub.provider && (
           <div className="flex justify-between gap-2">
-            <dt>Provider</dt>
+            <dt>{t("billing.provider")}</dt>
             <dd>{sub.provider}</dd>
           </div>
         )}
@@ -67,6 +69,7 @@ export function PlanCard({ sub }: { sub: Subscription }) {
 }
 
 export function BillingPage() {
+  const { t } = useI18n();
   const { token, sessionKey } = useAuth();
 
   // Keyed on the session identity (user + active org): an org switch that
@@ -85,7 +88,7 @@ export function BillingPage() {
     if (busy) return; // already in flight
     setBusy(true);
     setIsError(false);
-    setStatus(`Starting checkout for ${titleCase(tier)}…`);
+    setStatus(t("billing.startingCheckout", { tier: titleCase(tier) }));
     try {
       const { checkout_url } = await startCheckout(tier, token);
       redirectTo(checkout_url);
@@ -100,7 +103,7 @@ export function BillingPage() {
     if (busy) return;
     setBusy(true);
     setIsError(false);
-    setStatus("Opening the customer portal…");
+    setStatus(t("billing.openingPortal"));
     try {
       const { portal_url } = await openBillingPortal(token);
       redirectTo(portal_url);
@@ -119,15 +122,15 @@ export function BillingPage() {
     <>
       <PageHeader
         icon="billing"
-        title="Plan & billing"
-        subtitle="Your organization's plan and subscription. Upgrades and payment management happen on the provider's secure hosted pages."
+        title={t("billing.title")}
+        subtitle={t("billing.subtitle")}
       />
 
       {!token && (
-        <InfoCallout icon="lock">Log in to view your organization's plan.</InfoCallout>
+        <InfoCallout icon="lock">{t("billing.logInToView")}</InfoCallout>
       )}
 
-      {subRes.loading && !sub && <StatusLine>Loading your plan…</StatusLine>}
+      {subRes.loading && !sub && <StatusLine>{t("billing.loading")}</StatusLine>}
       {subRes.error && <StatusLine isError>{subRes.error}</StatusLine>}
 
       {sub && (
@@ -136,8 +139,7 @@ export function BillingPage() {
 
           {!canManage && (
             <InfoCallout icon="lock">
-              Only your organization's owners and billing managers can change the
-              plan or payment details.
+              {t("billing.ownersOnly")}
             </InfoCallout>
           )}
 
@@ -150,7 +152,7 @@ export function BillingPage() {
                   className={secondaryButtonClass}
                 >
                   <Icon name="billing" className="mr-1.5 h-4 w-4" />
-                  Manage subscription
+                  {t("billing.manage")}
                 </button>
               )}
               {UPGRADE_TIERS.filter((t) => t !== sub.tier).map((tier) => (
@@ -160,7 +162,7 @@ export function BillingPage() {
                   disabled={busy}
                   className={primaryButtonClass}
                 >
-                  Upgrade to {titleCase(tier)}
+                  {t("billing.upgradeTo", { tier: titleCase(tier) })}
                 </button>
               ))}
             </div>
