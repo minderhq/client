@@ -9,6 +9,7 @@ import { StatusLine } from "../components/StatusLine";
 import { useConfirm } from "../components/ConfirmDialog";
 import { useI18n } from "../i18n";
 import { apiBaseUrl, apiFetch, friendlyErrorMessage } from "../lib/api";
+import { absoluteUrl } from "../lib/links";
 import type { Paginated } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { copyText, useAutoClearTimeout } from "../lib/browser";
@@ -91,14 +92,15 @@ function ragConfigForMethod(method: string): Record<string, unknown> {
 
 /** The hosted visitor page for a slug. Built from the configured gateway base
  * URL (VITE_API_BASE_URL), never a hardcoded host, so a gateway served under
- * /api yields /api/public/chat/... (the embed snippet below likewise). */
+ * /api yields /api/public/chat/... (the embed snippet below likewise). A
+ * same-origin base ("/api") is made absolute: both are used on other sites. */
 function publicUrlForSlug(slug: string): string {
-  return `${apiBaseUrl}/public/chat/${slug}`;
+  return `${absoluteUrl(apiBaseUrl)}/public/chat/${slug}`;
 }
 
 /** The one-line embed loader snippet for a slug. */
 function embedCodeForSlug(slug: string): string {
-  return `<script src="${apiBaseUrl}/public/chat/widget.js" data-bot="${slug}" async></script>`;
+  return `<script src="${absoluteUrl(apiBaseUrl)}/public/chat/widget.js" data-bot="${slug}" async></script>`;
 }
 
 /** POST .../preview-token response (untyped in the spec); `url` is relative
@@ -372,7 +374,7 @@ function EndpointRow({
         `/v1/public-chat/endpoints/${endpoint.id}/preview-token`,
         { method: "POST", token },
       );
-      const absolute = `${apiBaseUrl}${url}`;
+      const absolute = `${absoluteUrl(apiBaseUrl)}${url}`;
       if (tab) {
         tab.opener = null;
         tab.location.href = absolute;

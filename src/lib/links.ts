@@ -8,3 +8,10 @@
  * as plain text instead of a dead link. A real deployment sets
  * `VITE_OPENWEBUI_URL` to OpenWebUI's routed URL (e.g. https://chat.<domain>). */
 export const openWebUiUrl: string = import.meta.env.VITE_OPENWEBUI_URL || "";
+
+/** `base` as an absolute URL without a trailing slash. A same-origin base such
+ * as the default "/api" resolves against `origin`; an absolute one is kept.
+ * For links used outside this page: the public chat link and embed snippet. */
+export function absoluteUrl(base: string, origin: string = window.location.origin): string {
+  return new URL(base, origin).href.replace(/\/$/, "");
+}
